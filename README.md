@@ -422,7 +422,21 @@ pie title Distribución de la batería de tests
 
 ---
 
-## 9. Historial de cambios de este documento
+## 9. Documentación
+
+La documentación detallada se organiza por ámbito en [`docs/`](docs/README.md):
+
+- [`docs/common/`](docs/common/README.md) para producto, arquitectura transversal,
+  contratos, estándares y skills compartidas.
+- [`docs/backend/`](docs/backend/README.md) para el monolito modular, sus módulos,
+  API, datos, seguridad, calidad y operación.
+- [`docs/frontend/`](docs/frontend/README.md) para arquitectura web, diseño de
+  producto, look and feel, design system, accesibilidad y calidad.
+
+---
+
+
+## 10. Historial de cambios de este documento
 
 | Fecha | Cambio |
 |---|---|
@@ -432,7 +446,7 @@ pie title Distribución de la batería de tests
 
 ---
 
-## 10. Cómo mantener este documento vivo
+## 11. Cómo mantener este documento vivo
 
 Al avanzar el proyecto, actualizar principalmente:
 
