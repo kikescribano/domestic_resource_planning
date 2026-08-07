@@ -1,0 +1,509 @@
+openapi: 3.0.3
+info:
+  title: DRP · Domestic Resource Planning API
+  description: >
+    API REST del core mínimo de DRP (Domestic Resource Planning).
+    Especificación ilustrativa de la Fase 0 — sujeta a cambios a medida
+    que avance el desarrollo. Ver readme.md del proyecto para el contexto
+    completo (modelo de dominio, event bus, roadmap).
+  version: "0.1.0-fase0"
+servers:
+  - url: https://api.drp.example/api/v1
+    description: Entorno ilustrativo (a definir en el despliegue real)
+
+tags:
+  - name: auth
+    description: Autenticación de usuarios del hogar
+  - name: assets
+    description: Gestión de recursos/assets
+  - name: locations
+    description: Gestión de ubicaciones
+  - name: users
+    description: Gestión de usuarios del hogar
+  - name: loans
+    description: Préstamos (concepto mínimo del core, ver readme.md 4.1.5)
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Iniciar sesión (usuarios del hogar)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        "200":
+          description: Autenticación correcta
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "401":
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Renovar el access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200":
+          description: Nuevo par de tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "401":
+          description: Refresh token inválido o revocado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /assets:
+    get:
+      tags: [assets]
+      summary: Listar assets del hogar
+      parameters:
+        - $ref: "#/components/parameters/LocationIdFilter"
+        - $ref: "#/components/parameters/ParentAssetIdFilter"
+        - name: ownerId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: estado
+          in: query
+          schema: { $ref: "#/components/schemas/AssetEstado" }
+      responses:
+        "200":
+          description: Listado de assets
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Asset" }
+    post:
+      tags: [assets]
+      summary: Dar de alta un asset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssetInput" }
+      responses:
+        "201":
+          description: Asset creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Asset" }
+        "409":
+          description: Conflicto de ubicación u otra regla de negocio
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /assets/{id}:
+    parameters:
+      - $ref: "#/components/parameters/AssetId"
+    get:
+      tags: [assets]
+      summary: Detalle de un asset
+      responses:
+        "200":
+          description: Asset
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Asset" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [assets]
+      summary: Modificar un asset (incluye cambiar ubicación o asset padre)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssetPatch" }
+      responses:
+        "200":
+          description: Asset actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Asset" }
+        "409":
+          description: Conflicto de ubicación o ciclo en la jerarquía
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /assets/{id}/children:
+    parameters:
+      - $ref: "#/components/parameters/AssetId"
+    get:
+      tags: [assets]
+      summary: Hijos directos en la jerarquía de composición
+      responses:
+        "200":
+          description: Listado de assets hijos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Asset" }
+
+  /locations:
+    get:
+      tags: [locations]
+      summary: Listar ubicaciones del hogar
+      parameters:
+        - name: parentLocationId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Listado de ubicaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Location" }
+    post:
+      tags: [locations]
+      summary: Crear una ubicación
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LocationInput" }
+      responses:
+        "201":
+          description: Ubicación creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Location" }
+
+  /locations/{id}/children:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [locations]
+      summary: Hijos directos en la jerarquía
+      responses:
+        "200":
+          description: Listado de ubicaciones hijas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Location" }
+
+  /users:
+    get:
+      tags: [users]
+      summary: Listar miembros del hogar
+      responses:
+        "200":
+          description: Listado de usuarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/User" }
+    post:
+      tags: [users]
+      summary: Dar de alta un miembro del hogar (solo ADMIN_HOGAR)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserInput" }
+      responses:
+        "201":
+          description: Usuario creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /users/{id}/roles:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [users]
+      summary: Modificar el rol estructural de un usuario (solo ADMIN_HOGAR)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { $ref: "#/components/schemas/UserRole" }
+      responses:
+        "200":
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /loans:
+    post:
+      tags: [loans]
+      summary: Iniciar un préstamo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoanInput" }
+      responses:
+        "201":
+          description: Préstamo iniciado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Loan" }
+        "409":
+          description: El asset ya tiene un préstamo activo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /loans/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [loans]
+      summary: Consultar el estado de un préstamo
+      security:
+        - bearerAuth: []
+        - loanToken: []
+      responses:
+        "200":
+          description: >
+            Estado del préstamo. La vista completa (usuarios del hogar) incluye
+            todos los campos de Loan; con token acotado (loanToken) solo se
+            devuelven los campos visibles para ese rol (ver readme.md, 5.4.3).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Loan" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /loans/{id}/return:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [loans]
+      summary: Confirmar la devolución de un préstamo
+      security:
+        - bearerAuth: []
+        - loanToken: []
+      responses:
+        "200":
+          description: Préstamo devuelto
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Loan" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT de usuarios del hogar (claims -- sub, householdId, role)
+    loanToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token acotado de vida corta para prestador/receptor externos (claims -- loanId, role)
+
+  parameters:
+    AssetId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    LocationIdFilter:
+      name: locationId
+      in: query
+      schema: { type: string, format: uuid }
+    ParentAssetIdFilter:
+      name: parentAssetId
+      in: query
+      schema: { type: string, format: uuid }
+
+  responses:
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: No autorizado para esta operación
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        code: { type: string, example: ASSET_LOCATION_CONFLICT }
+        message: { type: string }
+        details: { type: object }
+
+    TokenPair:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer, example: 900 }
+
+    UserRole:
+      type: string
+      enum: [ADMIN_HOGAR, MIEMBRO_HOGAR]
+
+    AssetEstado:
+      type: string
+      enum: [DISPONIBLE, PRESTADO, BAJA]
+
+    Ubicacion:
+      type: object
+      description: Referencia polimórfica a la ubicación de un asset -- exactamente uno de los dos campos.
+      properties:
+        tipo: { type: string, enum: [ASSET, LOCATION] }
+        id: { type: string, format: uuid }
+
+    AssetInput:
+      type: object
+      required: [nombre, ownerId]
+      properties:
+        nombre: { type: string }
+        categoria: { type: string }
+        ownerId: { type: string, format: uuid }
+        ubicacion: { $ref: "#/components/schemas/Ubicacion" }
+
+    AssetPatch:
+      type: object
+      properties:
+        nombre: { type: string }
+        categoria: { type: string }
+        ubicacion: { $ref: "#/components/schemas/Ubicacion" }
+        estado: { $ref: "#/components/schemas/AssetEstado" }
+
+    Asset:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        categoria: { type: string }
+        ownerId: { type: string, format: uuid }
+        ubicacion: { $ref: "#/components/schemas/Ubicacion" }
+        estado: { $ref: "#/components/schemas/AssetEstado" }
+        createdAt: { type: string, format: date-time }
+
+    LocationInput:
+      type: object
+      required: [nombre]
+      properties:
+        nombre: { type: string }
+        parentLocationId: { type: string, format: uuid }
+        capacidad:
+          type: object
+          properties:
+            unidad: { type: string, example: kg }
+            maximo: { type: number }
+        condicionesAmbientales:
+          type: object
+          properties:
+            temperaturaMin: { type: number }
+            temperaturaMax: { type: number }
+            humedadMin: { type: number }
+            humedadMax: { type: number }
+        notas: { type: string }
+
+    Location:
+      allOf:
+        - $ref: "#/components/schemas/LocationInput"
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+
+    UserInput:
+      type: object
+      required: [nombre, email, role]
+      properties:
+        nombre: { type: string }
+        email: { type: string, format: email }
+        role: { $ref: "#/components/schemas/UserRole" }
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        email: { type: string, format: email }
+        role: { $ref: "#/components/schemas/UserRole" }
+
+    LoanParticipant:
+      type: object
+      description: Exactamente uno de los dos campos -- usuario del hogar o persona externa.
+      properties:
+        userId: { type: string, format: uuid }
+        externo:
+          type: string
+          description: Nombre/contacto si no es un usuario del hogar
+
+    LoanInput:
+      type: object
+      required: [assetId, prestador, receptor]
+      properties:
+        assetId: { type: string, format: uuid }
+        prestador: { $ref: "#/components/schemas/LoanParticipant" }
+        receptor: { $ref: "#/components/schemas/LoanParticipant" }
+        fechaDevolucionPrevista: { type: string, format: date-time }
+
+    Loan:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        assetId: { type: string, format: uuid }
+        prestador: { $ref: "#/components/schemas/LoanParticipant" }
+        receptor: { $ref: "#/components/schemas/LoanParticipant" }
+        estado: { type: string, enum: [ACTIVO, DEVUELTO, VENCIDO] }
+        fechaInicio: { type: string, format: date-time }
+        fechaDevolucionPrevista: { type: string, format: date-time }
+        fechaDevolucionReal: { type: string, format: date-time }

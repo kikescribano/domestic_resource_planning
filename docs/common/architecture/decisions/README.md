@@ -20,3 +20,4 @@ Usa [`ADR-template.md`](ADR-template.md) para crear una entrada.
 | ID | Título | Estado | Sustituye |
 |---|---|---|---|
 | [ADR-001](ADR-001-solution-architecture-baseline.md) | Base arquitectónica de DRP | accepted | — |
+| [ADR-002](ADR-002-multi-tenancy-and-backend-framework.md) | Multi-tenancy por hogar y framework de backend | accepted | — |
