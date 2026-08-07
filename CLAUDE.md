@@ -107,6 +107,12 @@ Además hay Row-Level Security en PostgreSQL como segunda capa (ADR-003). Dos
 condiciones que la anulan entera: el usuario de BD de la aplicación no puede tener
 `BYPASSRLS`, y hace falta `FORCE ROW LEVEL SECURITY`.
 
+Ojo con lo que no nace de una petición: el proceso diario que marca los préstamos
+vencidos (README 4.1.5) no tiene token del que sacar el hogar. La salida fácil
+—`BYPASSRLS` para el usuario de la aplicación— desactiva la segunda capa para
+**toda** la aplicación, no solo para el proceso. Debe recorrer los hogares uno a
+uno fijando `app.household_id` en cada transacción, como cualquier petición.
+
 **2. Un asset es todo material del hogar**, no solo lo económicamente relevante, y
 se divide en dos naturalezas que se comportan distinto (README 4.1.1):
 
