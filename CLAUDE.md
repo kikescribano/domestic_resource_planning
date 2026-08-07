@@ -46,6 +46,43 @@ al renumerar secciones):
 python -c "import re,pathlib;bad=[f'{m.as_posix()} -> {l}' for m in pathlib.Path('.').rglob('*.md') if '.git' not in m.parts for l in re.findall(r'\]\(([^)#][^)]*)\)', m.read_text(encoding='utf-8')) if not l.startswith(('http','mailto')) and not (m.parent/l.split('#')[0]).resolve().exists()];print('\n'.join(bad) or 'OK')"
 ```
 
+## Al fusionar un PR: alinear el estado local
+
+En este repositorio **las ramas remotas se borran al fusionar**. Comprobar que un
+PR está `MERGED` no cierra la tarea: las referencias locales no se enteran solas,
+así que quedan apuntando a ramas muertas, las ramas locales quedan huérfanas y un
+worktree puede seguir sentado sobre una rama ya fusionada y borrada. Nada de esto
+da error — se acumula en silencio hasta que estorba.
+
+Después de confirmar el merge y hacer `pull` de la rama base:
+
+```bash
+git fetch --prune
+```
+
+Eso elimina las referencias obsoletas y marca las ramas locales huérfanas como
+`: gone` en `git branch -vv`. **Antes de borrar ninguna, comprueba que no se
+pierde nada:**
+
+```bash
+git log --oneline main..<rama>   # debe dar 0 commits
+```
+
+Solo entonces, y siempre con `-d`, nunca con `-D`:
+
+```bash
+git branch -d <rama>
+```
+
+Si `-d` se niega, es que quedaban commits sin fusionar: para y míralo en lugar de
+forzar.
+
+Si un worktree tiene tomada una de esas ramas, apárcalo antes con `git switch
+--detach <commit de main>`. No puede tomar la rama base directamente, porque git
+no admite la misma rama en dos worktrees a la vez, y mantenerlo sobre la rama
+vieja impide borrarla. **Nunca elimines el worktree desde el que estás
+trabajando.**
+
 ## Decisiones ya cerradas (no las reabras sin motivo)
 
 La Fase 0 terminó sin decisiones de diseño abiertas. Están fijadas:
