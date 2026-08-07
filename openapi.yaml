@@ -16,6 +16,10 @@ tags:
     description: Autenticación de usuarios del hogar
   - name: catalog
     description: Catálogo de artículos del hogar (definición reutilizable, ver readme.md 4.1.1)
+  - name: categories
+    description: Catálogo de categorías del hogar (clasificación funcional, ver readme.md 4.1.1)
+  - name: documents
+    description: Documentación asociada a assets y artículos -- enlaces, no ficheros
   - name: assets
     description: Gestión de recursos/assets
   - name: locations
@@ -83,6 +87,118 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+
+  /categories:
+    get:
+      tags: [categories]
+      summary: Listar las categorías del hogar
+      parameters:
+        - name: incluirRetiradas
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Listado de categorías vigentes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Category" }
+    post:
+      tags: [categories]
+      summary: Crear una categoría
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CategoryInput" }
+      responses:
+        "201":
+          description: Categoría creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Category" }
+        "409":
+          description: Ya existe una categoría vigente con ese nombre (CATEGORY_DUPLICATE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /categories/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [categories]
+      summary: Retirar una categoría
+      description: >
+        Retirada lógica. Deja de ofrecerse al clasificar, pero los assets y
+        artículos que ya la tenían la conservan, así que la fila permanece.
+      responses:
+        "204":
+          description: Categoría retirada
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /documents:
+    get:
+      tags: [documents]
+      summary: Listar documentos del hogar
+      parameters:
+        - name: assetId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: catalogItemId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: tipo
+          in: query
+          schema: { $ref: "#/components/schemas/DocumentoTipo" }
+      responses:
+        "200":
+          description: Listado de documentos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Document" }
+    post:
+      tags: [documents]
+      summary: Adjuntar un documento a un asset o a un artículo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DocumentInput" }
+      responses:
+        "201":
+          description: Documento adjuntado. Publica DocumentAttached.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Document" }
+        "409":
+          description: >
+            No se indicó exactamente un destino -- asset o artículo, nunca
+            ambos ni ninguno (DOCUMENT_TARGET_INVALID)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /documents/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [documents]
+      summary: Eliminar un documento
+      description: Borrado real -- no lo referencia ninguna otra entidad.
+      responses:
+        "204":
+          description: Documento eliminado
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /catalog-items:
     get:
@@ -191,9 +307,18 @@ paths:
         - name: catalogItemId
           in: query
           schema: { type: string, format: uuid }
+        - name: categoriaId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: sinPropietario
+          in: query
+          description: Devuelve los assets huérfanos que dejó una baja de usuario
+          schema: { type: boolean, default: false }
       responses:
         "200":
-          description: Listado de assets
+          description: >
+            Listado de assets. Excluye los BAJA salvo que se pidan con
+            estado=BAJA.
           content:
             application/json:
               schema:
@@ -433,9 +558,13 @@ paths:
     get:
       tags: [users]
       summary: Listar miembros del hogar
+      parameters:
+        - name: incluirBajas
+          in: query
+          schema: { type: boolean, default: false }
       responses:
         "200":
-          description: Listado de usuarios
+          description: Listado de usuarios activos
           content:
             application/json:
               schema:
@@ -456,6 +585,34 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/User" }
         "403": { $ref: "#/components/responses/Forbidden" }
+
+  /users/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [users]
+      summary: Dar de baja a un usuario del hogar (solo ADMIN_HOGAR)
+      description: >
+        Baja lógica -- marca deactivatedAt, revoca los refresh tokens del
+        usuario e impide que vuelva a autenticarse. Sus assets quedan SIN
+        PROPIETARIO, no se reasignan: se localizan después con
+        GET /assets?sinPropietario=true. Sus préstamos se conservan. Publica
+        UserDeactivated.
+      responses:
+        "204":
+          description: Usuario dado de baja
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            Es el único ADMIN_HOGAR activo del hogar
+            (USER_LAST_ADMIN)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
 
   /users/{id}/roles:
     parameters:
@@ -499,7 +656,10 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Loan" }
         "409":
-          description: El asset ya tiene un préstamo activo
+          description: >
+            El asset ya tiene un préstamo abierto -- ACTIVO o VENCIDO
+            (LOAN_ASSET_ALREADY_LENT), o no es DURADERO
+            (LOAN_ASSET_NOT_DURABLE)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -625,22 +785,81 @@ components:
         existencia: todas las existencias de un mismo artículo se llevan en ella.
       enum: [UNIDAD, GRAMO, KILOGRAMO, MILILITRO, LITRO, METRO, PAQUETE]
 
+    CategoryInput:
+      type: object
+      description: >
+        Clasificación funcional del hogar. Cada hogar arranca con un juego
+        sembrado y lo edita a su gusto.
+      required: [nombre]
+      properties:
+        nombre:
+          type: string
+          description: Único entre las categorías vigentes del hogar, comparado normalizado
+        notas: { type: string }
+
+    Category:
+      allOf:
+        - $ref: "#/components/schemas/CategoryInput"
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            createdAt: { type: string, format: date-time }
+            retiredAt:
+              type: string
+              format: date-time
+              nullable: true
+              description: Informado si la categoría está retirada
+
+    DocumentoTipo:
+      type: string
+      enum: [FACTURA, GARANTIA, MANUAL, OTRO]
+
+    DocumentInput:
+      type: object
+      description: >
+        Documento asociado. El core guarda el enlace, no el fichero. Cuelga de
+        exactamente uno de assetId o catalogItemId -- factura y garantía son de
+        la unidad física, el manual es del modelo.
+      required: [tipo, enlace]
+      properties:
+        assetId: { type: string, format: uuid }
+        catalogItemId: { type: string, format: uuid }
+        tipo: { $ref: "#/components/schemas/DocumentoTipo" }
+        enlace: { type: string, format: uri }
+        descripcion: { type: string }
+        fecha:
+          type: string
+          format: date
+          description: Fecha del documento -- la de la factura, la de fin de garantía...
+
+    Document:
+      allOf:
+        - $ref: "#/components/schemas/DocumentInput"
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            createdAt: { type: string, format: date-time }
+
     CatalogItemInput:
       type: object
       description: >
         Definición reutilizable de un artículo del hogar. No es un asset -- no
         tiene ubicación ni cantidad.
-      required: [nombre, categoria, unidad]
+      required: [nombre, categoriaId, unidad]
       properties:
         nombre:
           type: string
           description: Único en el hogar, comparado normalizado (sin mayúsculas ni acentos)
-        categoria: { type: string }
+        categoriaId:
+          type: string
+          format: uuid
+          description: Categoría vigente del catálogo del hogar
         unidad: { $ref: "#/components/schemas/UnidadMedida" }
         marca: { type: string }
         codigoBarras:
           type: string
           description: Opcional; único en el hogar si se informa
+        notas: { type: string }
 
     CatalogItem:
       allOf:
@@ -648,6 +867,9 @@ components:
         - type: object
           properties:
             id: { type: string, format: uuid }
+            categoria:
+              type: string
+              description: Nombre de la categoría, resuelto para lectura
             createdAt: { type: string, format: date-time }
             retiredAt:
               type: string
@@ -665,20 +887,25 @@ components:
     AssetInput:
       type: object
       description: >
-        Alta de un asset DURADERO. No admite cantidad. nombre y categoria son
+        Alta de un asset DURADERO. No admite cantidad. nombre y categoriaId son
         obligatorios salvo que se informe catalogItemId, en cuyo caso se heredan
         del artículo.
-      required: [tipo, ownerId]
+      required: [tipo]
       properties:
         nombre: { type: string }
         tipo: { $ref: "#/components/schemas/AssetTipo" }
-        categoria: { type: string }
+        categoriaId: { type: string, format: uuid }
         catalogItemId:
           type: string
           format: uuid
           description: Opcional en un DURADERO -- comparte definición entre unidades idénticas
-        ownerId: { type: string, format: uuid }
+        ownerId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Opcional -- un asset puede quedar sin propietario tras una baja de usuario
         ubicacion: { $ref: "#/components/schemas/Ubicacion" }
+        notas: { type: string }
 
     AssetIntakeInput:
       type: object
@@ -715,18 +942,21 @@ components:
       description: >
         Modificación parcial. El tipo es inmutable y no se acepta aquí.
         cantidad solo es válida sobre un asset CONSUMIBLE, y es absoluta.
-        nombre y categoria solo son válidos en un asset sin artículo -- si lo
+        nombre y categoriaId solo son válidos en un asset sin artículo -- si lo
         tiene, se cambian en el artículo. estado no se acepta: lo gobiernan
-        DELETE /assets/{id}, POST /loans y POST /loans/{id}/return.
+        DELETE /assets/{id}, POST /loans y POST /loans/{id}/return. ownerId es
+        la vía para reasignar un asset huérfano.
       properties:
         nombre: { type: string }
-        categoria: { type: string }
+        categoriaId: { type: string, format: uuid }
         catalogItemId:
           type: string
           format: uuid
           description: Solo para asignar artículo a un DURADERO que aún no lo tiene
+        ownerId: { type: string, format: uuid }
         ubicacion: { $ref: "#/components/schemas/Ubicacion" }
         cantidad: { type: number, minimum: 0 }
+        notas: { type: string }
 
     Asset:
       type: object
@@ -736,15 +966,24 @@ components:
           type: string
           description: Propio del asset, o resuelto desde su artículo cuando lo tiene.
         tipo: { $ref: "#/components/schemas/AssetTipo" }
+        categoriaId:
+          type: string
+          format: uuid
+          description: Propia del asset, o resuelta desde su artículo cuando lo tiene.
         categoria:
           type: string
-          description: Propia del asset, o resuelta desde su artículo cuando lo tiene.
+          description: Nombre de la categoría, resuelto para lectura.
         catalogItemId:
           type: string
           format: uuid
           nullable: true
           description: Siempre presente en CONSUMIBLE; opcional en DURADERO.
-        ownerId: { type: string, format: uuid }
+        ownerId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Nulo si su propietario causó baja y aún no se ha reasignado.
+        notas: { type: string, nullable: true }
         ubicacion: { $ref: "#/components/schemas/Ubicacion" }
         estado: { $ref: "#/components/schemas/AssetEstado" }
         cantidad:
@@ -758,24 +997,42 @@ components:
           description: Resuelta desde el artículo; solo presente si el asset lo tiene.
         createdAt: { type: string, format: date-time }
 
+    LocationTipo:
+      type: string
+      description: >
+        Naturaleza del contenedor, no de lo que se guarda dentro.
+      enum: [VIVIENDA, PLANTA, HABITACION, MUEBLE, ESTANTE, OTRO]
+
     LocationInput:
       type: object
-      required: [nombre]
+      required: [nombre, tipo]
       properties:
-        nombre: { type: string }
+        nombre:
+          type: string
+          description: Único entre las ubicaciones con el mismo padre
+        tipo: { $ref: "#/components/schemas/LocationTipo" }
         parentLocationId: { type: string, format: uuid }
         capacidad:
           type: object
+          description: >
+            Opcional. Superarla advierte, no bloquea -- el asset no lleva peso
+            ni volumen, así que solo el recuento de unidades es fiable.
+          required: [tipo, maximo, unidad]
           properties:
-            unidad: { type: string, example: kg }
+            tipo: { type: string, enum: [PESO, VOLUMEN, UNIDADES] }
             maximo: { type: number }
+            unidad: { type: string, example: kg }
         condicionesAmbientales:
           type: object
+          description: Todas opcionales -- solo se informan si son relevantes.
           properties:
-            temperaturaMin: { type: number }
-            temperaturaMax: { type: number }
-            humedadMin: { type: number }
-            humedadMax: { type: number }
+            temperaturaMin: { type: number, description: En grados Celsius }
+            temperaturaMax: { type: number, description: En grados Celsius }
+            humedadMin: { type: number, description: En porcentaje }
+            humedadMax: { type: number, description: En porcentaje }
+            exposicionLuz:
+              type: string
+              enum: [DIRECTA, INDIRECTA, OSCURIDAD]
         notas: { type: string }
 
     Location:
@@ -784,13 +1041,17 @@ components:
         - type: object
           properties:
             id: { type: string, format: uuid }
+            createdAt: { type: string, format: date-time }
 
     UserInput:
       type: object
       required: [nombre, email, role]
       properties:
         nombre: { type: string }
-        email: { type: string, format: email }
+        email:
+          type: string
+          format: email
+          description: Único entre los usuarios activos del hogar, comparado en minúsculas
         role: { $ref: "#/components/schemas/UserRole" }
 
     User:
@@ -800,15 +1061,33 @@ components:
         nombre: { type: string }
         email: { type: string, format: email }
         role: { $ref: "#/components/schemas/UserRole" }
+        debeCambiarPassword:
+          type: boolean
+          description: Lo activa el alta directa y lo apaga el primer cambio de contraseña
+        deactivatedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Informado si el usuario ha causado baja en el hogar
+
+    LoanExterno:
+      type: object
+      description: >
+        Persona ajena al hogar. Hace falta un canal porque es por donde se
+        manda el enlace con el token acotado -- al menos uno de email o
+        telefono.
+      required: [nombre]
+      properties:
+        nombre: { type: string }
+        email: { type: string, format: email }
+        telefono: { type: string }
 
     LoanParticipant:
       type: object
       description: Exactamente uno de los dos campos -- usuario del hogar o persona externa.
       properties:
         userId: { type: string, format: uuid }
-        externo:
-          type: string
-          description: Nombre/contacto si no es un usuario del hogar
+        externo: { $ref: "#/components/schemas/LoanExterno" }
 
     LoanInput:
       type: object
@@ -817,7 +1096,11 @@ components:
         assetId: { type: string, format: uuid }
         prestador: { $ref: "#/components/schemas/LoanParticipant" }
         receptor: { $ref: "#/components/schemas/LoanParticipant" }
-        fechaDevolucionPrevista: { type: string, format: date-time }
+        fechaDevolucionPrevista:
+          type: string
+          format: date-time
+          description: Opcional -- sin ella el préstamo nunca vence
+        notas: { type: string }
 
     Loan:
       type: object
@@ -826,7 +1109,13 @@ components:
         assetId: { type: string, format: uuid }
         prestador: { $ref: "#/components/schemas/LoanParticipant" }
         receptor: { $ref: "#/components/schemas/LoanParticipant" }
-        estado: { type: string, enum: [ACTIVO, DEVUELTO, VENCIDO] }
+        estado:
+          type: string
+          description: >
+            VENCIDO lo marca un proceso diario, no una acción del usuario. Un
+            préstamo VENCIDO sigue ocupando el asset -- vencer no es devolver.
+          enum: [ACTIVO, DEVUELTO, VENCIDO]
         fechaInicio: { type: string, format: date-time }
-        fechaDevolucionPrevista: { type: string, format: date-time }
-        fechaDevolucionReal: { type: string, format: date-time }
+        fechaDevolucionPrevista: { type: string, format: date-time, nullable: true }
+        fechaDevolucionReal: { type: string, format: date-time, nullable: true }
+        notas: { type: string, nullable: true }
