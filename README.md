@@ -672,6 +672,12 @@ pie title Distribución de la batería de tests
 | **Fase 2 — Primer módulo funcional** | Candidato a definir (CMMS o Warehouse) | ⚪ Pendiente |
 | **Fase 3 — Módulos adicionales** | Según backlog de la sección 4.2 | ⚪ Pendiente |
 
+> **Tarea de arranque de la Fase 1:** repartir a `docs/` las secciones de este
+> documento que corresponden por ámbito a `common/` (5.4.3, 5.6, 5.7 y la
+> definición del core en 4.1.x), dejando aquí un resumen y el enlace. Se aplazó
+> deliberadamente durante la Fase 0; el motivo y el destino de cada sección están
+> en [`docs/README.md`](docs/README.md).
+
 ### 8.1 Detalle de la Fase 0 (definición)
 
 - [x] Arquitectura general y stack tecnológico
@@ -709,6 +715,13 @@ El contrato completo de la API vive en [`openapi.yaml`](openapi.yaml) (OpenAPI
 3.0); su proceso de validación y las convenciones asociadas se documentan en
 [`docs/common/contracts/`](docs/common/contracts/README.md).
 
+> **Este documento sigue siendo la fuente vigente de la definición del core.**
+> Parte de su contenido (5.4.3, 5.6, 5.7) corresponde por ámbito a `docs/common/`,
+> y se repartirá al iniciar la Fase 1, cuando exista documentación propia de
+> backend y frontend que compita con él. El motivo del aplazamiento y el destino
+> previsto de cada sección están en
+> [`docs/README.md`](docs/README.md#estado-actual-la-definición-de-fase-0-vive-en-el-readme-principal).
+
 ---
 
 ## 10. Historial de cambios de este documento
@@ -720,6 +733,7 @@ El contrato completo de la API vive en [`openapi.yaml`](openapi.yaml) (OpenAPI
 | 2026-08-06 | Validación de las decisiones de diseño abiertas (4.1.7): roles prestador/receptor abiertos a miembros del hogar o a externos, alcance mínimo de la gestión de préstamos en el core, y unificación del campo ubicación |
 | 2026-08-06 | Reajuste de prioridades de módulos futuros (4.2): Gestión de eventos temporales pasa de Media a Baja; Warehouse pasa de Media a Alta |
 | 2026-08-07 | Cierre de los puntos pendientes de la Fase 0 (8.1): modelo de datos definitivo multi-tenant (5.6), catálogo de casos de uso del core (5.7), esquema de autenticación definitivo con Spring Security + JWT y gestión de tokens externos (5.4.1), y contratos JSON de la API (ejemplos en 5.4.3 + especificación OpenAPI en `openapi.yaml`) |
+| 2026-08-07 | Decisión documentada de aplazar a la Fase 1 el reparto de contenido del README a `docs/`, con el destino previsto de cada sección (ver `docs/README.md`) |
 | 2026-08-07 | Cierre de las decisiones abiertas de la Fase 0 (4.1.7): préstamo limitado a assets duraderos (la cesión de un consumible es un ajuste de cantidad), Row-Level Security activado como segunda capa de aislamiento (5.6, ADR-003), alta directa de usuarios en el MVP con invitación por email como evolución, y Flyway como librería de migraciones (ADR-004). La Fase 0 queda completada |
 | 2026-08-07 | Reformulación del concepto de asset (4.1.1): todo material del hogar es un asset, con distinción `DURADERO`/`CONSUMIBLE` y contador de cantidad en el core. Impacto en el diagrama de dominio (4.1.3), reglas de préstamo (4.1.5), decisiones validadas (4.1.7), evento `AssetQuantityChanged` (5.2.3), API (5.4.2, 5.4.3), modelo de datos (5.6), casos de uso con `AjustarCantidadAsset` (5.7), ejemplos de test (7) y `openapi.yaml` |
 

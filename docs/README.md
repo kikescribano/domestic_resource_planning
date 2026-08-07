@@ -49,6 +49,46 @@ Cuando un tema cruza componentes, `common/` conserva la decisión o el contrato 
 cada componente documenta únicamente su implementación, enlazando de vuelta a la
 fuente común.
 
+## Estado actual: la definición de Fase 0 vive en el README principal
+
+| Campo | Valor |
+|---|---|
+| Estado | Decidido |
+| Fecha | 2026-08-07 |
+| Revisar en | Inicio de la Fase 1 |
+
+Aplicando la regla anterior al pie de la letra, buena parte del
+[`README principal`](../README.md) debería estar aquí: el modelo de datos (5.6),
+el catálogo de casos de uso (5.7) y los contratos de la API (5.4.3) son
+conocimiento transversal y les correspondería `common/architecture/` y
+`common/contracts/`. Hoy no lo están, y es deliberado.
+
+**Por qué se aplaza.** Durante la Fase 0 el README ha funcionado como documento
+único de definición: se lee de principio a fin, cada sección da contexto a la
+siguiente y las decisiones se han tomado leyéndolo entero. Partirlo ahora, justo
+antes de escribir la primera línea de código, añadiría indirección sin resolver
+ningún problema real — nadie está buscando el modelo de datos y fallando al
+encontrarlo.
+
+**Cuándo se hace.** Al iniciar la **Fase 1**, cuando aparezca documentación
+propia de backend y frontend que necesite un sitio y empiece a competir con el
+README por ser la fuente de verdad. Ese es el momento en que el coste de no
+repartir supera al de repartir: dos documentos describiendo lo mismo es
+exactamente el problema que esta estructura existe para evitar.
+
+**Qué se moverá entonces,** dejando en el README un resumen y el enlace:
+
+| Sección del README | Destino previsto |
+|---|---|
+| 5.6 Modelo de datos | `common/architecture/` |
+| 5.7 Casos de uso del core | `common/architecture/` o `common/product/use-cases/` |
+| 5.4.3 Contratos JSON | `common/contracts/` |
+| 4.1.x Definición del core | `common/product/` (visión, glosario, capacidades) |
+
+Mientras tanto, **el README principal es la fuente vigente** para todo lo
+anterior, y los índices de este directorio enlazan a él en lugar de duplicar su
+contenido.
+
 ## Convenciones
 
 - Un `README.md` actúa como índice de cada directorio.
