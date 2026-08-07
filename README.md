@@ -60,11 +60,35 @@ Ahora bien, no todo el material se comporta igual, y esa diferencia condiciona e
 | Naturaleza | Qué es | Cómo se cuenta | Ejemplos |
 |---|---|---|---|
 | **`DURADERO`** | Tiene identidad propia y se usa de forma repetida sin agotarse | Una fila por unidad física | Caldera, taladro, sofá, coche, cuadro |
-| **`CONSUMIBLE`** | Se agota o se repone con el uso; las unidades son intercambiables entre sí | Una fila por existencia, con `cantidad` y `unidad` | Harina, detergente, pilas, bombillas |
+| **`CONSUMIBLE`** | Se agota o se repone con el uso; las unidades son intercambiables entre sí | Una fila por existencia —un artículo en una ubicación—, con `cantidad` | Harina, detergente, pilas, bombillas |
 
 Dar de alta trescientos gramos de harina como trescientas filas no tendría sentido; tampoco lo tendría gestionar dos taladros idénticos como "cantidad: 2", porque cada uno tiene su propia ubicación, su propio préstamo y su propio mantenimiento. De ahí la distinción.
 
-> **Alcance deliberado:** el core mantiene un contador simple (`cantidad` + `unidad`) y nada más. El seguimiento de existencias real — consumos, mínimos, reposición, caducidades, lotes — pertenece al módulo **Warehouse** (ver 4.2), que se engancha vía event bus. El core no debe convertirse en un gestor de inventario (ver la decisión en 4.1.7).
+> **Alcance deliberado:** el core mantiene un contador simple (`cantidad`) y nada más. El seguimiento de existencias real — consumos, mínimos, reposición, caducidades, lotes — pertenece al módulo **Warehouse** (ver 4.2), que se engancha vía event bus. El core no debe convertirse en un gestor de inventario (ver la decisión en 4.1.7).
+
+**Artículo y existencia: el alta de un consumible no se repite.**
+
+Traer a casa un paquete de azúcar de 1 kg no da de alta nada nuevo: el hogar ya sabe qué es el azúcar y en qué unidad lo lleva. Por eso la **definición** de un consumible se separa de sus **existencias**:
+
+| Concepto | Qué es | Qué guarda | Equivalente ERP |
+|---|---|---|---|
+| **`Articulo`** | La ficha reutilizable de *qué* es algo | `nombre`, `categoria`, `unidad`, y opcionalmente marca y código de barras | Material maestro |
+| **Asset `CONSUMIBLE`** | Una existencia concreta de ese artículo en un sitio | `cantidad`, ubicación, propietario, estado | Stock |
+
+Un artículo **no es un asset**: no es material, no ocupa sitio, no tiene cantidad y no se presta. Es solo la ficha que evita reescribir «Azúcar / `ALIMENTACION` / `GRAMO`» en cada compra.
+
+> **Nomenclatura.** Igual que `Prestamo` se persiste en la tabla `loans`, el concepto se llama `Articulo` en el dominio y `catalog_items` en la base de datos (ver 5.6), con `catalogItemId` como campo y `/api/v1/catalog-items` como recurso de la API (ver 5.4.2).
+
+De ahí que dar entrada a un consumible sea siempre la misma operación, `RegistrarEntradaConsumible` (ver 5.7): se indica el artículo —eligiéndolo del catálogo del hogar, o creándolo en el mismo gesto si aún no existe—, la ubicación y la cantidad que entra. Si ya hay una existencia de ese artículo en esa ubicación, **la operación suma sobre ella**; si no la hay, la crea. Nunca aparece una segunda fila «Azúcar» en la despensa.
+
+Reglas que sostienen ese comportamiento:
+
+- **Una existencia por artículo y ubicación.** El azúcar de la despensa y el del trastero son dos existencias del mismo artículo, cada una con su cantidad y su propietario.
+- **La `unidad` la fija el artículo**, no la existencia. Si el azúcar se lleva en gramos, todas sus existencias van en gramos; comprar «un paquete de 1 kg» es una conversión en la entrada, no otra unidad guardada. Convertir entre unidad de compra y unidad de consumo es del módulo Warehouse, no del core.
+- **En un `DURADERO` el artículo es opcional.** Dos taladros idénticos pueden compartir artículo (misma marca, mismo modelo, mismo manual) sin dejar de ser dos assets con su ubicación, su préstamo y su mantenimiento propios. Un sofá único no necesita artículo: se da de alta con su `nombre` y su `categoria` propios.
+- El catálogo es **de cada hogar**, como el resto de tablas del core (ver 5.6). Un catálogo compartido entre hogares, o sembrado desde una base de códigos de barras, sería una evolución posterior.
+
+> **Esto tampoco es gestión de inventario.** El catálogo es dato maestro: qué cosas existen y cómo se llaman. Cuánto queda, cuándo caduca y cuándo hay que reponer sigue siendo de Warehouse.
 
 **Jerarquía y composición.** Un asset puede definirse como un conjunto de otros assets (composición). Por ejemplo, el asset **"Trastero"** puede estar compuesto por los assets **"Estantería de trastero"** y **"Mesa de trabajo del trastero"**.
 
@@ -82,23 +106,38 @@ graph TD
 
 | Atributo | Aplica a | Descripción |
 |---|---|---|
-| Identificador, nombre | Ambos | — |
+| Identificador | Ambos | — |
 | `tipo` | Ambos | `DURADERO` o `CONSUMIBLE`. Se fija en el alta y **no es modificable** después: cambiar la naturaleza de un asset equivale a darlo de baja y crear otro |
-| `categoria` | Ambos | Clasificación funcional, independiente del tipo (`MOBILIARIO`, `ALIMENTACION`, `LIMPIEZA`, `HERRAMIENTA`, `DECORACION`…) |
+| `articuloId` | Obligatorio en `CONSUMIBLE`, opcional en `DURADERO` | Referencia al artículo del catálogo del hogar que define qué es este asset |
+| `nombre` | Ambos | Propio del asset, o heredado de su artículo cuando lo tiene. Un asset sin artículo debe informarlo |
+| `categoria` | Ambos | Clasificación funcional, independiente del tipo (`MOBILIARIO`, `ALIMENTACION`, `LIMPIEZA`, `HERRAMIENTA`, `DECORACION`…). Se hereda del artículo igual que el nombre |
 | Propietario/responsable | Ambos | Referencia a un usuario del hogar |
 | Ubicación | Ambos | Referencia a otro Asset **o** a una Location — nunca ambas a la vez |
 | Estado | Ambos | `DISPONIBLE`, `PRESTADO`, `BAJA` |
-| `cantidad` + `unidad` | Solo `CONSUMIBLE` | Existencia actual y su unidad de medida (`UNIDAD`, `GRAMO`, `KILOGRAMO`, `MILILITRO`, `LITRO`, `METRO`, `PAQUETE`) |
+| `cantidad` | Solo `CONSUMIBLE` | Existencia actual, expresada en la `unidad` de su artículo |
 | Documentación asociada | Opcional, típicamente `DURADERO` | Facturas, garantías, manuales. Deja de ser un atributo asumido: un paquete de arroz no tiene manual |
+
+**Atributos mínimos de un Articulo:**
+
+| Atributo | Descripción |
+|---|---|
+| Identificador | — |
+| `nombre` | Único dentro del hogar (comparado normalizado, sin distinguir mayúsculas ni acentos) |
+| `categoria` | La misma clasificación funcional que en un asset |
+| `unidad` | Unidad de medida en la que se llevan todas sus existencias (`UNIDAD`, `GRAMO`, `KILOGRAMO`, `MILILITRO`, `LITRO`, `METRO`, `PAQUETE`) |
+| Marca, código de barras | Opcionales. Si se informa el código de barras, es único en el hogar y sirve para localizar el artículo al dar entrada |
 
 **Reglas mínimas de negocio:**
 - Un asset no puede ser su propio ancestro en la jerarquía de composición (evita ciclos).
 - Un asset no puede tener como ubicación simultáneamente otro asset y una Location: es una u otra.
 - Un asset no puede eliminarse si tiene assets hijos o un préstamo activo, sin resolver antes esa dependencia.
-- Un `CONSUMIBLE` debe tener `cantidad` (≥ 0) y `unidad`; un `DURADERO` no puede tener ninguna de las dos — su cantidad implícita es siempre 1.
+- Un `CONSUMIBLE` debe tener `articuloId` y `cantidad` (≥ 0); un `DURADERO` no puede tener `cantidad` — la suya implícita es siempre 1.
+- El nombre y la categoría efectivos de un asset son los de su artículo cuando lo tiene; un asset sin artículo debe informarlos él. No se guardan por duplicado.
+- No puede haber dos existencias del mismo artículo en la misma ubicación: dar entrada sobre una existente suma cantidad.
+- Un artículo no puede borrarse mientras tenga existencias; se retira del catálogo cuando ya no queda ninguna.
 - Solo un `DURADERO` puede actuar como ubicación de otros assets: una estantería contiene cosas, un paquete de harina no.
 - Solo un `DURADERO` puede prestarse. Un consumible no se presta, se consume o se entrega; la semántica de devolución no le aplica (ver 4.1.5).
-- Un `CONSUMIBLE` con `cantidad = 0` **sigue existiendo** como asset (agotado, pendiente de reposición). Llegar a cero no da de baja nada: esa es una decisión del hogar, no del sistema.
+- Un `CONSUMIBLE` con `cantidad = 0` **sigue existiendo** como asset (agotado, pendiente de reposición). Llegar a cero no da de baja nada: esa es una decisión del hogar, no del sistema. Su artículo sigue en el catálogo en cualquier caso.
 
 #### 4.1.2 Ubicaciones
 
@@ -127,7 +166,14 @@ classDiagram
         +propietarioId
         +estado
         +cantidad
+    }
+    class Articulo {
+        +id
+        +nombre
+        +categoria
         +unidad
+        +marca
+        +codigoBarras
     }
     class Location {
         +id
@@ -152,6 +198,7 @@ classDiagram
 
     Asset "0..1" --> "0..1" Asset : ubicación
     Asset "0..1" --> "0..1" Location : ubicación
+    Asset "0..*" --> "0..1" Articulo : definido por
     Location "0..1" --> "0..1" Location : ubicación padre
     Usuario "1" --> "0..*" Rol : tiene
     Prestamo "1" --> "1" Asset : sobre
@@ -212,6 +259,7 @@ Las siguientes decisiones, inicialmente abiertas, han quedado validadas:
 - **Composición y ubicación física:** quedan unificadas en un único campo `ubicación` por asset (ver 4.1.1); no se distingue, por ahora, entre "de qué está compuesto" un asset y "dónde está físicamente".
 - **Préstamo de consumibles:** solo se prestan assets `DURADERO`. La cesión de un consumible (dar azúcar a un vecino) se modela como un ajuste de cantidad, no como un préstamo (ver la nota en 4.1.5). Se descartaron las alternativas de llevar cantidad en el préstamo —que obligaría a permitir varios préstamos activos sobre el mismo asset, rompiendo el índice único parcial de 5.6— y de añadir una entidad "cesión" al core, que no aporta nada que el contador de cantidad no cubra ya.
 - **Alcance del concepto de asset y gestión de cantidad:** un asset es todo material del hogar, no solo el económicamente relevante. Se distingue `DURADERO` de `CONSUMIBLE` (ver 4.1.1), y el core se limita a un contador simple (`cantidad` + `unidad`) sobre los consumibles. Todo el seguimiento de existencias — consumos, mínimos, reposición, caducidad, lotes — queda fuera del core y pertenece al módulo **Warehouse** (4.2), que se suscribe a `AssetQuantityChanged`. La alternativa de no guardar cantidad alguna en el core se descartó porque dejaría los consumibles sin representación útil hasta que Warehouse exista.
+- **Alta de consumibles y catálogo de artículos:** la definición de un consumible (`nombre`, `categoria`, `unidad`, marca y código de barras) se separa en una entidad propia, `Articulo`, y el asset `CONSUMIBLE` pasa a ser una **existencia** de ese artículo en una ubicación, con `cantidad` (ver 4.1.1). Dar entrada a un consumible ya existente suma sobre su existencia en vez de crear una fila nueva, así que traer otro paquete de azúcar no obliga a reintroducir nada. El artículo es obligatorio en `CONSUMIBLE` y opcional en `DURADERO`, donde permite compartir modelo y documentación entre unidades idénticas sin forzar a fichar un mueble único. Se descartaron dos alternativas: resolver el alta como *find-or-create* sobre el nombre del asset, porque la clave sería texto libre y la definición se reteclearía en cada ubicación nueva, y dejarlo en un autocompletado del frontend, porque la regla anti-duplicados viviría solo en la UI y la API seguiría admitiendo duplicados. Se acepta a sabiendas de que añade una entidad al core: retrofitarla cuando llegue Warehouse —que colgará mínimos, caducidades y lotes del artículo— obligaría a migrar cada consumible existente partiendo texto libre.
 
 - **Aislamiento multi-tenant con Row-Level Security:** se activa RLS de PostgreSQL desde el principio, **además** del filtrado por `household_id` en la aplicación (ver 5.6). Son dos capas independientes: si un repositorio olvida el filtro, la base de datos sigue sin devolver filas de otro hogar. Se descartó dejarlo solo en la aplicación porque convierte cada consulta nueva en una posible fuga entre hogares, y diferirlo a antes de producción porque retrofitar RLS obliga a revisar todas las consultas ya escritas. Registrado en [ADR-003](docs/common/architecture/decisions/ADR-003-row-level-security.md).
 - **Alta de usuarios en un hogar existente:** el MVP usa **alta directa** por parte de un `ADMIN_HOGAR` (`CrearUsuario`, ver 5.7), con contraseña inicial que el usuario cambia al entrar. La **invitación por email con token de un solo uso** queda como evolución posterior, no como alternativa descartada: se implementará cuando exista infraestructura de correo, que de todos modos hace falta para enviar los tokens acotados de préstamo (ver 5.4.1). Evita bloquear el core a la espera de esa infraestructura.
@@ -329,10 +377,11 @@ interface EventBus {
 
 | Evento | Se publica cuando… | Ejemplo de consumidor futuro |
 |---|---|---|
-| `AssetCreated` | Se da de alta un asset | CMMS genera un plan de mantenimiento por defecto |
+| `CatalogItemCreated` | Se crea un artículo en el catálogo del hogar | Warehouse le asocia su stock mínimo y su política de caducidad por defecto |
+| `AssetCreated` | Se da de alta un asset — incluida la primera existencia de un artículo en una ubicación | CMMS genera un plan de mantenimiento por defecto |
 | `AssetMoved` | Cambia la ubicación de un asset | Warehouse actualiza el stock por ubicación |
 | `AssetHierarchyChanged` | Cambia el asset padre/composición de un asset | Módulos que dependan de la estructura del hogar |
-| `AssetQuantityChanged` | Cambia la cantidad de un asset `CONSUMIBLE` | Warehouse registra el movimiento de existencias; el planificador de tareas añade el producto a la lista de la compra al llegar a 0 |
+| `AssetQuantityChanged` | Cambia la cantidad de un asset `CONSUMIBLE`, por ajuste o por entrada sobre una existencia ya creada | Warehouse registra el movimiento de existencias; el planificador de tareas añade el producto a la lista de la compra al llegar a 0 |
 | `AssetDeactivated` | Se da de baja un asset | CMMS cancela los planes de mantenimiento asociados |
 | `LocationCreated` | Se crea una ubicación | Warehouse la usa como posible punto de stock |
 | `LoanStarted` | Se inicia un préstamo | Planificador de tareas crea un recordatorio de devolución |
@@ -381,11 +430,17 @@ graph TD
 - `POST /api/v1/auth/login` — iniciar sesión (usuarios del hogar)
 - `POST /api/v1/auth/refresh` — renovar el access token
 
+**Catálogo de artículos**
+- `GET /api/v1/catalog-items` — listar y buscar (filtros: `q` sobre el nombre, `categoria`, `codigoBarras`); es lo que alimenta el autocompletado del alta
+- `POST /api/v1/catalog-items` — crear un artículo
+- `GET /api/v1/catalog-items/{id}` — detalle
+
 **Assets**
-- `GET /api/v1/assets` — listar (filtros: `locationId`, `parentAssetId`, `ownerId`, `estado`, `tipo`)
-- `POST /api/v1/assets` — dar de alta (`tipo` obligatorio; `cantidad` y `unidad` solo si es `CONSUMIBLE`)
+- `GET /api/v1/assets` — listar (filtros: `locationId`, `parentAssetId`, `ownerId`, `estado`, `tipo`, `catalogItemId`)
+- `POST /api/v1/assets` — dar de alta un `DURADERO` (`catalogItemId` opcional; `cantidad` no se acepta)
+- `POST /api/v1/assets/intake` — dar entrada a un `CONSUMIBLE`: crea la existencia (`201`) o suma sobre la que ya hay en esa ubicación (`200`)
 - `GET /api/v1/assets/{id}` — detalle
-- `PATCH /api/v1/assets/{id}` — modificar (incluye cambiar ubicación, asset padre o la `cantidad` de un consumible; el `tipo` es inmutable)
+- `PATCH /api/v1/assets/{id}` — modificar (incluye cambiar ubicación, asset padre o fijar la `cantidad` de un consumible). El `tipo` es inmutable; el `catalogItemId` solo admite **asignarse** a un `DURADERO` que todavía no tenga artículo, nunca cambiarse ni retirarse
 - `GET /api/v1/assets/{id}/children` — hijos directos en la jerarquía de composición
 
 **Locations**
@@ -432,24 +487,52 @@ El contrato completo, con todos los recursos, parámetros y esquemas de error, s
 }
 ```
 
-**`POST /api/v1/assets`** — request, asset **consumible**
+**`POST /api/v1/catalog-items`** — request, artículo del catálogo
 ```json
 {
   "nombre": "Harina de trigo",
-  "tipo": "CONSUMIBLE",
   "categoria": "ALIMENTACION",
-  "ownerId": "3d0a1e2c-...-000000000001",
-  "ubicacion": { "tipo": "LOCATION", "id": "5b83c7d2-...-000000000005" },
-  "cantidad": 1000,
-  "unidad": "GRAMO"
+  "unidad": "GRAMO",
+  "marca": "Marca Blanca",
+  "codigoBarras": "8412345678905"
 }
 ```
+> Publica `CatalogItemCreated`. Un nombre ya existente en el hogar (comparado normalizado) o un `codigoBarras` repetido se rechazan con `409` y el código `CATALOG_ITEM_DUPLICATE`.
 
-**`PATCH /api/v1/assets/{id}`** — ajustar la cantidad de un consumible
+**`POST /api/v1/assets/intake`** — request, entrada de un **consumible** con artículo ya existente
+```json
+{
+  "catalogItemId": "e71c0d93-...-000000000009",
+  "ownerId": "3d0a1e2c-...-000000000001",
+  "ubicacion": { "tipo": "LOCATION", "id": "5b83c7d2-...-000000000005" },
+  "cantidad": 1000
+}
+```
+> La `cantidad` va siempre en la `unidad` del artículo (aquí, gramos). En lugar de `catalogItemId` puede enviarse un objeto `catalogItem` con los mismos campos que `POST /api/v1/catalog-items`, y el artículo se crea en la misma operación.
+
+**`POST /api/v1/assets/intake`** — response cuando **ya había** existencia en esa ubicación (`200 OK`)
+```json
+{
+  "id": "b0f5a217-...-00000000000a",
+  "nombre": "Harina de trigo",
+  "tipo": "CONSUMIBLE",
+  "categoria": "ALIMENTACION",
+  "catalogItemId": "e71c0d93-...-000000000009",
+  "ownerId": "3d0a1e2c-...-000000000001",
+  "ubicacion": { "tipo": "LOCATION", "id": "5b83c7d2-...-000000000005" },
+  "estado": "DISPONIBLE",
+  "cantidad": 1300,
+  "unidad": "GRAMO",
+  "createdAt": "2026-08-06T10:15:00Z"
+}
+```
+> `nombre`, `categoria` y `unidad` se devuelven resueltos desde el artículo, aunque no se guarden en la fila del asset. La respuesta es `200` porque sumó sobre una existencia previa (había 300 g) y publica `AssetQuantityChanged`; si no hubiera existido, sería `201` con `AssetCreated`.
+
+**`PATCH /api/v1/assets/{id}`** — corregir la cantidad de un consumible
 ```json
 { "cantidad": 700 }
 ```
-> Publica `AssetQuantityChanged`. Enviar `cantidad` sobre un `DURADERO`, o un valor negativo, se rechaza con `409` y el código `ASSET_QUANTITY_NOT_APPLICABLE` / `ASSET_QUANTITY_NEGATIVE`.
+> A diferencia de la entrada, aquí la cantidad es **absoluta**: sustituye, no suma. Publica `AssetQuantityChanged`. Enviar `cantidad` sobre un `DURADERO`, o un valor negativo, se rechaza con `409` y el código `ASSET_QUANTITY_NOT_APPLICABLE` / `ASSET_QUANTITY_NEGATIVE`.
 
 **`GET /api/v1/loans/{id}`** — response con **token acotado de receptor**
 ```json
@@ -502,6 +585,8 @@ erDiagram
     HOUSEHOLDS ||--o{ ASSETS : "tiene"
     HOUSEHOLDS ||--o{ LOCATIONS : "tiene"
     HOUSEHOLDS ||--o{ LOANS : "tiene"
+    HOUSEHOLDS ||--o{ CATALOG_ITEMS : "tiene"
+    CATALOG_ITEMS ||--o{ ASSETS : "define"
     USERS ||--o{ ASSETS : "es propietario de"
     ASSETS ||--o{ ASSETS : "ubicación (contenedor)"
     LOCATIONS ||--o{ LOCATIONS : "ubicación padre"
@@ -525,9 +610,20 @@ erDiagram
         text role
         timestamptz created_at
     }
+    CATALOG_ITEMS {
+        uuid id PK
+        uuid household_id FK
+        text nombre
+        text categoria
+        text unidad
+        text marca
+        text codigo_barras
+        timestamptz created_at
+    }
     ASSETS {
         uuid id PK
         uuid household_id FK
+        uuid catalog_item_id FK
         text nombre
         text tipo
         text categoria
@@ -535,7 +631,6 @@ erDiagram
         uuid location_asset_id FK
         uuid location_id FK
         numeric cantidad
-        text unidad
         text estado
         timestamptz created_at
     }
@@ -584,7 +679,9 @@ erDiagram
 |---|---|
 | `households` | — |
 | `users` | `email` único **dentro del hogar** (`UNIQUE(household_id, email)`); `role` con `CHECK IN ('ADMIN_HOGAR','MIEMBRO_HOGAR')` |
-| `assets` | `CHECK (location_asset_id IS NULL OR location_id IS NULL)` — nunca ambas ubicaciones a la vez; `tipo` con `CHECK IN ('DURADERO','CONSUMIBLE')`; `estado` con `CHECK IN ('DISPONIBLE','PRESTADO','BAJA')`; coherencia de cantidad con `CHECK ((tipo = 'CONSUMIBLE' AND cantidad IS NOT NULL AND cantidad >= 0 AND unidad IS NOT NULL) OR (tipo = 'DURADERO' AND cantidad IS NULL AND unidad IS NULL))`; `unidad` con `CHECK IN ('UNIDAD','GRAMO','KILOGRAMO','MILILITRO','LITRO','METRO','PAQUETE')`. Que `location_asset_id` apunte a un `DURADERO` no es expresable como `CHECK` simple: se valida en el caso de uso |
+| `catalog_items` | `nombre` único en el hogar sin distinguir mayúsculas ni acentos, con índice único sobre `(household_id, lower(unaccent(nombre)))` — requiere la extensión `unaccent`, que se instala en su propia migración; `codigo_barras` único en el hogar cuando se informa, con índice único parcial `(household_id, codigo_barras) WHERE codigo_barras IS NOT NULL`; `unidad` con `CHECK IN ('UNIDAD','GRAMO','KILOGRAMO','MILILITRO','LITRO','METRO','PAQUETE')` |
+| `assets` | `CHECK (location_asset_id IS NULL OR location_id IS NULL)` — nunca ambas ubicaciones a la vez; `tipo` con `CHECK IN ('DURADERO','CONSUMIBLE')`; `estado` con `CHECK IN ('DISPONIBLE','PRESTADO','BAJA')`; coherencia de cantidad y artículo con `CHECK ((tipo = 'CONSUMIBLE' AND catalog_item_id IS NOT NULL AND cantidad IS NOT NULL AND cantidad >= 0) OR (tipo = 'DURADERO' AND cantidad IS NULL))`; todo asset tiene nombre efectivo, con `CHECK (nombre IS NOT NULL OR catalog_item_id IS NOT NULL)`. Que `location_asset_id` apunte a un `DURADERO` no es expresable como `CHECK` simple: se valida en el caso de uso |
+| `assets` (existencias) | Una sola existencia por artículo y ubicación: `CREATE UNIQUE INDEX ON assets (household_id, catalog_item_id, location_asset_id, location_id) NULLS NOT DISTINCT WHERE tipo = 'CONSUMIBLE'`. El `NULLS NOT DISTINCT` (PostgreSQL 15+) es lo que hace que la regla siga aplicando cuando la existencia aún no tiene ubicación asignada; sin él, cada entrada sin ubicar crearía una fila nueva |
 | `locations` | `parent_location_id` referencia a la propia tabla; la validación anti-ciclo se resuelve a nivel de aplicación (caso de uso), no es expresable como `CHECK` simple |
 | `loans` | exactamente uno de `prestador_user_id`/`prestador_externo` informado (ídem para receptor); `estado` con `CHECK IN ('ACTIVO','DEVUELTO','VENCIDO')`; índice único parcial `(asset_id) WHERE estado = 'ACTIVO'` para no permitir más de un préstamo activo por asset. Que el asset prestado sea `DURADERO` se valida en el caso de uso, no como `CHECK` |
 | `loan_access_tokens` | `token_hash` único; `rol` con `CHECK IN ('PRESTADOR','RECEPTOR')` |
@@ -598,17 +695,21 @@ Catálogo ilustrativo de los comandos y queries que expone la capa de aplicació
 
 | Tipo | Nombre | Entrada principal | Regla clave | Evento publicado |
 |---|---|---|---|---|
-| Comando | `CrearAsset` | nombre, tipo, categoría, ownerId, ubicación (opcional), cantidad y unidad (si `CONSUMIBLE`) | ubicación no puede ser Asset y Location a la vez; `CONSUMIBLE` exige cantidad ≥ 0 y unidad, `DURADERO` las prohíbe | `AssetCreated` |
-| Comando | `MoverAsset` | assetId, nueva ubicación | evita ciclos en la jerarquía; si la ubicación es un Asset, este debe ser `DURADERO` | `AssetMoved` / `AssetHierarchyChanged` |
-| Comando | `AjustarCantidadAsset` | assetId, nueva cantidad (absoluta) o delta | solo sobre `CONSUMIBLE`; la cantidad resultante no puede ser negativa | `AssetQuantityChanged` |
+| Comando | `CrearArticulo` | nombre, categoría, unidad, marca y código de barras (opcionales) | nombre único en el hogar (normalizado); código de barras único si se informa | `CatalogItemCreated` |
+| Comando | `CrearAsset` | nombre, tipo `DURADERO`, categoría, ownerId, ubicación y catalogItemId (opcionales) | ubicación no puede ser Asset y Location a la vez; no admite `cantidad`; un `CONSUMIBLE` no entra por aquí, sino por `RegistrarEntradaConsumible` | `AssetCreated` |
+| Comando | `RegistrarEntradaConsumible` | catalogItemId **o** datos de artículo nuevo, ubicación, cantidad, ownerId | crea el artículo si no existe; resuelve la existencia de ese artículo en esa ubicación y **suma** la cantidad, o la crea si no hay ninguna; la cantidad de entrada debe ser > 0 y va en la unidad del artículo | `CatalogItemCreated` (si creó artículo) + `AssetCreated` o `AssetQuantityChanged` |
+| Comando | `MoverAsset` | assetId, nueva ubicación | evita ciclos en la jerarquía; si la ubicación es un Asset, este debe ser `DURADERO`; mover una existencia a una ubicación que ya tiene otra del mismo artículo se rechaza — es una fusión, no un movimiento | `AssetMoved` / `AssetHierarchyChanged` |
+| Comando | `AjustarCantidadAsset` | assetId, nueva cantidad (absoluta) o delta | solo sobre `CONSUMIBLE`; la cantidad resultante no puede ser negativa. Es la corrección o el consumo, no la entrada de compra | `AssetQuantityChanged` |
 | Comando | `DarDeBajaAsset` | assetId | sin hijos activos ni préstamo `ACTIVO`; llegar a `cantidad = 0` no da de baja por sí solo | `AssetDeactivated` |
+| Comando | `RetirarArticulo` | catalogItemId | solo si no le queda ninguna existencia viva; la unidad de un artículo con existencias tampoco es modificable | — |
 | Comando | `CrearLocation` | nombre, parentLocationId (opcional), capacidad, condiciones | evita ciclos en la jerarquía | `LocationCreated` |
 | Comando | `CrearUsuario` | nombre, email, role, contraseña inicial | solo `ADMIN_HOGAR`; email único en el hogar; obliga a cambiar la contraseña en el primer acceso | — |
 | Comando | `ModificarRolUsuario` | userId, nuevo role | no puede quitarse el único `ADMIN_HOGAR` del hogar | — |
 | Comando | `IniciarPrestamo` | assetId, prestador, receptor, fecha de devolución prevista | el asset debe ser `DURADERO` y no tener otro préstamo `ACTIVO` | `LoanStarted` |
 | Comando | `ConfirmarDevolucion` | loanId | solo prestador, receptor o un usuario del hogar | `LoanReturned` |
 | Comando | `GenerarTokenAccesoExterno` | loanId, rol (`PRESTADOR`\|`RECEPTOR`) | vinculado a un préstamo `ACTIVO`; expira | — |
-| Query | `ListarAssets` | filtros: locationId, parentAssetId, ownerId, estado, tipo | resultado acotado al `householdId` del token | — |
+| Query | `ListarArticulos` | filtros: texto de búsqueda, categoría, código de barras | acotado al hogar; alimenta el autocompletado del alta de consumibles | — |
+| Query | `ListarAssets` | filtros: locationId, parentAssetId, ownerId, estado, tipo, catalogItemId | resultado acotado al `householdId` del token; el nombre y la categoría se resuelven desde el artículo cuando el asset lo tiene | — |
 | Query | `ObtenerAsset` / `ListarHijosDeAsset` | assetId | — | — |
 | Query | `ListarLocations` / `ObtenerLocation` | filtros: parentLocationId | — | — |
 | Query | `ListarUsuarios` | — | solo usuarios del propio hogar | — |
@@ -656,9 +757,12 @@ pie title Distribución de la batería de tests
 
 **Ejemplos adicionales derivados de esta iteración del core:**
 - *Unitario de dominio:* un `Asset` no puede definirse como su propio ancestro en la jerarquía de composición (evita ciclos).
-- *Unitario de dominio:* un `Asset` de tipo `DURADERO` no admite `cantidad` ni `unidad`, y un `CONSUMIBLE` no puede quedar con cantidad negativa tras un ajuste.
+- *Unitario de dominio:* un `Asset` de tipo `DURADERO` no admite `cantidad`, y un `CONSUMIBLE` no puede quedar con cantidad negativa tras un ajuste ni existir sin artículo.
 - *Integración de caso de uso:* ejecutar `IniciarPrestamo` sobre un asset que ya tiene un préstamo en estado `ACTIVO` debe fallar.
 - *Integración de caso de uso:* ejecutar `AjustarCantidadAsset` sobre un `CONSUMIBLE` debe persistir la nueva cantidad y publicar `AssetQuantityChanged`; sobre un `DURADERO` debe fallar sin publicar nada.
+- *Integración de caso de uso:* ejecutar `RegistrarEntradaConsumible` dos veces con el mismo artículo y la misma ubicación debe dejar **una sola** existencia con la suma de ambas cantidades, publicando `AssetCreated` la primera vez y `AssetQuantityChanged` la segunda.
+- *Integración de caso de uso:* `RegistrarEntradaConsumible` con un artículo nuevo debe crear artículo y existencia en la misma transacción; si el nombre ya existe en el hogar, debe reutilizar el artículo en lugar de duplicarlo.
+- *Contrato de adaptador / E2E:* `POST /api/v1/assets/intake` responde `201` la primera vez y `200` sobre la misma ubicación, con la cantidad acumulada y el nombre resuelto desde el artículo.
 - *Contrato de adaptador / E2E:* `GET /api/v1/loans/{id}` con el token acotado de un receptor externo solo debe exponer los campos permitidos para ese rol.
 
 ---
@@ -736,6 +840,7 @@ El contrato completo de la API vive en [`openapi.yaml`](openapi.yaml) (OpenAPI
 | 2026-08-07 | Decisión documentada de aplazar a la Fase 1 el reparto de contenido del README a `docs/`, con el destino previsto de cada sección (ver `docs/README.md`) |
 | 2026-08-07 | Cierre de las decisiones abiertas de la Fase 0 (4.1.7): préstamo limitado a assets duraderos (la cesión de un consumible es un ajuste de cantidad), Row-Level Security activado como segunda capa de aislamiento (5.6, ADR-003), alta directa de usuarios en el MVP con invitación por email como evolución, y Flyway como librería de migraciones (ADR-004). La Fase 0 queda completada |
 | 2026-08-07 | Reformulación del concepto de asset (4.1.1): todo material del hogar es un asset, con distinción `DURADERO`/`CONSUMIBLE` y contador de cantidad en el core. Impacto en el diagrama de dominio (4.1.3), reglas de préstamo (4.1.5), decisiones validadas (4.1.7), evento `AssetQuantityChanged` (5.2.3), API (5.4.2, 5.4.3), modelo de datos (5.6), casos de uso con `AjustarCantidadAsset` (5.7), ejemplos de test (7) y `openapi.yaml` |
+| 2026-08-07 | Separación entre artículo y existencia en el alta de consumibles (4.1.1): se añade la entidad `Articulo` (tabla `catalog_items`) como definición reutilizable, el asset `CONSUMIBLE` pasa a ser una existencia con `cantidad` y la `unidad` sube al artículo. Dar entrada a un consumible ya conocido suma sobre su existencia en lugar de crear una fila nueva. Impacto en el diagrama de dominio (4.1.3), decisiones validadas (4.1.7), evento `CatalogItemCreated` (5.2.3), API con `/catalog-items` y `/assets/intake` (5.4.2, 5.4.3), modelo de datos (5.6), casos de uso con `CrearArticulo` y `RegistrarEntradaConsumible` (5.7), ejemplos de test (7) y `openapi.yaml` |
 
 ---
 
