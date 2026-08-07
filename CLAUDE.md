@@ -134,9 +134,13 @@ De ahí tres consecuencias que se olvidan con facilidad:
 - **Traer otro paquete de azúcar no da de alta nada.** Es
   `RegistrarEntradaConsumible` (`POST /api/v1/assets/intake`), que resuelve el
   artículo —creándolo si hace falta— y **suma** sobre la existencia que ya haya en
-  esa ubicación. Solo hay una existencia por artículo y ubicación, garantizado por
-  un índice único parcial con `NULLS NOT DISTINCT`. El `cantidad` del `PATCH` es lo
-  contrario: absoluto, sustituye.
+  esa ubicación. El `cantidad` del `PATCH` es lo contrario: absoluto, sustituye.
+- **Solo una existencia viva por artículo y ubicación**, garantizado por un índice
+  único parcial con `NULLS NOT DISTINCT` que además excluye `estado = 'BAJA'` — sin
+  esa exclusión, una existencia dada de baja bloquearía su ubicación para siempre.
+  Juntar dos que ya existen por separado es `FusionarExistencias`
+  (`POST /api/v1/assets/{id}/merge`), nunca un `MoverAsset`: la fusión decide qué
+  ubicación y qué propietario sobreviven, y eso lo elige el usuario.
 - **El nombre y la categoría no se guardan por duplicado.** Cuando el asset tiene
   artículo, son los suyos y se resuelven al leer.
 

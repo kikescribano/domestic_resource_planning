@@ -275,8 +275,47 @@ paths:
         "409":
           description: >
             Conflicto de ubicación, ciclo en la jerarquía, cantidad sobre un
-            asset DURADERO (ASSET_QUANTITY_NOT_APPLICABLE) o cantidad negativa
-            (ASSET_QUANTITY_NEGATIVE)
+            asset DURADERO (ASSET_QUANTITY_NOT_APPLICABLE), cantidad negativa
+            (ASSET_QUANTITY_NEGATIVE) o mover una existencia a una ubicación
+            que ya tiene otra viva del mismo artículo
+            (EXISTENCE_ALREADY_IN_LOCATION), que se resuelve con
+            POST /assets/{id}/merge
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /assets/{id}/merge:
+    parameters:
+      - $ref: "#/components/parameters/AssetId"
+    post:
+      tags: [assets]
+      summary: Fusionar dos existencias del mismo artículo
+      description: >
+        Junta dos existencias CONSUMIBLE del mismo artículo creadas por
+        separado. El asset de la ruta es el que DESAPARECE: queda a cantidad 0
+        y estado BAJA, y su cantidad se suma a la del destino, que conserva su
+        ubicación y su propietario. Publica AssetQuantityChanged sobre el
+        destino y AssetDeactivated sobre el origen, correlacionados por payload
+        (mergedFromAssetId y mergedIntoAssetId).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssetMergeInput" }
+      responses:
+        "200":
+          description: Asset destino con la cantidad acumulada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Asset" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            Las dos existencias no son del mismo artículo
+            (MERGE_CATALOG_ITEM_MISMATCH), origen y destino coinciden
+            (MERGE_SAME_ASSET), alguna no es CONSUMIBLE
+            (MERGE_NOT_CONSUMIBLE) o alguna está dada de baja
+            (MERGE_ASSET_DEACTIVATED)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -608,6 +647,18 @@ components:
           exclusiveMinimum: true
           minimum: 0
           description: Cantidad que entra, se suma a la existencia si ya la hay
+
+    AssetMergeInput:
+      type: object
+      description: >
+        Destino de la fusión. El origen es el asset de la ruta, que es el que
+        desaparece.
+      required: [destinoAssetId]
+      properties:
+        destinoAssetId:
+          type: string
+          format: uuid
+          description: Existencia que absorbe la cantidad y sobrevive
 
     AssetPatch:
       type: object
