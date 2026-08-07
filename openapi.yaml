@@ -102,9 +102,13 @@ paths:
         - name: codigoBarras
           in: query
           schema: { type: string }
+        - name: incluirRetirados
+          in: query
+          description: Por defecto false -- los artículos retirados no se ofrecen en el alta
+          schema: { type: boolean, default: false }
       responses:
         "200":
-          description: Listado de artículos
+          description: Listado de artículos vigentes
           content:
             application/json:
               schema:
@@ -148,6 +152,25 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/CatalogItem" }
         "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [catalog]
+      summary: Retirar un artículo del catálogo
+      description: >
+        Retirada lógica -- marca retiredAt. La fila permanece porque las
+        existencias dadas de baja siguen apuntando a ella; borrarla rompería
+        la clave ajena y el historial. Un artículo retirado no se ofrece en el
+        alta ni admite nuevas entradas.
+      responses:
+        "204":
+          description: Artículo retirado
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            Al artículo aún le quedan existencias vivas
+            (CATALOG_ITEM_HAS_EXISTENCES)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
 
   /assets:
     get:
@@ -260,7 +283,9 @@ paths:
         POST /assets/intake). Ajustar cantidad sobre un asset CONSUMIBLE publica
         el evento AssetQuantityChanged. El tipo del asset es inmutable; el
         catalogItemId solo admite asignarse a un DURADERO que aún no tenga
-        artículo, nunca cambiarse ni retirarse.
+        artículo, nunca cambiarse ni retirarse. No acepta estado: la baja se
+        hace con DELETE, y PRESTADO/DISPONIBLE los gobiernan el préstamo y su
+        devolución.
       requestBody:
         required: true
         content:
@@ -280,6 +305,26 @@ paths:
             que ya tiene otra viva del mismo artículo
             (EXISTENCE_ALREADY_IN_LOCATION), que se resuelve con
             POST /assets/{id}/merge
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      tags: [assets]
+      summary: Dar de baja un asset
+      description: >
+        Baja lógica -- pasa el asset a estado BAJA, no borra la fila. Si es una
+        existencia con cantidad pendiente, la baja la lleva a 0 y publica
+        AssetQuantityChanged antes de AssetDeactivated: lo que quedaba se da
+        por perdido. Una existencia dada de baja libera su hueco de artículo y
+        ubicación, así que se puede volver a dar entrada allí.
+      responses:
+        "204":
+          description: Asset dado de baja
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            El asset tiene hijos en la jerarquía (ASSET_HAS_CHILDREN) o un
+            préstamo ACTIVO (ASSET_HAS_ACTIVE_LOAN)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -604,6 +649,11 @@ components:
           properties:
             id: { type: string, format: uuid }
             createdAt: { type: string, format: date-time }
+            retiredAt:
+              type: string
+              format: date-time
+              nullable: true
+              description: Informado si el artículo está retirado del catálogo
 
     Ubicacion:
       type: object
@@ -666,7 +716,8 @@ components:
         Modificación parcial. El tipo es inmutable y no se acepta aquí.
         cantidad solo es válida sobre un asset CONSUMIBLE, y es absoluta.
         nombre y categoria solo son válidos en un asset sin artículo -- si lo
-        tiene, se cambian en el artículo.
+        tiene, se cambian en el artículo. estado no se acepta: lo gobiernan
+        DELETE /assets/{id}, POST /loans y POST /loans/{id}/return.
       properties:
         nombre: { type: string }
         categoria: { type: string }
@@ -675,7 +726,6 @@ components:
           format: uuid
           description: Solo para asignar artículo a un DURADERO que aún no lo tiene
         ubicacion: { $ref: "#/components/schemas/Ubicacion" }
-        estado: { $ref: "#/components/schemas/AssetEstado" }
         cantidad: { type: number, minimum: 0 }
 
     Asset:
