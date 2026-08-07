@@ -1,8 +1,8 @@
 # DRP · Domestic Resource Planning
 
 > **Estado del documento:** vivo — se actualiza a medida que el proyecto avanza.
-> **Última actualización:** 2026-08-06
-> **Fase actual:** Fase 0 — Definición detallada del core mínimo: modelo de dominio, event bus y API REST (pre-desarrollo)
+> **Última actualización:** 2026-08-07
+> **Fase actual:** Fase 0 — Core mínimo definido (modelo de dominio, datos, casos de uso, event bus y API REST); pendientes tres decisiones de infraestructura (ver 4.1.7) antes de pasar a desarrollo
 
 ---
 
@@ -42,6 +42,7 @@ El proyecto se construye como dos componentes claramente diferenciados —**back
 
 ### 4.1 Core mínimo (obligatorio)
 
+- **Gestión del hogar:** unidad de aislamiento multi-tenant — varios hogares comparten la misma base de datos; agrupa a los usuarios, assets, ubicaciones y préstamos de una misma vivienda (ver el modelo de datos en 5.6).
 - **Gestión de recursos/assets:** alta, baja, modificación, categorización, ubicación (jerárquica), propietario/responsable y documentación asociada (facturas, garantías, manuales).
 - **Gestión de ubicaciones:** estructura jerárquica de espacios físicos con características mínimas de almacenaje.
 - **Gestión de usuarios del hogar:** autenticación y roles, incluyendo roles de acceso acotado para préstamos entre personas.
@@ -179,6 +180,11 @@ Las siguientes decisiones, inicialmente abiertas, han quedado validadas:
 - **Roles Prestador/Receptor:** pueden ser tanto miembros del hogar como personas externas. El acceso acotado por token (ver 5.4.1) se aplica únicamente cuando la persona no tiene cuenta completa en el sistema.
 - **Alcance de la gestión de préstamos:** se mantiene mínima dentro del core (ver 4.1.5) mientras no gane funcionalidad adicional; si en el futuro crece (recordatorios automáticos, penalizaciones, valoraciones, historial extenso), se extraerá como módulo propio.
 - **Composición y ubicación física:** quedan unificadas en un único campo `ubicación` por asset (ver 4.1.1); no se distingue, por ahora, entre "de qué está compuesto" un asset y "dónde está físicamente".
+
+**Pendientes** (surgidas al definir el modelo de datos y la autenticación en 5.6/5.4.1):
+- ¿Se activa **PostgreSQL Row-Level Security** como capa adicional de aislamiento multi-tenant, o el filtrado por `household_id` a nivel de aplicación es suficiente para el MVP?
+- ¿Cómo se invita/da de alta a un nuevo usuario en un hogar ya existente (flujo de invitación por email vs. alta directa por un `ADMIN_HOGAR`)?
+- ¿Qué librería de migraciones de base de datos se usará (Flyway vs. Liquibase)?
 
 > Si en el futuro surgen nuevas decisiones de diseño pendientes de validar, se recomienda añadirlas aquí siguiendo el mismo formato (pregunta + decisión + referencia a la sección afectada) hasta que se resuelvan.
 
@@ -322,12 +328,26 @@ graph TD
 
 - API REST autenticada (token), respuestas en JSON.
 
-#### 5.4.1 Autenticación
+#### 5.4.1 Autenticación (definitivo)
 
-- **Usuarios del hogar** (administrador/miembro): JWT (bearer token), con claims mínimos `userId`, `householdId` y `roles[]`.
-- **Usuarios externos de un préstamo** (prestador/receptor sin cuenta completa): token acotado de vida corta, vinculado a un `prestamoId` concreto (p. ej. enviado por email o SMS como enlace), sin necesidad de crear una cuenta. Su alcance se limita a la lectura del estado de ese préstamo y a confirmar la devolución.
+**Usuarios del hogar (administrador/miembro):**
+- Implementación con **Spring Security** + JWT firmado (HS256; clave gestionada como secreto de despliegue, no en el repositorio).
+- `POST /api/v1/auth/login` valida `email` + contraseña (hash `BCrypt` vía `PasswordEncoder` de Spring Security) y devuelve un **access token** de vida corta (≈15 min) y un **refresh token** de vida larga (≈30 días).
+- Claims del access token: `sub` (userId), `householdId`, `role` (`ADMIN_HOGAR` | `MIEMBRO_HOGAR`).
+- Un filtro (`OncePerRequestFilter`) valida el JWT en cada petición y puebla el `SecurityContext`; la autorización por rol se expresa con `@PreAuthorize` sobre casos de uso/controllers.
+- Los refresh tokens se guardan **hasheados** en la tabla `refresh_tokens` (ver 5.6) y rotan en cada uso (`POST /api/v1/auth/refresh`); son revocables por el propio usuario o un administrador.
+- **Aislamiento multi-tenant:** al compartir varios hogares la misma base de datos, todo caso de uso filtra siempre por el `householdId` del token — nunca se confía en un `householdId` recibido como parámetro del cliente.
+
+**Usuarios externos de un préstamo (prestador/receptor sin cuenta completa):**
+- Al iniciar un préstamo, el core genera un token acotado (JWT firmado, sin `sub` de usuario) con claims `loanId` y `role` (`PRESTADOR` | `RECEPTOR`), enviado como enlace por email o SMS.
+- El hash del token se guarda en `loan_access_tokens` (ver 5.6) junto a su expiración, lo que permite revocarlo o comprobar reutilización.
+- Su alcance queda acotado a `GET /api/v1/loans/{id}` (del préstamo indicado) y a `POST /api/v1/loans/{id}/return`; no da acceso a ningún otro recurso del hogar.
 
 #### 5.4.2 Recursos principales (ilustrativo, sujeto a definición detallada de contratos)
+
+**Autenticación**
+- `POST /api/v1/auth/login` — iniciar sesión (usuarios del hogar)
+- `POST /api/v1/auth/refresh` — renovar el access token
 
 **Assets**
 - `GET /api/v1/assets` — listar (filtros: `locationId`, `parentAssetId`, `ownerId`, `estado`)
@@ -351,10 +371,178 @@ graph TD
 - `GET /api/v1/loans/{id}` — consultar estado (accesible por el hogar y por el prestador/receptor asociado con su token acotado)
 - `POST /api/v1/loans/{id}/return` — confirmar devolución
 
+#### 5.4.3 Contratos JSON (ejemplos)
+
+El contrato completo, con todos los recursos, parámetros y esquemas de error, se mantiene versionado en el archivo `openapi.yaml` adjunto a este documento (especificación OpenAPI 3.0). Aquí se muestran ejemplos ilustrativos de los recursos más representativos.
+
+**`POST /api/v1/assets`** — request
+```json
+{
+  "nombre": "Estantería de trastero",
+  "categoria": "MOBILIARIO",
+  "ownerId": "3d0a1e2c-...-000000000001",
+  "ubicacion": { "tipo": "ASSET", "id": "9f21b4a0-...-000000000002" }
+}
+```
+
+**`POST /api/v1/assets`** — response (`201 Created`)
+```json
+{
+  "id": "7c44f8b1-...-000000000003",
+  "nombre": "Estantería de trastero",
+  "categoria": "MOBILIARIO",
+  "ownerId": "3d0a1e2c-...-000000000001",
+  "ubicacion": { "tipo": "ASSET", "id": "9f21b4a0-...-000000000002" },
+  "estado": "DISPONIBLE",
+  "createdAt": "2026-08-06T10:15:00Z"
+}
+```
+
+**`GET /api/v1/loans/{id}`** — response con **token acotado de receptor**
+```json
+{
+  "id": "1a2b3c4d-...-000000000004",
+  "assetNombre": "Taladro",
+  "estado": "ACTIVO",
+  "fechaInicio": "2026-08-01T09:00:00Z",
+  "fechaDevolucionPrevista": "2026-08-15T09:00:00Z"
+}
+```
+> El token acotado solo expone estos campos; la vista completa (usuarios del hogar) añade `assetId`, `prestador`, `receptor` y `householdId`.
+
+**Formato de error (todos los endpoints)**
+```json
+{
+  "code": "ASSET_LOCATION_CONFLICT",
+  "message": "Un asset no puede tener como ubicación un Asset y una Location a la vez",
+  "details": {}
+}
+```
+
 ### 5.5 Frontend responsive
 
 - Objetivo de rango de dispositivos: desde un **iPhone X (375px)** o equivalente en adelante, hasta **pantallas ultrawide** (2560px–3440px+).
 - Enfoque **mobile-first**, con un sistema de diseño y breakpoints a definir en el detalle de la capa de UI.
+
+### 5.6 Modelo de datos (PostgreSQL, multi-tenant)
+
+Varios hogares comparten la misma base de datos. En esta primera versión, el aislamiento entre hogares se implementa **a nivel de aplicación**: todo caso de uso y todo repositorio filtra siempre por el `householdId` del token de quien hace la petición. Queda como decisión pendiente (ver 4.1.7) si conviene añadir además **Row-Level Security** nativo de PostgreSQL como capa adicional de defensa.
+
+```mermaid
+erDiagram
+    HOUSEHOLDS ||--o{ USERS : "tiene"
+    HOUSEHOLDS ||--o{ ASSETS : "tiene"
+    HOUSEHOLDS ||--o{ LOCATIONS : "tiene"
+    HOUSEHOLDS ||--o{ LOANS : "tiene"
+    USERS ||--o{ ASSETS : "es propietario de"
+    ASSETS ||--o{ ASSETS : "ubicación (contenedor)"
+    LOCATIONS ||--o{ LOCATIONS : "ubicación padre"
+    LOCATIONS ||--o{ ASSETS : "ubicación"
+    ASSETS ||--o{ LOANS : "prestado en"
+    USERS ||--o{ LOANS : "presta / recibe"
+    LOANS ||--o{ LOAN_ACCESS_TOKENS : "genera"
+    USERS ||--o{ REFRESH_TOKENS : "tiene"
+
+    HOUSEHOLDS {
+        uuid id PK
+        text nombre
+        timestamptz created_at
+    }
+    USERS {
+        uuid id PK
+        uuid household_id FK
+        text nombre
+        text email
+        text password_hash
+        text role
+        timestamptz created_at
+    }
+    ASSETS {
+        uuid id PK
+        uuid household_id FK
+        text nombre
+        text categoria
+        uuid owner_id FK
+        uuid location_asset_id FK
+        uuid location_id FK
+        text estado
+        timestamptz created_at
+    }
+    LOCATIONS {
+        uuid id PK
+        uuid household_id FK
+        text nombre
+        uuid parent_location_id FK
+        jsonb capacidad
+        jsonb condiciones_ambientales
+        text notas
+    }
+    LOANS {
+        uuid id PK
+        uuid household_id FK
+        uuid asset_id FK
+        uuid prestador_user_id FK
+        text prestador_externo
+        uuid receptor_user_id FK
+        text receptor_externo
+        text estado
+        timestamptz fecha_inicio
+        timestamptz fecha_devolucion_prevista
+        timestamptz fecha_devolucion_real
+    }
+    LOAN_ACCESS_TOKENS {
+        uuid id PK
+        uuid loan_id FK
+        text token_hash
+        text rol
+        timestamptz expires_at
+        timestamptz used_at
+    }
+    REFRESH_TOKENS {
+        uuid id PK
+        uuid user_id FK
+        text token_hash
+        timestamptz expires_at
+        timestamptz revoked_at
+    }
+```
+
+**Restricciones y notas por tabla:**
+
+| Tabla | Restricciones clave |
+|---|---|
+| `households` | — |
+| `users` | `email` único **dentro del hogar** (`UNIQUE(household_id, email)`); `role` con `CHECK IN ('ADMIN_HOGAR','MIEMBRO_HOGAR')` |
+| `assets` | `CHECK (location_asset_id IS NULL OR location_id IS NULL)` — nunca ambas ubicaciones a la vez; `estado` con `CHECK IN ('DISPONIBLE','PRESTADO','BAJA')` |
+| `locations` | `parent_location_id` referencia a la propia tabla; la validación anti-ciclo se resuelve a nivel de aplicación (caso de uso), no es expresable como `CHECK` simple |
+| `loans` | exactamente uno de `prestador_user_id`/`prestador_externo` informado (ídem para receptor); `estado` con `CHECK IN ('ACTIVO','DEVUELTO','VENCIDO')`; índice único parcial `(asset_id) WHERE estado = 'ACTIVO'` para no permitir más de un préstamo activo por asset |
+| `loan_access_tokens` | `token_hash` único; `rol` con `CHECK IN ('PRESTADOR','RECEPTOR')` |
+| `refresh_tokens` | `token_hash` único; se marca `revoked_at` en lugar de borrarse, para poder auditar |
+
+Todas las tablas del core (excepto `loan_access_tokens` y `refresh_tokens`, que cuelgan de `loans`/`users`) incluyen `household_id` para el filtrado multi-tenant.
+
+### 5.7 Casos de uso del core (comandos y queries)
+
+Catálogo ilustrativo de los comandos y queries que expone la capa de aplicación del core (capa "Casos de uso" de Clean Architecture, ver 5.3). Cada comando valida sus reglas de negocio y, cuando corresponde, publica un evento en el bus (ver 5.2.3).
+
+| Tipo | Nombre | Entrada principal | Regla clave | Evento publicado |
+|---|---|---|---|---|
+| Comando | `CrearAsset` | nombre, categoría, ownerId, ubicación (opcional) | ubicación no puede ser Asset y Location a la vez | `AssetCreated` |
+| Comando | `MoverAsset` | assetId, nueva ubicación | evita ciclos en la jerarquía | `AssetMoved` / `AssetHierarchyChanged` |
+| Comando | `DarDeBajaAsset` | assetId | sin hijos activos ni préstamo `ACTIVO` | `AssetDeactivated` |
+| Comando | `CrearLocation` | nombre, parentLocationId (opcional), capacidad, condiciones | evita ciclos en la jerarquía | `LocationCreated` |
+| Comando | `CrearUsuario` | nombre, email, role | solo `ADMIN_HOGAR`; email único en el hogar | — |
+| Comando | `ModificarRolUsuario` | userId, nuevo role | no puede quitarse el único `ADMIN_HOGAR` del hogar | — |
+| Comando | `IniciarPrestamo` | assetId, prestador, receptor, fecha de devolución prevista | el asset no puede tener otro préstamo `ACTIVO` | `LoanStarted` |
+| Comando | `ConfirmarDevolucion` | loanId | solo prestador, receptor o un usuario del hogar | `LoanReturned` |
+| Comando | `GenerarTokenAccesoExterno` | loanId, rol (`PRESTADOR`\|`RECEPTOR`) | vinculado a un préstamo `ACTIVO`; expira | — |
+| Query | `ListarAssets` | filtros: locationId, parentAssetId, ownerId, estado | resultado acotado al `householdId` del token | — |
+| Query | `ObtenerAsset` / `ListarHijosDeAsset` | assetId | — | — |
+| Query | `ListarLocations` / `ObtenerLocation` | filtros: parentLocationId | — | — |
+| Query | `ListarUsuarios` | — | solo usuarios del propio hogar | — |
+| Query | `ObtenerPrestamo` | loanId | accesible por el hogar o por token acotado, con campos distintos (ver 5.4.3) | — |
+
+> Este catálogo es ilustrativo y crecerá a medida que se implementen los casos de uso; cada nuevo comando/query debería añadirse aquí siguiendo el mismo formato.
 
 ---
 
@@ -362,13 +550,15 @@ graph TD
 
 | Componente | Tecnología | Notas |
 |---|---|---|
-| Backend | Kotlin | Monolito modular |
+| Backend | Kotlin + Spring Boot | Monolito modular |
 | Persistencia | PostgreSQL 16+ | |
+| Multi-tenancy | Aislamiento por `household_id` | Varios hogares comparten la misma base de datos (ver 5.6); Row-Level Security de PostgreSQL como posible capa adicional (decisión pendiente, ver 4.1.7) |
 | Comunicación interna BE | Event bus (in-process) | Contrato definido (ver 5.2); librería concreta por definir; candidato a evolucionar con patrón Outbox |
-| Comunicación FE ↔ BE | API REST autenticada | JWT para usuarios del hogar; tokens acotados de vida corta para usuarios externos de préstamo (ver 5.4.1) |
+| Comunicación FE ↔ BE | API REST autenticada | Spring Security + JWT para usuarios del hogar; tokens acotados de vida corta (tabla `loan_access_tokens`) para usuarios externos de préstamo (ver 5.4.1) |
+| Contratos de API | OpenAPI 3.0 (`openapi.yaml`) + ejemplos en el README | Ver 5.4.3 |
 | Frontend | TypeScript | |
 | Librería de UI sugerida | React | |
-| Testing | Por definir (candidatos: Kotest/JUnit5 en BE, Vitest/Jest + Testing Library en FE) | A confirmar |
+| Testing | Por definir (candidatos: Kotest/JUnit5 + Testcontainers en BE, Vitest/Jest + Testing Library en FE) | A confirmar |
 
 ---
 
@@ -414,11 +604,14 @@ pie title Distribución de la batería de tests
 - [x] Roles de usuario, incluyendo roles acotados para préstamos
 - [x] Contrato y catálogo inicial del event bus
 - [x] Recursos y esquema de autenticación de la API REST (nivel ilustrativo)
-- [ ] Modelo de datos definitivo (tablas, tipos, constraints) y diagrama ER completo
-- [ ] Casos de uso detallados del core (comandos y queries)
-- [ ] Esquema de autenticación definitivo y gestión de tokens externos
-- [ ] Contratos JSON definitivos de la API (request/response schemas)
+- [x] Modelo de datos definitivo (tablas, tipos, constraints) y diagrama ER completo (ver 5.6)
+- [x] Casos de uso detallados del core (comandos y queries) (ver 5.7)
+- [x] Esquema de autenticación definitivo y gestión de tokens externos (ver 5.4.1)
+- [x] Contratos JSON definitivos de la API (request/response schemas) (ver 5.4.3 y `openapi.yaml`)
 - [x] Resolución de las decisiones de diseño abiertas (ver 4.1.7)
+- [ ] Decidir activación de PostgreSQL Row-Level Security como capa adicional de aislamiento multi-tenant
+- [ ] Definir flujo de invitación/alta de nuevos usuarios en un hogar existente
+- [ ] Seleccionar librería de migraciones de base de datos (Flyway/Liquibase)
 
 ---
 
@@ -433,8 +626,11 @@ La documentación detallada se organiza por ámbito en [`docs/`](docs/README.md)
 - [`docs/frontend/`](docs/frontend/README.md) para arquitectura web, diseño de
   producto, look and feel, design system, accesibilidad y calidad.
 
----
+El contrato completo de la API vive en [`openapi.yaml`](openapi.yaml) (OpenAPI
+3.0); su proceso de validación y las convenciones asociadas se documentan en
+[`docs/common/contracts/`](docs/common/contracts/README.md).
 
+---
 
 ## 10. Historial de cambios de este documento
 
@@ -444,6 +640,7 @@ La documentación detallada se organiza por ámbito en [`docs/`](docs/README.md)
 | 2026-08-06 | Profundización del core mínimo: jerarquía de assets/ubicaciones con ubicación polimórfica, características de almacenaje, roles de usuario (incl. préstamos), contrato y catálogo inicial del event bus, y ampliación de la definición de la API REST |
 | 2026-08-06 | Validación de las decisiones de diseño abiertas (4.1.7): roles prestador/receptor abiertos a miembros del hogar o a externos, alcance mínimo de la gestión de préstamos en el core, y unificación del campo ubicación |
 | 2026-08-06 | Reajuste de prioridades de módulos futuros (4.2): Gestión de eventos temporales pasa de Media a Baja; Warehouse pasa de Media a Alta |
+| 2026-08-07 | Cierre de los puntos pendientes de la Fase 0 (8.1): modelo de datos definitivo multi-tenant (5.6), catálogo de casos de uso del core (5.7), esquema de autenticación definitivo con Spring Security + JWT y gestión de tokens externos (5.4.1), y contratos JSON de la API (ejemplos en 5.4.3 + especificación OpenAPI en `openapi.yaml`) |
 
 ---
 
@@ -451,8 +648,8 @@ La documentación detallada se organiza por ámbito en [`docs/`](docs/README.md)
 
 Al avanzar el proyecto, actualizar principalmente:
 
-- **Sección 4.1.7** — añadir aquí nuevas decisiones de diseño pendientes cuando surjan, y trasladarlas a la lista de validadas en cuanto se resuelvan (dejando también constancia en el historial de cambios, sección 9).
+- **Sección 4.1.7** — añadir aquí nuevas decisiones de diseño pendientes cuando surjan, y trasladarlas a la lista de validadas en cuanto se resuelvan (dejando también constancia en el historial de cambios, sección 10).
 - **Sección 4.2** — mover módulos de "por diseñar" a "en desarrollo"/"en producción" según corresponda.
 - **Sección 8** — marcar fases y sub-tareas como en curso/completadas, y añadir nuevas fases si el roadmap se ajusta.
-- **Sección 9** — añadir una línea por cada actualización relevante del documento (fecha + resumen del cambio).
+- **Sección 10** — añadir una línea por cada actualización relevante del documento (fecha + resumen del cambio).
 - **Diagramas de la sección 5** — mantenerlos alineados con decisiones reales de arquitectura una vez se empiece a implementar.
