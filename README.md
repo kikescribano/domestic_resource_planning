@@ -2,7 +2,7 @@
 
 > **Estado del documento:** vivo — se actualiza a medida que el proyecto avanza.
 > **Última actualización:** 2026-08-07
-> **Fase actual:** Fase 0 — Core mínimo definido (modelo de dominio, datos, casos de uso, event bus y API REST); pendientes tres decisiones de infraestructura (ver 4.1.7) antes de pasar a desarrollo
+> **Fase actual:** Fase 0 completada — core mínimo definido y sin decisiones de diseño abiertas; lista para iniciar la Fase 1 (Core MVP)
 
 ---
 
@@ -195,6 +195,8 @@ stateDiagram-v2
 - Un asset no puede tener más de un préstamo en estado `ACTIVO` simultáneamente.
 - Solo se prestan assets `DURADERO` (ver 4.1.1): un consumible se consume o se entrega, y la semántica de devolución no le aplica.
 
+> **¿Y ceder un consumible?** Dar azúcar a un vecino no necesita ningún concepto nuevo: es un `AjustarCantidadAsset` que descuenta la cantidad (ver 5.7). Si te lo reponen, otro ajuste que la suma. Modelarlo como préstamo obligaría a llevar cantidad en el préstamo y a permitir varios préstamos activos sobre el mismo asset, complicando el core para un caso que el contador ya resuelve.
+
 > **Nota de alcance:** esta es una versión mínima, suficiente para que los roles de prestador/receptor tengan algo que consultar. Si en el futuro el negocio de préstamos crece (recordatorios automáticos, penalizaciones, valoraciones, historial extenso), es candidato a extraerse como módulo propio, reutilizando el mismo mecanismo de event bus para no romper el core.
 
 #### 4.1.6 Event bus y API REST
@@ -208,14 +210,14 @@ Las siguientes decisiones, inicialmente abiertas, han quedado validadas:
 - **Roles Prestador/Receptor:** pueden ser tanto miembros del hogar como personas externas. El acceso acotado por token (ver 5.4.1) se aplica únicamente cuando la persona no tiene cuenta completa en el sistema.
 - **Alcance de la gestión de préstamos:** se mantiene mínima dentro del core (ver 4.1.5) mientras no gane funcionalidad adicional; si en el futuro crece (recordatorios automáticos, penalizaciones, valoraciones, historial extenso), se extraerá como módulo propio.
 - **Composición y ubicación física:** quedan unificadas en un único campo `ubicación` por asset (ver 4.1.1); no se distingue, por ahora, entre "de qué está compuesto" un asset y "dónde está físicamente".
+- **Préstamo de consumibles:** solo se prestan assets `DURADERO`. La cesión de un consumible (dar azúcar a un vecino) se modela como un ajuste de cantidad, no como un préstamo (ver la nota en 4.1.5). Se descartaron las alternativas de llevar cantidad en el préstamo —que obligaría a permitir varios préstamos activos sobre el mismo asset, rompiendo el índice único parcial de 5.6— y de añadir una entidad "cesión" al core, que no aporta nada que el contador de cantidad no cubra ya.
 - **Alcance del concepto de asset y gestión de cantidad:** un asset es todo material del hogar, no solo el económicamente relevante. Se distingue `DURADERO` de `CONSUMIBLE` (ver 4.1.1), y el core se limita a un contador simple (`cantidad` + `unidad`) sobre los consumibles. Todo el seguimiento de existencias — consumos, mínimos, reposición, caducidad, lotes — queda fuera del core y pertenece al módulo **Warehouse** (4.2), que se suscribe a `AssetQuantityChanged`. La alternativa de no guardar cantidad alguna en el core se descartó porque dejaría los consumibles sin representación útil hasta que Warehouse exista.
 
-**Pendientes** (surgidas al definir el modelo de datos y la autenticación en 5.6/5.4.1):
-- ¿Se activa **PostgreSQL Row-Level Security** como capa adicional de aislamiento multi-tenant, o el filtrado por `household_id` a nivel de aplicación es suficiente para el MVP?
-- ¿Cómo se invita/da de alta a un nuevo usuario en un hogar ya existente (flujo de invitación por email vs. alta directa por un `ADMIN_HOGAR`)?
-- ¿Qué librería de migraciones de base de datos se usará (Flyway vs. Liquibase)?
+- **Aislamiento multi-tenant con Row-Level Security:** se activa RLS de PostgreSQL desde el principio, **además** del filtrado por `household_id` en la aplicación (ver 5.6). Son dos capas independientes: si un repositorio olvida el filtro, la base de datos sigue sin devolver filas de otro hogar. Se descartó dejarlo solo en la aplicación porque convierte cada consulta nueva en una posible fuga entre hogares, y diferirlo a antes de producción porque retrofitar RLS obliga a revisar todas las consultas ya escritas. Registrado en [ADR-003](docs/common/architecture/decisions/ADR-003-row-level-security.md).
+- **Alta de usuarios en un hogar existente:** el MVP usa **alta directa** por parte de un `ADMIN_HOGAR` (`CrearUsuario`, ver 5.7), con contraseña inicial que el usuario cambia al entrar. La **invitación por email con token de un solo uso** queda como evolución posterior, no como alternativa descartada: se implementará cuando exista infraestructura de correo, que de todos modos hace falta para enviar los tokens acotados de préstamo (ver 5.4.1). Evita bloquear el core a la espera de esa infraestructura.
+- **Librería de migraciones:** **Flyway**, con migraciones en SQL plano versionado. Se descartó Liquibase porque su principal ventaja —la abstracción sobre el motor— no aporta nada con PostgreSQL ya fijado, y su ceremonia de changelogs complica revisar una política de RLS, que se lee mucho mejor como SQL. Registrado en [ADR-004](docs/common/architecture/decisions/ADR-004-database-migrations.md).
 
-> Si en el futuro surgen nuevas decisiones de diseño pendientes de validar, se recomienda añadirlas aquí siguiendo el mismo formato (pregunta + decisión + referencia a la sección afectada) hasta que se resuelvan.
+> Si en el futuro surgen nuevas decisiones de diseño pendientes de validar, se recomienda añadirlas aquí siguiendo el mismo formato (pregunta + decisión + referencia a la sección afectada) hasta que se resuelvan. En este momento no queda ninguna abierta.
 
 ### 4.2 Módulos futuros (activables progresivamente)
 
@@ -477,7 +479,22 @@ El contrato completo, con todos los recursos, parámetros y esquemas de error, s
 
 ### 5.6 Modelo de datos (PostgreSQL, multi-tenant)
 
-Varios hogares comparten la misma base de datos. En esta primera versión, el aislamiento entre hogares se implementa **a nivel de aplicación**: todo caso de uso y todo repositorio filtra siempre por el `householdId` del token de quien hace la petición. Queda como decisión pendiente (ver 4.1.7) si conviene añadir además **Row-Level Security** nativo de PostgreSQL como capa adicional de defensa.
+Varios hogares comparten la misma base de datos, y el aislamiento entre ellos se defiende en **dos capas independientes**:
+
+1. **Aplicación:** todo caso de uso y todo repositorio filtra siempre por el `householdId` del token de quien hace la petición. Nunca se confía en un `householdId` recibido como parámetro del cliente.
+2. **Base de datos (Row-Level Security):** cada tabla con `household_id` tiene RLS activado y una política que restringe las filas visibles al hogar de la sesión. Si un repositorio olvidase el filtro, PostgreSQL sigue sin devolver filas ajenas.
+
+```sql
+ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assets FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY assets_household_isolation ON assets
+    USING (household_id = current_setting('app.household_id')::uuid);
+```
+
+La aplicación fija `SET LOCAL app.household_id = '<uuid>'` al abrir cada transacción, a partir del claim del token. Dos condiciones que es fácil pasar por alto y que invalidan la protección entera: el usuario de base de datos de la aplicación **no** debe ser superusuario ni tener `BYPASSRLS`, y hace falta `FORCE ROW LEVEL SECURITY` para que la política también se aplique al propietario de la tabla.
+
+Las políticas se versionan como migraciones Flyway, igual que el esquema (ver 4.1.7). El detalle de ambas decisiones está en [ADR-003](docs/common/architecture/decisions/ADR-003-row-level-security.md) y [ADR-004](docs/common/architecture/decisions/ADR-004-database-migrations.md).
 
 ```mermaid
 erDiagram
@@ -586,7 +603,7 @@ Catálogo ilustrativo de los comandos y queries que expone la capa de aplicació
 | Comando | `AjustarCantidadAsset` | assetId, nueva cantidad (absoluta) o delta | solo sobre `CONSUMIBLE`; la cantidad resultante no puede ser negativa | `AssetQuantityChanged` |
 | Comando | `DarDeBajaAsset` | assetId | sin hijos activos ni préstamo `ACTIVO`; llegar a `cantidad = 0` no da de baja por sí solo | `AssetDeactivated` |
 | Comando | `CrearLocation` | nombre, parentLocationId (opcional), capacidad, condiciones | evita ciclos en la jerarquía | `LocationCreated` |
-| Comando | `CrearUsuario` | nombre, email, role | solo `ADMIN_HOGAR`; email único en el hogar | — |
+| Comando | `CrearUsuario` | nombre, email, role, contraseña inicial | solo `ADMIN_HOGAR`; email único en el hogar; obliga a cambiar la contraseña en el primer acceso | — |
 | Comando | `ModificarRolUsuario` | userId, nuevo role | no puede quitarse el único `ADMIN_HOGAR` del hogar | — |
 | Comando | `IniciarPrestamo` | assetId, prestador, receptor, fecha de devolución prevista | el asset debe ser `DURADERO` y no tener otro préstamo `ACTIVO` | `LoanStarted` |
 | Comando | `ConfirmarDevolucion` | loanId | solo prestador, receptor o un usuario del hogar | `LoanReturned` |
@@ -598,6 +615,8 @@ Catálogo ilustrativo de los comandos y queries que expone la capa de aplicació
 | Query | `ObtenerPrestamo` | loanId | accesible por el hogar o por token acotado, con campos distintos (ver 5.4.3) | — |
 
 > Este catálogo es ilustrativo y crecerá a medida que se implementen los casos de uso; cada nuevo comando/query debería añadirse aquí siguiendo el mismo formato.
+>
+> **Previsto para más adelante:** `InvitarUsuario` (invitación por email con token de un solo uso) sustituirá o convivirá con `CrearUsuario` cuando exista infraestructura de correo, y requerirá una tabla de invitaciones que no forma parte del esquema del MVP (ver la decisión en 4.1.7).
 
 ---
 
@@ -607,7 +626,8 @@ Catálogo ilustrativo de los comandos y queries que expone la capa de aplicació
 |---|---|---|
 | Backend | Kotlin + Spring Boot | Monolito modular |
 | Persistencia | PostgreSQL 16+ | |
-| Multi-tenancy | Aislamiento por `household_id` | Varios hogares comparten la misma base de datos (ver 5.6); Row-Level Security de PostgreSQL como posible capa adicional (decisión pendiente, ver 4.1.7) |
+| Multi-tenancy | Aislamiento por `household_id` en aplicación + Row-Level Security de PostgreSQL | Varios hogares comparten la misma base de datos; dos capas independientes de aislamiento (ver 5.6 y ADR-003) |
+| Migraciones de BD | Flyway (SQL plano versionado) | Esquema y políticas de RLS versionados juntos (ver ADR-004) |
 | Comunicación interna BE | Event bus (in-process) | Contrato definido (ver 5.2); librería concreta por definir; candidato a evolucionar con patrón Outbox |
 | Comunicación FE ↔ BE | API REST autenticada | Spring Security + JWT para usuarios del hogar; tokens acotados de vida corta (tabla `loan_access_tokens`) para usuarios externos de préstamo (ver 5.4.1) |
 | Contratos de API | OpenAPI 3.0 (`openapi.yaml`) + ejemplos en el README | Ver 5.4.3 |
@@ -647,10 +667,16 @@ pie title Distribución de la batería de tests
 
 | Fase | Contenido | Estado |
 |---|---|---|
-| **Fase 0 — Definición** | Arquitectura, stack, alcance del core, estrategia de testing | 🟡 En curso |
-| **Fase 1 — Core MVP** | Gestión de recursos/assets, autenticación, API REST, event bus, FE responsive básico | ⚪ Pendiente |
+| **Fase 0 — Definición** | Arquitectura, stack, alcance del core, estrategia de testing | 🟢 Completada |
+| **Fase 1 — Core MVP** | Gestión de recursos/assets, autenticación, API REST, event bus, FE responsive básico | 🟡 Siguiente |
 | **Fase 2 — Primer módulo funcional** | Candidato a definir (CMMS o Warehouse) | ⚪ Pendiente |
 | **Fase 3 — Módulos adicionales** | Según backlog de la sección 4.2 | ⚪ Pendiente |
+
+> **Tarea de arranque de la Fase 1:** repartir a `docs/` las secciones de este
+> documento que corresponden por ámbito a `common/` (5.4.3, 5.6, 5.7 y la
+> definición del core en 4.1.x), dejando aquí un resumen y el enlace. Se aplazó
+> deliberadamente durante la Fase 0; el motivo y el destino de cada sección están
+> en [`docs/README.md`](docs/README.md).
 
 ### 8.1 Detalle de la Fase 0 (definición)
 
@@ -666,9 +692,11 @@ pie title Distribución de la batería de tests
 - [x] Esquema de autenticación definitivo y gestión de tokens externos (ver 5.4.1)
 - [x] Contratos JSON definitivos de la API (request/response schemas) (ver 5.4.3 y `openapi.yaml`)
 - [x] Resolución de las decisiones de diseño abiertas (ver 4.1.7)
-- [ ] Decidir activación de PostgreSQL Row-Level Security como capa adicional de aislamiento multi-tenant
-- [ ] Definir flujo de invitación/alta de nuevos usuarios en un hogar existente
-- [ ] Seleccionar librería de migraciones de base de datos (Flyway/Liquibase)
+- [x] Decidir activación de PostgreSQL Row-Level Security como capa adicional de aislamiento multi-tenant (activado, ver 5.6 y ADR-003)
+- [x] Definir flujo de invitación/alta de nuevos usuarios en un hogar existente (alta directa en el MVP, invitación por email como evolución, ver 4.1.7)
+- [x] Seleccionar librería de migraciones de base de datos (Flyway, ver ADR-004)
+
+**La Fase 0 queda cerrada: no hay decisiones de diseño abiertas.** El siguiente paso es la Fase 1, cuyo criterio de validación ya está fijado en la ADR-001: un recorrido vertical que atraviese frontend, API autenticada, aplicación, dominio y PostgreSQL, con pruebas en los tres niveles.
 
 ---
 
@@ -687,6 +715,13 @@ El contrato completo de la API vive en [`openapi.yaml`](openapi.yaml) (OpenAPI
 3.0); su proceso de validación y las convenciones asociadas se documentan en
 [`docs/common/contracts/`](docs/common/contracts/README.md).
 
+> **Este documento sigue siendo la fuente vigente de la definición del core.**
+> Parte de su contenido (5.4.3, 5.6, 5.7) corresponde por ámbito a `docs/common/`,
+> y se repartirá al iniciar la Fase 1, cuando exista documentación propia de
+> backend y frontend que compita con él. El motivo del aplazamiento y el destino
+> previsto de cada sección están en
+> [`docs/README.md`](docs/README.md#estado-actual-la-definición-de-fase-0-vive-en-el-readme-principal).
+
 ---
 
 ## 10. Historial de cambios de este documento
@@ -698,6 +733,8 @@ El contrato completo de la API vive en [`openapi.yaml`](openapi.yaml) (OpenAPI
 | 2026-08-06 | Validación de las decisiones de diseño abiertas (4.1.7): roles prestador/receptor abiertos a miembros del hogar o a externos, alcance mínimo de la gestión de préstamos en el core, y unificación del campo ubicación |
 | 2026-08-06 | Reajuste de prioridades de módulos futuros (4.2): Gestión de eventos temporales pasa de Media a Baja; Warehouse pasa de Media a Alta |
 | 2026-08-07 | Cierre de los puntos pendientes de la Fase 0 (8.1): modelo de datos definitivo multi-tenant (5.6), catálogo de casos de uso del core (5.7), esquema de autenticación definitivo con Spring Security + JWT y gestión de tokens externos (5.4.1), y contratos JSON de la API (ejemplos en 5.4.3 + especificación OpenAPI en `openapi.yaml`) |
+| 2026-08-07 | Decisión documentada de aplazar a la Fase 1 el reparto de contenido del README a `docs/`, con el destino previsto de cada sección (ver `docs/README.md`) |
+| 2026-08-07 | Cierre de las decisiones abiertas de la Fase 0 (4.1.7): préstamo limitado a assets duraderos (la cesión de un consumible es un ajuste de cantidad), Row-Level Security activado como segunda capa de aislamiento (5.6, ADR-003), alta directa de usuarios en el MVP con invitación por email como evolución, y Flyway como librería de migraciones (ADR-004). La Fase 0 queda completada |
 | 2026-08-07 | Reformulación del concepto de asset (4.1.1): todo material del hogar es un asset, con distinción `DURADERO`/`CONSUMIBLE` y contador de cantidad en el core. Impacto en el diagrama de dominio (4.1.3), reglas de préstamo (4.1.5), decisiones validadas (4.1.7), evento `AssetQuantityChanged` (5.2.3), API (5.4.2, 5.4.3), modelo de datos (5.6), casos de uso con `AjustarCantidadAsset` (5.7), ejemplos de test (7) y `openapi.yaml` |
 
 ---
