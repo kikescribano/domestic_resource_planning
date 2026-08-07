@@ -89,3 +89,18 @@ validará con el primer recorrido vertical descrito en la ADR-001.
 Sustituir el modelo de base de datos compartida por aislamiento físico, o
 cambiar de framework, requerirá una nueva ADR con evidencia de la necesidad
 (incidente de fuga, requisito regulatorio o límite de rendimiento medido).
+
+## Posterior a esta decisión
+
+El cuerpo de esta ADR se conserva tal y como se aceptó. Las cuestiones que
+quedaban abiertas en «Costes y riesgos» se han resuelto después:
+
+- El riesgo de que un repositorio olvide el filtro por `household_id` se mitiga
+  con Row-Level Security, aceptado en [ADR-003](ADR-003-row-level-security.md).
+  La decisión de esta ADR no cambia: el filtrado en aplicación se mantiene como
+  primera capa.
+- La librería de migraciones se resuelve en
+  [ADR-004](ADR-004-database-migrations.md): Flyway.
+- El flujo de alta de usuarios en un hogar existente se decide en la sección
+  4.1.7 del [`README principal`](../../../README.md): alta directa por un
+  administrador en el MVP, con invitación por email como evolución posterior.
