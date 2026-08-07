@@ -14,6 +14,8 @@ servers:
 tags:
   - name: auth
     description: Autenticación de usuarios del hogar
+  - name: catalog
+    description: Catálogo de artículos del hogar (definición reutilizable, ver readme.md 4.1.1)
   - name: assets
     description: Gestión de recursos/assets
   - name: locations
@@ -82,6 +84,94 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
 
+  /catalog-items:
+    get:
+      tags: [catalog]
+      summary: Listar y buscar artículos del catálogo del hogar
+      description: >
+        Alimenta el autocompletado del alta de consumibles: se busca el artículo
+        antes de dar entrada, para no volver a introducir su definición.
+      parameters:
+        - name: q
+          in: query
+          description: Búsqueda por nombre (normalizado, sin distinguir mayúsculas ni acentos)
+          schema: { type: string }
+        - name: categoria
+          in: query
+          schema: { type: string }
+        - name: codigoBarras
+          in: query
+          schema: { type: string }
+        - name: incluirRetirados
+          in: query
+          description: Por defecto false -- los artículos retirados no se ofrecen en el alta
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Listado de artículos vigentes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CatalogItem" }
+    post:
+      tags: [catalog]
+      summary: Crear un artículo en el catálogo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CatalogItemInput" }
+      responses:
+        "201":
+          description: Artículo creado. Publica el evento CatalogItemCreated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatalogItem" }
+        "409":
+          description: >
+            Ya existe un artículo con ese nombre normalizado o ese código de
+            barras en el hogar (CATALOG_ITEM_DUPLICATE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /catalog-items/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [catalog]
+      summary: Detalle de un artículo
+      responses:
+        "200":
+          description: Artículo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatalogItem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [catalog]
+      summary: Retirar un artículo del catálogo
+      description: >
+        Retirada lógica -- marca retiredAt. La fila permanece porque las
+        existencias dadas de baja siguen apuntando a ella; borrarla rompería
+        la clave ajena y el historial. Un artículo retirado no se ofrece en el
+        alta ni admite nuevas entradas.
+      responses:
+        "204":
+          description: Artículo retirado
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            Al artículo aún le quedan existencias vivas
+            (CATALOG_ITEM_HAS_EXISTENCES)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
   /assets:
     get:
       tags: [assets]
@@ -98,6 +188,9 @@ paths:
         - name: tipo
           in: query
           schema: { $ref: "#/components/schemas/AssetTipo" }
+        - name: catalogItemId
+          in: query
+          schema: { type: string, format: uuid }
       responses:
         "200":
           description: Listado de assets
@@ -108,7 +201,11 @@ paths:
                 items: { $ref: "#/components/schemas/Asset" }
     post:
       tags: [assets]
-      summary: Dar de alta un asset
+      summary: Dar de alta un asset DURADERO
+      description: >
+        Solo admite assets DURADERO. La entrada de un CONSUMIBLE se hace por
+        POST /assets/intake, que resuelve el artículo y suma sobre la existencia
+        que ya hubiera en esa ubicación.
       requestBody:
         required: true
         content:
@@ -122,6 +219,45 @@ paths:
               schema: { $ref: "#/components/schemas/Asset" }
         "409":
           description: Conflicto de ubicación u otra regla de negocio
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /assets/intake:
+    post:
+      tags: [assets]
+      summary: Dar entrada a un consumible
+      description: >
+        Registra la entrada de un CONSUMIBLE. Se indica el artículo (existente
+        por catalogItemId, o nuevo mediante el objeto catalogItem), la ubicación
+        y la cantidad, siempre en la unidad del artículo. Si ya existe una
+        existencia de ese artículo en esa ubicación, la operación suma sobre
+        ella y responde 200; si no, la crea y responde 201.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssetIntakeInput" }
+      responses:
+        "200":
+          description: >
+            Existencia ya presente en esa ubicación: se sumó la cantidad.
+            Publica AssetQuantityChanged.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Asset" }
+        "201":
+          description: >
+            Primera existencia de ese artículo en esa ubicación. Publica
+            AssetCreated, y CatalogItemCreated si además creó el artículo.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Asset" }
+        "409":
+          description: >
+            Conflicto de ubicación, cantidad no positiva
+            (INTAKE_QUANTITY_NOT_POSITIVE) o artículo duplicado
+            (CATALOG_ITEM_DUPLICATE)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -143,8 +279,13 @@ paths:
       tags: [assets]
       summary: Modificar un asset (ubicación, asset padre o cantidad de un consumible)
       description: >
-        Ajustar cantidad sobre un asset CONSUMIBLE publica el evento
-        AssetQuantityChanged. El tipo del asset es inmutable.
+        La cantidad enviada aquí es absoluta -- sustituye, no suma (para sumar,
+        POST /assets/intake). Ajustar cantidad sobre un asset CONSUMIBLE publica
+        el evento AssetQuantityChanged. El tipo del asset es inmutable; el
+        catalogItemId solo admite asignarse a un DURADERO que aún no tenga
+        artículo, nunca cambiarse ni retirarse. No acepta estado: la baja se
+        hace con DELETE, y PRESTADO/DISPONIBLE los gobiernan el préstamo y su
+        devolución.
       requestBody:
         required: true
         content:
@@ -159,8 +300,67 @@ paths:
         "409":
           description: >
             Conflicto de ubicación, ciclo en la jerarquía, cantidad sobre un
-            asset DURADERO (ASSET_QUANTITY_NOT_APPLICABLE) o cantidad negativa
-            (ASSET_QUANTITY_NEGATIVE)
+            asset DURADERO (ASSET_QUANTITY_NOT_APPLICABLE), cantidad negativa
+            (ASSET_QUANTITY_NEGATIVE) o mover una existencia a una ubicación
+            que ya tiene otra viva del mismo artículo
+            (EXISTENCE_ALREADY_IN_LOCATION), que se resuelve con
+            POST /assets/{id}/merge
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      tags: [assets]
+      summary: Dar de baja un asset
+      description: >
+        Baja lógica -- pasa el asset a estado BAJA, no borra la fila. Si es una
+        existencia con cantidad pendiente, la baja la lleva a 0 y publica
+        AssetQuantityChanged antes de AssetDeactivated: lo que quedaba se da
+        por perdido. Una existencia dada de baja libera su hueco de artículo y
+        ubicación, así que se puede volver a dar entrada allí.
+      responses:
+        "204":
+          description: Asset dado de baja
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            El asset tiene hijos en la jerarquía (ASSET_HAS_CHILDREN) o un
+            préstamo ACTIVO (ASSET_HAS_ACTIVE_LOAN)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /assets/{id}/merge:
+    parameters:
+      - $ref: "#/components/parameters/AssetId"
+    post:
+      tags: [assets]
+      summary: Fusionar dos existencias del mismo artículo
+      description: >
+        Junta dos existencias CONSUMIBLE del mismo artículo creadas por
+        separado. El asset de la ruta es el que DESAPARECE: queda a cantidad 0
+        y estado BAJA, y su cantidad se suma a la del destino, que conserva su
+        ubicación y su propietario. Publica AssetQuantityChanged sobre el
+        destino y AssetDeactivated sobre el origen, correlacionados por payload
+        (mergedFromAssetId y mergedIntoAssetId).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssetMergeInput" }
+      responses:
+        "200":
+          description: Asset destino con la cantidad acumulada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Asset" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            Las dos existencias no son del mismo artículo
+            (MERGE_CATALOG_ITEM_MISMATCH), origen y destino coinciden
+            (MERGE_SAME_ASSET), alguna no es CONSUMIBLE
+            (MERGE_NOT_CONSUMIBLE) o alguna está dada de baja
+            (MERGE_ASSET_DEACTIVATED)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -413,14 +613,47 @@ components:
       type: string
       description: >
         Naturaleza del asset. DURADERO tiene identidad propia y se cuenta por
-        unidad física; CONSUMIBLE se agota o se repone y se cuenta mediante
-        cantidad + unidad. Se fija en el alta y es inmutable después.
+        unidad física; CONSUMIBLE se agota o se repone y es una existencia de un
+        artículo, con cantidad en la unidad de ese artículo. Se fija en el alta
+        y es inmutable después.
       enum: [DURADERO, CONSUMIBLE]
 
     UnidadMedida:
       type: string
-      description: Unidad de medida de la cantidad de un asset CONSUMIBLE.
+      description: >
+        Unidad de medida de un artículo del catálogo. La fija el artículo, no la
+        existencia: todas las existencias de un mismo artículo se llevan en ella.
       enum: [UNIDAD, GRAMO, KILOGRAMO, MILILITRO, LITRO, METRO, PAQUETE]
+
+    CatalogItemInput:
+      type: object
+      description: >
+        Definición reutilizable de un artículo del hogar. No es un asset -- no
+        tiene ubicación ni cantidad.
+      required: [nombre, categoria, unidad]
+      properties:
+        nombre:
+          type: string
+          description: Único en el hogar, comparado normalizado (sin mayúsculas ni acentos)
+        categoria: { type: string }
+        unidad: { $ref: "#/components/schemas/UnidadMedida" }
+        marca: { type: string }
+        codigoBarras:
+          type: string
+          description: Opcional; único en el hogar si se informa
+
+    CatalogItem:
+      allOf:
+        - $ref: "#/components/schemas/CatalogItemInput"
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            createdAt: { type: string, format: date-time }
+            retiredAt:
+              type: string
+              format: date-time
+              nullable: true
+              description: Informado si el artículo está retirado del catálogo
 
     Ubicacion:
       type: object
@@ -432,38 +665,85 @@ components:
     AssetInput:
       type: object
       description: >
-        Alta de un asset. Si tipo es CONSUMIBLE, cantidad y unidad son
-        obligatorias; si es DURADERO, ambas deben omitirse.
-      required: [nombre, tipo, ownerId]
+        Alta de un asset DURADERO. No admite cantidad. nombre y categoria son
+        obligatorios salvo que se informe catalogItemId, en cuyo caso se heredan
+        del artículo.
+      required: [tipo, ownerId]
       properties:
         nombre: { type: string }
         tipo: { $ref: "#/components/schemas/AssetTipo" }
         categoria: { type: string }
+        catalogItemId:
+          type: string
+          format: uuid
+          description: Opcional en un DURADERO -- comparte definición entre unidades idénticas
         ownerId: { type: string, format: uuid }
         ubicacion: { $ref: "#/components/schemas/Ubicacion" }
-        cantidad: { type: number, minimum: 0 }
-        unidad: { $ref: "#/components/schemas/UnidadMedida" }
+
+    AssetIntakeInput:
+      type: object
+      description: >
+        Entrada de un consumible. Exactamente uno de catalogItemId o catalogItem:
+        el primero referencia un artículo del catálogo, el segundo lo crea en la
+        misma operación. La cantidad va en la unidad del artículo.
+      required: [ownerId, cantidad]
+      properties:
+        catalogItemId: { type: string, format: uuid }
+        catalogItem: { $ref: "#/components/schemas/CatalogItemInput" }
+        ownerId: { type: string, format: uuid }
+        ubicacion: { $ref: "#/components/schemas/Ubicacion" }
+        cantidad:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+          description: Cantidad que entra, se suma a la existencia si ya la hay
+
+    AssetMergeInput:
+      type: object
+      description: >
+        Destino de la fusión. El origen es el asset de la ruta, que es el que
+        desaparece.
+      required: [destinoAssetId]
+      properties:
+        destinoAssetId:
+          type: string
+          format: uuid
+          description: Existencia que absorbe la cantidad y sobrevive
 
     AssetPatch:
       type: object
       description: >
         Modificación parcial. El tipo es inmutable y no se acepta aquí.
-        cantidad solo es válida sobre un asset CONSUMIBLE.
+        cantidad solo es válida sobre un asset CONSUMIBLE, y es absoluta.
+        nombre y categoria solo son válidos en un asset sin artículo -- si lo
+        tiene, se cambian en el artículo. estado no se acepta: lo gobiernan
+        DELETE /assets/{id}, POST /loans y POST /loans/{id}/return.
       properties:
         nombre: { type: string }
         categoria: { type: string }
+        catalogItemId:
+          type: string
+          format: uuid
+          description: Solo para asignar artículo a un DURADERO que aún no lo tiene
         ubicacion: { $ref: "#/components/schemas/Ubicacion" }
-        estado: { $ref: "#/components/schemas/AssetEstado" }
         cantidad: { type: number, minimum: 0 }
-        unidad: { $ref: "#/components/schemas/UnidadMedida" }
 
     Asset:
       type: object
       properties:
         id: { type: string, format: uuid }
-        nombre: { type: string }
+        nombre:
+          type: string
+          description: Propio del asset, o resuelto desde su artículo cuando lo tiene.
         tipo: { $ref: "#/components/schemas/AssetTipo" }
-        categoria: { type: string }
+        categoria:
+          type: string
+          description: Propia del asset, o resuelta desde su artículo cuando lo tiene.
+        catalogItemId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Siempre presente en CONSUMIBLE; opcional en DURADERO.
         ownerId: { type: string, format: uuid }
         ubicacion: { $ref: "#/components/schemas/Ubicacion" }
         estado: { $ref: "#/components/schemas/AssetEstado" }
@@ -475,7 +755,7 @@ components:
           allOf:
             - $ref: "#/components/schemas/UnidadMedida"
           nullable: true
-          description: Solo presente en assets CONSUMIBLE.
+          description: Resuelta desde el artículo; solo presente si el asset lo tiene.
         createdAt: { type: string, format: date-time }
 
     LocationInput:
