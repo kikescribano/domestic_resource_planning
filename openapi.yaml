@@ -95,6 +95,9 @@ paths:
         - name: estado
           in: query
           schema: { $ref: "#/components/schemas/AssetEstado" }
+        - name: tipo
+          in: query
+          schema: { $ref: "#/components/schemas/AssetTipo" }
       responses:
         "200":
           description: Listado de assets
@@ -138,7 +141,10 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     patch:
       tags: [assets]
-      summary: Modificar un asset (incluye cambiar ubicación o asset padre)
+      summary: Modificar un asset (ubicación, asset padre o cantidad de un consumible)
+      description: >
+        Ajustar cantidad sobre un asset CONSUMIBLE publica el evento
+        AssetQuantityChanged. El tipo del asset es inmutable.
       requestBody:
         required: true
         content:
@@ -151,7 +157,10 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Asset" }
         "409":
-          description: Conflicto de ubicación o ciclo en la jerarquía
+          description: >
+            Conflicto de ubicación, ciclo en la jerarquía, cantidad sobre un
+            asset DURADERO (ASSET_QUANTITY_NOT_APPLICABLE) o cantidad negativa
+            (ASSET_QUANTITY_NEGATIVE)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -400,6 +409,19 @@ components:
       type: string
       enum: [DISPONIBLE, PRESTADO, BAJA]
 
+    AssetTipo:
+      type: string
+      description: >
+        Naturaleza del asset. DURADERO tiene identidad propia y se cuenta por
+        unidad física; CONSUMIBLE se agota o se repone y se cuenta mediante
+        cantidad + unidad. Se fija en el alta y es inmutable después.
+      enum: [DURADERO, CONSUMIBLE]
+
+    UnidadMedida:
+      type: string
+      description: Unidad de medida de la cantidad de un asset CONSUMIBLE.
+      enum: [UNIDAD, GRAMO, KILOGRAMO, MILILITRO, LITRO, METRO, PAQUETE]
+
     Ubicacion:
       type: object
       description: Referencia polimórfica a la ubicación de un asset -- exactamente uno de los dos campos.
@@ -409,30 +431,51 @@ components:
 
     AssetInput:
       type: object
-      required: [nombre, ownerId]
+      description: >
+        Alta de un asset. Si tipo es CONSUMIBLE, cantidad y unidad son
+        obligatorias; si es DURADERO, ambas deben omitirse.
+      required: [nombre, tipo, ownerId]
       properties:
         nombre: { type: string }
+        tipo: { $ref: "#/components/schemas/AssetTipo" }
         categoria: { type: string }
         ownerId: { type: string, format: uuid }
         ubicacion: { $ref: "#/components/schemas/Ubicacion" }
+        cantidad: { type: number, minimum: 0 }
+        unidad: { $ref: "#/components/schemas/UnidadMedida" }
 
     AssetPatch:
       type: object
+      description: >
+        Modificación parcial. El tipo es inmutable y no se acepta aquí.
+        cantidad solo es válida sobre un asset CONSUMIBLE.
       properties:
         nombre: { type: string }
         categoria: { type: string }
         ubicacion: { $ref: "#/components/schemas/Ubicacion" }
         estado: { $ref: "#/components/schemas/AssetEstado" }
+        cantidad: { type: number, minimum: 0 }
+        unidad: { $ref: "#/components/schemas/UnidadMedida" }
 
     Asset:
       type: object
       properties:
         id: { type: string, format: uuid }
         nombre: { type: string }
+        tipo: { $ref: "#/components/schemas/AssetTipo" }
         categoria: { type: string }
         ownerId: { type: string, format: uuid }
         ubicacion: { $ref: "#/components/schemas/Ubicacion" }
         estado: { $ref: "#/components/schemas/AssetEstado" }
+        cantidad:
+          type: number
+          nullable: true
+          description: Solo presente en assets CONSUMIBLE.
+        unidad:
+          allOf:
+            - $ref: "#/components/schemas/UnidadMedida"
+          nullable: true
+          description: Solo presente en assets CONSUMIBLE.
         createdAt: { type: string, format: date-time }
 
     LocationInput:
