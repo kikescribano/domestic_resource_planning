@@ -12,6 +12,8 @@ servers:
     description: Entorno ilustrativo (a definir en el despliegue real)
 
 tags:
+  - name: households
+    description: Alta de un hogar y de su primer administrador
   - name: auth
     description: Autenticación de usuarios del hogar
   - name: articles
@@ -33,6 +35,81 @@ security:
   - bearerAuth: []
 
 paths:
+  /households:
+    post:
+      tags: [households]
+      summary: Crear un hogar con su primer administrador
+      description: >
+        Unica escritura sin autenticar de la API. Crea la identidad sin
+        verificar, el hogar, la pertenencia HOUSEHOLD_ADMIN y las categorias
+        por defecto en una transaccion, y envia por correo un token de
+        verificacion de un solo uso. NO devuelve sesion -- el hogar no es
+        utilizable hasta verificar. Responde siempre 202, exista o no ya ese
+        correo: contestar otra cosa permitiria averiguar quien esta
+        registrado.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HouseholdInput" }
+      responses:
+        "202":
+          description: Solicitud aceptada. Sin cuerpo, y siempre la misma respuesta.
+
+  /auth/verify-email:
+    post:
+      tags: [auth]
+      summary: Verificar el correo y obtener sesion
+      description: >
+        Consume el token de un solo uso enviado por correo, marca la identidad
+        como verificada y devuelve el par de tokens. Si era el alta de un
+        hogar, es aqui donde se publica HouseholdCreated -- no al insertar la
+        fila, para que ningun modulo siembre datos de un hogar que quiza no
+        llegue a usarse.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "200":
+          description: Correo verificado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenPair" }
+        "409":
+          description: Token caducado, ya usado o inexistente (VERIFICATION_TOKEN_INVALID)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /auth/resend-verification:
+    post:
+      tags: [auth]
+      summary: Reenviar el enlace de verificacion
+      description: >
+        Invalida el token anterior y emite uno nuevo. Responde siempre igual,
+        exista o no la identidad, por el mismo motivo que el alta de hogar.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "202":
+          description: Solicitud aceptada. Sin cuerpo, y siempre la misma respuesta.
+
   /auth/login:
     post:
       tags: [auth]
@@ -56,7 +133,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/TokenPair"
         "401":
-          description: Credenciales inválidas
+          description: >
+            Credenciales inválidas, o correo sin verificar
+            (EMAIL_NOT_VERIFIED)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -772,6 +851,23 @@ components:
         createdBy: { type: string, format: uuid, nullable: true }
         updatedBy: { type: string, format: uuid, nullable: true }
 
+    HouseholdInput:
+      type: object
+      required: [name, timeZone, admin]
+      properties:
+        name: { type: string }
+        timeZone:
+          type: string
+          example: Europe/Madrid
+          description: Identificador IANA. Lo usa el proceso diario de vencidos
+        admin:
+          type: object
+          required: [name, email, password]
+          properties:
+            name: { type: string }
+            email: { type: string, format: email }
+            password: { type: string, format: password }
+
     UserRole:
       type: string
       enum: [HOUSEHOLD_ADMIN, HOUSEHOLD_MEMBER]
@@ -1095,29 +1191,45 @@ components:
         email:
           type: string
           format: email
-          description: Único entre los usuarios activos del hogar, comparado en minúsculas
+          description: >
+            Único en toda la instalación, comparado en minúsculas. Si ya
+            existe una identidad con ese correo se reutiliza en lugar de
+            duplicarla, pero mientras el MVP admita una sola pertenencia
+            activa el alta se rechaza (IDENTITY_ALREADY_MEMBER).
         phone: { type: string }
         role: { $ref: "#/components/schemas/UserRole" }
 
     User:
+      description: >
+        Es una PERTENENCIA a un hogar (HouseholdMember), no la identidad. id
+        es el memberId, que es lo que referencian propietario de asset,
+        prestamos y autoria. Los datos de la persona -- name, email, phone,
+        avatarUrl, lastLoginAt -- se resuelven desde su identidad, que vive
+        fuera del hogar.
       allOf:
         - type: object
           properties:
             id: { type: string, format: uuid }
+            identityId: { type: string, format: uuid }
             name: { type: string }
             email: { type: string, format: email }
             phone: { type: string, nullable: true }
             role: { $ref: "#/components/schemas/UserRole" }
             avatarUrl: { type: string, format: uri, nullable: true }
             lastLoginAt: { type: string, format: date-time, nullable: true }
+            emailVerifiedAt:
+              type: string
+              format: date-time
+              nullable: true
+              description: Resuelto desde la identidad. Vacío impide iniciar sesión
             mustChangePassword:
               type: boolean
-              description: Lo activa el alta directa y lo apaga el primer cambio de contraseña
+              description: Lo activa el alta hecha por un administrador y lo apaga el primer cambio
             deactivatedAt:
               type: string
               format: date-time
               nullable: true
-              description: Informado si el usuario ha causado baja en el hogar
+              description: Informado si esa persona ha dejado este hogar -- no cierra su cuenta
         - $ref: "#/components/schemas/Authorship"
 
     LoanExternal:
