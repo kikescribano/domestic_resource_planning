@@ -1027,7 +1027,7 @@ components:
       type: string
       description: >
         Naturaleza del contenedor, no de lo que se guarda dentro.
-      enum: [DWELLING, FLOOR, ROOM, FURNITURE, SHELF, OTHER]
+      enum: [HOUSE, FLOOR, ROOM, FURNITURE, SHELF, OTHER]
 
     LocationInput:
       type: object
