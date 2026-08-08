@@ -121,6 +121,8 @@ graph TD
 | Notas (`notes`) | Ambos, opcional | Texto libre |
 | Fecha de alta (`createdAt`) | Ambos | — |
 | Última modificación (`updatedAt`) | Ambos | — |
+| Creado por (`createdBy`) | Ambos | Ver «Autoría de los cambios» |
+| Modificado por (`updatedBy`) | Ambos | Ídem |
 | Documentación asociada | Opcional, típicamente `DURABLE` | Facturas, garantías, manuales. No es un campo del asset sino una entidad propia (ver más abajo): un paquete de arroz no tiene manual |
 
 **Atributos mínimos de un Articulo:**
@@ -140,6 +142,8 @@ graph TD
 | Fecha de alta (`createdAt`) | — |
 | Última modificación (`updatedAt`) | — |
 | Fecha de retirada (`retiredAt`) | Informada si el artículo está retirado del catálogo |
+| Creado por (`createdBy`) | Ver «Autoría de los cambios» |
+| Modificado por (`updatedBy`) | Ídem |
 
 **Categorías: un catálogo por hogar.**
 
@@ -151,7 +155,10 @@ La clasificación funcional no es una lista fija del sistema sino una **entidad 
 | Nombre (`name`) | Único entre las categorías vigentes del hogar, comparado normalizado |
 | Notas (`notes`) | Texto libre, opcional |
 | Fecha de alta (`createdAt`) | — |
+| Última modificación (`updatedAt`) | — |
 | Fecha de retirada (`retiredAt`) | Informada si la categoría está retirada |
+| Creado por (`createdBy`) | Ver «Autoría de los cambios» |
+| Modificado por (`updatedBy`) | Ídem |
 
 A diferencia de `type`, `status` o `unit`, los nombres de categoría **no son valores de un enumerado**: son datos que el hogar edita y que se le muestran tal cual, así que van en su idioma y no siguen la regla de nomenclatura de 4.1.7.
 
@@ -170,8 +177,28 @@ Facturas, garantías y manuales se modelan como una entidad `Document` que **gua
 | Fecha del documento (`date`) | Cuándo se emitió: la fecha de la factura, la de la garantía. Opcional |
 | Válido hasta (`validUntil`) | Cuándo deja de valer, que en una garantía es el dato que importa. Opcional, y distinto del anterior: tenerlos en un solo campo obligaba a elegir cuál de los dos se pierde |
 | Alta (`createdAt`) | — |
+| Última modificación (`updatedAt`) | — |
+| Creado por (`createdBy`) | Ver «Autoría de los cambios» |
+| Modificado por (`updatedBy`) | Ídem |
 
 Un documento cuelga **de un asset o de un artículo, nunca de ambos**, y la distinción es la que ya estaba implícita en el modelo: la factura y la garantía son de la unidad física que compraste, y el manual es del modelo. Colgarlo del artículo es lo que hace que dos taladros idénticos compartan manual sin duplicarlo, que es justo lo que 4.1.7 prometía al abrir el artículo a los duraderos.
+
+**Autoría de los cambios (transversal).**
+
+Un hogar es un sitio compartido, y la pregunta que más se hace no es qué cambió sino **quién lo cambió**: quién movió el taladro, quién se llevó la última bombilla. Por eso toda entidad del core lleva dos referencias más, junto a sus fechas:
+
+| Atributo | Descripción |
+|---|---|
+| Creado por (`createdBy`) | Usuario que dio de alta la fila |
+| Modificado por (`updatedBy`) | Usuario del último cambio |
+
+Tres cosas que se derivan y conviene no olvidar:
+
+- **Ambos pueden estar vacíos, y vacío significa «el sistema».** El proceso diario que marca los préstamos vencidos (4.1.5) no actúa en nombre de nadie, así que deja `updatedBy` a nulo. Inventar un usuario técnico para rellenarlo daría una autoría falsa.
+- **Nunca se aceptan del cliente.** Salen del token de quien hace la petición, igual que el `householdId`. Un campo de autoría que el cliente pueda rellenar no vale para nada, porque se puede falsear.
+- **El usuario referenciado puede estar de baja.** Como los usuarios no se borran (ver 4.1.4), la referencia sigue resolviendo: el historial no pierde el nombre de quien hizo las cosas cuando esa persona deja el hogar.
+
+El hogar es la excepción: no lleva autoría propia porque, en el instante en que su fila nace, todavía no existe ningún usuario que pueda figurar.
 
 **Reglas mínimas de negocio:**
 - Un asset no puede ser su propio ancestro en la jerarquía de composición (evita ciclos).
@@ -209,6 +236,8 @@ Una **ubicación (Location)** representa un espacio físico de almacenaje y, al 
 | Notas (`notes`) | Texto libre, opcional |
 | Fecha de alta (`createdAt`) | — |
 | Última modificación (`updatedAt`) | — |
+| Creado por (`createdBy`) | Ver «Autoría de los cambios» |
+| Modificado por (`updatedBy`) | Ídem |
 
 **Reglas mínimas de negocio:**
 - Una ubicación no puede ser su propia ancestra (evita ciclos).
@@ -327,6 +356,8 @@ El hogar es la unidad de aislamiento que agrupa a todo lo demás (ver 5.6), y ha
 | Baja (`deactivatedAt`) | Informado si el usuario ha causado baja en el hogar |
 | Fecha de alta (`createdAt`) | — |
 | Última modificación (`updatedAt`) | — |
+| Creado por (`createdBy`) | Ver «Autoría de los cambios» |
+| Modificado por (`updatedBy`) | Ídem |
 
 **Baja de un usuario.** Quien deja el hogar no se borra: se marca `deactivatedAt`, deja de poder autenticarse y se le revocan los refresh tokens. La fila permanece porque los préstamos y el historial la referencian.
 
@@ -367,6 +398,8 @@ stateDiagram-v2
 | Notas (`notes`) | Texto libre, opcional |
 | Fecha de alta (`createdAt`) | — |
 | Última modificación (`updatedAt`) | — |
+| Creado por (`createdBy`) | Ver «Autoría de los cambios» |
+| Modificado por (`updatedBy`) | Ídem |
 
 **Cómo se llega a `OVERDUE`.** No lo provoca ninguna acción del usuario, así que hace falta algo que lo marque: un **proceso programado** recorre a diario los préstamos `ACTIVE` con `dueAt` ya pasada, los pasa a `OVERDUE` y publica `LoanOverdue` (ver 5.2.3). Es el primer proceso de fondo del sistema, y de ahí cuelgan los recordatorios automáticos que la gestión avanzada de préstamos (4.2) necesitará.
 
@@ -414,7 +447,9 @@ Las siguientes decisiones, inicialmente abiertas, han quedado validadas:
 
 > **Pendiente de validar:** el aviso por capacidad de una ubicación (4.1.2) solo puede contar unidades, porque un asset no lleva peso ni volumen. ¿Merece la pena que los tenga? Solo si alguien los rellena, y un hogar que no pesa sus cajas obtendría un aviso peor que ninguno. Queda abierta hasta tener uso real; mientras tanto, el aviso se limita a lo que el sistema sabe con certeza.
 
-> **Pendiente de validar:** cinco atributos quedaron propuestos y sin decidir, todos por el mismo motivo — son útiles, pero rozan el alcance de un módulo futuro o meten la UI en el dominio. **Estado de conservación** y **condición en entrega y devolución de un préstamo** («volvió rayado») son lo primero que se llevarán el CMMS y la gestión avanzada de préstamos. **Etiquetas libres** en un asset amplían la clasificación más allá de una sola categoría, a costa de otra entidad recién después de añadir el catálogo de categorías. **Icono y color** de una categoría los va a querer el frontend mobile-first, pero son presentación. **Quién creó y quién modificó** cada fila responde a la pregunta más real de un hogar compartido —«¿quién movió el taladro?»— y cuesta dos columnas en cada tabla. Ninguno se añade hasta que haya un caso de uso que lo pida.
+- **Autoría de los cambios:** toda entidad del core lleva `createdBy` y `updatedBy` (ver 4.1.1). Un hogar es un sitio compartido y la pregunta que más se hace no es qué cambió sino quién lo cambió. Ambas son anulables y **nulo significa el sistema**, que es lo que deja el proceso de vencidos al no actuar en nombre de nadie; se descartó inventar un usuario técnico porque daría una autoría falsa. Nunca se aceptan del cliente: salen del token, igual que el `householdId`. El hogar es la única excepción — cuando su fila nace no existe todavía ningún usuario al que apuntar.
+
+> **Pendiente de validar:** cuatro atributos quedaron propuestos y sin decidir, todos por el mismo motivo — son útiles, pero rozan el alcance de un módulo futuro o meten la UI en el dominio. **Estado de conservación** y **condición en entrega y devolución de un préstamo** («volvió rayado») son lo primero que se llevarán el CMMS y la gestión avanzada de préstamos. **Etiquetas libres** en un asset amplían la clasificación más allá de una sola categoría, a costa de otra entidad recién después de añadir el catálogo de categorías. **Icono y color** de una categoría los va a querer el frontend mobile-first, pero son presentación. Ninguno se añade hasta que haya un caso de uso que lo pida.
 
 > Si en el futuro surgen nuevas decisiones de diseño pendientes de validar, se recomienda añadirlas aquí siguiendo el mismo formato (pregunta + decisión + referencia a la sección afectada) hasta que se resuelvan.
 
@@ -812,6 +847,8 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
         timestamptz deactivated_at
+        uuid created_by FK
+        uuid updated_by FK
     }
     CATEGORIES {
         uuid id PK
@@ -821,6 +858,8 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
         timestamptz retired_at
+        uuid created_by FK
+        uuid updated_by FK
     }
     DOCUMENTS {
         uuid id PK
@@ -833,6 +872,9 @@ erDiagram
         date date
         date valid_until
         timestamptz created_at
+        timestamptz updated_at
+        uuid created_by FK
+        uuid updated_by FK
     }
     ARTICLES {
         uuid id PK
@@ -849,6 +891,8 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
         timestamptz retired_at
+        uuid created_by FK
+        uuid updated_by FK
     }
     ASSETS {
         uuid id PK
@@ -868,6 +912,8 @@ erDiagram
         text notes
         timestamptz created_at
         timestamptz updated_at
+        uuid created_by FK
+        uuid updated_by FK
     }
     LOCATIONS {
         uuid id PK
@@ -881,6 +927,8 @@ erDiagram
         text notes
         timestamptz created_at
         timestamptz updated_at
+        uuid created_by FK
+        uuid updated_by FK
     }
     LOANS {
         uuid id PK
@@ -897,6 +945,8 @@ erDiagram
         timestamptz returned_at
         timestamptz created_at
         timestamptz updated_at
+        uuid created_by FK
+        uuid updated_by FK
     }
     LOAN_ACCESS_TOKENS {
         uuid id PK
@@ -919,7 +969,7 @@ erDiagram
 
 | Tabla | Restricciones clave |
 |---|---|
-| `households` | `time_zone` con un identificador IANA válido; se valida en el caso de uso, no como `CHECK`. Es lo que usa el proceso de vencidos para saber cuándo ha pasado la fecha en ese hogar |
+| `households` | `time_zone` con un identificador IANA válido; se valida en el caso de uso, no como `CHECK`. No lleva `created_by` ni `updated_by`: cuando la fila nace no existe ningún usuario al que apuntar. Es lo que usa el proceso de vencidos para saber cuándo ha pasado la fecha en ese hogar |
 | `users` | `email` único entre los usuarios **activos** del hogar y comparado en minúsculas: índice único parcial sobre `(household_id, lower(email)) WHERE deactivated_at IS NULL`. Sin el `lower()`, `Kike@x.com` y `kike@x.com` serían dos cuentas; sin el parcial, el email de quien causa baja quedaría bloqueado para siempre. `role` con `CHECK IN ('HOUSEHOLD_ADMIN','HOUSEHOLD_MEMBER')`. Que no se pueda dar de baja al único `HOUSEHOLD_ADMIN` activo no es expresable como `CHECK`: se valida en el caso de uso |
 | `categories` | `name` único entre las categorías vigentes del hogar, con índice único parcial sobre `(household_id, lower(unaccent(name))) WHERE retired_at IS NULL` — mismo tratamiento que `articles`, y por el mismo motivo: la retirada es lógica porque `assets` y `articles` la referencian |
 | `documents` | Cuelga de exactamente uno de los dos, con `CHECK ((asset_id IS NULL) <> (article_id IS NULL))`; `type` con `CHECK IN ('INVOICE','WARRANTY','MANUAL','OTHER')`; `url` obligatorio; `CHECK (valid_until IS NULL OR date IS NULL OR valid_until >= date)`, porque una garantía no puede caducar antes de emitirse. Borrar un documento sí es un `DELETE` real: no lo referencia nada y no forma parte del historial de ninguna otra entidad |
@@ -932,6 +982,17 @@ erDiagram
 | `refresh_tokens` | `token_hash` único; se marca `revoked_at` en lugar de borrarse, para poder auditar |
 
 Todas las tablas del core (excepto `loan_access_tokens` y `refresh_tokens`, que cuelgan de `loans`/`users`) incluyen `household_id` para el filtrado multi-tenant.
+
+**Autoría, y su integridad entre hogares.** Todas ellas llevan además `created_by` y `updated_by`, ambas anulables y referenciando a `users`: nulo significa que el cambio no lo hizo una persona sino el sistema (ver 4.1.1). `households` es la excepción, porque en el instante de crearse no existe todavía ningún usuario al que apuntar.
+
+Que esas referencias no puedan cruzarse de hogar sí es expresable en base de datos, y merece la pena porque es exactamente el tipo de fuga que ADR-003 quiere evitar en dos capas. Con `UNIQUE (household_id, id)` en `users`, cada tabla puede declarar la clave ajena compuesta:
+
+```sql
+ALTER TABLE assets ADD CONSTRAINT assets_created_by_same_household
+    FOREIGN KEY (household_id, created_by) REFERENCES users (household_id, id);
+```
+
+Así la propia base de datos rechaza atribuir un cambio a un usuario de otro hogar, aunque el caso de uso se despistara.
 
 ### 5.7 Casos de uso del core (comandos y queries)
 
@@ -1026,6 +1087,12 @@ pie title Distribución de la batería de tests
 - *Contrato de adaptador / E2E:* `POST /api/v1/assets/intake` responde `201` la primera vez y `200` sobre la misma ubicación, con la cantidad acumulada y el nombre resuelto desde el artículo.
 - *Contrato de adaptador / E2E:* `GET /api/v1/loans/{id}` con el token acotado de un receptor externo solo debe exponer los campos permitidos para ese rol.
 
+**Ejemplos derivados de la autoría de los cambios:**
+- *Integración de caso de uso:* cualquier comando debe rellenar `createdBy`/`updatedBy` con el usuario del token, e **ignorar** el valor si el cliente lo envía en el cuerpo.
+- *Integración de caso de uso:* `MarkOverdueLoans` debe dejar `updatedBy` a nulo, porque no actúa en nombre de nadie.
+- *Contrato de adaptador:* la clave ajena compuesta debe rechazar un `createdBy` que apunte a un usuario de otro hogar.
+- *Integración de caso de uso:* dar de baja a un usuario no debe borrar su rastro — las filas que creó siguen resolviendo su nombre.
+
 **Ejemplos derivados de la profundización de atributos:**
 - *Unitario de dominio:* un `Document` no puede colgar a la vez de un asset y de un artículo, ni de ninguno de los dos.
 - *Integración de caso de uso:* `DeactivateUser` sobre el único `HOUSEHOLD_ADMIN` activo debe fallar; sobre cualquier otro debe dejar sus assets con propietario nulo, revocar sus refresh tokens e impedirle autenticarse después.
@@ -1109,6 +1176,7 @@ El contrato completo de la API vive en [`openapi.yaml`](openapi.yaml) (OpenAPI
 | 2026-08-07 | Decisión documentada de aplazar a la Fase 1 el reparto de contenido del README a `docs/`, con el destino previsto de cada sección (ver `docs/README.md`) |
 | 2026-08-07 | Cierre de las decisiones abiertas de la Fase 0 (4.1.7): préstamo limitado a assets duraderos (la cesión de un consumible es un ajuste de cantidad), Row-Level Security activado como segunda capa de aislamiento (5.6, ADR-003), alta directa de usuarios en el MVP con invitación por email como evolución, y Flyway como librería de migraciones (ADR-004). La Fase 0 queda completada |
 | 2026-08-07 | Reformulación del concepto de asset (4.1.1): todo material del hogar es un asset, con distinción `DURABLE`/`CONSUMABLE` y contador de cantidad en el core. Impacto en el diagrama de dominio (4.1.3), reglas de préstamo (4.1.5), decisiones validadas (4.1.7), evento `AssetQuantityChanged` (5.2.3), API (5.4.2, 5.4.3), modelo de datos (5.6), casos de uso con `AdjustAssetQuantity` (5.7), ejemplos de test (7) y `openapi.yaml` |
+| 2026-08-08 | Autoría de los cambios en todo el core: cada entidad gana `createdBy` y `updatedBy` (4.1.1), anulables y con nulo significando «el sistema», nunca aceptadas del cliente, y con clave ajena compuesta para que una autoría no pueda cruzarse de hogar (5.6). El hogar queda fuera, porque cuando su fila nace no hay ningún usuario al que apuntar. Impacto en las tablas de atributos, el modelo de datos, los ejemplos de test (7) y `openapi.yaml`. Quedan cuatro atributos pendientes en 4.1.7 |
 | 2026-08-08 | Segunda pasada de nomenclatura: se traducen al inglés los **valores de los enumerados** (`DURABLE`, `CONSUMABLE`, `AVAILABLE`, `LENT`, `DECOMMISSIONED`, `ACTIVE`, `RETURNED`, `OVERDUE`, `HOUSEHOLD_ADMIN`…), los **nombres de los casos de uso** (`CreateAsset`, `RegisterConsumableIntake`, `MergeStockItems`, `MarkOverdueLoans`…) y los **nombres de clase** del modelo de dominio (`Article`, `Category`, `Document`, `User`, `Loan`, `Role`). La regla de 4.1.7 pasa a ser sin excepciones: todo nombre destinado a ser programado va en inglés. Los nombres de categoría sembrados dejan de parecer un enumerado y se escriben como lo que son, datos editables por el hogar |
 | 2026-08-08 | Homogeneización de las tablas de atributos (4.1.x), que ahora dan **Nombre de definición (`nombreDePrograma`)** en la columna «Atributo», y unificación de toda la nomenclatura de programación en inglés camelCase: campos de API, columnas de BD y payloads de evento. El artículo pasa de `catalog_items`/`catalogItemId` a `articles`/`articleId`. Se amplían los atributos de todas las entidades: el hogar gana zona horaria —que necesitaba el proceso de vencidos—, el asset número de serie, fecha de adquisición y foto, el artículo modelo, contenido por envase y foto, el documento fecha de validez separada de la de emisión, el usuario teléfono, avatar y último acceso, y la ubicación foto. Cinco atributos más quedan propuestos y anotados como pendientes en 4.1.7 |
 | 2026-08-07 | Profundización de los atributos de las entidades del core (4.1.1 a 4.1.5): `category` pasa a ser un catálogo por hogar (entidad `Category`); la documentación asociada se modela como entidad `Document` que guarda enlace y cuelga de un asset o de un artículo; el usuario gana baja lógica, normalización de email y `mustChangePassword`, y sus assets quedan sin propietario al causar baja; la ubicación gana `type` y esquema explícito de capacidad y condiciones ambientales, cerrando dos «a definir»; el préstamo estructura el contacto del externo y define cómo se alcanza `OVERDUE` mediante proceso programado. Corregido el índice único de préstamos, que solo miraba a `ACTIVE` y dejaba prestar un asset con préstamo `OVERDUE`. Impacto en 4.1.3, 4.1.7, 5.2.3, 5.4.2, 5.6, 5.7, 7 y `openapi.yaml` |
