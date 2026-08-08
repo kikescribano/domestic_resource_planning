@@ -317,8 +317,8 @@ paths:
       responses:
         "200":
           description: >
-            Listado de assets. Excluye los BAJA salvo que se pidan con
-            estado=BAJA.
+            Listado de assets. Excluye los DECOMMISSIONED salvo que se pidan con
+            status=DECOMMISSIONED.
           content:
             application/json:
               schema:
@@ -326,9 +326,9 @@ paths:
                 items: { $ref: "#/components/schemas/Asset" }
     post:
       tags: [assets]
-      summary: Dar de alta un asset DURADERO
+      summary: Dar de alta un asset DURABLE
       description: >
-        Solo admite assets DURADERO. La entrada de un CONSUMIBLE se hace por
+        Solo admite assets DURABLE. La entrada de un CONSUMABLE se hace por
         POST /assets/intake, que resuelve el artículo y suma sobre la existencia
         que ya hubiera en esa ubicación.
       requestBody:
@@ -353,7 +353,7 @@ paths:
       tags: [assets]
       summary: Dar entrada a un consumible
       description: >
-        Registra la entrada de un CONSUMIBLE. Se indica el artículo (existente
+        Registra la entrada de un CONSUMABLE. Se indica el artículo (existente
         por articleId, o nuevo mediante el objeto article), la ubicación
         y la cantidad, siempre en la unidad del artículo. Si ya existe una
         existencia de ese artículo en esa ubicación, la operación suma sobre
@@ -405,11 +405,11 @@ paths:
       summary: Modificar un asset (ubicación, asset padre o cantidad de un consumible)
       description: >
         La cantidad enviada aquí es absoluta -- sustituye, no suma (para sumar,
-        POST /assets/intake). Ajustar cantidad sobre un asset CONSUMIBLE publica
+        POST /assets/intake). Ajustar cantidad sobre un asset CONSUMABLE publica
         el evento AssetQuantityChanged. El tipo del asset es inmutable; el
-        articleId solo admite asignarse a un DURADERO que aún no tenga
+        articleId solo admite asignarse a un DURABLE que aún no tenga
         artículo, nunca cambiarse ni retirarse. No acepta estado: la baja se
-        hace con DELETE, y PRESTADO/DISPONIBLE los gobiernan el préstamo y su
+        hace con DELETE, y LENT/AVAILABLE los gobiernan el préstamo y su
         devolución.
       requestBody:
         required: true
@@ -425,7 +425,7 @@ paths:
         "409":
           description: >
             Conflicto de ubicación, ciclo en la jerarquía, cantidad sobre un
-            asset DURADERO (ASSET_QUANTITY_NOT_APPLICABLE), cantidad negativa
+            asset DURABLE (ASSET_QUANTITY_NOT_APPLICABLE), cantidad negativa
             (ASSET_QUANTITY_NEGATIVE) o mover una existencia a una ubicación
             que ya tiene otra viva del mismo artículo
             (EXISTENCE_ALREADY_IN_LOCATION), que se resuelve con
@@ -437,7 +437,7 @@ paths:
       tags: [assets]
       summary: Dar de baja un asset
       description: >
-        Baja lógica -- pasa el asset a estado BAJA, no borra la fila. Si es una
+        Baja lógica -- pasa el asset a estado DECOMMISSIONED, no borra la fila. Si es una
         existencia con cantidad pendiente, la baja la lleva a 0 y publica
         AssetQuantityChanged antes de AssetDeactivated: lo que quedaba se da
         por perdido. Una existencia dada de baja libera su hueco de artículo y
@@ -449,7 +449,7 @@ paths:
         "409":
           description: >
             El asset tiene hijos en la jerarquía (ASSET_HAS_CHILDREN) o un
-            préstamo ACTIVO (ASSET_HAS_ACTIVE_LOAN)
+            préstamo ACTIVE (ASSET_HAS_ACTIVE_LOAN)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -461,9 +461,9 @@ paths:
       tags: [assets]
       summary: Fusionar dos existencias del mismo artículo
       description: >
-        Junta dos existencias CONSUMIBLE del mismo artículo creadas por
+        Junta dos existencias CONSUMABLE del mismo artículo creadas por
         separado. El asset de la ruta es el que DESAPARECE: queda a cantidad 0
-        y estado BAJA, y su cantidad se suma a la del destino, que conserva su
+        y estado DECOMMISSIONED, y su cantidad se suma a la del destino, que conserva su
         ubicación y su propietario. Publica AssetQuantityChanged sobre el
         destino y AssetDeactivated sobre el origen, correlacionados por payload
         (mergedFromAssetId y mergedIntoAssetId).
@@ -483,7 +483,7 @@ paths:
           description: >
             Las dos existencias no son del mismo artículo
             (MERGE_CATALOG_ITEM_MISMATCH), origen y destino coinciden
-            (MERGE_SAME_ASSET), alguna no es CONSUMIBLE
+            (MERGE_SAME_ASSET), alguna no es CONSUMABLE
             (MERGE_NOT_CONSUMIBLE) o alguna está dada de baja
             (MERGE_ASSET_DEACTIVATED)
           content:
@@ -572,7 +572,7 @@ paths:
                 items: { $ref: "#/components/schemas/User" }
     post:
       tags: [users]
-      summary: Dar de alta un miembro del hogar (solo ADMIN_HOGAR)
+      summary: Dar de alta un miembro del hogar (solo HOUSEHOLD_ADMIN)
       requestBody:
         required: true
         content:
@@ -594,7 +594,7 @@ paths:
         schema: { type: string, format: uuid }
     delete:
       tags: [users]
-      summary: Dar de baja a un usuario del hogar (solo ADMIN_HOGAR)
+      summary: Dar de baja a un usuario del hogar (solo HOUSEHOLD_ADMIN)
       description: >
         Baja lógica -- marca deactivatedAt, revoca los refresh tokens del
         usuario e impide que vuelva a autenticarse. Sus assets quedan SIN
@@ -608,7 +608,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
           description: >
-            Es el único ADMIN_HOGAR activo del hogar
+            Es el único HOUSEHOLD_ADMIN activo del hogar
             (USER_LAST_ADMIN)
           content:
             application/json:
@@ -622,7 +622,7 @@ paths:
         schema: { type: string, format: uuid }
     patch:
       tags: [users]
-      summary: Modificar el rol estructural de un usuario (solo ADMIN_HOGAR)
+      summary: Modificar el rol estructural de un usuario (solo HOUSEHOLD_ADMIN)
       requestBody:
         required: true
         content:
@@ -657,8 +657,8 @@ paths:
               schema: { $ref: "#/components/schemas/Loan" }
         "409":
           description: >
-            El asset ya tiene un préstamo abierto -- ACTIVO o VENCIDO
-            (LOAN_ASSET_ALREADY_LENT), o no es DURADERO
+            El asset ya tiene un préstamo abierto -- ACTIVE o OVERDUE
+            (LOAN_ASSET_ALREADY_LENT), o no es DURABLE
             (LOAN_ASSET_NOT_DURABLE)
           content:
             application/json:
@@ -763,27 +763,27 @@ components:
 
     UserRole:
       type: string
-      enum: [ADMIN_HOGAR, MIEMBRO_HOGAR]
+      enum: [HOUSEHOLD_ADMIN, HOUSEHOLD_MEMBER]
 
     AssetStatus:
       type: string
-      enum: [DISPONIBLE, PRESTADO, BAJA]
+      enum: [AVAILABLE, LENT, DECOMMISSIONED]
 
     AssetType:
       type: string
       description: >
-        Naturaleza del asset. DURADERO tiene identidad propia y se cuenta por
-        unidad física; CONSUMIBLE se agota o se repone y es una existencia de un
+        Naturaleza del asset. DURABLE tiene identidad propia y se cuenta por
+        unidad física; CONSUMABLE se agota o se repone y es una existencia de un
         artículo, con cantidad en la unidad de ese artículo. Se fija en el alta
         y es inmutable después.
-      enum: [DURADERO, CONSUMIBLE]
+      enum: [DURABLE, CONSUMABLE]
 
     MeasurementUnit:
       type: string
       description: >
         Unidad de medida de un artículo del catálogo. La fija el artículo, no la
         existencia: todas las existencias de un mismo artículo se llevan en ella.
-      enum: [UNIDAD, GRAMO, KILOGRAMO, MILILITRO, LITRO, METRO, PAQUETE]
+      enum: [UNIT, GRAM, KILOGRAM, MILLILITER, LITER, METER, PACK]
 
     CategoryInput:
       type: object
@@ -812,7 +812,7 @@ components:
 
     DocumentType:
       type: string
-      enum: [FACTURA, GARANTIA, MANUAL, OTRO]
+      enum: [INVOICE, WARRANTY, MANUAL, OTHER]
 
     DocumentInput:
       type: object
@@ -902,7 +902,7 @@ components:
     AssetInput:
       type: object
       description: >
-        Alta de un asset DURADERO. No admite quantity. name y categoryId son
+        Alta de un asset DURABLE. No admite quantity. name y categoryId son
         obligatorios salvo que se informe articleId, en cuyo caso se heredan
         del artículo.
       required: [type]
@@ -913,7 +913,7 @@ components:
         articleId:
           type: string
           format: uuid
-          description: Opcional en un DURADERO -- comparte definición entre unidades idénticas
+          description: Opcional en un DURABLE -- comparte definición entre unidades idénticas
         ownerId:
           type: string
           format: uuid
@@ -922,11 +922,11 @@ components:
         location: { $ref: "#/components/schemas/LocationRef" }
         serialNumber:
           type: string
-          description: Solo DURADERO
+          description: Solo DURABLE
         acquiredOn:
           type: string
           format: date
-          description: Solo DURADERO
+          description: Solo DURABLE
         photoUrl: { type: string, format: uri }
         notes: { type: string }
 
@@ -964,7 +964,7 @@ components:
       type: object
       description: >
         Modificación parcial. El tipo es inmutable y no se acepta aquí.
-        cantidad solo es válida sobre un asset CONSUMIBLE, y es absoluta.
+        cantidad solo es válida sobre un asset CONSUMABLE, y es absoluta.
         nombre y categoryId solo son válidos en un asset sin artículo -- si lo
         tiene, se cambian en el artículo. estado no se acepta: lo gobiernan
         DELETE /assets/{id}, POST /loans y POST /loans/{id}/return. ownerId es
@@ -975,7 +975,7 @@ components:
         articleId:
           type: string
           format: uuid
-          description: Solo para asignar artículo a un DURADERO que aún no lo tiene
+          description: Solo para asignar artículo a un DURABLE que aún no lo tiene
         ownerId: { type: string, format: uuid }
         location: { $ref: "#/components/schemas/LocationRef" }
         quantity: { type: number, minimum: 0 }
@@ -1000,7 +1000,7 @@ components:
           type: string
           format: uuid
           nullable: true
-          description: Siempre presente en CONSUMIBLE; opcional en DURADERO.
+          description: Siempre presente en CONSUMABLE; opcional en DURABLE.
         ownerId:
           type: string
           format: uuid
@@ -1015,7 +1015,7 @@ components:
         quantity:
           type: number
           nullable: true
-          description: Solo presente en assets CONSUMIBLE.
+          description: Solo presente en assets CONSUMABLE.
         unit:
           allOf:
             - $ref: "#/components/schemas/MeasurementUnit"
@@ -1027,7 +1027,7 @@ components:
       type: string
       description: >
         Naturaleza del contenedor, no de lo que se guarda dentro.
-      enum: [VIVIENDA, PLANTA, HABITACION, MUEBLE, ESTANTE, OTRO]
+      enum: [DWELLING, FLOOR, ROOM, FURNITURE, SHELF, OTHER]
 
     LocationInput:
       type: object
@@ -1045,7 +1045,7 @@ components:
             ni volumen, así que solo el recuento de unidades es fiable.
           required: [type, max, unit]
           properties:
-            type: { type: string, enum: [PESO, VOLUMEN, UNIDADES] }
+            type: { type: string, enum: [WEIGHT, VOLUME, UNITS] }
             max: { type: number }
             unit: { type: string, example: kg }
         environmentalConditions:
@@ -1058,7 +1058,7 @@ components:
             maxHumidity: { type: number, description: En porcentaje }
             lightExposure:
               type: string
-              enum: [DIRECTA, INDIRECTA, OSCURIDAD]
+              enum: [DIRECT, INDIRECT, DARKNESS]
         photoUrl: { type: string, format: uri }
         notes: { type: string }
 
@@ -1148,9 +1148,9 @@ components:
         status:
           type: string
           description: >
-            VENCIDO lo marca un proceso diario, no una acción del usuario. Un
-            préstamo VENCIDO sigue ocupando el asset -- vencer no es devolver.
-          enum: [ACTIVO, DEVUELTO, VENCIDO]
+            OVERDUE lo marca un proceso diario, no una acción del usuario. Un
+            préstamo OVERDUE sigue ocupando el asset -- vencer no es devolver.
+          enum: [ACTIVE, RETURNED, OVERDUE]
         startedAt: { type: string, format: date-time }
         dueAt: { type: string, format: date-time, nullable: true }
         returnedAt: { type: string, format: date-time, nullable: true }
