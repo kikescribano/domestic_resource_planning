@@ -761,6 +761,17 @@ components:
         refreshToken: { type: string }
         expiresIn: { type: integer, example: 900 }
 
+    Authorship:
+      type: object
+      description: >
+        Autoria de la fila, solo lectura. Se toma del token de quien hace la
+        peticion y se ignora si el cliente la envia. Nulo significa que el
+        cambio lo hizo el sistema y no una persona -- el caso del proceso
+        diario de prestamos vencidos.
+      properties:
+        createdBy: { type: string, format: uuid, nullable: true }
+        updatedBy: { type: string, format: uuid, nullable: true }
+
     UserRole:
       type: string
       enum: [HOUSEHOLD_ADMIN, HOUSEHOLD_MEMBER]
@@ -809,6 +820,7 @@ components:
               format: date-time
               nullable: true
               description: Informado si la categoría está retirada
+        - $ref: "#/components/schemas/Authorship"
 
     DocumentType:
       type: string
@@ -843,6 +855,7 @@ components:
           properties:
             id: { type: string, format: uuid }
             createdAt: { type: string, format: date-time }
+        - $ref: "#/components/schemas/Authorship"
 
     ArticleInput:
       type: object
@@ -891,6 +904,7 @@ components:
               format: date-time
               nullable: true
               description: Informado si el artículo está retirado del catálogo
+        - $ref: "#/components/schemas/Authorship"
 
     LocationRef:
       type: object
@@ -982,46 +996,48 @@ components:
         notes: { type: string }
 
     Asset:
-      type: object
-      properties:
-        id: { type: string, format: uuid }
-        name:
-          type: string
-          description: Propio del asset, o resuelto desde su artículo cuando lo tiene.
-        type: { $ref: "#/components/schemas/AssetType" }
-        categoryId:
-          type: string
-          format: uuid
-          description: Propia del asset, o resuelta desde su artículo cuando lo tiene.
-        category:
-          type: string
-          description: Nombre de la categoría, resuelto para lectura.
-        articleId:
-          type: string
-          format: uuid
-          nullable: true
-          description: Siempre presente en CONSUMABLE; opcional en DURABLE.
-        ownerId:
-          type: string
-          format: uuid
-          nullable: true
-          description: Nulo si su propietario causó baja y aún no se ha reasignado.
-        serialNumber: { type: string, nullable: true }
-        acquiredOn: { type: string, format: date, nullable: true }
-        photoUrl: { type: string, format: uri, nullable: true }
-        notes: { type: string, nullable: true }
-        location: { $ref: "#/components/schemas/LocationRef" }
-        status: { $ref: "#/components/schemas/AssetStatus" }
-        quantity:
-          type: number
-          nullable: true
-          description: Solo presente en assets CONSUMABLE.
-        unit:
-          allOf:
-            - $ref: "#/components/schemas/MeasurementUnit"
-          nullable: true
-          description: Resuelta desde el artículo; solo presente si el asset lo tiene.
-        createdAt: { type: string, format: date-time }
+      allOf:
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            name:
+              type: string
+              description: Propio del asset, o resuelto desde su artículo cuando lo tiene.
+            type: { $ref: "#/components/schemas/AssetType" }
+            categoryId:
+              type: string
+              format: uuid
+              description: Propia del asset, o resuelta desde su artículo cuando lo tiene.
+            category:
+              type: string
+              description: Nombre de la categoría, resuelto para lectura.
+            articleId:
+              type: string
+              format: uuid
+              nullable: true
+              description: Siempre presente en CONSUMABLE; opcional en DURABLE.
+            ownerId:
+              type: string
+              format: uuid
+              nullable: true
+              description: Nulo si su propietario causó baja y aún no se ha reasignado.
+            serialNumber: { type: string, nullable: true }
+            acquiredOn: { type: string, format: date, nullable: true }
+            photoUrl: { type: string, format: uri, nullable: true }
+            notes: { type: string, nullable: true }
+            location: { $ref: "#/components/schemas/LocationRef" }
+            status: { $ref: "#/components/schemas/AssetStatus" }
+            quantity:
+              type: number
+              nullable: true
+              description: Solo presente en assets CONSUMABLE.
+            unit:
+              allOf:
+                - $ref: "#/components/schemas/MeasurementUnit"
+              nullable: true
+              description: Resuelta desde el artículo; solo presente si el asset lo tiene.
+            createdAt: { type: string, format: date-time }
+        - $ref: "#/components/schemas/Authorship"
 
     LocationType:
       type: string
@@ -1069,6 +1085,7 @@ components:
           properties:
             id: { type: string, format: uuid }
             createdAt: { type: string, format: date-time }
+        - $ref: "#/components/schemas/Authorship"
 
     UserInput:
       type: object
@@ -1083,23 +1100,25 @@ components:
         role: { $ref: "#/components/schemas/UserRole" }
 
     User:
-      type: object
-      properties:
-        id: { type: string, format: uuid }
-        name: { type: string }
-        email: { type: string, format: email }
-        phone: { type: string, nullable: true }
-        role: { $ref: "#/components/schemas/UserRole" }
-        avatarUrl: { type: string, format: uri, nullable: true }
-        lastLoginAt: { type: string, format: date-time, nullable: true }
-        mustChangePassword:
-          type: boolean
-          description: Lo activa el alta directa y lo apaga el primer cambio de contraseña
-        deactivatedAt:
-          type: string
-          format: date-time
-          nullable: true
-          description: Informado si el usuario ha causado baja en el hogar
+      allOf:
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            email: { type: string, format: email }
+            phone: { type: string, nullable: true }
+            role: { $ref: "#/components/schemas/UserRole" }
+            avatarUrl: { type: string, format: uri, nullable: true }
+            lastLoginAt: { type: string, format: date-time, nullable: true }
+            mustChangePassword:
+              type: boolean
+              description: Lo activa el alta directa y lo apaga el primer cambio de contraseña
+            deactivatedAt:
+              type: string
+              format: date-time
+              nullable: true
+              description: Informado si el usuario ha causado baja en el hogar
+        - $ref: "#/components/schemas/Authorship"
 
     LoanExternal:
       type: object
@@ -1134,24 +1153,26 @@ components:
         notes: { type: string }
 
     Loan:
-      type: object
-      properties:
-        id: { type: string, format: uuid }
-        assetId: { type: string, format: uuid }
-        assetName:
-          type: string
-          description: >
-            Nombre del asset, resuelto para lectura. Es el único dato del asset
-            que ve un token acotado (ver readme.md 5.4.3).
-        lender: { $ref: "#/components/schemas/LoanParticipant" }
-        borrower: { $ref: "#/components/schemas/LoanParticipant" }
-        status:
-          type: string
-          description: >
-            OVERDUE lo marca un proceso diario, no una acción del usuario. Un
-            préstamo OVERDUE sigue ocupando el asset -- vencer no es devolver.
-          enum: [ACTIVE, RETURNED, OVERDUE]
-        startedAt: { type: string, format: date-time }
-        dueAt: { type: string, format: date-time, nullable: true }
-        returnedAt: { type: string, format: date-time, nullable: true }
-        notes: { type: string, nullable: true }
+      allOf:
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            assetId: { type: string, format: uuid }
+            assetName:
+              type: string
+              description: >
+                Nombre del asset, resuelto para lectura. Es el único dato del asset
+                que ve un token acotado (ver readme.md 5.4.3).
+            lender: { $ref: "#/components/schemas/LoanParticipant" }
+            borrower: { $ref: "#/components/schemas/LoanParticipant" }
+            status:
+              type: string
+              description: >
+                OVERDUE lo marca un proceso diario, no una acción del usuario. Un
+                préstamo OVERDUE sigue ocupando el asset -- vencer no es devolver.
+              enum: [ACTIVE, RETURNED, OVERDUE]
+            startedAt: { type: string, format: date-time }
+            dueAt: { type: string, format: date-time, nullable: true }
+            returnedAt: { type: string, format: date-time, nullable: true }
+            notes: { type: string, nullable: true }
+        - $ref: "#/components/schemas/Authorship"

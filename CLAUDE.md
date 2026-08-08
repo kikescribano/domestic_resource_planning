@@ -113,6 +113,10 @@ vencidos (README 4.1.5) no tiene token del que sacar el hogar. La salida fácil
 **toda** la aplicación, no solo para el proceso. Debe recorrer los hogares uno a
 uno fijando `app.household_id` en cada transacción, como cualquier petición.
 
+Toda fila del core lleva `created_by` y `updated_by`, que se toman **del token** y
+nunca del cuerpo de la petición. Nulo no es un hueco: significa que el cambio lo
+hizo el sistema y no una persona.
+
 **2. Un asset es todo material del hogar**, no solo lo económicamente relevante, y
 se divide en dos naturalezas que se comportan distinto (README 4.1.1):
 
