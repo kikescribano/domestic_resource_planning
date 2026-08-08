@@ -11,6 +11,7 @@ solo componente.
 - [`contracts/`](contracts/README.md): contratos compartidos entre componentes.
 - [`standards/`](standards/README.md): convenciones aplicables a toda la solución.
 - [`skills/`](skills/README.md): catálogo y documentación de capacidades reutilizables.
+- [`marketing/`](marketing/README.md): material con el que se presenta el producto hacia fuera.
 - [`templates/`](templates/document-template.md): punto de partida para documentos nuevos.
 
 Los detalles internos deben permanecer en [`../backend/`](../backend/README.md) o

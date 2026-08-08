@@ -1,0 +1,54 @@
+# Marketing
+
+| Campo | Valor |
+|---|---|
+| Estado | Borrador |
+| Responsable | Por decidir |
+| Ámbito | Toda la solución |
+| Última revisión | 2026-08-08 |
+
+Este espacio reúne el material con el que DRP se presenta hacia fuera:
+presentaciones, identidad visual, mensajes y cualquier pieza pensada para
+explicar el producto a quien todavía no lo conoce.
+
+Es material **derivado**. Describe lo que DRP es; no lo decide. Ninguna pieza de
+esta carpeta establece alcance, arquitectura ni comportamiento: eso vive en el
+[`README.md` principal](../../../README.md) y en las
+[ADR](../architecture/decisions/README.md). Si una presentación y el README se
+contradicen, manda el README y la pieza se corrige.
+
+## Por qué vive en `common/`
+
+Cómo se cuenta DRP no pertenece al backend ni al frontend: es una propiedad de la
+solución completa, igual que la visión de producto. Aplicando la
+[regla de ubicación](../../README.md#regla-de-ubicación), su sitio es `common/`.
+
+## Índice
+
+| Pieza | Contenido |
+|---|---|
+| [`DRP-resumen.pptx`](DRP-resumen.pptx) | Presentación de 18 diapositivas que resume el README principal: objetivo, analogía ERP → DRP, core mínimo, modelo de dominio, arquitectura, event bus, aislamiento multi-tenant, casos de uso, stack, testing y roadmap. Cada diapositiva lleva en sus notas la sección del README de la que procede. Refleja el estado del README a 2026-08-07 (Fase 0 completada). |
+
+## Contenido previsto
+
+| Pieza | Contenido |
+|---|---|
+| `messaging.md` | Slogan, propuesta de valor, descripción corta y larga, y tono con el que se habla del producto. |
+| `brand/` | Logo y sus variantes (color, monocromo, versión reducida), paleta, tipografías y usos prohibidos. |
+| `presentations/` | Presentaciones adicionales cuando haya más de una: comercial, técnica, demo. Mientras solo exista la de resumen, se queda en la raíz de esta carpeta. |
+| `screenshots/` | Capturas del producto para material divulgativo, con la versión a la que corresponden. |
+
+## Convenciones
+
+- **Cada pieza declara de qué versión de la fuente procede.** Una presentación
+  sin fecha no se puede auditar contra el README, que es un documento vivo.
+- **Un cambio sustantivo del README no actualiza el material solo.** Al tocar
+  alcance, modelo de dominio o arquitectura, hay que revisar si alguna pieza de
+  aquí queda desfasada y, si lo queda, regenerarla en el mismo incremento.
+- **Los binarios conviven con su fuente editable** cuando la exportación no se
+  pueda volver a generar desde el repositorio (por ejemplo, un logo: se guarda el
+  SVG junto al PNG, no solo el PNG).
+- Nombres de archivo en minúsculas y `kebab-case`, salvo que la pieza lleve el
+  nombre del producto.
+- El material de esta carpeta no es contractual: los contratos observables viven
+  en [`../contracts/`](../contracts/README.md).
