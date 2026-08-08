@@ -119,30 +119,30 @@ se divide en dos naturalezas que se comportan distinto (README 4.1.1):
 - `DURADERO` — identidad propia, una fila por unidad física. Es el único que puede
   actuar como ubicación de otros assets y el único que puede prestarse.
 - `CONSUMIBLE` — se agota y se repone. Una fila por **existencia**: un artículo en
-  una ubicación, con `cantidad`. Ceder un consumible es un ajuste de cantidad, no
+  una ubicación, con `quantity`. Ceder un consumible es un ajuste de cantidad, no
   un préstamo.
 
-El `tipo` es inmutable tras el alta. El core mantiene solo un contador: el
+El `type` es inmutable tras el alta. El core mantiene solo un contador: el
 seguimiento de existencias (consumos, mínimos, caducidad, lotes) es del módulo
 Warehouse, no del core.
 
 **Definición y existencia van separadas.** La ficha de qué es algo vive en un
-`Articulo` (tabla `catalog_items`): `nombre`, `categoria`, `unidad`, y opcionalmente
+`Articulo` (tabla `articles`): `name`, `category`, `unit`, y opcionalmente
 marca y código de barras. Un artículo **no es un asset** — no ocupa sitio, no tiene
 cantidad, no se presta. Es obligatorio en un `CONSUMIBLE` y opcional en un
 `DURADERO`, donde deja compartir modelo y documentación entre unidades idénticas.
 
 De ahí tres consecuencias que se olvidan con facilidad:
 
-- **La `unidad` la fija el artículo, no la existencia.** Todas las existencias de un
+- **La `unit` la fija el artículo, no la existencia.** Todas las existencias de un
   artículo van en la misma unidad; convertir entre unidad de compra y de consumo es
   de Warehouse.
 - **Traer otro paquete de azúcar no da de alta nada.** Es
   `RegistrarEntradaConsumible` (`POST /api/v1/assets/intake`), que resuelve el
   artículo —creándolo si hace falta— y **suma** sobre la existencia que ya haya en
-  esa ubicación. El `cantidad` del `PATCH` es lo contrario: absoluto, sustituye.
+  esa ubicación. El `quantity` del `PATCH` es lo contrario: absoluto, sustituye.
 - **Solo una existencia viva por artículo y ubicación**, garantizado por un índice
-  único parcial con `NULLS NOT DISTINCT` que además excluye `estado = 'BAJA'` — sin
+  único parcial con `NULLS NOT DISTINCT` que además excluye `status = 'BAJA'` — sin
   esa exclusión, una existencia dada de baja bloquearía su ubicación para siempre.
   Juntar dos que ya existen por separado es `FusionarExistencias`
   (`POST /api/v1/assets/{id}/merge`), nunca un `MoverAsset`: la fusión decide qué

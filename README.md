@@ -1,7 +1,7 @@
 # DRP · Domestic Resource Planning
 
 > **Estado del documento:** vivo — se actualiza a medida que el proyecto avanza.
-> **Última actualización:** 2026-08-07
+> **Última actualización:** 2026-08-08
 > **Fase actual:** Fase 0 completada — core mínimo definido y sin decisiones de diseño abiertas; lista para iniciar la Fase 1 (Core MVP)
 
 ---
@@ -60,11 +60,11 @@ Ahora bien, no todo el material se comporta igual, y esa diferencia condiciona e
 | Naturaleza | Qué es | Cómo se cuenta | Ejemplos |
 |---|---|---|---|
 | **`DURADERO`** | Tiene identidad propia y se usa de forma repetida sin agotarse | Una fila por unidad física | Caldera, taladro, sofá, coche, cuadro |
-| **`CONSUMIBLE`** | Se agota o se repone con el uso; las unidades son intercambiables entre sí | Una fila por existencia —un artículo en una ubicación—, con `cantidad` | Harina, detergente, pilas, bombillas |
+| **`CONSUMIBLE`** | Se agota o se repone con el uso; las unidades son intercambiables entre sí | Una fila por existencia —un artículo en una ubicación—, con `quantity` | Harina, detergente, pilas, bombillas |
 
 Dar de alta trescientos gramos de harina como trescientas filas no tendría sentido; tampoco lo tendría gestionar dos taladros idénticos como "cantidad: 2", porque cada uno tiene su propia ubicación, su propio préstamo y su propio mantenimiento. De ahí la distinción.
 
-> **Alcance deliberado:** el core mantiene un contador simple (`cantidad`) y nada más. El seguimiento de existencias real — consumos, mínimos, reposición, caducidades, lotes — pertenece al módulo **Warehouse** (ver 4.2), que se engancha vía event bus. El core no debe convertirse en un gestor de inventario (ver la decisión en 4.1.7).
+> **Alcance deliberado:** el core mantiene un contador simple (`quantity`) y nada más. El seguimiento de existencias real — consumos, mínimos, reposición, caducidades, lotes — pertenece al módulo **Warehouse** (ver 4.2), que se engancha vía event bus. El core no debe convertirse en un gestor de inventario (ver la decisión en 4.1.7).
 
 **Artículo y existencia: el alta de un consumible no se repite.**
 
@@ -72,20 +72,20 @@ Traer a casa un paquete de azúcar de 1 kg no da de alta nada nuevo: el hogar ya
 
 | Concepto | Qué es | Qué guarda | Equivalente ERP |
 |---|---|---|---|
-| **`Articulo`** | La ficha reutilizable de *qué* es algo | `nombre`, `categoria`, `unidad`, y opcionalmente marca y código de barras | Material maestro |
-| **Asset `CONSUMIBLE`** | Una existencia concreta de ese artículo en un sitio | `cantidad`, ubicación, propietario, estado | Stock |
+| **`Articulo`** | La ficha reutilizable de *qué* es algo | `name`, `category`, `unit`, y opcionalmente marca y código de barras | Material maestro |
+| **Asset `CONSUMIBLE`** | Una existencia concreta de ese artículo en un sitio | `quantity`, ubicación, propietario, estado | Stock |
 
 Un artículo **no es un asset**: no es material, no ocupa sitio, no tiene cantidad y no se presta. Es solo la ficha que evita reescribir «Azúcar / `ALIMENTACION` / `GRAMO`» en cada compra.
 
-> **Nomenclatura.** Igual que `Prestamo` se persiste en la tabla `loans`, el concepto se llama `Articulo` en el dominio y `catalog_items` en la base de datos (ver 5.6), con `catalogItemId` como campo y `/api/v1/catalog-items` como recurso de la API (ver 5.4.2).
+> **Nomenclatura.** En castellano el concepto es «artículo»; en código es `article` — tabla `articles`, campo `articleId`, recurso `/api/v1/articles`. Las tablas de atributos de aquí en adelante dan las dos formas: **Nombre de definición (`nombreDePrograma`)**, con la regla completa en 4.1.7.
 
 De ahí que dar entrada a un consumible sea siempre la misma operación, `RegistrarEntradaConsumible` (ver 5.7): se indica el artículo —eligiéndolo del catálogo del hogar, o creándolo en el mismo gesto si aún no existe—, la ubicación y la cantidad que entra. Si ya hay una existencia de ese artículo en esa ubicación, **la operación suma sobre ella**; si no la hay, la crea. Nunca aparece una segunda fila «Azúcar» en la despensa.
 
 Reglas que sostienen ese comportamiento:
 
 - **Una existencia por artículo y ubicación.** El azúcar de la despensa y el del trastero son dos existencias del mismo artículo, cada una con su cantidad y su propietario.
-- **La `unidad` la fija el artículo**, no la existencia. Si el azúcar se lleva en gramos, todas sus existencias van en gramos; comprar «un paquete de 1 kg» es una conversión en la entrada, no otra unidad guardada. Convertir entre unidad de compra y unidad de consumo es del módulo Warehouse, no del core.
-- **En un `DURADERO` el artículo es opcional.** Dos taladros idénticos pueden compartir artículo (misma marca, mismo modelo, mismo manual) sin dejar de ser dos assets con su ubicación, su préstamo y su mantenimiento propios. Un sofá único no necesita artículo: se da de alta con su `nombre` y su `categoria` propios.
+- **La `unit` la fija el artículo**, no la existencia. Si el azúcar se lleva en gramos, todas sus existencias van en gramos; comprar «un paquete de 1 kg» es una conversión en la entrada, no otra unidad guardada. Convertir entre unidad de compra y unidad de consumo es del módulo Warehouse, no del core.
+- **En un `DURADERO` el artículo es opcional.** Dos taladros idénticos pueden compartir artículo (misma marca, mismo modelo, mismo manual) sin dejar de ser dos assets con su ubicación, su préstamo y su mantenimiento propios. Un sofá único no necesita artículo: se da de alta con su `name` y su `category` propios.
 - El catálogo es **de cada hogar**, como el resto de tablas del core (ver 5.6). Un catálogo compartido entre hogares, o sembrado desde una base de códigos de barras, sería una evolución posterior.
 
 > **Esto tampoco es gestión de inventario.** El catálogo es dato maestro: qué cosas existen y cómo se llaman. Cuánto queda, cuándo caduca y cuándo hay que reponer sigue siendo de Warehouse.
@@ -106,28 +106,40 @@ graph TD
 
 | Atributo | Aplica a | Descripción |
 |---|---|---|
-| Identificador | Ambos | — |
-| `tipo` | Ambos | `DURADERO` o `CONSUMIBLE`. Se fija en el alta y **no es modificable** después: cambiar la naturaleza de un asset equivale a darlo de baja y crear otro |
-| `articuloId` | Obligatorio en `CONSUMIBLE`, opcional en `DURADERO` | Referencia al artículo del catálogo del hogar que define qué es este asset |
-| `nombre` | Ambos | Propio del asset, o heredado de su artículo cuando lo tiene. Un asset sin artículo debe informarlo |
-| `categoriaId` | Ambos | Clasificación funcional, independiente del tipo. Referencia al catálogo de categorías del hogar (ver más abajo). Se hereda del artículo igual que el nombre |
-| Propietario/responsable | Ambos | Referencia a un usuario del hogar |
-| Ubicación | Ambos | Referencia a otro Asset **o** a una Location — nunca ambas a la vez |
-| Estado | Ambos | `DISPONIBLE`, `PRESTADO`, `BAJA` |
-| `cantidad` | Solo `CONSUMIBLE` | Existencia actual, expresada en la `unidad` de su artículo |
-| `notas` | Ambos | Texto libre, opcional |
+| Identificador (`id`) | Ambos | — |
+| Tipo (`type`) | Ambos | `DURADERO` o `CONSUMIBLE`. Se fija en el alta y **no es modificable** después: cambiar la naturaleza de un asset equivale a darlo de baja y crear otro |
+| Artículo (`articleId`) | Obligatorio en `CONSUMIBLE`, opcional en `DURADERO` | Referencia al artículo del catálogo del hogar que define qué es este asset |
+| Nombre (`name`) | Ambos | Propio del asset, o heredado de su artículo cuando lo tiene. Un asset sin artículo debe informarlo |
+| Categoría (`categoryId`) | Ambos | Clasificación funcional, independiente del tipo. Referencia al catálogo de categorías del hogar (ver más abajo). Se hereda del artículo igual que el nombre |
+| Propietario (`ownerId`) | Ambos | Referencia a un usuario del hogar. Opcional: queda vacío cuando su propietario causa baja (ver 4.1.4) |
+| Ubicación (`location`) | Ambos | Referencia a otro Asset **o** a una Location — nunca ambas a la vez |
+| Estado (`status`) | Ambos | `DISPONIBLE`, `PRESTADO`, `BAJA` |
+| Cantidad (`quantity`) | Solo `CONSUMIBLE` | Existencia actual, expresada en la unidad de su artículo |
+| Número de serie (`serialNumber`) | Solo `DURADERO`, opcional | Lo que distingue dos unidades por lo demás idénticas, y lo que pide un fabricante al reclamar una garantía |
+| Fecha de adquisición (`acquiredOn`) | Solo `DURADERO`, opcional | Cuándo entró en el hogar. Es procedencia, no valor: el importe pertenece al módulo de gastos |
+| Foto (`photoUrl`) | Ambos, opcional | Enlace a una imagen. Reconocer una cosa de un vistazo es la mitad de un inventario doméstico, y el mismo criterio que en la documentación: se guarda el enlace, no el fichero |
+| Notas (`notes`) | Ambos, opcional | Texto libre |
+| Fecha de alta (`createdAt`) | Ambos | — |
+| Última modificación (`updatedAt`) | Ambos | — |
 | Documentación asociada | Opcional, típicamente `DURADERO` | Facturas, garantías, manuales. No es un campo del asset sino una entidad propia (ver más abajo): un paquete de arroz no tiene manual |
 
 **Atributos mínimos de un Articulo:**
 
 | Atributo | Descripción |
 |---|---|
-| Identificador | — |
-| `nombre` | Único dentro del hogar (comparado normalizado, sin distinguir mayúsculas ni acentos) |
-| `categoriaId` | La misma clasificación funcional que en un asset, contra el mismo catálogo |
-| `unidad` | Unidad de medida en la que se llevan todas sus existencias (`UNIDAD`, `GRAMO`, `KILOGRAMO`, `MILILITRO`, `LITRO`, `METRO`, `PAQUETE`) |
-| Marca, código de barras | Opcionales. Si se informa el código de barras, es único en el hogar y sirve para localizar el artículo al dar entrada |
-| `notas` | Texto libre, opcional |
+| Identificador (`id`) | — |
+| Nombre (`name`) | Único dentro del hogar (comparado normalizado, sin distinguir mayúsculas ni acentos) |
+| Categoría (`categoryId`) | La misma clasificación funcional que en un asset, contra el mismo catálogo |
+| Unidad (`unit`) | Unidad de medida en la que se llevan todas sus existencias (`UNIDAD`, `GRAMO`, `KILOGRAMO`, `MILILITRO`, `LITRO`, `METRO`, `PAQUETE`) |
+| Marca (`brand`) | Opcional |
+| Modelo (`model`) | Opcional. Marca y modelo juntos son la identidad real de un duradero, y lo que hace que compartir artículo entre dos unidades signifique algo |
+| Código de barras (`barcode`) | Opcional. Si se informa, es único en el hogar y sirve para localizar el artículo al dar entrada |
+| Contenido por envase (`packSize`) | Opcional, en la unidad del artículo. Es lo que permite dar entrada a «dos paquetes» de algo que se lleva en gramos sin que nadie multiplique a mano — la fricción que quedó señalada al subir la unidad al artículo |
+| Foto (`photoUrl`) | Opcional. Sirve a todas sus existencias a la vez |
+| Notas (`notes`) | Texto libre, opcional |
+| Fecha de alta (`createdAt`) | — |
+| Última modificación (`updatedAt`) | — |
+| Fecha de retirada (`retiredAt`) | Informada si el artículo está retirado del catálogo |
 
 **Categorías: un catálogo por hogar.**
 
@@ -135,33 +147,37 @@ La clasificación funcional no es una lista fija del sistema sino una **entidad 
 
 | Atributo | Descripción |
 |---|---|
-| Identificador | — |
-| `nombre` | Único entre las categorías vigentes del hogar, comparado normalizado |
-| `notas` | Texto libre, opcional |
+| Identificador (`id`) | — |
+| Nombre (`name`) | Único entre las categorías vigentes del hogar, comparado normalizado |
+| Notas (`notes`) | Texto libre, opcional |
+| Fecha de alta (`createdAt`) | — |
+| Fecha de retirada (`retiredAt`) | Informada si la categoría está retirada |
 
 Se retira igual que un artículo, y por el mismo motivo: los assets la referencian por clave ajena, así que borrar la fila rompería el historial. Una categoría retirada deja de ofrecerse al clasificar, pero los assets que ya la tenían la conservan.
 
 **Documentación asociada.**
 
-Facturas, garantías y manuales se modelan como una entidad `Documento` que **guarda un enlace, no el fichero**. El core no almacena binarios: la factura suele estar ya en el correo y el manual en la web del fabricante, y sostener subida de ficheros exigiría decidir almacenamiento, tamaños y tipos permitidos antes de escribir la primera línea de la Fase 1. Subir el fichero queda como evolución posterior, y encaja sin romper nada: el día que exista, es una segunda forma de rellenar el mismo `enlace`.
+Facturas, garantías y manuales se modelan como una entidad `Documento` que **guarda un enlace, no el fichero**. El core no almacena binarios: la factura suele estar ya en el correo y el manual en la web del fabricante, y sostener subida de ficheros exigiría decidir almacenamiento, tamaños y tipos permitidos antes de escribir la primera línea de la Fase 1. Subir el fichero queda como evolución posterior, y encaja sin romper nada: el día que exista, es una segunda forma de rellenar el mismo `url`.
 
 | Atributo | Descripción |
 |---|---|
-| Identificador | — |
-| `tipo` | `FACTURA`, `GARANTIA`, `MANUAL`, `OTRO` |
-| `enlace` | URL al documento. Obligatorio |
-| `descripcion` | Texto libre, opcional |
-| `fecha` | Fecha del documento (la de la factura, la de fin de garantía…), opcional |
+| Identificador (`id`) | — |
+| Tipo (`type`) | `FACTURA`, `GARANTIA`, `MANUAL`, `OTRO` |
+| Enlace (`url`) | URL al documento. Obligatorio |
+| Descripción (`description`) | Texto libre, opcional |
+| Fecha del documento (`date`) | Cuándo se emitió: la fecha de la factura, la de la garantía. Opcional |
+| Válido hasta (`validUntil`) | Cuándo deja de valer, que en una garantía es el dato que importa. Opcional, y distinto del anterior: tenerlos en un solo campo obligaba a elegir cuál de los dos se pierde |
+| Alta (`createdAt`) | — |
 
 Un documento cuelga **de un asset o de un artículo, nunca de ambos**, y la distinción es la que ya estaba implícita en el modelo: la factura y la garantía son de la unidad física que compraste, y el manual es del modelo. Colgarlo del artículo es lo que hace que dos taladros idénticos compartan manual sin duplicarlo, que es justo lo que 4.1.7 prometía al abrir el artículo a los duraderos.
 
 **Reglas mínimas de negocio:**
 - Un asset no puede ser su propio ancestro en la jerarquía de composición (evita ciclos).
 - Un asset no puede tener como ubicación simultáneamente otro asset y una Location: es una u otra.
-- Un asset no puede darse de baja si tiene assets hijos o un préstamo **abierto** —`ACTIVO` o `VENCIDO`—, sin resolver antes esa dependencia. La baja es siempre lógica (`estado = BAJA`): nada se borra, para no perder el historial.
+- Un asset no puede darse de baja si tiene assets hijos o un préstamo **abierto** —`ACTIVO` o `VENCIDO`—, sin resolver antes esa dependencia. La baja es siempre lógica (`status = BAJA`): nada se borra, para no perder el historial.
 - Un `CONSUMIBLE` nunca está `PRESTADO`, porque no se presta: su estado es `DISPONIBLE` o `BAJA`.
 - Dar de baja una existencia que aún tenía cantidad la deja a 0 — se da por perdida — en lugar de dejar un resto colgando en una fila muerta que ninguna suma de existencias volvería a mirar.
-- Un `CONSUMIBLE` debe tener `articuloId` y `cantidad` (≥ 0); un `DURADERO` no puede tener `cantidad` — la suya implícita es siempre 1.
+- Un `CONSUMIBLE` debe tener `articleId` y `quantity` (≥ 0); un `DURADERO` no puede tener `quantity` — la suya implícita es siempre 1.
 - El nombre y la categoría efectivos de un asset son los de su artículo cuando lo tiene; un asset sin artículo debe informarlos él. No se guardan por duplicado.
 - Una categoría no se borra: se retira cuando el hogar deja de usarla, y los assets que ya la tenían la conservan.
 - Un documento cuelga de un asset **o** de un artículo, nunca de los dos ni de ninguno.
@@ -171,7 +187,7 @@ Un documento cuelga **de un asset o de un artículo, nunca de ambos**, y la dist
 - Un artículo no se borra nunca: se **retira** del catálogo cuando ya no le queda ninguna existencia viva, y deja de ofrecerse en el alta. Las existencias dadas de baja siguen apuntando a él, así que la fila tiene que permanecer.
 - Solo un `DURADERO` puede actuar como ubicación de otros assets: una estantería contiene cosas, un paquete de harina no.
 - Solo un `DURADERO` puede prestarse. Un consumible no se presta, se consume o se entrega; la semántica de devolución no le aplica (ver 4.1.5).
-- Un `CONSUMIBLE` con `cantidad = 0` **sigue existiendo** como asset (agotado, pendiente de reposición). Llegar a cero no da de baja nada: esa es una decisión del hogar, no del sistema. Su artículo sigue en el catálogo en cualquier caso.
+- Un `CONSUMIBLE` con `quantity = 0` **sigue existiendo** como asset (agotado, pendiente de reposición). Llegar a cero no da de baja nada: esa es una decisión del hogar, no del sistema. Su artículo sigue en el catálogo en cualquier caso.
 
 #### 4.1.2 Ubicaciones
 
@@ -181,13 +197,16 @@ Una **ubicación (Location)** representa un espacio físico de almacenaje y, al 
 
 | Atributo | Descripción |
 |---|---|
-| Identificador | — |
-| `nombre` | Único entre las ubicaciones hermanas, es decir, con el mismo padre: dos «Estantería 2» pueden convivir en garajes distintos, pero no en el mismo |
-| `tipo` | `VIVIENDA`, `PLANTA`, `HABITACION`, `MUEBLE`, `ESTANTE`, `OTRO`. Lista fija: describe la naturaleza del contenedor, no lo que el hogar guarda en él |
-| Ubicación padre | Opcional, para la jerarquía |
-| `capacidad` | Opcional, y con forma única: un `tipo` (`PESO`, `VOLUMEN`, `UNIDADES`), un `maximo` numérico y su unidad. No se modela por tipo de ubicación — un estante aguanta kilos y un armario litros, pero ambos caben en la misma terna |
-| Condiciones ambientales | Opcionales, todas: `temperaturaMin`/`Max` en °C, `humedadMin`/`Max` en %, y `exposicionLuz` (`DIRECTA`, `INDIRECTA`, `OSCURIDAD`). Solo se informan si son relevantes para esa ubicación |
-| `notas` | Texto libre, opcional |
+| Identificador (`id`) | — |
+| Nombre (`name`) | Único entre las ubicaciones hermanas, es decir, con el mismo padre: dos «Estantería 2» pueden convivir en garajes distintos, pero no en el mismo |
+| Tipo (`type`) | `VIVIENDA`, `PLANTA`, `HABITACION`, `MUEBLE`, `ESTANTE`, `OTRO`. Lista fija: describe la naturaleza del contenedor, no lo que el hogar guarda en él |
+| Ubicación padre (`parentLocationId`) | Opcional, para la jerarquía |
+| Capacidad (`capacity`) | Opcional, y con forma única: un tipo (`PESO`, `VOLUMEN`, `UNIDADES`), un máximo numérico y su unidad. No se modela por tipo de ubicación — un estante aguanta kilos y un armario litros, pero ambos caben en la misma terna |
+| Condiciones ambientales (`environmentalConditions`) | Opcionales, todas: temperatura mínima y máxima en °C, humedad mínima y máxima en %, y exposición a la luz (`DIRECTA`, `INDIRECTA`, `OSCURIDAD`). Solo se informan si son relevantes para esa ubicación |
+| Foto (`photoUrl`) | Opcional. Una foto del estante ahorra describir dónde está la caja |
+| Notas (`notes`) | Texto libre, opcional |
+| Fecha de alta (`createdAt`) | — |
+| Última modificación (`updatedAt`) | — |
 
 **Reglas mínimas de negocio:**
 - Una ubicación no puede ser su propia ancestra (evita ciclos).
@@ -202,55 +221,55 @@ Una **ubicación (Location)** representa un espacio físico de almacenaje y, al 
 classDiagram
     class Asset {
         +id
-        +nombre
-        +tipo
-        +categoria
-        +propietarioId
-        +estado
-        +cantidad
+        +name
+        +type
+        +category
+        +ownerId
+        +status
+        +quantity
     }
     class Articulo {
         +id
-        +nombre
-        +unidad
-        +marca
-        +codigoBarras
+        +name
+        +unit
+        +brand
+        +barcode
         +retiredAt
     }
     class Categoria {
         +id
-        +nombre
+        +name
         +retiredAt
     }
     class Documento {
         +id
-        +tipo
-        +enlace
-        +descripcion
-        +fecha
+        +type
+        +url
+        +description
+        +date
     }
     class Location {
         +id
-        +nombre
-        +tipo
-        +capacidad
-        +condicionesAmbientales
+        +name
+        +type
+        +capacity
+        +environmentalConditions
     }
     class Usuario {
         +id
-        +nombre
+        +name
         +email
-        +debeCambiarPassword
+        +mustChangePassword
         +deactivatedAt
     }
     class Rol {
-        +nombre
+        +name
     }
     class Prestamo {
         +id
-        +estado
-        +fechaInicio
-        +fechaDevolucionPrevista
+        +status
+        +startedAt
+        +dueAt
     }
 
     Asset "0..1" --> "0..1" Asset : ubicación
@@ -278,17 +297,34 @@ Se contemplan cuatro roles, agrupados en dos tipos según su alcance:
 | Prestador | Contextual (ligado a un préstamo) | Un préstamo concreto | Consultar el estado del préstamo; confirmar la entrega del asset |
 | Receptor del préstamo | Contextual (ligado a un préstamo) | Un préstamo concreto | Consultar el estado y la fecha prevista de devolución; confirmar la devolución |
 
+**Atributos mínimos de un Hogar:**
+
+El hogar es la unidad de aislamiento que agrupa a todo lo demás (ver 5.6), y hasta ahora solo tenía nombre.
+
+| Atributo | Descripción |
+|---|---|
+| Identificador (`id`) | — |
+| Nombre (`name`) | — |
+| Zona horaria (`timeZone`) | Identificador IANA, p. ej. `Europe/Madrid`. **La necesita el proceso diario de vencidos** (ver 4.1.5): «la fecha prevista ya pasó» no significa nada sin saber respecto a qué huso, y un hogar no tiene por qué estar donde esté el servidor |
+| Fecha de alta (`createdAt`) | — |
+| Última modificación (`updatedAt`) | — |
+
 **Atributos mínimos de un Usuario:**
 
 | Atributo | Descripción |
 |---|---|
-| Identificador | — |
-| `nombre` | Nombre con el que aparece en el hogar |
-| `email` | Identifica al usuario dentro del hogar. Se compara **normalizado a minúsculas**: `Kike@x.com` y `kike@x.com` son la misma persona |
-| `role` | `ADMIN_HOGAR` o `MIEMBRO_HOGAR` (ver arriba) |
-| `passwordHash` | `BCrypt`, nunca la contraseña en claro (ver 5.4.1) |
-| `debeCambiarPassword` | Lo activa el alta directa y lo apaga el primer cambio. Sin este campo, la regla de «cambiar la contraseña al entrar» que fija 4.1.7 no tenía dónde apoyarse |
-| `deactivatedAt` | Informado si el usuario ha causado baja en el hogar |
+| Identificador (`id`) | — |
+| Nombre (`name`) | Nombre con el que aparece en el hogar |
+| Correo electrónico (`email`) | Identifica al usuario dentro del hogar. Se compara **normalizado a minúsculas**: `Kike@x.com` y `kike@x.com` son la misma persona |
+| Teléfono (`phone`) | Opcional. Al participante externo de un préstamo ya se le exige un canal para mandarle el enlace; al miembro del hogar no se le pedía ninguno |
+| Rol (`role`) | `ADMIN_HOGAR` o `MIEMBRO_HOGAR` (ver arriba) |
+| Hash de contraseña (`passwordHash`) | `BCrypt`, nunca la contraseña en claro (ver 5.4.1) |
+| Debe cambiar contraseña (`mustChangePassword`) | Lo activa el alta directa y lo apaga el primer cambio. Sin este campo, la regla de «cambiar la contraseña al entrar» que fija 4.1.7 no tenía dónde apoyarse |
+| Avatar (`avatarUrl`) | Opcional. Enlace a una imagen, mismo criterio que las demás |
+| Último acceso (`lastLoginAt`) | Deja ver cuentas dormidas antes de decidir una baja |
+| Baja (`deactivatedAt`) | Informado si el usuario ha causado baja en el hogar |
+| Fecha de alta (`createdAt`) | — |
+| Última modificación (`updatedAt`) | — |
 
 **Baja de un usuario.** Quien deja el hogar no se borra: se marca `deactivatedAt`, deja de poder autenticarse y se le revocan los refresh tokens. La fila permanece porque los préstamos y el historial la referencian.
 
@@ -317,16 +353,20 @@ stateDiagram-v2
 
 | Atributo | Descripción |
 |---|---|
-| Identificador, asset prestado | — |
-| Prestador y receptor | Usuario del hogar **o** persona externa, exactamente uno de los dos por cada lado |
-| Contacto del externo | `nombre` y un canal —`email` o `telefono`, al menos uno— porque es por donde se envía el enlace con el token acotado (ver 5.4.1). Un `text` suelto no sirve para eso |
-| `fechaInicio` | — |
-| `fechaDevolucionPrevista` | Opcional. Sin ella el préstamo nunca vence: es un préstamo sin plazo, no un plazo infinito |
-| `fechaDevolucionReal` | Informada al confirmar la devolución |
-| `estado` | `ACTIVO`, `DEVUELTO`, `VENCIDO` |
-| `notas` | Texto libre, opcional |
+| Identificador (`id`) | — |
+| Asset prestado (`assetId`) | — |
+| Prestador (`lender`) | Usuario del hogar **o** persona externa, exactamente uno de los dos |
+| Receptor (`borrower`) | Ídem |
+| Contacto del externo (`external`) | Nombre y un canal —correo o teléfono, al menos uno— porque es por donde se envía el enlace con el token acotado (ver 5.4.1). Un texto suelto no sirve para eso |
+| Fecha de inicio (`startedAt`) | — |
+| Fecha prevista de devolución (`dueAt`) | Opcional. Sin ella el préstamo nunca vence: es un préstamo sin plazo, no un plazo infinito |
+| Fecha real de devolución (`returnedAt`) | Informada al confirmar la devolución |
+| Estado (`status`) | `ACTIVO`, `DEVUELTO`, `VENCIDO` |
+| Notas (`notes`) | Texto libre, opcional |
+| Fecha de alta (`createdAt`) | — |
+| Última modificación (`updatedAt`) | — |
 
-**Cómo se llega a `VENCIDO`.** No lo provoca ninguna acción del usuario, así que hace falta algo que lo marque: un **proceso programado** recorre a diario los préstamos `ACTIVO` con `fechaDevolucionPrevista` ya pasada, los pasa a `VENCIDO` y publica `LoanOverdue` (ver 5.2.3). Es el primer proceso de fondo del sistema, y de ahí cuelgan los recordatorios automáticos que la gestión avanzada de préstamos (4.2) necesitará.
+**Cómo se llega a `VENCIDO`.** No lo provoca ninguna acción del usuario, así que hace falta algo que lo marque: un **proceso programado** recorre a diario los préstamos `ACTIVO` con `dueAt` ya pasada, los pasa a `VENCIDO` y publica `LoanOverdue` (ver 5.2.3). Es el primer proceso de fondo del sistema, y de ahí cuelgan los recordatorios automáticos que la gestión avanzada de préstamos (4.2) necesitará.
 
 Que el estado se persista, en vez de derivarse al leer, es lo que permite publicar ese evento: un valor calculado no tiene momento en el que ocurrir, y sin evento no hay recordatorio al que engancharse.
 
@@ -335,7 +375,7 @@ Que el estado se persista, en vez de derivarse al leer, es lo que permite public
 **Reglas mínimas de negocio:**
 - Un asset no puede tener más de un préstamo en estado `ACTIVO` simultáneamente. Un préstamo `VENCIDO` sigue ocupando ese hueco: vencer no es devolver.
 - Solo se prestan assets `DURADERO` (ver 4.1.1): un consumible se consume o se entrega, y la semántica de devolución no le aplica.
-- Un préstamo sin `fechaDevolucionPrevista` no puede vencer, y el proceso lo ignora.
+- Un préstamo sin `dueAt` no puede vencer, y el proceso lo ignora.
 
 > **¿Y ceder un consumible?** Dar azúcar a un vecino no necesita ningún concepto nuevo: es un `AjustarCantidadAsset` que descuenta la cantidad (ver 5.7). Si te lo reponen, otro ajuste que la suma. Modelarlo como préstamo obligaría a llevar cantidad en el préstamo y a permitir varios préstamos activos sobre el mismo asset, complicando el core para un caso que el contador ya resuelve.
 
@@ -353,19 +393,24 @@ Las siguientes decisiones, inicialmente abiertas, han quedado validadas:
 - **Alcance de la gestión de préstamos:** se mantiene mínima dentro del core (ver 4.1.5) mientras no gane funcionalidad adicional; si en el futuro crece (recordatorios automáticos, penalizaciones, valoraciones, historial extenso), se extraerá como módulo propio.
 - **Composición y ubicación física:** quedan unificadas en un único campo `ubicación` por asset (ver 4.1.1); no se distingue, por ahora, entre "de qué está compuesto" un asset y "dónde está físicamente".
 - **Préstamo de consumibles:** solo se prestan assets `DURADERO`. La cesión de un consumible (dar azúcar a un vecino) se modela como un ajuste de cantidad, no como un préstamo (ver la nota en 4.1.5). Se descartaron las alternativas de llevar cantidad en el préstamo —que obligaría a permitir varios préstamos activos sobre el mismo asset, rompiendo el índice único parcial de 5.6— y de añadir una entidad "cesión" al core, que no aporta nada que el contador de cantidad no cubra ya.
-- **Alcance del concepto de asset y gestión de cantidad:** un asset es todo material del hogar, no solo el económicamente relevante. Se distingue `DURADERO` de `CONSUMIBLE` (ver 4.1.1), y el core se limita a un contador simple (`cantidad` + `unidad`) sobre los consumibles. Todo el seguimiento de existencias — consumos, mínimos, reposición, caducidad, lotes — queda fuera del core y pertenece al módulo **Warehouse** (4.2), que se suscribe a `AssetQuantityChanged`. La alternativa de no guardar cantidad alguna en el core se descartó porque dejaría los consumibles sin representación útil hasta que Warehouse exista.
-- **Alta de consumibles y catálogo de artículos:** la definición de un consumible (`nombre`, `categoria`, `unidad`, marca y código de barras) se separa en una entidad propia, `Articulo`, y el asset `CONSUMIBLE` pasa a ser una **existencia** de ese artículo en una ubicación, con `cantidad` (ver 4.1.1). Dar entrada a un consumible ya existente suma sobre su existencia en vez de crear una fila nueva, así que traer otro paquete de azúcar no obliga a reintroducir nada. El artículo es obligatorio en `CONSUMIBLE` y opcional en `DURADERO`, donde permite compartir modelo y documentación entre unidades idénticas sin forzar a fichar un mueble único. Se descartaron dos alternativas: resolver el alta como *find-or-create* sobre el nombre del asset, porque la clave sería texto libre y la definición se reteclearía en cada ubicación nueva, y dejarlo en un autocompletado del frontend, porque la regla anti-duplicados viviría solo en la UI y la API seguiría admitiendo duplicados. Se acepta a sabiendas de que añade una entidad al core: retrofitarla cuando llegue Warehouse —que colgará mínimos, caducidades y lotes del artículo— obligaría a migrar cada consumible existente partiendo texto libre. Juntar dos existencias del mismo artículo que ya se crearon por separado es un caso de uso explícito, `FusionarExistencias` (ver 5.7), y no un efecto colateral de `MoverAsset`: la fusión tiene que decidir qué ubicación y qué propietario sobreviven, y esa decisión es del usuario, no del sistema.
+- **Alcance del concepto de asset y gestión de cantidad:** un asset es todo material del hogar, no solo el económicamente relevante. Se distingue `DURADERO` de `CONSUMIBLE` (ver 4.1.1), y el core se limita a un contador simple (`quantity` + `unit`) sobre los consumibles. Todo el seguimiento de existencias — consumos, mínimos, reposición, caducidad, lotes — queda fuera del core y pertenece al módulo **Warehouse** (4.2), que se suscribe a `AssetQuantityChanged`. La alternativa de no guardar cantidad alguna en el core se descartó porque dejaría los consumibles sin representación útil hasta que Warehouse exista.
+- **Alta de consumibles y catálogo de artículos:** la definición de un consumible (`name`, `category`, `unit`, marca y código de barras) se separa en una entidad propia, `Articulo`, y el asset `CONSUMIBLE` pasa a ser una **existencia** de ese artículo en una ubicación, con `quantity` (ver 4.1.1). Dar entrada a un consumible ya existente suma sobre su existencia en vez de crear una fila nueva, así que traer otro paquete de azúcar no obliga a reintroducir nada. El artículo es obligatorio en `CONSUMIBLE` y opcional en `DURADERO`, donde permite compartir modelo y documentación entre unidades idénticas sin forzar a fichar un mueble único. Se descartaron dos alternativas: resolver el alta como *find-or-create* sobre el nombre del asset, porque la clave sería texto libre y la definición se reteclearía en cada ubicación nueva, y dejarlo en un autocompletado del frontend, porque la regla anti-duplicados viviría solo en la UI y la API seguiría admitiendo duplicados. Se acepta a sabiendas de que añade una entidad al core: retrofitarla cuando llegue Warehouse —que colgará mínimos, caducidades y lotes del artículo— obligaría a migrar cada consumible existente partiendo texto libre. Juntar dos existencias del mismo artículo que ya se crearon por separado es un caso de uso explícito, `FusionarExistencias` (ver 5.7), y no un efecto colateral de `MoverAsset`: la fusión tiene que decidir qué ubicación y qué propietario sobreviven, y esa decisión es del usuario, no del sistema.
 
 - **Aislamiento multi-tenant con Row-Level Security:** se activa RLS de PostgreSQL desde el principio, **además** del filtrado por `household_id` en la aplicación (ver 5.6). Son dos capas independientes: si un repositorio olvida el filtro, la base de datos sigue sin devolver filas de otro hogar. Se descartó dejarlo solo en la aplicación porque convierte cada consulta nueva en una posible fuga entre hogares, y diferirlo a antes de producción porque retrofitar RLS obliga a revisar todas las consultas ya escritas. Registrado en [ADR-003](docs/common/architecture/decisions/ADR-003-row-level-security.md).
 - **Alta de usuarios en un hogar existente:** el MVP usa **alta directa** por parte de un `ADMIN_HOGAR` (`CrearUsuario`, ver 5.7), con contraseña inicial que el usuario cambia al entrar. La **invitación por email con token de un solo uso** queda como evolución posterior, no como alternativa descartada: se implementará cuando exista infraestructura de correo, que de todos modos hace falta para enviar los tokens acotados de préstamo (ver 5.4.1). Evita bloquear el core a la espera de esa infraestructura.
 - **Librería de migraciones:** **Flyway**, con migraciones en SQL plano versionado. Se descartó Liquibase porque su principal ventaja —la abstracción sobre el motor— no aporta nada con PostgreSQL ya fijado, y su ceremonia de changelogs complica revisar una política de RLS, que se lee mucho mejor como SQL. Registrado en [ADR-004](docs/common/architecture/decisions/ADR-004-database-migrations.md).
 
-- **Clasificación funcional:** `categoria` deja de ser texto libre y pasa a ser un **catálogo por hogar** (entidad `Categoria`, ver 4.1.1), sembrado con un juego por defecto al crear el hogar y editable después. Se descartó la lista fija con `CHECK`, que es más consistente con `tipo`/`estado`/`unidad` pero obliga a una migración cada vez que un hogar guarda algo que no encaja en cinco cajones pensados por otro; y se descartó dejarlo en texto libre, que no da filtros ni agrupaciones fiables. Se retira lógicamente, igual que un artículo y por el mismo motivo de clave ajena.
+- **Clasificación funcional:** `category` deja de ser texto libre y pasa a ser un **catálogo por hogar** (entidad `Categoria`, ver 4.1.1), sembrado con un juego por defecto al crear el hogar y editable después. Se descartó la lista fija con `CHECK`, que es más consistente con `type`/`status`/`unit` pero obliga a una migración cada vez que un hogar guarda algo que no encaja en cinco cajones pensados por otro; y se descartó dejarlo en texto libre, que no da filtros ni agrupaciones fiables. Se retira lógicamente, igual que un artículo y por el mismo motivo de clave ajena.
 - **Documentación asociada:** se modela como entidad `Documento` que guarda **un enlace, no el fichero** (ver 4.1.1). El core no gana almacenamiento de binarios, que exigiría decidir backend de ficheros, tamaños y tipos permitidos, y modificar el stack antes de empezar la Fase 1. Subir el fichero queda como evolución, no como alternativa descartada: cuando exista, será otra forma de rellenar el mismo campo. Un documento cuelga de un asset o de un artículo, lo que hace que el manual se comparta entre unidades idénticas y la factura no.
 - **Baja de un usuario:** baja lógica (`deactivatedAt`), y sus assets **quedan sin propietario** en lugar de reasignarse (ver 4.1.4). Se descartó exigir la reasignación en el mismo gesto porque convierte la baja en un inventario completo y, con muchos assets a nombre de esa persona, en la práctica hace que la baja no se ejecute. El precio es aceptar assets huérfanos, que se acota con un filtro de listado para localizarlos. `owner_id` pasa a ser opcional en `assets`.
 - **Transición a `VENCIDO`:** la marca un **proceso programado** diario, que además publica `LoanOverdue` (ver 4.1.5 y 5.2.3). Se descartó derivar el estado al leer —más simple, sin proceso de fondo, pero un valor calculado no tiene un instante en el que ocurra y por tanto no puede publicar el evento del que colgarán los recordatorios— y marcarlo en la consulta, que convierte una lectura en escritura y deja el estado a merced de que alguien mire. El proceso no nace de una petición, así que debe recorrer los hogares fijando `app.household_id` en cada transacción, nunca con `BYPASSRLS`.
 
+- **Nomenclatura de los atributos:** la documentación sigue en castellano, pero **todo identificador de programación va en inglés camelCase** — campos de la API, columnas de base de datos (en `snake_case`) y payloads de evento. Antes convivían `nombre`, `categoria` y `cantidad` con `ownerId` y `createdAt` en la misma respuesta JSON, que es la peor de las dos opciones. Se descartó unificar hacia el castellano porque aleja el código de la convención habitual en Kotlin y Spring y obligaría a renombrar también las tablas, que ya eran inglesas. Las tablas de atributos de 4.1.x dan las dos formas: **Nombre de definición (`nombreDePrograma`)**. Quedan deliberadamente fuera dos cosas: los **valores de los enumerados** (`DURADERO`, `ADMIN_HOGAR`, `VENCIDO`…), que son vocabulario de dominio usado en la prosa de todo el documento, y los **nombres de los casos de uso** (`CrearAsset`, `RegistrarEntradaConsumible`), que no son variables.
+- **Artículo como `article`:** el concepto pasa a llamarse `article` en programación —tabla `articles`, campo `articleId`, recurso `/api/v1/articles`—, en lugar del anterior `catalog_items`/`catalogItemId`. Había tres nombres para una misma cosa y hacía falta una nota aclaratoria en 4.1.1 para sostenerlo; ahora el nombre de programación sigue al de definición.
+
 > **Pendiente de validar:** el aviso por capacidad de una ubicación (4.1.2) solo puede contar unidades, porque un asset no lleva peso ni volumen. ¿Merece la pena que los tenga? Solo si alguien los rellena, y un hogar que no pesa sus cajas obtendría un aviso peor que ninguno. Queda abierta hasta tener uso real; mientras tanto, el aviso se limita a lo que el sistema sabe con certeza.
+
+> **Pendiente de validar:** cinco atributos quedaron propuestos y sin decidir, todos por el mismo motivo — son útiles, pero rozan el alcance de un módulo futuro o meten la UI en el dominio. **Estado de conservación** y **condición en entrega y devolución de un préstamo** («volvió rayado») son lo primero que se llevarán el CMMS y la gestión avanzada de préstamos. **Etiquetas libres** en un asset amplían la clasificación más allá de una sola categoría, a costa de otra entidad recién después de añadir el catálogo de categorías. **Icono y color** de una categoría los va a querer el frontend mobile-first, pero son presentación. **Quién creó y quién modificó** cada fila responde a la pregunta más real de un hogar compartido —«¿quién movió el taladro?»— y cuesta dos columnas en cada tabla. Ninguno se añade hasta que haya un caso de uso que lo pida.
 
 > Si en el futuro surgen nuevas decisiones de diseño pendientes de validar, se recomienda añadirlas aquí siguiendo el mismo formato (pregunta + decisión + referencia a la sección afectada) hasta que se resuelvan.
 
@@ -479,7 +524,7 @@ interface EventBus {
 
 | Evento | Se publica cuando… | Ejemplo de consumidor futuro |
 |---|---|---|
-| `CatalogItemCreated` | Se crea un artículo en el catálogo del hogar | Warehouse le asocia su stock mínimo y su política de caducidad por defecto |
+| `ArticleCreated` | Se crea un artículo en el catálogo del hogar | Warehouse le asocia su stock mínimo y su política de caducidad por defecto |
 | `AssetCreated` | Se da de alta un asset — incluida la primera existencia de un artículo en una ubicación | CMMS genera un plan de mantenimiento por defecto |
 | `AssetMoved` | Cambia la ubicación de un asset | Warehouse actualiza el stock por ubicación |
 | `AssetHierarchyChanged` | Cambia el asset padre/composición de un asset | Módulos que dependan de la estructura del hogar |
@@ -538,28 +583,28 @@ graph TD
 - `POST /api/v1/auth/refresh` — renovar el access token
 
 **Catálogo de artículos**
-- `GET /api/v1/catalog-items` — listar y buscar (filtros: `q` sobre el nombre, `categoria`, `codigoBarras`); es lo que alimenta el autocompletado del alta. Devuelve solo artículos vigentes salvo `incluirRetirados=true`
-- `POST /api/v1/catalog-items` — crear un artículo
-- `GET /api/v1/catalog-items/{id}` — detalle
-- `DELETE /api/v1/catalog-items/{id}` — retirar del catálogo (retirada lógica, ver 5.7)
+- `GET /api/v1/articles` — listar y buscar (filtros: `q` sobre el nombre, `category`, `barcode`); es lo que alimenta el autocompletado del alta. Devuelve solo artículos vigentes salvo `includeRetired=true`
+- `POST /api/v1/articles` — crear un artículo
+- `GET /api/v1/articles/{id}` — detalle
+- `DELETE /api/v1/articles/{id}` — retirar del catálogo (retirada lógica, ver 5.7)
 
 **Assets**
-- `GET /api/v1/assets` — listar (filtros: `locationId`, `parentAssetId`, `ownerId`, `estado`, `tipo`, `catalogItemId`). **Excluye las bajas** salvo que se pidan con `estado=BAJA`: cada fusión deja una, y sin ese criterio la despensa se llenaría de existencias muertas. Con `sinPropietario=true` devuelve los huérfanos que dejó una baja de usuario (ver 4.1.4)
-- `POST /api/v1/assets` — dar de alta un `DURADERO` (`catalogItemId` opcional; `cantidad` no se acepta)
+- `GET /api/v1/assets` — listar (filtros: `locationId`, `parentAssetId`, `ownerId`, `status`, `type`, `articleId`). **Excluye las bajas** salvo que se pidan con `status=BAJA`: cada fusión deja una, y sin ese criterio la despensa se llenaría de existencias muertas. Con `withoutOwner=true` devuelve los huérfanos que dejó una baja de usuario (ver 4.1.4)
+- `POST /api/v1/assets` — dar de alta un `DURADERO` (`articleId` opcional; `quantity` no se acepta)
 - `POST /api/v1/assets/intake` — dar entrada a un `CONSUMIBLE`: crea la existencia (`201`) o suma sobre la que ya hay en esa ubicación (`200`)
 - `POST /api/v1/assets/{id}/merge` — fusionar la existencia `{id}` en otra del mismo artículo; `{id}` es la que **desaparece**
 - `GET /api/v1/assets/{id}` — detalle
-- `PATCH /api/v1/assets/{id}` — modificar (incluye cambiar ubicación, asset padre o fijar la `cantidad` de un consumible). El `tipo` es inmutable; el `catalogItemId` solo admite **asignarse** a un `DURADERO` que todavía no tenga artículo, nunca cambiarse ni retirarse. **No acepta `estado`**: se cambia con las operaciones que lo gobiernan (`DELETE`, préstamo y devolución)
-- `DELETE /api/v1/assets/{id}` — dar de baja (baja lógica: `estado = BAJA`, ver 5.7)
+- `PATCH /api/v1/assets/{id}` — modificar (incluye cambiar ubicación, asset padre o fijar la `quantity` de un consumible). El `type` es inmutable; el `articleId` solo admite **asignarse** a un `DURADERO` que todavía no tenga artículo, nunca cambiarse ni retirarse. **No acepta `status`**: se cambia con las operaciones que lo gobiernan (`DELETE`, préstamo y devolución)
+- `DELETE /api/v1/assets/{id}` — dar de baja (baja lógica: `status = BAJA`, ver 5.7)
 - `GET /api/v1/assets/{id}/children` — hijos directos en la jerarquía de composición
 
 **Categorías**
-- `GET /api/v1/categories` — listar (solo vigentes salvo `incluirRetiradas=true`)
+- `GET /api/v1/categories` — listar (solo vigentes salvo `includeRetired=true`)
 - `POST /api/v1/categories` — crear
 - `DELETE /api/v1/categories/{id}` — retirar (retirada lógica)
 
 **Documentos**
-- `GET /api/v1/documents` — listar (filtros: `assetId`, `catalogItemId`, `tipo`)
+- `GET /api/v1/documents` — listar (filtros: `assetId`, `articleId`, `type`)
 - `POST /api/v1/documents` — adjuntar a un asset o a un artículo
 - `DELETE /api/v1/documents/{id}` — eliminar el enlace
 
@@ -569,7 +614,7 @@ graph TD
 - `GET /api/v1/locations/{id}/children` — hijos directos en la jerarquía
 
 **Usuarios**
-- `GET /api/v1/users` — listar miembros del hogar (excluye las bajas salvo `incluirBajas=true`)
+- `GET /api/v1/users` — listar miembros del hogar (excluye las bajas salvo `includeDeactivated=true`)
 - `POST /api/v1/users` — dar de alta un miembro (solo administrador)
 - `PATCH /api/v1/users/{id}/roles` — modificar roles
 - `DELETE /api/v1/users/{id}` — dar de baja en el hogar (solo administrador; sus assets quedan sin propietario)
@@ -586,11 +631,11 @@ El contrato completo, con todos los recursos, parámetros y esquemas de error, s
 **`POST /api/v1/assets`** — request, asset **duradero**
 ```json
 {
-  "nombre": "Estantería de trastero",
-  "tipo": "DURADERO",
-  "categoriaId": "c1a70de5-...-00000000000b",
+  "name": "Estantería de trastero",
+  "type": "DURADERO",
+  "categoryId": "c1a70de5-...-00000000000b",
   "ownerId": "3d0a1e2c-...-000000000001",
-  "ubicacion": { "tipo": "ASSET", "id": "9f21b4a0-...-000000000002" }
+  "location": { "type": "ASSET", "id": "9f21b4a0-...-000000000002" }
 }
 ```
 
@@ -598,94 +643,94 @@ El contrato completo, con todos los recursos, parámetros y esquemas de error, s
 ```json
 {
   "id": "7c44f8b1-...-000000000003",
-  "nombre": "Estantería de trastero",
-  "tipo": "DURADERO",
-  "categoriaId": "c1a70de5-...-00000000000b",
-  "categoria": "MOBILIARIO",
+  "name": "Estantería de trastero",
+  "type": "DURADERO",
+  "categoryId": "c1a70de5-...-00000000000b",
+  "category": "MOBILIARIO",
   "ownerId": "3d0a1e2c-...-000000000001",
-  "ubicacion": { "tipo": "ASSET", "id": "9f21b4a0-...-000000000002" },
-  "estado": "DISPONIBLE",
+  "location": { "type": "ASSET", "id": "9f21b4a0-...-000000000002" },
+  "status": "DISPONIBLE",
   "createdAt": "2026-08-06T10:15:00Z"
 }
 ```
-> `categoriaId` es lo que se escribe; `categoria` es su nombre resuelto para lectura. Mismo patrón que `nombre` y `unidad` con el artículo: se guarda una vez y se resuelve al leer.
+> `categoryId` es lo que se escribe; `category` es su nombre resuelto para lectura. Mismo patrón que `name` y `unit` con el artículo: se guarda una vez y se resuelve al leer.
 
 **`POST /api/v1/documents`** — adjuntar el manual a un **artículo**, no a una unidad
 ```json
 {
-  "catalogItemId": "e71c0d93-...-000000000009",
-  "tipo": "MANUAL",
-  "enlace": "https://ejemplo.com/manual-taladro.pdf",
-  "descripcion": "Manual de usuario"
+  "articleId": "e71c0d93-...-000000000009",
+  "type": "MANUAL",
+  "url": "https://ejemplo.com/manual-taladro.pdf",
+  "description": "Manual de usuario"
 }
 ```
 > Colgado del artículo, lo comparten todas las unidades idénticas. La factura y la garantía irían con `assetId`, porque son de la unidad concreta que se compró. Informar los dos, o ninguno, se rechaza con `409` y el código `DOCUMENT_TARGET_INVALID`.
 
-**`POST /api/v1/catalog-items`** — request, artículo del catálogo
+**`POST /api/v1/articles`** — request, artículo del catálogo
 ```json
 {
-  "nombre": "Harina de trigo",
-  "categoriaId": "8e3b91a4-...-00000000000c",
-  "unidad": "GRAMO",
-  "marca": "Marca Blanca",
-  "codigoBarras": "8412345678905"
+  "name": "Harina de trigo",
+  "categoryId": "8e3b91a4-...-00000000000c",
+  "unit": "GRAMO",
+  "brand": "Marca Blanca",
+  "barcode": "8412345678905"
 }
 ```
-> Publica `CatalogItemCreated`. Un nombre ya existente en el hogar (comparado normalizado) o un `codigoBarras` repetido se rechazan con `409` y el código `CATALOG_ITEM_DUPLICATE`.
+> Publica `ArticleCreated`. Un nombre ya existente en el hogar (comparado normalizado) o un `barcode` repetido se rechazan con `409` y el código `ARTICLE_DUPLICATE`.
 
 **`POST /api/v1/assets/intake`** — request, entrada de un **consumible** con artículo ya existente
 ```json
 {
-  "catalogItemId": "e71c0d93-...-000000000009",
+  "articleId": "e71c0d93-...-000000000009",
   "ownerId": "3d0a1e2c-...-000000000001",
-  "ubicacion": { "tipo": "LOCATION", "id": "5b83c7d2-...-000000000005" },
-  "cantidad": 1000
+  "location": { "type": "LOCATION", "id": "5b83c7d2-...-000000000005" },
+  "quantity": 1000
 }
 ```
-> La `cantidad` va siempre en la `unidad` del artículo (aquí, gramos). En lugar de `catalogItemId` puede enviarse un objeto `catalogItem` con los mismos campos que `POST /api/v1/catalog-items`, y el artículo se crea en la misma operación.
+> La `quantity` va siempre en la `unit` del artículo (aquí, gramos). En lugar de `articleId` puede enviarse un objeto `article` con los mismos campos que `POST /api/v1/articles`, y el artículo se crea en la misma operación.
 
 **`POST /api/v1/assets/intake`** — response cuando **ya había** existencia en esa ubicación (`200 OK`)
 ```json
 {
   "id": "b0f5a217-...-00000000000a",
-  "nombre": "Harina de trigo",
-  "tipo": "CONSUMIBLE",
-  "categoriaId": "8e3b91a4-...-00000000000c",
-  "categoria": "ALIMENTACION",
-  "catalogItemId": "e71c0d93-...-000000000009",
+  "name": "Harina de trigo",
+  "type": "CONSUMIBLE",
+  "categoryId": "8e3b91a4-...-00000000000c",
+  "category": "ALIMENTACION",
+  "articleId": "e71c0d93-...-000000000009",
   "ownerId": "3d0a1e2c-...-000000000001",
-  "ubicacion": { "tipo": "LOCATION", "id": "5b83c7d2-...-000000000005" },
-  "estado": "DISPONIBLE",
-  "cantidad": 1300,
-  "unidad": "GRAMO",
+  "location": { "type": "LOCATION", "id": "5b83c7d2-...-000000000005" },
+  "status": "DISPONIBLE",
+  "quantity": 1300,
+  "unit": "GRAMO",
   "createdAt": "2026-08-06T10:15:00Z"
 }
 ```
-> `nombre`, `categoria` y `unidad` se devuelven resueltos desde el artículo, aunque no se guarden en la fila del asset. La respuesta es `200` porque sumó sobre una existencia previa (había 300 g) y publica `AssetQuantityChanged`; si no hubiera existido, sería `201` con `AssetCreated`.
+> `name`, `category` y `unit` se devuelven resueltos desde el artículo, aunque no se guarden en la fila del asset. La respuesta es `200` porque sumó sobre una existencia previa (había 300 g) y publica `AssetQuantityChanged`; si no hubiera existido, sería `201` con `AssetCreated`.
 
 **`POST /api/v1/assets/{id}/merge`** — fusionar dos existencias del mismo artículo
 ```json
-{ "destinoAssetId": "b0f5a217-...-00000000000a" }
+{ "targetAssetId": "b0f5a217-...-00000000000a" }
 ```
-> `{id}` es la existencia que **desaparece**: queda a `cantidad = 0` y `estado = BAJA`, y su cantidad se suma a la del destino, que conserva su ubicación y su propietario. La respuesta es `200` con el asset destino ya actualizado. Fusionar existencias de artículos distintos se rechaza con `409` y el código `MERGE_CATALOG_ITEM_MISMATCH`.
+> `{id}` es la existencia que **desaparece**: queda a `quantity = 0` y `status = BAJA`, y su cantidad se suma a la del destino, que conserva su ubicación y su propietario. La respuesta es `200` con el asset destino ya actualizado. Fusionar existencias de artículos distintos se rechaza con `409` y el código `MERGE_ARTICLE_MISMATCH`.
 
 **`PATCH /api/v1/assets/{id}`** — corregir la cantidad de un consumible
 ```json
-{ "cantidad": 700 }
+{ "quantity": 700 }
 ```
-> A diferencia de la entrada, aquí la cantidad es **absoluta**: sustituye, no suma. Publica `AssetQuantityChanged`. Enviar `cantidad` sobre un `DURADERO`, o un valor negativo, se rechaza con `409` y el código `ASSET_QUANTITY_NOT_APPLICABLE` / `ASSET_QUANTITY_NEGATIVE`.
+> A diferencia de la entrada, aquí la cantidad es **absoluta**: sustituye, no suma. Publica `AssetQuantityChanged`. Enviar `quantity` sobre un `DURADERO`, o un valor negativo, se rechaza con `409` y el código `ASSET_QUANTITY_NOT_APPLICABLE` / `ASSET_QUANTITY_NEGATIVE`.
 
 **`GET /api/v1/loans/{id}`** — response con **token acotado de receptor**
 ```json
 {
   "id": "1a2b3c4d-...-000000000004",
-  "assetNombre": "Taladro",
-  "estado": "ACTIVO",
-  "fechaInicio": "2026-08-01T09:00:00Z",
-  "fechaDevolucionPrevista": "2026-08-15T09:00:00Z"
+  "assetName": "Taladro",
+  "status": "ACTIVO",
+  "startedAt": "2026-08-01T09:00:00Z",
+  "dueAt": "2026-08-15T09:00:00Z"
 }
 ```
-> El token acotado solo expone estos campos; la vista completa (usuarios del hogar) añade `assetId`, `prestador`, `receptor` y `householdId`.
+> El token acotado solo expone estos campos; la vista completa (usuarios del hogar) añade `assetId`, `lender`, `borrower` y `householdId`.
 
 **Formato de error (todos los endpoints)**
 ```json
@@ -726,13 +771,13 @@ erDiagram
     HOUSEHOLDS ||--o{ ASSETS : "tiene"
     HOUSEHOLDS ||--o{ LOCATIONS : "tiene"
     HOUSEHOLDS ||--o{ LOANS : "tiene"
-    HOUSEHOLDS ||--o{ CATALOG_ITEMS : "tiene"
+    HOUSEHOLDS ||--o{ ARTICLES : "tiene"
     HOUSEHOLDS ||--o{ CATEGORIES : "tiene"
-    CATALOG_ITEMS ||--o{ ASSETS : "define"
+    ARTICLES ||--o{ ASSETS : "define"
     CATEGORIES ||--o{ ASSETS : "clasifica"
-    CATEGORIES ||--o{ CATALOG_ITEMS : "clasifica"
+    CATEGORIES ||--o{ ARTICLES : "clasifica"
     ASSETS ||--o{ DOCUMENTS : "adjunta"
-    CATALOG_ITEMS ||--o{ DOCUMENTS : "adjunta"
+    ARTICLES ||--o{ DOCUMENTS : "adjunta"
     USERS ||--o{ ASSETS : "es propietario de"
     ASSETS ||--o{ ASSETS : "ubicación (contenedor)"
     LOCATIONS ||--o{ LOCATIONS : "ubicación padre"
@@ -744,17 +789,22 @@ erDiagram
 
     HOUSEHOLDS {
         uuid id PK
-        text nombre
+        text name
+        text time_zone
         timestamptz created_at
+        timestamptz updated_at
     }
     USERS {
         uuid id PK
         uuid household_id FK
-        text nombre
+        text name
         text email
         text password_hash
+        text phone
         text role
-        boolean debe_cambiar_password
+        boolean must_change_password
+        text avatar_url
+        timestamptz last_login_at
         timestamptz created_at
         timestamptz updated_at
         timestamptz deactivated_at
@@ -762,31 +812,36 @@ erDiagram
     CATEGORIES {
         uuid id PK
         uuid household_id FK
-        text nombre
-        text notas
+        text name
+        text notes
         timestamptz created_at
+        timestamptz updated_at
         timestamptz retired_at
     }
     DOCUMENTS {
         uuid id PK
         uuid household_id FK
         uuid asset_id FK
-        uuid catalog_item_id FK
-        text tipo
-        text enlace
-        text descripcion
-        date fecha
+        uuid article_id FK
+        text type
+        text url
+        text description
+        date date
+        date valid_until
         timestamptz created_at
     }
-    CATALOG_ITEMS {
+    ARTICLES {
         uuid id PK
         uuid household_id FK
         uuid category_id FK
-        text nombre
-        text unidad
-        text marca
-        text codigo_barras
-        text notas
+        text name
+        text unit
+        text brand
+        text model
+        text barcode
+        numeric pack_size
+        text photo_url
+        text notes
         timestamptz created_at
         timestamptz updated_at
         timestamptz retired_at
@@ -794,28 +849,32 @@ erDiagram
     ASSETS {
         uuid id PK
         uuid household_id FK
-        uuid catalog_item_id FK
+        uuid article_id FK
         uuid category_id FK
-        text nombre
-        text tipo
+        text name
+        text type
         uuid owner_id FK
         uuid location_asset_id FK
         uuid location_id FK
-        numeric cantidad
-        text estado
-        text notas
+        numeric quantity
+        text status
+        text serial_number
+        date acquired_on
+        text photo_url
+        text notes
         timestamptz created_at
         timestamptz updated_at
     }
     LOCATIONS {
         uuid id PK
         uuid household_id FK
-        text nombre
-        text tipo
+        text name
+        text type
         uuid parent_location_id FK
-        jsonb capacidad
-        jsonb condiciones_ambientales
-        text notas
+        jsonb capacity
+        jsonb environmental_conditions
+        text photo_url
+        text notes
         timestamptz created_at
         timestamptz updated_at
     }
@@ -823,16 +882,17 @@ erDiagram
         uuid id PK
         uuid household_id FK
         uuid asset_id FK
-        uuid prestador_user_id FK
-        jsonb prestador_externo
-        uuid receptor_user_id FK
-        jsonb receptor_externo
-        text estado
-        text notas
-        timestamptz fecha_inicio
-        timestamptz fecha_devolucion_prevista
-        timestamptz fecha_devolucion_real
+        uuid lender_user_id FK
+        jsonb lender_external
+        uuid borrower_user_id FK
+        jsonb borrower_external
+        text status
+        text notes
+        timestamptz started_at
+        timestamptz due_at
+        timestamptz returned_at
         timestamptz created_at
+        timestamptz updated_at
     }
     LOAN_ACCESS_TOKENS {
         uuid id PK
@@ -855,15 +915,15 @@ erDiagram
 
 | Tabla | Restricciones clave |
 |---|---|
-| `households` | — |
+| `households` | `time_zone` con un identificador IANA válido; se valida en el caso de uso, no como `CHECK`. Es lo que usa el proceso de vencidos para saber cuándo ha pasado la fecha en ese hogar |
 | `users` | `email` único entre los usuarios **activos** del hogar y comparado en minúsculas: índice único parcial sobre `(household_id, lower(email)) WHERE deactivated_at IS NULL`. Sin el `lower()`, `Kike@x.com` y `kike@x.com` serían dos cuentas; sin el parcial, el email de quien causa baja quedaría bloqueado para siempre. `role` con `CHECK IN ('ADMIN_HOGAR','MIEMBRO_HOGAR')`. Que no se pueda dar de baja al único `ADMIN_HOGAR` activo no es expresable como `CHECK`: se valida en el caso de uso |
-| `categories` | `nombre` único entre las categorías vigentes del hogar, con índice único parcial sobre `(household_id, lower(unaccent(nombre))) WHERE retired_at IS NULL` — mismo tratamiento que `catalog_items`, y por el mismo motivo: la retirada es lógica porque `assets` y `catalog_items` la referencian |
-| `documents` | Cuelga de exactamente uno de los dos, con `CHECK ((asset_id IS NULL) <> (catalog_item_id IS NULL))`; `tipo` con `CHECK IN ('FACTURA','GARANTIA','MANUAL','OTRO')`; `enlace` obligatorio. Borrar un documento sí es un `DELETE` real: no lo referencia nada y no forma parte del historial de ninguna otra entidad |
-| `catalog_items` | `nombre` único entre los artículos **vigentes** del hogar, sin distinguir mayúsculas ni acentos: índice único parcial sobre `(household_id, lower(unaccent(nombre))) WHERE retired_at IS NULL` — requiere la extensión `unaccent`, que se instala en su propia migración; `codigo_barras` con el mismo tratamiento, `(household_id, codigo_barras) WHERE codigo_barras IS NOT NULL AND retired_at IS NULL`; `unidad` con `CHECK IN ('UNIDAD','GRAMO','KILOGRAMO','MILILITRO','LITRO','METRO','PAQUETE')`. La retirada es **lógica** (`retired_at`), no un `DELETE`: las existencias dadas de baja conservan su `catalog_item_id`, así que borrar la fila rompería la clave ajena y con ella el historial |
-| `assets` | `CHECK (location_asset_id IS NULL OR location_id IS NULL)` — nunca ambas ubicaciones a la vez; `tipo` con `CHECK IN ('DURADERO','CONSUMIBLE')`; `estado` con `CHECK IN ('DISPONIBLE','PRESTADO','BAJA')`; coherencia de cantidad y artículo con `CHECK ((tipo = 'CONSUMIBLE' AND catalog_item_id IS NOT NULL AND cantidad IS NOT NULL AND cantidad >= 0) OR (tipo = 'DURADERO' AND cantidad IS NULL))`; todo asset tiene nombre y categoría efectivos, con `CHECK (catalog_item_id IS NOT NULL OR (nombre IS NOT NULL AND category_id IS NOT NULL))`; un consumible nunca está prestado, con `CHECK (tipo = 'DURADERO' OR estado <> 'PRESTADO')`. `owner_id` es **anulable**: lo deja vacío la baja de su propietario (ver 4.1.4). Que `location_asset_id` apunte a un `DURADERO` no es expresable como `CHECK` simple: se valida en el caso de uso |
-| `assets` (existencias) | Una sola existencia **viva** por artículo y ubicación: `CREATE UNIQUE INDEX ON assets (household_id, catalog_item_id, location_asset_id, location_id) NULLS NOT DISTINCT WHERE tipo = 'CONSUMIBLE' AND estado <> 'BAJA'`. El `NULLS NOT DISTINCT` (PostgreSQL 15+) es lo que hace que la regla siga aplicando cuando la existencia aún no tiene ubicación asignada; sin él, cada entrada sin ubicar crearía una fila nueva. El `estado <> 'BAJA'` es igual de necesario: sin él, una existencia dada de baja o fusionada seguiría ocupando su hueco para siempre y ningún `RegistrarEntradaConsumible` posterior podría volver a usar esa ubicación |
-| `locations` | `parent_location_id` referencia a la propia tabla; la validación anti-ciclo se resuelve a nivel de aplicación (caso de uso), no es expresable como `CHECK` simple. `tipo` con `CHECK IN ('VIVIENDA','PLANTA','HABITACION','MUEBLE','ESTANTE','OTRO')`; `nombre` único entre hermanas, con índice único sobre `(household_id, parent_location_id, lower(unaccent(nombre))) NULLS NOT DISTINCT` — el `NULLS NOT DISTINCT` cubre las ubicaciones raíz, que no tienen padre |
-| `loans` | exactamente uno de `prestador_user_id`/`prestador_externo` informado (ídem para receptor); `estado` con `CHECK IN ('ACTIVO','DEVUELTO','VENCIDO')`; índice único parcial `(asset_id) WHERE estado IN ('ACTIVO','VENCIDO')` para no permitir más de un préstamo abierto por asset — **un préstamo vencido sigue ocupando el asset**, así que el índice no puede mirar solo a `ACTIVO`. El contacto del externo es `jsonb` con `nombre` y al menos uno de `email`/`telefono`, que es lo que necesita el enlace del token acotado. Que el asset prestado sea `DURADERO` se valida en el caso de uso, no como `CHECK` |
+| `categories` | `name` único entre las categorías vigentes del hogar, con índice único parcial sobre `(household_id, lower(unaccent(name))) WHERE retired_at IS NULL` — mismo tratamiento que `articles`, y por el mismo motivo: la retirada es lógica porque `assets` y `articles` la referencian |
+| `documents` | Cuelga de exactamente uno de los dos, con `CHECK ((asset_id IS NULL) <> (article_id IS NULL))`; `type` con `CHECK IN ('FACTURA','GARANTIA','MANUAL','OTRO')`; `url` obligatorio; `CHECK (valid_until IS NULL OR date IS NULL OR valid_until >= date)`, porque una garantía no puede caducar antes de emitirse. Borrar un documento sí es un `DELETE` real: no lo referencia nada y no forma parte del historial de ninguna otra entidad |
+| `articles` | `name` único entre los artículos **vigentes** del hogar, sin distinguir mayúsculas ni acentos: índice único parcial sobre `(household_id, lower(unaccent(name))) WHERE retired_at IS NULL` — requiere la extensión `unaccent`, que se instala en su propia migración; `barcode` con el mismo tratamiento, `(household_id, barcode) WHERE barcode IS NOT NULL AND retired_at IS NULL`; `unit` con `CHECK IN ('UNIDAD','GRAMO','KILOGRAMO','MILILITRO','LITRO','METRO','PAQUETE')`; `CHECK (pack_size IS NULL OR pack_size > 0)`. La retirada es **lógica** (`retired_at`), no un `DELETE`: las existencias dadas de baja conservan su `article_id`, así que borrar la fila rompería la clave ajena y con ella el historial |
+| `assets` | `CHECK (location_asset_id IS NULL OR location_id IS NULL)` — nunca ambas ubicaciones a la vez; `type` con `CHECK IN ('DURADERO','CONSUMIBLE')`; `status` con `CHECK IN ('DISPONIBLE','PRESTADO','BAJA')`; coherencia de cantidad y artículo con `CHECK ((type = 'CONSUMIBLE' AND article_id IS NOT NULL AND quantity IS NOT NULL AND quantity >= 0) OR (type = 'DURADERO' AND quantity IS NULL))`; todo asset tiene nombre y categoría efectivos, con `CHECK (article_id IS NOT NULL OR (name IS NOT NULL AND category_id IS NOT NULL))`; un consumible nunca está prestado, con `CHECK (type = 'DURADERO' OR status <> 'PRESTADO')`; `serial_number` y `acquired_on` solo tienen sentido en un duradero, con `CHECK (type = 'DURADERO' OR (serial_number IS NULL AND acquired_on IS NULL))`. `owner_id` es **anulable**: lo deja vacío la baja de su propietario (ver 4.1.4). Que `location_asset_id` apunte a un `DURADERO` no es expresable como `CHECK` simple: se valida en el caso de uso |
+| `assets` (existencias) | Una sola existencia **viva** por artículo y ubicación: `CREATE UNIQUE INDEX ON assets (household_id, article_id, location_asset_id, location_id) NULLS NOT DISTINCT WHERE type = 'CONSUMIBLE' AND status <> 'BAJA'`. El `NULLS NOT DISTINCT` (PostgreSQL 15+) es lo que hace que la regla siga aplicando cuando la existencia aún no tiene ubicación asignada; sin él, cada entrada sin ubicar crearía una fila nueva. El `status <> 'BAJA'` es igual de necesario: sin él, una existencia dada de baja o fusionada seguiría ocupando su hueco para siempre y ningún `RegistrarEntradaConsumible` posterior podría volver a usar esa ubicación |
+| `locations` | `parent_location_id` referencia a la propia tabla; la validación anti-ciclo se resuelve a nivel de aplicación (caso de uso), no es expresable como `CHECK` simple. `type` con `CHECK IN ('VIVIENDA','PLANTA','HABITACION','MUEBLE','ESTANTE','OTRO')`; `name` único entre hermanas, con índice único sobre `(household_id, parent_location_id, lower(unaccent(name))) NULLS NOT DISTINCT` — el `NULLS NOT DISTINCT` cubre las ubicaciones raíz, que no tienen padre |
+| `loans` | exactamente uno de `lender_user_id`/`lender_external` informado (ídem para receptor); `status` con `CHECK IN ('ACTIVO','DEVUELTO','VENCIDO')`; índice único parcial `(asset_id) WHERE status IN ('ACTIVO','VENCIDO')` para no permitir más de un préstamo abierto por asset — **un préstamo vencido sigue ocupando el asset**, así que el índice no puede mirar solo a `ACTIVO`. El contacto del externo es `jsonb` con `name` y al menos uno de `email`/`phone`, que es lo que necesita el enlace del token acotado. Que el asset prestado sea `DURADERO` se valida en el caso de uso, no como `CHECK` |
 | `loan_access_tokens` | `token_hash` único; `rol` con `CHECK IN ('PRESTADOR','RECEPTOR')` |
 | `refresh_tokens` | `token_hash` único; se marca `revoked_at` en lugar de borrarse, para poder auditar |
 
@@ -876,17 +936,17 @@ Catálogo ilustrativo de los comandos y queries que expone la capa de aplicació
 | Tipo | Nombre | Entrada principal | Regla clave | Evento publicado |
 |---|---|---|---|---|
 | Comando | `CrearCategoria` | nombre, notas (opcional) | nombre único entre las vigentes del hogar (normalizado) | — |
-| Comando | `RetirarCategoria` | categoriaId | retirada lógica; deja de ofrecerse al clasificar, y los assets y artículos que ya la tenían la conservan | — |
-| Comando | `CrearArticulo` | nombre, categoriaId, unidad, marca y código de barras (opcionales) | nombre único en el hogar (normalizado); código de barras único si se informa; la categoría debe estar vigente | `CatalogItemCreated` |
-| Comando | `CrearAsset` | nombre, tipo `DURADERO`, categoriaId, ownerId, ubicación y catalogItemId (opcionales) | ubicación no puede ser Asset y Location a la vez; no admite `cantidad`; sin `catalogItemId` son obligatorios nombre y categoría; un `CONSUMIBLE` no entra por aquí, sino por `RegistrarEntradaConsumible` | `AssetCreated` |
-| Comando | `AdjuntarDocumento` | assetId **o** catalogItemId, tipo, enlace, descripción y fecha (opcionales) | exactamente uno de los dos destinos; el core guarda el enlace, no el fichero | `DocumentAttached` |
+| Comando | `RetirarCategoria` | categoryId | retirada lógica; deja de ofrecerse al clasificar, y los assets y artículos que ya la tenían la conservan | — |
+| Comando | `CrearArticulo` | nombre, categoryId, unidad, marca y código de barras (opcionales) | nombre único en el hogar (normalizado); código de barras único si se informa; la categoría debe estar vigente | `ArticleCreated` |
+| Comando | `CrearAsset` | nombre, tipo `DURADERO`, categoryId, ownerId, ubicación y articleId (opcionales) | ubicación no puede ser Asset y Location a la vez; no admite `quantity`; sin `articleId` son obligatorios nombre y categoría; un `CONSUMIBLE` no entra por aquí, sino por `RegistrarEntradaConsumible` | `AssetCreated` |
+| Comando | `AdjuntarDocumento` | assetId **o** articleId, tipo, enlace, descripción y fecha (opcionales) | exactamente uno de los dos destinos; el core guarda el enlace, no el fichero | `DocumentAttached` |
 | Comando | `EliminarDocumento` | documentId | borrado real: no lo referencia nada | — |
-| Comando | `RegistrarEntradaConsumible` | catalogItemId **o** datos de artículo nuevo, ubicación, cantidad, ownerId | crea el artículo si no existe; resuelve la existencia de ese artículo en esa ubicación y **suma** la cantidad, o la crea si no hay ninguna; la cantidad de entrada debe ser > 0 y va en la unidad del artículo | `CatalogItemCreated` (si creó artículo) + `AssetCreated` o `AssetQuantityChanged` |
+| Comando | `RegistrarEntradaConsumible` | articleId **o** datos de artículo nuevo, ubicación, cantidad, ownerId | crea el artículo si no existe; resuelve la existencia de ese artículo en esa ubicación y **suma** la cantidad, o la crea si no hay ninguna; la cantidad de entrada debe ser > 0 y va en la unidad del artículo | `ArticleCreated` (si creó artículo) + `AssetCreated` o `AssetQuantityChanged` |
 | Comando | `MoverAsset` | assetId, nueva ubicación | evita ciclos en la jerarquía; si la ubicación es un Asset, este debe ser `DURADERO`; mover una existencia a una ubicación que ya tiene otra viva del mismo artículo se rechaza con `EXISTENCE_ALREADY_IN_LOCATION` — eso es una fusión, y se resuelve con `FusionarExistencias` | `AssetMoved` / `AssetHierarchyChanged` |
-| Comando | `FusionarExistencias` | assetId origen, assetId destino | ambas `CONSUMIBLE` vivas del **mismo artículo** y distintas entre sí; el destino se queda con la suma de las cantidades y conserva su ubicación y su propietario; el origen queda a `cantidad = 0` y `estado = BAJA` | `AssetQuantityChanged` (destino) + `AssetDeactivated` (origen) |
+| Comando | `FusionarExistencias` | assetId origen, assetId destino | ambas `CONSUMIBLE` vivas del **mismo artículo** y distintas entre sí; el destino se queda con la suma de las cantidades y conserva su ubicación y su propietario; el origen queda a `quantity = 0` y `status = BAJA` | `AssetQuantityChanged` (destino) + `AssetDeactivated` (origen) |
 | Comando | `AjustarCantidadAsset` | assetId, nueva cantidad (absoluta) o delta | solo sobre `CONSUMIBLE`; la cantidad resultante no puede ser negativa. Es la corrección o el consumo, no la entrada de compra | `AssetQuantityChanged` |
-| Comando | `DarDeBajaAsset` | assetId | sin hijos activos ni préstamo abierto (`ACTIVO` o `VENCIDO`); llegar a `cantidad = 0` no da de baja por sí solo. Si es una existencia con cantidad pendiente, la baja la lleva a 0: lo que quedaba se da por perdido | `AssetDeactivated`, precedido de `AssetQuantityChanged` si había cantidad que dar de baja |
-| Comando | `RetirarArticulo` | catalogItemId | solo si no le queda ninguna existencia viva. Es una retirada **lógica** (`retired_at`): el artículo deja de salir en el catálogo y no admite nuevas entradas, pero la fila permanece porque las existencias dadas de baja siguen apuntando a ella. La `unidad` de un artículo que ya tiene existencias no es modificable | — |
+| Comando | `DarDeBajaAsset` | assetId | sin hijos activos ni préstamo abierto (`ACTIVO` o `VENCIDO`); llegar a `quantity = 0` no da de baja por sí solo. Si es una existencia con cantidad pendiente, la baja la lleva a 0: lo que quedaba se da por perdido | `AssetDeactivated`, precedido de `AssetQuantityChanged` si había cantidad que dar de baja |
+| Comando | `RetirarArticulo` | articleId | solo si no le queda ninguna existencia viva. Es una retirada **lógica** (`retired_at`): el artículo deja de salir en el catálogo y no admite nuevas entradas, pero la fila permanece porque las existencias dadas de baja siguen apuntando a ella. La `unit` de un artículo que ya tiene existencias no es modificable | — |
 | Comando | `CrearLocation` | nombre, parentLocationId (opcional), capacidad, condiciones | evita ciclos en la jerarquía | `LocationCreated` |
 | Comando | `CrearUsuario` | nombre, email, role, contraseña inicial | solo `ADMIN_HOGAR`; email único en el hogar; obliga a cambiar la contraseña en el primer acceso | — |
 | Comando | `ModificarRolUsuario` | userId, nuevo role | no puede quitarse el único `ADMIN_HOGAR` del hogar | — |
@@ -894,11 +954,11 @@ Catálogo ilustrativo de los comandos y queries que expone la capa de aplicació
 | Comando | `IniciarPrestamo` | assetId, prestador, receptor, fecha de devolución prevista | el asset debe ser `DURADERO` y no tener otro préstamo abierto: un `VENCIDO` sigue ocupándolo | `LoanStarted` |
 | Comando | `ConfirmarDevolucion` | loanId | solo prestador, receptor o un usuario del hogar | `LoanReturned` |
 | Comando | `GenerarTokenAccesoExterno` | loanId, rol (`PRESTADOR`\|`RECEPTOR`) | vinculado a un préstamo abierto —también `VENCIDO`, que es justo cuando hace falta reclamar la devolución—; expira | — |
-| Comando de sistema | `MarcarPrestamosVencidos` | — (proceso diario) | pasa a `VENCIDO` los `ACTIVO` con `fechaDevolucionPrevista` ya superada; ignora los que no la tienen. No nace de una petición: recorre los hogares fijando `app.household_id` en cada transacción, nunca con `BYPASSRLS`. Idempotente por construcción — solo mira los `ACTIVO` | `LoanOverdue` por cada préstamo marcado |
+| Comando de sistema | `MarcarPrestamosVencidos` | — (proceso diario) | pasa a `VENCIDO` los `ACTIVO` con `dueAt` ya superada; ignora los que no la tienen. No nace de una petición: recorre los hogares fijando `app.household_id` en cada transacción, nunca con `BYPASSRLS`. Idempotente por construcción — solo mira los `ACTIVO` | `LoanOverdue` por cada préstamo marcado |
 | Query | `ListarArticulos` | filtros: texto de búsqueda, categoría, código de barras | acotado al hogar; excluye los retirados salvo que se pidan; alimenta el autocompletado del alta de consumibles | — |
-| Query | `ListarAssets` | filtros: locationId, parentAssetId, ownerId, estado, tipo, catalogItemId, categoriaId, sinPropietario | resultado acotado al `householdId` del token; excluye los `BAJA` salvo que se filtre por ese estado; `sinPropietario` devuelve los huérfanos de una baja de usuario; el nombre y la categoría se resuelven desde el artículo cuando el asset lo tiene | — |
+| Query | `ListarAssets` | filtros: locationId, parentAssetId, ownerId, estado, tipo, articleId, categoryId, withoutOwner | resultado acotado al `householdId` del token; excluye los `BAJA` salvo que se filtre por ese estado; `withoutOwner` devuelve los huérfanos de una baja de usuario; el nombre y la categoría se resuelven desde el artículo cuando el asset lo tiene | — |
 | Query | `ListarCategorias` | — | excluye las retiradas salvo que se pidan | — |
-| Query | `ListarDocumentos` | filtros: assetId, catalogItemId, tipo | acotado al hogar | — |
+| Query | `ListarDocumentos` | filtros: assetId, articleId, tipo | acotado al hogar | — |
 | Query | `ObtenerAsset` / `ListarHijosDeAsset` | assetId | — | — |
 | Query | `ListarLocations` / `ObtenerLocation` | filtros: parentLocationId | — | — |
 | Query | `ListarUsuarios` | — | solo usuarios del propio hogar; excluye las bajas salvo que se pidan | — |
@@ -950,12 +1010,12 @@ pie title Distribución de la batería de tests
 
 **Ejemplos adicionales derivados de esta iteración del core:**
 - *Unitario de dominio:* un `Asset` no puede definirse como su propio ancestro en la jerarquía de composición (evita ciclos).
-- *Unitario de dominio:* un `Asset` de tipo `DURADERO` no admite `cantidad`, y un `CONSUMIBLE` no puede quedar con cantidad negativa tras un ajuste ni existir sin artículo.
+- *Unitario de dominio:* un `Asset` de tipo `DURADERO` no admite `quantity`, y un `CONSUMIBLE` no puede quedar con cantidad negativa tras un ajuste ni existir sin artículo.
 - *Integración de caso de uso:* ejecutar `IniciarPrestamo` sobre un asset que ya tiene un préstamo en estado `ACTIVO` debe fallar.
 - *Integración de caso de uso:* ejecutar `AjustarCantidadAsset` sobre un `CONSUMIBLE` debe persistir la nueva cantidad y publicar `AssetQuantityChanged`; sobre un `DURADERO` debe fallar sin publicar nada.
 - *Integración de caso de uso:* ejecutar `RegistrarEntradaConsumible` dos veces con el mismo artículo y la misma ubicación debe dejar **una sola** existencia con la suma de ambas cantidades, publicando `AssetCreated` la primera vez y `AssetQuantityChanged` la segunda.
 - *Integración de caso de uso:* `RegistrarEntradaConsumible` con un artículo nuevo debe crear artículo y existencia en la misma transacción; si el nombre ya existe en el hogar, debe reutilizar el artículo en lugar de duplicarlo.
-- *Integración de caso de uso:* `FusionarExistencias` sobre dos existencias del mismo artículo debe dejar el destino con la suma y el origen a `cantidad = 0` y `estado = BAJA`, publicando `AssetQuantityChanged` y `AssetDeactivated` correlacionados; con artículos distintos debe fallar sin tocar ninguna de las dos.
+- *Integración de caso de uso:* `FusionarExistencias` sobre dos existencias del mismo artículo debe dejar el destino con la suma y el origen a `quantity = 0` y `status = BAJA`, publicando `AssetQuantityChanged` y `AssetDeactivated` correlacionados; con artículos distintos debe fallar sin tocar ninguna de las dos.
 - *Integración de caso de uso:* tras fusionar (o dar de baja) la existencia de una ubicación, un `RegistrarEntradaConsumible` del mismo artículo en esa misma ubicación debe volver a crear existencia sin chocar con el índice único.
 - *Integración de caso de uso:* `DarDeBajaAsset` sobre una existencia con cantidad pendiente debe dejarla a 0 y publicar `AssetQuantityChanged` antes de `AssetDeactivated`; sobre una que ya estaba a 0, solo el segundo.
 - *Integración de caso de uso:* `RetirarArticulo` debe marcar `retired_at` sin borrar la fila, dejar el artículo fuera del autocompletado y seguir resolviendo el nombre de las existencias dadas de baja que lo referencian.
@@ -1045,10 +1105,11 @@ El contrato completo de la API vive en [`openapi.yaml`](openapi.yaml) (OpenAPI
 | 2026-08-07 | Decisión documentada de aplazar a la Fase 1 el reparto de contenido del README a `docs/`, con el destino previsto de cada sección (ver `docs/README.md`) |
 | 2026-08-07 | Cierre de las decisiones abiertas de la Fase 0 (4.1.7): préstamo limitado a assets duraderos (la cesión de un consumible es un ajuste de cantidad), Row-Level Security activado como segunda capa de aislamiento (5.6, ADR-003), alta directa de usuarios en el MVP con invitación por email como evolución, y Flyway como librería de migraciones (ADR-004). La Fase 0 queda completada |
 | 2026-08-07 | Reformulación del concepto de asset (4.1.1): todo material del hogar es un asset, con distinción `DURADERO`/`CONSUMIBLE` y contador de cantidad en el core. Impacto en el diagrama de dominio (4.1.3), reglas de préstamo (4.1.5), decisiones validadas (4.1.7), evento `AssetQuantityChanged` (5.2.3), API (5.4.2, 5.4.3), modelo de datos (5.6), casos de uso con `AjustarCantidadAsset` (5.7), ejemplos de test (7) y `openapi.yaml` |
-| 2026-08-07 | Profundización de los atributos de las entidades del core (4.1.1 a 4.1.5): `categoria` pasa a ser un catálogo por hogar (entidad `Categoria`); la documentación asociada se modela como entidad `Documento` que guarda enlace y cuelga de un asset o de un artículo; el usuario gana baja lógica, normalización de email y `debeCambiarPassword`, y sus assets quedan sin propietario al causar baja; la ubicación gana `tipo` y esquema explícito de capacidad y condiciones ambientales, cerrando dos «a definir»; el préstamo estructura el contacto del externo y define cómo se alcanza `VENCIDO` mediante proceso programado. Corregido el índice único de préstamos, que solo miraba a `ACTIVO` y dejaba prestar un asset con préstamo `VENCIDO`. Impacto en 4.1.3, 4.1.7, 5.2.3, 5.4.2, 5.6, 5.7, 7 y `openapi.yaml` |
-| 2026-08-07 | Revisión de la baja a la luz del modelo artículo/existencia: la retirada de un artículo pasa a ser lógica (`retired_at`), porque las existencias dadas de baja lo referencian por clave ajena; `DarDeBajaAsset` define qué ocurre con la cantidad pendiente y publica también `AssetQuantityChanged`; la baja gana endpoint propio (`DELETE /assets/{id}`) y el `PATCH` deja de aceptar `estado`, que permitía saltarse `DarDeBajaAsset` e `IniciarPrestamo`; los listados excluyen bajas y retirados por defecto (4.1.1, 5.4.2, 5.6, 5.7, 7) |
+| 2026-08-08 | Homogeneización de las tablas de atributos (4.1.x), que ahora dan **Nombre de definición (`nombreDePrograma`)** en la columna «Atributo», y unificación de toda la nomenclatura de programación en inglés camelCase: campos de API, columnas de BD y payloads de evento. El artículo pasa de `catalog_items`/`catalogItemId` a `articles`/`articleId`. Se amplían los atributos de todas las entidades: el hogar gana zona horaria —que necesitaba el proceso de vencidos—, el asset número de serie, fecha de adquisición y foto, el artículo modelo, contenido por envase y foto, el documento fecha de validez separada de la de emisión, el usuario teléfono, avatar y último acceso, y la ubicación foto. Cinco atributos más quedan propuestos y anotados como pendientes en 4.1.7 |
+| 2026-08-07 | Profundización de los atributos de las entidades del core (4.1.1 a 4.1.5): `category` pasa a ser un catálogo por hogar (entidad `Categoria`); la documentación asociada se modela como entidad `Documento` que guarda enlace y cuelga de un asset o de un artículo; el usuario gana baja lógica, normalización de email y `mustChangePassword`, y sus assets quedan sin propietario al causar baja; la ubicación gana `type` y esquema explícito de capacidad y condiciones ambientales, cerrando dos «a definir»; el préstamo estructura el contacto del externo y define cómo se alcanza `VENCIDO` mediante proceso programado. Corregido el índice único de préstamos, que solo miraba a `ACTIVO` y dejaba prestar un asset con préstamo `VENCIDO`. Impacto en 4.1.3, 4.1.7, 5.2.3, 5.4.2, 5.6, 5.7, 7 y `openapi.yaml` |
+| 2026-08-07 | Revisión de la baja a la luz del modelo artículo/existencia: la retirada de un artículo pasa a ser lógica (`retired_at`), porque las existencias dadas de baja lo referencian por clave ajena; `DarDeBajaAsset` define qué ocurre con la cantidad pendiente y publica también `AssetQuantityChanged`; la baja gana endpoint propio (`DELETE /assets/{id}`) y el `PATCH` deja de aceptar `status`, que permitía saltarse `DarDeBajaAsset` e `IniciarPrestamo`; los listados excluyen bajas y retirados por defecto (4.1.1, 5.4.2, 5.6, 5.7, 7) |
 | 2026-08-07 | Caso de uso `FusionarExistencias` (5.7) para juntar dos existencias del mismo artículo creadas por separado, con endpoint `POST /assets/{id}/merge` (5.4.2, 5.4.3) y sin evento propio: reutiliza `AssetQuantityChanged` y `AssetDeactivated` correlacionados por payload. El índice único de existencias pasa a excluir las dadas de baja (5.6), que si no bloqueaban su ubicación para siempre |
-| 2026-08-07 | Separación entre artículo y existencia en el alta de consumibles (4.1.1): se añade la entidad `Articulo` (tabla `catalog_items`) como definición reutilizable, el asset `CONSUMIBLE` pasa a ser una existencia con `cantidad` y la `unidad` sube al artículo. Dar entrada a un consumible ya conocido suma sobre su existencia en lugar de crear una fila nueva. Impacto en el diagrama de dominio (4.1.3), decisiones validadas (4.1.7), evento `CatalogItemCreated` (5.2.3), API con `/catalog-items` y `/assets/intake` (5.4.2, 5.4.3), modelo de datos (5.6), casos de uso con `CrearArticulo` y `RegistrarEntradaConsumible` (5.7), ejemplos de test (7) y `openapi.yaml` |
+| 2026-08-07 | Separación entre artículo y existencia en el alta de consumibles (4.1.1): se añade la entidad `Articulo` (tabla `articles`) como definición reutilizable, el asset `CONSUMIBLE` pasa a ser una existencia con `quantity` y la `unit` sube al artículo. Dar entrada a un consumible ya conocido suma sobre su existencia en lugar de crear una fila nueva. Impacto en el diagrama de dominio (4.1.3), decisiones validadas (4.1.7), evento `ArticleCreated` (5.2.3), API con `/articles` y `/assets/intake` (5.4.2, 5.4.3), modelo de datos (5.6), casos de uso con `CrearArticulo` y `RegistrarEntradaConsumible` (5.7), ejemplos de test (7) y `openapi.yaml` |
 
 ---
 
