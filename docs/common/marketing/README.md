@@ -30,13 +30,21 @@ solución completa, igual que la visión de producto. Aplicando la
 |---|---|
 | [`DRP-resumen.pptx`](DRP-resumen.pptx) | Presentación de 18 diapositivas que resume el README principal: objetivo, analogía ERP → DRP, core mínimo, modelo de dominio, arquitectura, event bus, aislamiento multi-tenant, casos de uso, stack, testing y roadmap. Cada diapositiva lleva en sus notas la sección del README de la que procede. Refleja el estado del README a 2026-08-07 (Fase 0 completada). |
 | [`assets/build-drp-resumen.js`](assets/build-drp-resumen.js) | Generador de la presentación anterior: es su fuente editable. La presentación **no se retoca a mano**, se regenera ejecutando este script. El procedimiento y su verificación están en [SKILL-001](../skills/SKILL-001-readme-to-deck.md). |
+| [`brand-guidelines-template.docx`](brand-guidelines-template.docx) | Plantilla en blanco de manual de marca (v1.0), en siete secciones: identidad, logo y sus variantes, paleta con HEX/RGB/CMYK, tipografía y jerarquía, iconografía, tono de voz y design tokens. Todo lo que aparece entre corchetes es un hueco por rellenar. |
+
+La plantilla es la única pieza de aquí que no describe a DRP: es un **formulario**,
+no material derivado, así que no procede de ninguna versión del README ni se queda
+desfasada cuando este cambia. Y se rellena a mano en Word, de modo que el propio
+`.docx` es su fuente editable y no necesita un generador al lado. Los assets que
+salgan de rellenarla —logo, paleta, tipografías— van a `brand/`, y esos sí quedan
+sujetos a las convenciones de más abajo.
 
 ## Contenido previsto
 
 | Pieza | Contenido |
 |---|---|
 | `messaging.md` | Slogan, propuesta de valor, descripción corta y larga, y tono con el que se habla del producto. |
-| `brand/` | Logo y sus variantes (color, monocromo, versión reducida), paleta, tipografías y usos prohibidos. |
+| `brand/` | Logo y sus variantes (color, monocromo, versión reducida), paleta, tipografías y usos prohibidos: los huecos que define la plantilla, ya resueltos y con los archivos al lado. |
 | `presentations/` | Presentaciones adicionales cuando haya más de una: comercial, técnica, demo. Mientras solo exista la de resumen, se queda en la raíz de esta carpeta. |
 | `screenshots/` | Capturas del producto para material divulgativo, con la versión a la que corresponden. |
 
