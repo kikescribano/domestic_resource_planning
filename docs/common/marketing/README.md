@@ -6,6 +6,7 @@
 | Responsable | Por decidir |
 | Ámbito | Toda la solución |
 | Última revisión | 2026-08-08 |
+| Procedimiento | [SKILL-001 · Presentación de resumen a partir del README](../skills/SKILL-001-readme-to-deck.md) |
 
 Este espacio reúne el material con el que DRP se presenta hacia fuera:
 presentaciones, identidad visual, mensajes y cualquier pieza pensada para
@@ -28,6 +29,7 @@ solución completa, igual que la visión de producto. Aplicando la
 | Pieza | Contenido |
 |---|---|
 | [`DRP-resumen.pptx`](DRP-resumen.pptx) | Presentación de 18 diapositivas que resume el README principal: objetivo, analogía ERP → DRP, core mínimo, modelo de dominio, arquitectura, event bus, aislamiento multi-tenant, casos de uso, stack, testing y roadmap. Cada diapositiva lleva en sus notas la sección del README de la que procede. Refleja el estado del README a 2026-08-07 (Fase 0 completada). |
+| [`assets/build-drp-resumen.js`](assets/build-drp-resumen.js) | Generador de la presentación anterior: es su fuente editable. La presentación **no se retoca a mano**, se regenera ejecutando este script. El procedimiento y su verificación están en [SKILL-001](../skills/SKILL-001-readme-to-deck.md). |
 
 ## Contenido previsto
 
