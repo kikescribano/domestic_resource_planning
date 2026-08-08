@@ -14,6 +14,7 @@ docs/
 │   ├── contracts/            Contratos compartidos entre frontend y backend
 │   ├── standards/            Convenciones transversales
 │   ├── skills/               Catálogo y definición de skills compartidas
+│   ├── marketing/            Presentaciones, identidad visual y mensajes
 │   └── templates/            Plantillas documentales
 ├── backend/                  Documentación exclusiva del backend
 │   ├── architecture/         Estructura interna y dependencias
@@ -44,6 +45,7 @@ docs/
 | Explica experiencia, interfaz o implementación web | `frontend/` |
 | Describe una capacidad reutilizable en toda la solución | `common/skills/` |
 | Describe una capacidad exclusiva de un componente | `<componente>/skills/` |
+| Presenta el producto hacia fuera: presentaciones, marca, mensajes | `common/marketing/` |
 
 Cuando un tema cruza componentes, `common/` conserva la decisión o el contrato y
 cada componente documenta únicamente su implementación, enlazando de vuelta a la
