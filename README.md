@@ -1,7 +1,7 @@
 # DRP · Domestic Resource Planning
 
 > **Estado del documento:** vivo — se actualiza a medida que el proyecto avanza.
-> **Última actualización:** 2026-08-08
+> **Última actualización:** 2026-08-09
 > **Fase actual:** Fase 0 completada — core mínimo definido y sin decisiones de diseño abiertas; lista para iniciar la Fase 1 (Core MVP)
 
 ---
@@ -248,7 +248,7 @@ Lo que **no** se hace es colgar el resto del dominio de la vivienda. Categorías
 - Si se informa una capacidad, superarla al asignar un asset **advierte pero no bloquea**: el sistema no sabe cuánto ocupa cada cosa —el asset no lleva peso ni volumen— así que solo puede contar unidades con certeza. Bloquear con datos incompletos impediría guardar algo que sí cabe.
 - Una ubicación no puede eliminarse si tiene ubicaciones hijas o assets dentro.
 
-> **Por decidir:** que el aviso de capacidad sea útil más allá de contar unidades exige que el asset lleve peso o volumen, y eso solo tiene sentido si alguien los rellena. Queda anotado como pregunta en 4.1.7 en lugar de inventar un campo que nadie mantendría.
+> **Por decidir, y no aquí:** que el aviso de capacidad sea útil más allá de contar unidades exige que el asset lleve peso o volumen, y eso solo tiene sentido si alguien los rellena. Es terreno del módulo **Warehouse** (ver 4.2), que es quien va a necesitar medir lo que ocupa cada cosa; se resolverá al definir los módulos, no antes. Queda anotado como pregunta en 4.1.7 en lugar de inventar aquí un campo que nadie mantendría.
 
 #### 4.1.3 Modelo de dominio del core (vista conjunta)
 
@@ -376,7 +376,7 @@ De la separación salen cuatro consecuencias que conviene tener presentes:
 | Nombre (`name`) | Nombre de la persona |
 | Correo electrónico (`email`) | Identifica a la persona en toda la instalación. Se compara **normalizado a minúsculas**: `Kike@x.com` y `kike@x.com` son la misma persona |
 | Teléfono (`phone`) | Opcional. Al participante externo de un préstamo ya se le exige un canal para mandarle el enlace; al miembro del hogar no se le pedía ninguno |
-| Hash de contraseña (`passwordHash`) | `BCrypt`, nunca la contraseña en claro (ver 5.4.1) |
+| Hash de contraseña (`passwordHash`) | `Argon2id`, nunca la contraseña en claro (ver 5.4.1) |
 | Correo verificado (`emailVerifiedAt`) | Mientras esté vacío no se puede iniciar sesión |
 | Avatar (`avatarUrl`) | Opcional. Enlace a una imagen, mismo criterio que las demás |
 | Último acceso (`lastLoginAt`) | Deja ver cuentas dormidas antes de decidir una baja |
@@ -436,6 +436,36 @@ Aceptar una invitación **verifica el correo por sí solo**: haber recibido el t
 El estado de una invitación no es un campo: se deduce de esas tres fechas y del reloj. Solo puede haber **una invitación viva por correo y hogar**.
 
 Esto sustituye al alta directa, y con ella desaparece `mustChangePassword`: era el apaño para que alguien cambiara una contraseña que otro le había puesto, y ya nadie pone la contraseña de nadie. La contrapartida es que un miembro sin correo —un menor, alguien mayor que no lo usa— no puede entrar por esta vía; si aparece esa necesidad, será una decisión nueva y no la recuperación del alta directa tal cual.
+
+**Contraseñas: olvidarla y cambiarla.**
+
+La contraseña vive en la identidad, así que ambas operaciones son de la persona y no de ninguno de sus hogares.
+
+**Olvidarla** son dos pasos, con el mismo patrón que la verificación: `RequestPasswordReset` recibe un correo y, si hay identidad activa detrás, emite un token de un solo uso y lo envía; `ResetPassword` lo consume y fija la contraseña nueva. Como el alta de hogar, **responde siempre igual** exista o no ese correo — es un endpoint anónimo, y contestar otra cosa diría a cualquiera quién usa el sistema.
+
+Tres cosas que lo diferencian de los demás tokens del sistema:
+
+- **Dura una hora, no siete días.** Este token cambia una credencial; una invitación solo propone entrar en un hogar. No corren el mismo riesgo, así que no merecen el mismo plazo. Una hora cubre de sobra ir al correo y volver.
+- **Restablecer cierra todas las sesiones.** Se revocan todos los refresh tokens de esa identidad. Si el motivo del restablecimiento era que alguien más había entrado, dejarle la sesión abierta anula el gesto entero. La revocación ocurre **antes** de emitir el par de tokens nuevo, no después.
+- **Restablecer verifica el correo.** Por lo mismo que aceptar una invitación: recibir el token demuestra el control de la dirección, que es justo lo que la verificación comprueba. Un hogar creado y nunca verificado se rescata restableciendo la contraseña, y sale de la cola de purga.
+
+Solo hay **un token de restablecimiento vivo por identidad**: pedir otro invalida el anterior.
+
+**Cambiarla estando dentro** es `ChangePassword`, y exige la contraseña actual además de la nueva. No es burocracia: sin ese requisito, quien se hiciera con un access token robado podría cambiar la contraseña y dejar fuera al dueño de la cuenta. Revoca las **demás** sesiones y conserva la que está en uso.
+
+> Una identidad dada de baja no puede restablecer contraseña. No recibe correo, y la respuesta es la misma que en cualquier otro caso.
+
+**Qué se admite como contraseña.**
+
+Una sola regla de forma: **mínimo 12 caracteres**, y ninguna exigencia de mayúsculas, dígitos ni símbolos. Las reglas de composición no producen contraseñas más difíciles de adivinar, sino más difíciles de recordar: empujan hacia el patrón `Password1!` y hacia el papel pegado al monitor. Lo que de verdad encarece un ataque es la longitud.
+
+Sobre eso, una única comprobación de contenido: **se rechazan las contraseñas más comunes**, contra una lista empaquetada con la aplicación. Cubre el grueso del problema real sin depender de ningún servicio externo, que en un camino crítico como el alta significaría latencia y un plan B para cuando no responda; una instalación sin salida a internet se comporta igual.
+
+Lo que **no** hay, y es deliberado: ni caducidad periódica, que solo produce variaciones triviales del mismo secreto, ni historial de contraseñas anteriores, que obligaría a conservar credenciales viejas — un pasivo, no un activo. Una contraseña se cambia cuando hay motivo, no por calendario.
+
+La regla se aplica en los **cuatro** puntos donde se fija una contraseña: al crear un hogar, al aceptar una invitación, al restablecerla y al cambiarla estando dentro.
+
+> **Por eso el hash es `Argon2id` y no `BCrypt`.** BCrypt ignora en silencio todo lo que pase de 72 bytes: no falla, trunca. Con una política que favorece frases largas, dos contraseñas distintas que compartan los primeros 72 bytes serían la misma para el sistema. Argon2id no tiene ese límite, viene de serie en Spring Security y es hoy la recomendación habitual. Cambiarlo ahora no cuesta nada —no hay ni una línea de código escrita—, y envuelto en un `DelegatingPasswordEncoder` el algoritmo deja de ser una puerta de una sola dirección. Su configuración mínima es la que recomienda OWASP: **19 MiB de memoria, 2 iteraciones y grado de paralelismo 1**. Es un suelo, no un objetivo — subirlo es correcto si el hardware lo aguanta, y bajarlo no.
 
 **Bajas: dejar un hogar no es cerrar la cuenta.**
 
@@ -534,7 +564,14 @@ Las siguientes decisiones, inicialmente abiertas, han quedado validadas:
 - **Identidad y pertenencia separadas:** las credenciales viven en una `Identity` única de la instalación y el papel en un hogar en un `HouseholdMember` propio (ver 4.1.4). En el MVP una identidad tiene **como mucho una pertenencia activa**, garantizado por un índice único parcial que basta con retirar el día que se admitan varias. Se descartó mantener un único `users` con `householdId`, que es más simple pero convierte «la misma persona en dos hogares» en una migración de identidad, token y todas las consultas a la vez; y se descartó abrir el multi-hogar ya, que mete selector de hogar y cambio de contexto antes de tener el core en pie. El coste es partir la tabla desde el principio y aceptar que `identities` queda fuera de RLS.
 - **Varias viviendas por hogar:** una vivienda es una `Location` sin padre y de tipo `HOUSE`, no una entidad propia (ver 4.1.2). Se descartó una tabla `dwellings`, que haría explícito el concepto pero duplicaría la raíz de la jerarquía y tendería a volver obligatorio pertenecer a una vivienda — justo lo contrario de lo que se busca: categorías, artículos, usuarios y assets cuelgan del **hogar**, y la ubicación de un asset sigue siendo opcional.
 
-> **Pendiente de validar (revisada el 2026-08-09, sigue abierta):** el aviso por capacidad de una ubicación (4.1.2) solo puede contar unidades, porque un asset no lleva peso ni volumen. ¿Merece la pena que los tenga? Solo si alguien los rellena, y un hogar que no pesa sus cajas obtendría un aviso peor que ninguno. Se descartó tanto añadir los campos como retirar la capacidad de `Location`: el aviso se queda en lo que el sistema sabe con certeza hasta que haya uso real que diga otra cosa.
+- **Recuperación de contraseña:** dos pasos con token de un solo uso y **una hora** de caducidad, mucho más corta que los 7 días de una invitación porque cambia una credencial en lugar de proponer entrar en un hogar (ver 4.1.4). Vive en su propia tabla, `password_reset_tokens`, en lugar de compartir una genérica con un campo de propósito: la confusión de propósito entre tokens es una clase de vulnerabilidad conocida, y un filtro olvidado convertiría un token de verificación en uno de cambio de contraseña. Restablecer **revoca todas las sesiones** —si el motivo era un acceso ajeno, dejarlas abiertas anula el gesto— y **marca el correo como verificado**, por la misma razón que aceptar una invitación. Se añade además `ChangePassword` para quien ya está dentro, que exige la contraseña actual y conserva la sesión en uso.
+
+- **Política de contraseñas:** **mínimo 12 caracteres y ninguna regla de composición**, más el rechazo de las contraseñas más comunes contra una lista local (ver 4.1.4). Se descartó la composición clásica —ocho caracteres con mayúscula, dígito y símbolo—, que es lo que la gente espera pero produce contraseñas más cortas y más difíciles de recordar sin ser más difíciles de adivinar; y se descartó el mínimo simple de ocho sin más, que en un sistema con registro abierto deja pasar lo trivial. Se descartó consultar Have I Been Pwned pese a su cobertura muy superior, porque mete una dependencia externa con latencia y plan B en un camino crítico, y rompe una instalación sin salida a internet. Sin caducidad periódica ni historial de contraseñas anteriores: la primera produce variaciones triviales del mismo secreto y el segundo obliga a conservar credenciales que ya no hacen falta.
+- **Algoritmo de hash:** pasa de **BCrypt a `Argon2id`**, revisando lo que fijó la [ADR-002](docs/common/architecture/decisions/ADR-002-multi-tenancy-and-backend-framework.md) — cuyo cuerpo no se reescribe: la revisión queda enlazada al final de esa ADR. El motivo no es preferencia sino un límite real: BCrypt trunca en silencio a partir de 72 bytes, y la política recién adoptada favorece precisamente frases largas. Se descartó mantener BCrypt rechazando entradas de más de 72 bytes, que pone un techo arbitrario justo donde la política empuja, y pre-hashear con SHA-256 antes de BCrypt, que resuelve el límite a costa de una combinación artesanal con trampas conocidas y que habría que documentar para siempre. El cambio es gratis ahora, sin una línea de código escrita, y el `DelegatingPasswordEncoder` de Spring Security deja el algoritmo abierto a futuras migraciones. Su configuración mínima queda fijada en la que recomienda OWASP —19 MiB de memoria, 2 iteraciones y paralelismo 1 ([Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#argon2id))—, entendida como suelo y no como objetivo.
+
+> **Pendiente, y con destinatario (revisada el 2026-08-09):** el aviso por capacidad de una ubicación (4.1.2) solo puede contar unidades, porque un asset no lleva peso ni volumen. ¿Merece la pena que los tenga? Solo si alguien los rellena, y un hogar que no pesa sus cajas obtendría un aviso peor que ninguno.
+>
+> No es una pregunta del core: **corresponde al módulo Warehouse** (ver 4.2), que es quien necesitará medir lo que ocupa cada cosa para gestionar existencias de verdad. Se resolverá al definir los módulos, y hasta entonces se queda abierta a propósito. Mientras tanto el core no cambia: se descartó tanto añadir los campos como retirar la capacidad de `Location`, y el aviso se limita a lo que el sistema sabe con certeza.
 
 - **Autoría de los cambios:** toda entidad del core lleva `createdBy` y `updatedBy` (ver 4.1.1). Un hogar es un sitio compartido y la pregunta que más se hace no es qué cambió sino quién lo cambió. Ambas son anulables y **nulo significa el sistema**, que es lo que deja el proceso de vencidos al no actuar en nombre de nadie; se descartó inventar un usuario técnico porque daría una autoría falsa. Nunca se aceptan del cliente: salen del token, igual que el `householdId`. El hogar es la única excepción — cuando su fila nace no existe todavía ningún usuario al que apuntar.
 
@@ -548,7 +585,7 @@ Las siguientes decisiones, inicialmente abiertas, han quedado validadas:
 |---|---|---|---|
 | Gestión de eventos temporales | Mudanzas, reformas, viajes, celebraciones: proyectos con inicio/fin y recursos asociados | Por diseñar | Baja |
 | CMMS doméstico | Mantenimiento preventivo/correctivo de assets (planes, avisos, histórico) | Por diseñar | Alta |
-| Warehouse | Inventario doméstico (despensa, garaje, trastero) con stock y consumo | Por diseñar | Alta |
+| Warehouse | Inventario doméstico (despensa, garaje, trastero) con stock y consumo. Hereda la pregunta abierta sobre peso y volumen de un asset, de la que depende que el aviso de capacidad de una ubicación sirva para algo (ver 4.1.7) | Por diseñar | Alta |
 | Planificador de tareas | Rutinas, turnos entre miembros del hogar, recordatorios | Por diseñar | Media |
 | Gestión avanzada de préstamos | Recordatorios, penalizaciones, valoraciones e histórico extenso (el core ya cubre lo mínimo, ver 4.1.5) | Por diseñar | Baja |
 | *(otros a definir)* | Candidatos futuros: gastos/presupuesto, seguros y garantías, energía | Backlog abierto | — |
@@ -694,10 +731,12 @@ graph TD
 
 **Usuarios del hogar (administrador/miembro):**
 - Implementación con **Spring Security** + JWT firmado (HS256; clave gestionada como secreto de despliegue, no en el repositorio).
-- `POST /api/v1/auth/login` valida `email` + contraseña (hash `BCrypt` vía `PasswordEncoder` de Spring Security) y devuelve un **access token** de vida corta (≈15 min) y un **refresh token** de vida larga (≈30 días). Se rechaza mientras el correo no esté verificado (ver 4.1.4).
+- `POST /api/v1/auth/login` valida `email` + contraseña (hash `Argon2id` vía `PasswordEncoder` de Spring Security, envuelto en `DelegatingPasswordEncoder` para que el prefijo `{argon2}` deje migrar de algoritmo sin invalidar los hashes existentes) y devuelve un **access token** de vida corta (≈15 min) y un **refresh token** de vida larga (≈30 días). Se rechaza mientras el correo no esté verificado (ver 4.1.4).
 - Claims del access token: `sub` (`identityId`), `memberId`, `householdId` y `role` (`HOUSEHOLD_ADMIN` | `HOUSEHOLD_MEMBER`).
 - El `sub` identifica a la **persona** y el `memberId` a su **pertenencia** al hogar del token. Van los dos desde el principio aunque en el MVP haya una sola pertenencia por identidad: el día que haya varias, el token no cambia de forma — solo deja de resolverse sola cuál es.
 - Un filtro (`OncePerRequestFilter`) valida el JWT en cada petición y puebla el `SecurityContext`; la autorización por rol se expresa con `@PreAuthorize` sobre casos de uso/controllers.
+- `POST /api/v1/auth/password-reset` y `.../confirm` restablecen la contraseña de una identidad mediante token de un solo uso con **una hora** de caducidad; confirmar revoca todos los refresh tokens de esa identidad **antes** de emitir el par nuevo, y marca el correo como verificado si no lo estaba (ver 4.1.4).
+- `POST /api/v1/auth/password` cambia la contraseña estando autenticado, exigiendo la actual, y revoca las demás sesiones.
 - Los refresh tokens se guardan **hasheados** en la tabla `refresh_tokens` (ver 5.6), cuelgan de la **identidad** —la sesión es de la persona, no de su papel— y rotan en cada uso (`POST /api/v1/auth/refresh`); son revocables por el propio usuario o un administrador.
 - **Aislamiento multi-tenant:** al compartir varios hogares la misma base de datos, todo caso de uso filtra siempre por el `householdId` del token — nunca se confía en un `householdId` recibido como parámetro del cliente.
 
@@ -715,6 +754,9 @@ graph TD
 - `POST /api/v1/auth/verify-email` — consumir el token de verificación; devuelve el par de tokens
 - `POST /api/v1/auth/resend-verification` — reenviar el enlace de verificación
 - `POST /api/v1/auth/login` — iniciar sesión (usuarios del hogar)
+- `POST /api/v1/auth/password-reset` — solicitar el restablecimiento; **sin credencial**, responde siempre igual
+- `POST /api/v1/auth/password-reset/confirm` — fijar la contraseña nueva con el token recibido
+- `POST /api/v1/auth/password` — cambiar la contraseña estando autenticado (exige la actual)
 - `POST /api/v1/auth/refresh` — renovar el access token
 
 **Catálogo de artículos**
@@ -929,6 +971,7 @@ erDiagram
     HOUSEHOLDS ||--o{ INVITATIONS : "emite"
     IDENTITIES ||--o{ HOUSEHOLD_MEMBERS : "pertenece como"
     IDENTITIES ||--o{ EMAIL_VERIFICATION_TOKENS : "verifica con"
+    IDENTITIES ||--o{ PASSWORD_RESET_TOKENS : "restablece con"
     HOUSEHOLDS ||--o{ ASSETS : "tiene"
     HOUSEHOLDS ||--o{ LOCATIONS : "tiene"
     HOUSEHOLDS ||--o{ LOANS : "tiene"
@@ -992,6 +1035,13 @@ erDiagram
         uuid created_by FK
     }
     EMAIL_VERIFICATION_TOKENS {
+        uuid id PK
+        uuid identity_id FK
+        text token_hash
+        timestamptz expires_at
+        timestamptz used_at
+    }
+    PASSWORD_RESET_TOKENS {
         uuid id PK
         uuid identity_id FK
         text token_hash
@@ -1121,6 +1171,7 @@ erDiagram
 | `identities` | `email` único en **toda la instalación**, comparado en minúsculas: índice único sobre `lower(email)`. Ya no es parcial por baja — la identidad sobrevive a cualquier hogar, así que su correo no se libera. Sin el `lower()`, `Kike@x.com` y `kike@x.com` serían dos cuentas. **No lleva `household_id`**: queda fuera de RLS (ver más abajo) |
 | `household_members` | `UNIQUE (household_id, identity_id)` — nadie pertenece dos veces al mismo hogar; `role` con `CHECK IN ('HOUSEHOLD_ADMIN','HOUSEHOLD_MEMBER')`. Que en el MVP una identidad tenga como mucho **una** pertenencia activa se garantiza con un índice único parcial `(identity_id) WHERE deactivated_at IS NULL`: quitarlo es todo lo que hará falta el día que se admitan varias. Que no se pueda dar de baja al único `HOUSEHOLD_ADMIN` activo no es expresable como `CHECK`: se valida en el caso de uso |
 | `invitations` | `token_hash` único; una sola invitación viva por correo y hogar, con índice único parcial `(household_id, lower(email)) WHERE accepted_at IS NULL AND revoked_at IS NULL`; `role` con `CHECK IN ('HOUSEHOLD_ADMIN','HOUSEHOLD_MEMBER')`. El estado no es una columna: se deduce de `expires_at`, `accepted_at` y `revoked_at` |
+| `password_reset_tokens` | `token_hash` único; un solo token vivo por identidad, con índice único parcial `(identity_id) WHERE used_at IS NULL` — pedir uno nuevo marca el anterior como usado antes de insertar. Caduca a la hora. Tabla propia y no un `purpose` compartido con la verificación: con una sola tabla, un filtro mal escrito convierte un token de verificación en uno de cambio de contraseña, que es una clase de vulnerabilidad conocida |
 | `email_verification_tokens` | `token_hash` único; un solo uso, marcado con `used_at`; expira. Mismo patrón que `loan_access_tokens`, y por el mismo motivo: el token viaja por correo y hay que poder comprobar reutilización |
 | `categories` | `name` único entre las categorías vigentes del hogar, con índice único parcial sobre `(household_id, lower(unaccent(name))) WHERE retired_at IS NULL` — mismo tratamiento que `articles`, y por el mismo motivo: la retirada es lógica porque `assets` y `articles` la referencian |
 | `documents` | Cuelga de exactamente uno de los dos, con `CHECK ((asset_id IS NULL) <> (article_id IS NULL))`; `type` con `CHECK IN ('INVOICE','WARRANTY','MANUAL','OTHER')`; `url` obligatorio; `CHECK (valid_until IS NULL OR date IS NULL OR valid_until >= date)`, porque una garantía no puede caducar antes de emitirse. Borrar un documento sí es un `DELETE` real: no lo referencia nada y no forma parte del historial de ninguna otra entidad |
@@ -1132,7 +1183,7 @@ erDiagram
 | `loan_access_tokens` | `token_hash` único; `role` con `CHECK IN ('LENDER','BORROWER')` |
 | `refresh_tokens` | `token_hash` único; cuelga de `identities`, no de la pertenencia; se marca `revoked_at` en lugar de borrarse, para poder auditar |
 
-Todas las tablas del core incluyen `household_id` para el filtrado multi-tenant, con cuatro excepciones: `loan_access_tokens` cuelga de `loans`, y `refresh_tokens`, `email_verification_tokens` e `identities` cuelgan de la identidad, que por definición no pertenece a ningún hogar.
+Todas las tablas del core incluyen `household_id` para el filtrado multi-tenant, con cinco excepciones: `loan_access_tokens` cuelga de `loans`, y `refresh_tokens`, `email_verification_tokens`, `password_reset_tokens` e `identities` cuelgan de la identidad, que por definición no pertenece a ningún hogar.
 
 > **Ojo con `identities`.** Las otras tres excepciones son tablas de tokens, sin más contenido que un hash. `identities` no: guarda nombre, correo y teléfono de personas reales, y al no llevar `household_id` **no puede tener política de RLS**. Es la única tabla con datos personales que depende de una sola capa de aislamiento, la de la aplicación. Su repositorio debe resolver siempre por identidad autenticada —nunca listar, nunca buscar por correo salvo en el login— porque ahí no hay red debajo.
 
@@ -1169,6 +1220,9 @@ Catálogo ilustrativo de los comandos y queries que expone la capa de aplicació
 | Comando | `CreateHousehold` | nombre y zona horaria del hogar; nombre, correo y contraseña de quien lo abre | sin autenticar; crea identidad sin verificar, hogar, pertenencia `HOUSEHOLD_ADMIN` y categorías por defecto en una transacción, fijando `app.household_id` con el identificador que genera la aplicación antes de insertar; emite el token de verificación y **no devuelve sesión**; responde igual exista o no el correo | — |
 | Comando | `VerifyEmail` | token de verificación | de un solo uso y con caducidad; marca la identidad verificada y devuelve el par de tokens | `HouseholdCreated` (si era el alta de un hogar) |
 | Comando | `ResendVerification` | correo | responde igual exista o no la identidad; invalida el token anterior | — |
+| Comando | `RequestPasswordReset` | email | sin credencial; responde igual exista o no la identidad; no hace nada si está dada de baja; invalida el token anterior y emite uno con 1 h de caducidad | — |
+| Comando | `ResetPassword` | token, contraseña nueva | de un solo uso y con caducidad; fija la contraseña, marca el correo verificado si no lo estaba y **revoca todos** los refresh tokens antes de emitir el par nuevo | — |
+| Comando | `ChangePassword` | contraseña actual, contraseña nueva | autenticado; exige la actual para que un access token robado no baste para expulsar al dueño; revoca las **demás** sesiones | — |
 | Comando | `InviteUser` | email, role | solo `HOUSEHOLD_ADMIN`; no puede invitarse a quien ya sea miembro activo del hogar; una sola invitación viva por correo y hogar; emite token de un solo uso con 7 días de caducidad | — |
 | Comando | `AcceptInvitation` | token, nombre y contraseña si la identidad no existe | sin autenticar, lo autoriza el token; crea la identidad **ya verificada** —recibir el token prueba el control del correo— o vincula la existente, y crea la pertenencia con el rol invitado; falla si la identidad ya tiene otra pertenencia activa | — |
 | Comando | `RevokeInvitation` | invitationId | solo `HOUSEHOLD_ADMIN`; solo sobre invitaciones vivas | — |
@@ -1243,6 +1297,17 @@ pie title Distribución de la batería de tests
 - *Integración de caso de uso:* `RetireArticle` debe marcar `retired_at` sin borrar la fila, dejar el artículo fuera del autocompletado y seguir resolviendo el nombre de las existencias dadas de baja que lo referencian.
 - *Contrato de adaptador / E2E:* `POST /api/v1/assets/intake` responde `201` la primera vez y `200` sobre la misma ubicación, con la cantidad acumulada y el nombre resuelto desde el artículo.
 - *Contrato de adaptador / E2E:* `GET /api/v1/loans/{id}` con el token acotado de un receptor externo solo debe exponer los campos permitidos para ese rol.
+
+**Ejemplos derivados de las contraseñas:**
+- *Unitario de dominio:* la política acepta una frase larga sin mayúsculas ni símbolos y rechaza una de 11 caracteres, por larga que sea la lista de requisitos que cumpla.
+- *Unitario de dominio:* una contraseña de la lista de comunes se rechaza aunque supere los 12 caracteres.
+- *Contrato de adaptador:* dos contraseñas de más de 72 bytes que compartan los primeros 72 deben dar hashes distintos y no validarse la una contra la otra — es exactamente lo que BCrypt no garantizaba.
+- *Contrato de adaptador / E2E:* `POST /api/v1/auth/login` con una contraseña de menos de 12 caracteres debe responder `401`, no `400`: ahí se comprueba una credencial, no se fija una.
+- *Integración de caso de uso:* `ResetPassword` debe revocar **todos** los refresh tokens anteriores y dejar utilizable solo el par emitido en esa misma llamada.
+- *Integración de caso de uso:* restablecer la contraseña de una identidad sin verificar debe dejarla verificada, y sacar su hogar de la cola de purga.
+- *Integración de caso de uso:* pedir un segundo restablecimiento debe invalidar el primer token; el token caducado a la hora y un día debe rechazarse.
+- *Integración de caso de uso:* `ChangePassword` con la contraseña actual equivocada debe fallar sin tocar nada, y con la correcta debe conservar viva la sesión en uso y tumbar las demás.
+- *Contrato de adaptador / E2E:* `POST /api/v1/auth/password-reset` debe responder lo mismo con un correo registrado, uno desconocido y uno de una identidad dada de baja.
 
 **Ejemplos derivados del enrolamiento:**
 - *Integración de caso de uso:* `CreateHousehold` debe dejar identidad sin verificar, hogar, pertenencia `HOUSEHOLD_ADMIN` y categorías por defecto; si falla cualquiera de los pasos, no debe quedar ningún hogar a medias.
@@ -1343,6 +1408,9 @@ El contrato completo de la API vive en [`openapi.yaml`](openapi.yaml) (OpenAPI
 | 2026-08-07 | Decisión documentada de aplazar a la Fase 1 el reparto de contenido del README a `docs/`, con el destino previsto de cada sección (ver `docs/README.md`) |
 | 2026-08-07 | Cierre de las decisiones abiertas de la Fase 0 (4.1.7): préstamo limitado a assets duraderos (la cesión de un consumible es un ajuste de cantidad), Row-Level Security activado como segunda capa de aislamiento (5.6, ADR-003), alta directa de usuarios en el MVP con invitación por email como evolución, y Flyway como librería de migraciones (ADR-004). La Fase 0 queda completada |
 | 2026-08-07 | Reformulación del concepto de asset (4.1.1): todo material del hogar es un asset, con distinción `DURABLE`/`CONSUMABLE` y contador de cantidad en el core. Impacto en el diagrama de dominio (4.1.3), reglas de préstamo (4.1.5), decisiones validadas (4.1.7), evento `AssetQuantityChanged` (5.2.3), API (5.4.2, 5.4.3), modelo de datos (5.6), casos de uso con `AdjustAssetQuantity` (5.7), ejemplos de test (7) y `openapi.yaml` |
+| 2026-08-09 | La pregunta abierta sobre el aviso de capacidad (4.1.2, 4.1.7) gana destinatario: **corresponde al módulo Warehouse**, que es quien necesitará medir lo que ocupa cada cosa, y se resolverá al definir los módulos en lugar de esperar a un «uso real» sin plazo. Anotada también en la fila de Warehouse de 4.2, para que la pregunta se encuentre desde el módulo y no solo desde el core |
+| 2026-08-09 | Política de contraseñas (4.1.4, 4.1.7): **mínimo 12 caracteres sin reglas de composición**, más rechazo de las más comunes contra lista local, sin caducidad ni historial. Al fijarla salió que **BCrypt trunca en silencio a partir de 72 bytes**, justo lo que la política fomenta, así que el hash pasa a `Argon2id`; la ADR-002 no se reescribe y la revisión queda enlazada al final de esa ADR. El mínimo se declara en `openapi.yaml` en los cuatro puntos donde se fija una contraseña, y **no** en el login, donde validar la forma daría `400` en lugar de `401`. La configuración mínima de Argon2id queda fijada en la recomendada por OWASP: 19 MiB, 2 iteraciones y paralelismo 1 |
+| 2026-08-09 | Recuperación y cambio de contraseña (4.1.4, 5.4.1, 5.7): `RequestPasswordReset` + `ResetPassword` con token de un solo uso de **una hora**, en tabla propia `password_reset_tokens` para no arriesgar confusión de propósito con la verificación; restablecer revoca **todas** las sesiones antes de emitir la nueva y marca el correo como verificado. Se añade `ChangePassword` para quien ya está autenticado, que exige la contraseña actual y conserva su sesión — hasta ahora no había ninguna forma de cambiar la contraseña. Anotada como pendiente la **política de contraseñas**, inexistente y ahora exigible en tres puntos distintos |
 | 2026-08-09 | Cierre de los puntos que dejó abiertos el enrolamiento (4.1.7): el alta de miembros pasa de **alta directa a invitación por correo** (`InviteUser` + `AcceptInvitation`), ahora que la verificación obligatoria trae la infraestructura de correo al primer día; aceptar una invitación verifica el correo por sí solo, y desaparece `mustChangePassword`, que solo existía para el alta directa. Los hogares sin verificar se purgan **a los 7 días** con `PurgeUnverifiedHouseholds`, el único borrado real del core. Revisadas y mantenidas abiertas las dos pendientes restantes: peso y volumen del asset, y los cuatro atributos propuestos. Corregida la afirmación de que crear un hogar era la única escritura sin autenticar — es la única que no exige credencial alguna |
 | 2026-08-08 | Enrolamiento de un inquilino (4.1.4): alta de hogar **autoservicio** con verificación de correo obligatoria en dos pasos (`CreateHousehold` + `VerifyEmail`), única escritura sin autenticar y sin delatar qué correos existen. Se separa `Identity` (credenciales, única en la instalación) de `HouseholdMember` (rol en un hogar), con una sola pertenencia activa en el MVP; `users` desaparece y todo lo que el dominio llamaba «usuario» pasa a la pertenencia, mientras los refresh tokens cuelgan de la identidad. Se hace explícito que un hogar puede tener **varias viviendas**, que son `Location` raíz de tipo `HOUSE`, y que el resto del dominio cuelga del hogar y no de la vivienda (4.1.2). `identities` queda fuera de RLS, lo que se marca como el único punto con datos personales a una sola capa (5.6). Impacto en 4.1.7, 5.2.3, 5.4.1, 5.4.2, 5.4.3, 5.6, 5.7, 7 y `openapi.yaml` |
 | 2026-08-08 | Autoría de los cambios en todo el core: cada entidad gana `createdBy` y `updatedBy` (4.1.1), anulables y con nulo significando «el sistema», nunca aceptadas del cliente, y con clave ajena compuesta para que una autoría no pueda cruzarse de hogar (5.6). El hogar queda fuera, porque cuando su fila nace no hay ningún usuario al que apuntar. Impacto en las tablas de atributos, el modelo de datos, los ejemplos de test (7) y `openapi.yaml`. Quedan cuatro atributos pendientes en 4.1.7 |
