@@ -111,6 +111,7 @@ quedaban abiertas en «Costes y riesgos» se han resuelto después:
   concreto: BCrypt ignora en silencio todo lo que exceda de 72 bytes, y la
   política de contraseñas adoptada favorece frases largas, así que dos
   contraseñas distintas que compartieran ese prefijo serían la misma para el
-  sistema. El resto de lo que fija esta ADR sobre autenticación —JWT firmado,
+  sistema. Su configuración mínima es la recomendada por OWASP: 19 MiB de
+  memoria, 2 iteraciones y paralelismo 1. El resto de lo que fija esta ADR sobre autenticación —JWT firmado,
   access token corto, refresh rotativo hasheado y tokens acotados por préstamo—
   no cambia.
