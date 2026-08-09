@@ -28,6 +28,8 @@ tags:
     description: Gestión de ubicaciones
   - name: users
     description: Gestión de usuarios del hogar
+  - name: invitations
+    description: Invitaciones para sumar a alguien a un hogar
   - name: loans
     description: Préstamos (concepto mínimo del core, ver readme.md 4.1.5)
 
@@ -649,21 +651,88 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/User" }
+  /invitations:
+    get:
+      tags: [invitations]
+      summary: Listar las invitaciones vivas (solo HOUSEHOLD_ADMIN)
+      responses:
+        "200":
+          description: Invitaciones ni aceptadas, ni revocadas, ni caducadas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Invitation" }
+        "403": { $ref: "#/components/responses/Forbidden" }
     post:
-      tags: [users]
-      summary: Dar de alta un miembro del hogar (solo HOUSEHOLD_ADMIN)
+      tags: [invitations]
+      summary: Invitar a alguien al hogar (solo HOUSEHOLD_ADMIN)
+      description: >
+        Emite un token de un solo uso con 7 dias de caducidad y lo envia por
+        correo. No crea identidad ni pertenencia: eso ocurre al aceptar.
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/UserInput" }
+            schema: { $ref: "#/components/schemas/InvitationInput" }
       responses:
         "201":
-          description: Usuario creado
+          description: Invitacion emitida
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/User" }
+              schema: { $ref: "#/components/schemas/Invitation" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: >
+            Ya es miembro activo del hogar (ALREADY_MEMBER) o ya hay una
+            invitacion viva para ese correo (INVITATION_ALREADY_PENDING)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /invitations/accept:
+    post:
+      tags: [invitations]
+      summary: Aceptar una invitacion
+      description: >
+        Sin autenticar -- lo autoriza el token recibido por correo. Crea la
+        identidad ya VERIFICADA, porque haber recibido el token prueba el
+        control de esa direccion, o vincula la que ya exista. name y password
+        solo hacen falta si la identidad no existia.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InvitationAcceptInput" }
+      responses:
+        "200":
+          description: Invitacion aceptada; se devuelve sesion
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenPair" }
+        "409":
+          description: >
+            Token caducado, ya usado o revocado (INVITATION_TOKEN_INVALID), o
+            la identidad ya pertenece a otro hogar (IDENTITY_ALREADY_MEMBER)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /invitations/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [invitations]
+      summary: Revocar una invitacion (solo HOUSEHOLD_ADMIN)
+      responses:
+        "204":
+          description: Invitacion revocada
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /users/{id}:
     parameters:
@@ -1183,21 +1252,43 @@ components:
             createdAt: { type: string, format: date-time }
         - $ref: "#/components/schemas/Authorship"
 
-    UserInput:
+    InvitationInput:
       type: object
-      required: [name, email, role]
+      required: [email, role]
       properties:
-        name: { type: string }
         email:
           type: string
           format: email
-          description: >
-            Único en toda la instalación, comparado en minúsculas. Si ya
-            existe una identidad con ese correo se reutiliza en lugar de
-            duplicarla, pero mientras el MVP admita una sola pertenencia
-            activa el alta se rechaza (IDENTITY_ALREADY_MEMBER).
-        phone: { type: string }
+          description: Normalizado a minusculas, como en la identidad
         role: { $ref: "#/components/schemas/UserRole" }
+
+    Invitation:
+      type: object
+      description: >
+        El estado no es un campo: se deduce de expiresAt, acceptedAt y
+        revokedAt.
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role: { $ref: "#/components/schemas/UserRole" }
+        expiresAt: { type: string, format: date-time }
+        acceptedAt: { type: string, format: date-time, nullable: true }
+        revokedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        createdBy: { type: string, format: uuid, nullable: true }
+
+    InvitationAcceptInput:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string }
+        name:
+          type: string
+          description: Solo si la identidad no existia todavia
+        password:
+          type: string
+          format: password
+          description: Solo si la identidad no existia todavia
 
     User:
       description: >
@@ -1222,9 +1313,6 @@ components:
               format: date-time
               nullable: true
               description: Resuelto desde la identidad. Vacío impide iniciar sesión
-            mustChangePassword:
-              type: boolean
-              description: Lo activa el alta hecha por un administrador y lo apaga el primer cambio
             deactivatedAt:
               type: string
               format: date-time

@@ -294,7 +294,6 @@ classDiagram
         +id
         +name
         +email
-        +mustChangePassword
         +emailVerifiedAt
         +deactivatedAt
     }
@@ -378,7 +377,6 @@ De la separación salen cuatro consecuencias que conviene tener presentes:
 | Correo electrónico (`email`) | Identifica a la persona en toda la instalación. Se compara **normalizado a minúsculas**: `Kike@x.com` y `kike@x.com` son la misma persona |
 | Teléfono (`phone`) | Opcional. Al participante externo de un préstamo ya se le exige un canal para mandarle el enlace; al miembro del hogar no se le pedía ninguno |
 | Hash de contraseña (`passwordHash`) | `BCrypt`, nunca la contraseña en claro (ver 5.4.1) |
-| Debe cambiar contraseña (`mustChangePassword`) | Lo activa el alta hecha por un administrador y lo apaga el primer cambio. Quien abre un hogar elige su propia contraseña, así que no se activa |
 | Correo verificado (`emailVerifiedAt`) | Mientras esté vacío no se puede iniciar sesión |
 | Avatar (`avatarUrl`) | Opcional. Enlace a una imagen, mismo criterio que las demás |
 | Último acceso (`lastLoginAt`) | Deja ver cuentas dormidas antes de decidir una baja |
@@ -403,7 +401,7 @@ No lleva autoría propia, por el mismo motivo que el hogar: la identidad que abr
 
 **Alta de un hogar: autoservicio con verificación.**
 
-Crear un hogar es lo que da existencia a un inquilino, así que es **la única escritura sin autenticar** de la API — por el mismo motivo que el login: todavía no hay nada contra lo que autenticarse. El recorrido tiene dos pasos, y el hogar no sirve hasta completar el segundo:
+Crear un hogar es lo que da existencia a un inquilino, así que es **la única escritura que no exige credencial alguna** — ni contraseña ni token. Las otras operaciones abiertas de la API sí llevan algo: el login lleva credenciales, y verificar el correo o aceptar una invitación llevan un token de un solo uso recibido por correo. El recorrido tiene dos pasos, y el hogar no sirve hasta completar el segundo:
 
 1. **`CreateHousehold`** recibe el nombre y la zona horaria del hogar junto al nombre, correo y contraseña de quien lo abre. En una sola transacción genera el `householdId`, crea la identidad sin verificar, el hogar, la pertenencia con rol `HOUSEHOLD_ADMIN` y siembra las categorías por defecto (ver 4.1.1). Emite un token de verificación de un solo uso y lo envía por correo. **No devuelve tokens de sesión**: no hay nada que hacer todavía.
 2. **`VerifyEmail`** consume ese token, marca la identidad como verificada y entonces sí devuelve el par de tokens. Es también el momento en que se publica `HouseholdCreated` (ver 5.2.3): un módulo activo no debería sembrar datos para un hogar que quizá no llegue a existir de verdad.
@@ -415,7 +413,29 @@ Iniciar sesión con el correo sin verificar se rechaza; `ResendVerification` ree
 Dos cosas que se derivan de que el endpoint sea anónimo:
 
 - **No puede delatar quién está registrado.** Responder «ese correo ya existe» permitiría a cualquiera comprobar si una persona usa el sistema. La respuesta es siempre la misma, y es el correo recibido —o su ausencia— el que explica lo que ha pasado.
-- **Habrá hogares creados y nunca verificados.** Es el precio del registro abierto. Se purgan pasado un plazo de retención, `Por decidir`, junto con la identidad que los abrió si no llegó a verificarse.
+- **Habrá hogares creados y nunca verificados.** Es el precio del registro abierto. Se purgan **a los 7 días**, junto con la identidad que los abrió si no llegó a verificarse. El token de verificación caduca mucho antes, así que una semana da margen de sobra para reenviarlo; alargarlo solo acumula hogares fantasma y mantiene retenido un correo que quizá ni era de quien lo tecleó. Es **el único borrado real del core** —todo lo demás es baja lógica— y se justifica porque ahí no hay nada que conservar: unas categorías sembradas y una identidad que nunca llegó a entrar.
+
+**Sumar a alguien al hogar: invitación, no alta directa.**
+
+Un administrador no crea cuentas ajenas: **invita**. `InviteUser` recibe el correo y el rol, emite un token de un solo uso y lo envía; `AcceptInvitation` lo consume y es quien acepta el que elige su contraseña. Si esa persona ya tiene identidad en la instalación, la invitación **la vincula** en lugar de duplicarla.
+
+Aceptar una invitación **verifica el correo por sí solo**: haber recibido el token demuestra el control de esa dirección, que es exactamente lo que la verificación comprueba. Por eso no hay un segundo paso de verificación para quien entra invitado.
+
+| Atributo de una Invitation | Descripción |
+|---|---|
+| Identificador (`id`) | — |
+| Correo invitado (`email`) | Normalizado a minúsculas, como en la identidad |
+| Rol propuesto (`role`) | `HOUSEHOLD_ADMIN` o `HOUSEHOLD_MEMBER` |
+| Hash del token (`tokenHash`) | Nunca el token en claro, igual que en préstamos y verificación |
+| Caducidad (`expiresAt`) | 7 días, la misma ventana que la retención de hogares sin verificar y por el mismo motivo |
+| Aceptada (`acceptedAt`) | — |
+| Revocada (`revokedAt`) | Un administrador puede retirarla, p. ej. si se equivocó de dirección |
+| Fecha de alta (`createdAt`) | — |
+| Creado por (`createdBy`) | Ver «Autoría de los cambios» |
+
+El estado de una invitación no es un campo: se deduce de esas tres fechas y del reloj. Solo puede haber **una invitación viva por correo y hogar**.
+
+Esto sustituye al alta directa, y con ella desaparece `mustChangePassword`: era el apaño para que alguien cambiara una contraseña que otro le había puesto, y ya nadie pone la contraseña de nadie. La contrapartida es que un miembro sin correo —un menor, alguien mayor que no lo usa— no puede entrar por esta vía; si aparece esa necesidad, será una decisión nueva y no la recuperación del alta directa tal cual.
 
 **Bajas: dejar un hogar no es cerrar la cuenta.**
 
@@ -495,9 +515,8 @@ Las siguientes decisiones, inicialmente abiertas, han quedado validadas:
 - **Alta de consumibles y catálogo de artículos:** la definición de un consumible (`name`, `category`, `unit`, marca y código de barras) se separa en una entidad propia, `Article`, y el asset `CONSUMABLE` pasa a ser una **existencia** de ese artículo en una ubicación, con `quantity` (ver 4.1.1). Dar entrada a un consumible ya existente suma sobre su existencia en vez de crear una fila nueva, así que traer otro paquete de azúcar no obliga a reintroducir nada. El artículo es obligatorio en `CONSUMABLE` y opcional en `DURABLE`, donde permite compartir modelo y documentación entre unidades idénticas sin forzar a fichar un mueble único. Se descartaron dos alternativas: resolver el alta como *find-or-create* sobre el nombre del asset, porque la clave sería texto libre y la definición se reteclearía en cada ubicación nueva, y dejarlo en un autocompletado del frontend, porque la regla anti-duplicados viviría solo en la UI y la API seguiría admitiendo duplicados. Se acepta a sabiendas de que añade una entidad al core: retrofitarla cuando llegue Warehouse —que colgará mínimos, caducidades y lotes del artículo— obligaría a migrar cada consumible existente partiendo texto libre. Juntar dos existencias del mismo artículo que ya se crearon por separado es un caso de uso explícito, `MergeStockItems` (ver 5.7), y no un efecto colateral de `MoveAsset`: la fusión tiene que decidir qué ubicación y qué propietario sobreviven, y esa decisión es del usuario, no del sistema.
 
 - **Aislamiento multi-tenant con Row-Level Security:** se activa RLS de PostgreSQL desde el principio, **además** del filtrado por `household_id` en la aplicación (ver 5.6). Son dos capas independientes: si un repositorio olvida el filtro, la base de datos sigue sin devolver filas de otro hogar. Se descartó dejarlo solo en la aplicación porque convierte cada consulta nueva en una posible fuga entre hogares, y diferirlo a antes de producción porque retrofitar RLS obliga a revisar todas las consultas ya escritas. Registrado en [ADR-003](docs/common/architecture/decisions/ADR-003-row-level-security.md).
-- **Alta de usuarios en un hogar existente:** el MVP usa **alta directa** por parte de un `HOUSEHOLD_ADMIN` (`CreateUser`, ver 5.7), con contraseña inicial que el usuario cambia al entrar. La **invitación por email con token de un solo uso** queda como evolución posterior, no como alternativa descartada.
+- **Alta de usuarios en un hogar existente:** **invitación por correo**, no alta directa (`InviteUser` + `AcceptInvitation`, ver 4.1.4 y 5.7). La decisión anterior —alta directa con contraseña inicial— se difirió a la invitación por no haber infraestructura de correo; exigir verificación al crear un hogar la trae al primer día, junto con el mecanismo entero de token de un solo uso, hasheado y con caducidad, así que el motivo del aplazamiento desapareció. Se descartó mantener el alta directa, que deja a un administrador tecleando la contraseña de otra persona y el correo del miembro sin verificar, y se descartó sostener las dos vías, que duplica el flujo de alta y su batería de pruebas antes de tener el core en pie. Con ella desaparece `mustChangePassword`, que solo existía para el alta directa. El precio: quien no tenga correo no puede entrar en un hogar, y darle cabida será una decisión nueva.
 
-  > **La razón original de aplazarlo ya no vale.** Se difirió porque no había infraestructura de correo; exigir verificación en el alta de un hogar (ver 4.1.4) la trae al primer día, y con ella el mecanismo entero —token de un solo uso, hasheado, con caducidad— que la invitación necesitaría. Lo que queda no es un bloqueo técnico sino alcance: sigue habiendo que definir el estado «invitado pero no aceptado» y su caducidad. Merece revisarse antes de cerrar el alcance de la Fase 1.
 - **Librería de migraciones:** **Flyway**, con migraciones en SQL plano versionado. Se descartó Liquibase porque su principal ventaja —la abstracción sobre el motor— no aporta nada con PostgreSQL ya fijado, y su ceremonia de changelogs complica revisar una política de RLS, que se lee mucho mejor como SQL. Registrado en [ADR-004](docs/common/architecture/decisions/ADR-004-database-migrations.md).
 
 - **Clasificación funcional:** `category` deja de ser texto libre y pasa a ser un **catálogo por hogar** (entidad `Category`, ver 4.1.1), sembrado con un juego por defecto al crear el hogar y editable después. Se descartó la lista fija con `CHECK`, que es más consistente con `type`/`status`/`unit` pero obliga a una migración cada vez que un hogar guarda algo que no encaja en cinco cajones pensados por otro; y se descartó dejarlo en texto libre, que no da filtros ni agrupaciones fiables. Se retira lógicamente, igual que un artículo y por el mismo motivo de clave ajena.
@@ -510,16 +529,16 @@ Las siguientes decisiones, inicialmente abiertas, han quedado validadas:
   La única frontera es la que separa un identificador de un dato: los **nombres de las categorías** que siembra cada hogar (ver 4.1.1) se editan y se muestran al usuario, así que son datos y van en el idioma del hogar. La prosa de este documento tampoco cambia: se sigue hablando de artículos, préstamos y existencias, y solo el identificador entre backticks aparece en inglés.
 - **Artículo como `article`:** el concepto pasa a llamarse `article` en programación —tabla `articles`, campo `articleId`, recurso `/api/v1/articles`—, en lugar del anterior `catalog_items`/`catalogItemId`. Había tres nombres para una misma cosa y hacía falta una nota aclaratoria en 4.1.1 para sostenerlo; ahora el nombre de programación sigue al de definición.
 
-- **Enrolamiento de un inquilino:** el alta es **autoservicio abierto** — cualquiera crea su hogar desde la web (`CreateHousehold`, ver 4.1.4 y 5.7). Se descartó el alta por código o invitación, que elimina el registro anónimo pero obliga a alguien a emitir y repartir códigos antes de que exista ningún usuario, y la instalación mono-hogar, que sería lo más simple pero dejaría sin uso real el multi-tenant que justifican ADR-002 y ADR-003. El precio son los hogares creados y nunca usados, que se purgan pasado un plazo de retención `Por decidir`, y una superficie anónima que obliga a no delatar qué correos existen.
+- **Enrolamiento de un inquilino:** el alta es **autoservicio abierto** — cualquiera crea su hogar desde la web (`CreateHousehold`, ver 4.1.4 y 5.7). Se descartó el alta por código o invitación, que elimina el registro anónimo pero obliga a alguien a emitir y repartir códigos antes de que exista ningún usuario, y la instalación mono-hogar, que sería lo más simple pero dejaría sin uso real el multi-tenant que justifican ADR-002 y ADR-003. El precio son los hogares creados y nunca usados, que se purgan **a los 7 días** (ver 4.1.4), y una superficie anónima que obliga a no delatar qué correos existen.
 - **Verificación del correo:** obligatoria **antes** de poder usar el hogar. Se descartó dejarlo usable de inmediato, que era lo coherente con haber aplazado la infraestructura de correo, porque sin correo verificado no hay recuperación de contraseña y el registro abierto queda sin freno alguno; y se descartó la verificación diferida, que obliga a arrastrar el estado de verificación por todo el sistema. El coste asumido es adelantar la infraestructura de correo a la Fase 1 (ver la decisión de alta de usuarios, más arriba).
 - **Identidad y pertenencia separadas:** las credenciales viven en una `Identity` única de la instalación y el papel en un hogar en un `HouseholdMember` propio (ver 4.1.4). En el MVP una identidad tiene **como mucho una pertenencia activa**, garantizado por un índice único parcial que basta con retirar el día que se admitan varias. Se descartó mantener un único `users` con `householdId`, que es más simple pero convierte «la misma persona en dos hogares» en una migración de identidad, token y todas las consultas a la vez; y se descartó abrir el multi-hogar ya, que mete selector de hogar y cambio de contexto antes de tener el core en pie. El coste es partir la tabla desde el principio y aceptar que `identities` queda fuera de RLS.
 - **Varias viviendas por hogar:** una vivienda es una `Location` sin padre y de tipo `HOUSE`, no una entidad propia (ver 4.1.2). Se descartó una tabla `dwellings`, que haría explícito el concepto pero duplicaría la raíz de la jerarquía y tendería a volver obligatorio pertenecer a una vivienda — justo lo contrario de lo que se busca: categorías, artículos, usuarios y assets cuelgan del **hogar**, y la ubicación de un asset sigue siendo opcional.
 
-> **Pendiente de validar:** el aviso por capacidad de una ubicación (4.1.2) solo puede contar unidades, porque un asset no lleva peso ni volumen. ¿Merece la pena que los tenga? Solo si alguien los rellena, y un hogar que no pesa sus cajas obtendría un aviso peor que ninguno. Queda abierta hasta tener uso real; mientras tanto, el aviso se limita a lo que el sistema sabe con certeza.
+> **Pendiente de validar (revisada el 2026-08-09, sigue abierta):** el aviso por capacidad de una ubicación (4.1.2) solo puede contar unidades, porque un asset no lleva peso ni volumen. ¿Merece la pena que los tenga? Solo si alguien los rellena, y un hogar que no pesa sus cajas obtendría un aviso peor que ninguno. Se descartó tanto añadir los campos como retirar la capacidad de `Location`: el aviso se queda en lo que el sistema sabe con certeza hasta que haya uso real que diga otra cosa.
 
 - **Autoría de los cambios:** toda entidad del core lleva `createdBy` y `updatedBy` (ver 4.1.1). Un hogar es un sitio compartido y la pregunta que más se hace no es qué cambió sino quién lo cambió. Ambas son anulables y **nulo significa el sistema**, que es lo que deja el proceso de vencidos al no actuar en nombre de nadie; se descartó inventar un usuario técnico porque daría una autoría falsa. Nunca se aceptan del cliente: salen del token, igual que el `householdId`. El hogar es la única excepción — cuando su fila nace no existe todavía ningún usuario al que apuntar.
 
-> **Pendiente de validar:** cuatro atributos quedaron propuestos y sin decidir, todos por el mismo motivo — son útiles, pero rozan el alcance de un módulo futuro o meten la UI en el dominio. **Estado de conservación** y **condición en entrega y devolución de un préstamo** («volvió rayado») son lo primero que se llevarán el CMMS y la gestión avanzada de préstamos. **Etiquetas libres** en un asset amplían la clasificación más allá de una sola categoría, a costa de otra entidad recién después de añadir el catálogo de categorías. **Icono y color** de una categoría los va a querer el frontend mobile-first, pero son presentación. Ninguno se añade hasta que haya un caso de uso que lo pida.
+> **Pendiente de validar:** cuatro atributos quedaron propuestos y sin decidir, todos por el mismo motivo — son útiles, pero rozan el alcance de un módulo futuro o meten la UI en el dominio. **Estado de conservación** y **condición en entrega y devolución de un préstamo** («volvió rayado») son lo primero que se llevarán el CMMS y la gestión avanzada de préstamos. **Etiquetas libres** en un asset amplían la clasificación más allá de una sola categoría, a costa de otra entidad recién después de añadir el catálogo de categorías. **Icono y color** de una categoría los va a querer el frontend mobile-first, pero son presentación. Revisados el 2026-08-09, los cuatro siguen fuera: ninguno se añade hasta que haya un caso de uso que lo pida.
 
 > Si en el futuro surgen nuevas decisiones de diseño pendientes de validar, se recomienda añadirlas aquí siguiendo el mismo formato (pregunta + decisión + referencia a la sección afectada) hasta que se resuelvan.
 
@@ -731,7 +750,10 @@ graph TD
 
 **Usuarios**
 - `GET /api/v1/users` — listar miembros del hogar (excluye las bajas salvo `includeDeactivated=true`). Devuelve pertenencias, con el nombre y el correo resueltos desde la identidad
-- `POST /api/v1/users` — dar de alta un miembro (solo administrador)
+- `POST /api/v1/invitations` — invitar a alguien al hogar (solo administrador)
+- `GET /api/v1/invitations` — listar las invitaciones vivas
+- `DELETE /api/v1/invitations/{id}` — revocar una invitación
+- `POST /api/v1/invitations/accept` — aceptar con el token recibido; **sin autenticar**, lo autoriza el token
 - `PATCH /api/v1/users/{id}/roles` — modificar roles
 - `DELETE /api/v1/users/{id}` — sacar del hogar (solo administrador; sus assets quedan sin propietario). Retira la pertenencia, no la cuenta
 
@@ -904,6 +926,7 @@ Las políticas se versionan como migraciones Flyway, igual que el esquema (ver 4
 ```mermaid
 erDiagram
     HOUSEHOLDS ||--o{ HOUSEHOLD_MEMBERS : "tiene"
+    HOUSEHOLDS ||--o{ INVITATIONS : "emite"
     IDENTITIES ||--o{ HOUSEHOLD_MEMBERS : "pertenece como"
     IDENTITIES ||--o{ EMAIL_VERIFICATION_TOKENS : "verifica con"
     HOUSEHOLDS ||--o{ ASSETS : "tiene"
@@ -938,7 +961,6 @@ erDiagram
         text email
         text phone
         text password_hash
-        boolean must_change_password
         text avatar_url
         timestamptz email_verified_at
         timestamptz last_login_at
@@ -956,6 +978,18 @@ erDiagram
         timestamptz deactivated_at
         uuid created_by FK
         uuid updated_by FK
+    }
+    INVITATIONS {
+        uuid id PK
+        uuid household_id FK
+        text email
+        text role
+        text token_hash
+        timestamptz expires_at
+        timestamptz accepted_at
+        timestamptz revoked_at
+        timestamptz created_at
+        uuid created_by FK
     }
     EMAIL_VERIFICATION_TOKENS {
         uuid id PK
@@ -1086,6 +1120,7 @@ erDiagram
 | `households` | `time_zone` con un identificador IANA válido; se valida en el caso de uso, no como `CHECK`. No lleva `created_by` ni `updated_by`: cuando la fila nace no existe ningún usuario al que apuntar. Es lo que usa el proceso de vencidos para saber cuándo ha pasado la fecha en ese hogar |
 | `identities` | `email` único en **toda la instalación**, comparado en minúsculas: índice único sobre `lower(email)`. Ya no es parcial por baja — la identidad sobrevive a cualquier hogar, así que su correo no se libera. Sin el `lower()`, `Kike@x.com` y `kike@x.com` serían dos cuentas. **No lleva `household_id`**: queda fuera de RLS (ver más abajo) |
 | `household_members` | `UNIQUE (household_id, identity_id)` — nadie pertenece dos veces al mismo hogar; `role` con `CHECK IN ('HOUSEHOLD_ADMIN','HOUSEHOLD_MEMBER')`. Que en el MVP una identidad tenga como mucho **una** pertenencia activa se garantiza con un índice único parcial `(identity_id) WHERE deactivated_at IS NULL`: quitarlo es todo lo que hará falta el día que se admitan varias. Que no se pueda dar de baja al único `HOUSEHOLD_ADMIN` activo no es expresable como `CHECK`: se valida en el caso de uso |
+| `invitations` | `token_hash` único; una sola invitación viva por correo y hogar, con índice único parcial `(household_id, lower(email)) WHERE accepted_at IS NULL AND revoked_at IS NULL`; `role` con `CHECK IN ('HOUSEHOLD_ADMIN','HOUSEHOLD_MEMBER')`. El estado no es una columna: se deduce de `expires_at`, `accepted_at` y `revoked_at` |
 | `email_verification_tokens` | `token_hash` único; un solo uso, marcado con `used_at`; expira. Mismo patrón que `loan_access_tokens`, y por el mismo motivo: el token viaja por correo y hay que poder comprobar reutilización |
 | `categories` | `name` único entre las categorías vigentes del hogar, con índice único parcial sobre `(household_id, lower(unaccent(name))) WHERE retired_at IS NULL` — mismo tratamiento que `articles`, y por el mismo motivo: la retirada es lógica porque `assets` y `articles` la referencian |
 | `documents` | Cuelga de exactamente uno de los dos, con `CHECK ((asset_id IS NULL) <> (article_id IS NULL))`; `type` con `CHECK IN ('INVOICE','WARRANTY','MANUAL','OTHER')`; `url` obligatorio; `CHECK (valid_until IS NULL OR date IS NULL OR valid_until >= date)`, porque una garantía no puede caducar antes de emitirse. Borrar un documento sí es un `DELETE` real: no lo referencia nada y no forma parte del historial de ninguna otra entidad |
@@ -1134,12 +1169,15 @@ Catálogo ilustrativo de los comandos y queries que expone la capa de aplicació
 | Comando | `CreateHousehold` | nombre y zona horaria del hogar; nombre, correo y contraseña de quien lo abre | sin autenticar; crea identidad sin verificar, hogar, pertenencia `HOUSEHOLD_ADMIN` y categorías por defecto en una transacción, fijando `app.household_id` con el identificador que genera la aplicación antes de insertar; emite el token de verificación y **no devuelve sesión**; responde igual exista o no el correo | — |
 | Comando | `VerifyEmail` | token de verificación | de un solo uso y con caducidad; marca la identidad verificada y devuelve el par de tokens | `HouseholdCreated` (si era el alta de un hogar) |
 | Comando | `ResendVerification` | correo | responde igual exista o no la identidad; invalida el token anterior | — |
-| Comando | `CreateUser` | nombre, email, role, contraseña inicial | solo `HOUSEHOLD_ADMIN`; email único en el hogar; obliga a cambiar la contraseña en el primer acceso | — |
+| Comando | `InviteUser` | email, role | solo `HOUSEHOLD_ADMIN`; no puede invitarse a quien ya sea miembro activo del hogar; una sola invitación viva por correo y hogar; emite token de un solo uso con 7 días de caducidad | — |
+| Comando | `AcceptInvitation` | token, nombre y contraseña si la identidad no existe | sin autenticar, lo autoriza el token; crea la identidad **ya verificada** —recibir el token prueba el control del correo— o vincula la existente, y crea la pertenencia con el rol invitado; falla si la identidad ya tiene otra pertenencia activa | — |
+| Comando | `RevokeInvitation` | invitationId | solo `HOUSEHOLD_ADMIN`; solo sobre invitaciones vivas | — |
 | Comando | `ChangeUserRole` | userId, nuevo role | no puede quitarse el único `HOUSEHOLD_ADMIN` del hogar | — |
 | Comando | `DeactivateUser` | memberId | solo `HOUSEHOLD_ADMIN`; no puede ser el único administrador activo; marca `deactivated_at` en la **pertenencia** y deja sus assets **sin propietario**. La identidad y sus préstamos se conservan; cerrar la cuenta entera es otra cosa (ver 4.1.4) | `UserDeactivated` |
 | Comando | `StartLoan` | assetId, prestador, receptor, fecha de devolución prevista | el asset debe ser `DURABLE` y no tener otro préstamo abierto: un `OVERDUE` sigue ocupándolo | `LoanStarted` |
 | Comando | `ConfirmReturn` | loanId | solo prestador, receptor o un usuario del hogar | `LoanReturned` |
 | Comando | `GenerateExternalAccessToken` | loanId, rol (`LENDER`\|`BORROWER`) | vinculado a un préstamo abierto —también `OVERDUE`, que es justo cuando hace falta reclamar la devolución—; expira | — |
+| Comando de sistema | `PurgeUnverifiedHouseholds` | — (proceso diario) | borra los hogares sin verificar con más de 7 días, y la identidad que los abrió si nunca se verificó. **El único borrado real del core.** Como el proceso de vencidos, no nace de una petición: recorre los hogares fijando `app.household_id`, nunca con `BYPASSRLS` | — |
 | Comando de sistema | `MarkOverdueLoans` | — (proceso diario) | pasa a `OVERDUE` los `ACTIVE` con `dueAt` ya superada; ignora los que no la tienen. No nace de una petición: recorre los hogares fijando `app.household_id` en cada transacción, nunca con `BYPASSRLS`. Idempotente por construcción — solo mira los `ACTIVE` | `LoanOverdue` por cada préstamo marcado |
 | Query | `ListArticles` | filtros: texto de búsqueda, categoría, código de barras | acotado al hogar; excluye los retirados salvo que se pidan; alimenta el autocompletado del alta de consumibles | — |
 | Query | `ListAssets` | filtros: locationId, parentAssetId, ownerId, status, type, articleId, categoryId, withoutOwner | resultado acotado al `householdId` del token; excluye los `DECOMMISSIONED` salvo que se filtre por ese estado; `withoutOwner` devuelve los huérfanos de una baja de usuario; el nombre y la categoría se resuelven desde el artículo cuando el asset lo tiene | — |
@@ -1147,6 +1185,7 @@ Catálogo ilustrativo de los comandos y queries que expone la capa de aplicació
 | Query | `ListDocuments` | filtros: assetId, articleId, type | acotado al hogar | — |
 | Query | `GetAsset` / `ListAssetChildren` | assetId | — | — |
 | Query | `ListLocations` / `GetLocation` | filtros: parentLocationId | — | — |
+| Query | `ListInvitations` | — | solo `HOUSEHOLD_ADMIN`; excluye aceptadas, revocadas y caducadas salvo que se pidan | — |
 | Query | `ListUsers` | — | solo usuarios del propio hogar; excluye las bajas salvo que se pidan | — |
 | Query | `GetLoan` | loanId | accesible por el hogar o por token acotado, con campos distintos (ver 5.4.3) | — |
 
@@ -1154,7 +1193,6 @@ Catálogo ilustrativo de los comandos y queries que expone la capa de aplicació
 
 > Este catálogo es ilustrativo y crecerá a medida que se implementen los casos de uso; cada nuevo comando/query debería añadirse aquí siguiendo el mismo formato.
 >
-> **Previsto para más adelante:** `InviteUser` (invitación por email con token de un solo uso) sustituirá o convivirá con `CreateUser` cuando exista infraestructura de correo, y requerirá una tabla de invitaciones que no forma parte del esquema del MVP (ver la decisión en 4.1.7).
 
 ---
 
@@ -1210,7 +1248,9 @@ pie title Distribución de la batería de tests
 - *Integración de caso de uso:* `CreateHousehold` debe dejar identidad sin verificar, hogar, pertenencia `HOUSEHOLD_ADMIN` y categorías por defecto; si falla cualquiera de los pasos, no debe quedar ningún hogar a medias.
 - *Integración de caso de uso:* iniciar sesión con el correo sin verificar debe fallar; tras `VerifyEmail` con un token válido debe funcionar, y el mismo token no debe servir dos veces.
 - *Contrato de adaptador / E2E:* `POST /api/v1/households` debe responder lo mismo con un correo nuevo que con uno ya registrado — mismo código, mismo cuerpo y sin diferencia de tiempo apreciable.
-- *Integración de caso de uso:* `CreateUser` sobre una identidad que ya pertenece a otro hogar debe fallar mientras el MVP admita una sola pertenencia activa.
+- *Integración de caso de uso:* `AcceptInvitation` sobre una identidad que ya pertenece a otro hogar debe fallar mientras el MVP admita una sola pertenencia activa.
+- *Integración de caso de uso:* aceptar una invitación debe dejar la identidad **verificada** sin pasar por `VerifyEmail`, y el token no debe servir dos veces ni después de revocarse.
+- *Integración de caso de uso:* `PurgeUnverifiedHouseholds` debe borrar un hogar sin verificar de más de 7 días con todo lo sembrado, y no tocar ninguno verificado ni ninguno más reciente.
 - *Unitario de dominio:* dejar un hogar marca la pertenencia, no la identidad; cerrar la cuenta marca la identidad e impide autenticarse en cualquier hogar.
 - *Contrato de adaptador:* el repositorio de `identities` no debe exponer listado ni búsqueda por correo fuera del login — es la única tabla con datos personales sin RLS debajo.
 
@@ -1260,7 +1300,7 @@ pie title Distribución de la batería de tests
 - [x] Contratos JSON definitivos de la API (request/response schemas) (ver 5.4.3 y `openapi.yaml`)
 - [x] Resolución de las decisiones de diseño abiertas (ver 4.1.7)
 - [x] Decidir activación de PostgreSQL Row-Level Security como capa adicional de aislamiento multi-tenant (activado, ver 5.6 y ADR-003)
-- [x] Definir flujo de invitación/alta de nuevos usuarios en un hogar existente (alta directa en el MVP, invitación por email como evolución, ver 4.1.7)
+- [x] Definir flujo de invitación/alta de nuevos usuarios en un hogar existente (revisado el 2026-08-09: invitación por email, ver 4.1.7)
 - [x] Seleccionar librería de migraciones de base de datos (Flyway, ver ADR-004)
 
 **La Fase 0 queda cerrada: no hay decisiones de diseño abiertas.** El siguiente paso es la Fase 1, cuyo criterio de validación ya está fijado en la ADR-001: un recorrido vertical que atraviese frontend, API autenticada, aplicación, dominio y PostgreSQL, con pruebas en los tres niveles.
@@ -1303,6 +1343,7 @@ El contrato completo de la API vive en [`openapi.yaml`](openapi.yaml) (OpenAPI
 | 2026-08-07 | Decisión documentada de aplazar a la Fase 1 el reparto de contenido del README a `docs/`, con el destino previsto de cada sección (ver `docs/README.md`) |
 | 2026-08-07 | Cierre de las decisiones abiertas de la Fase 0 (4.1.7): préstamo limitado a assets duraderos (la cesión de un consumible es un ajuste de cantidad), Row-Level Security activado como segunda capa de aislamiento (5.6, ADR-003), alta directa de usuarios en el MVP con invitación por email como evolución, y Flyway como librería de migraciones (ADR-004). La Fase 0 queda completada |
 | 2026-08-07 | Reformulación del concepto de asset (4.1.1): todo material del hogar es un asset, con distinción `DURABLE`/`CONSUMABLE` y contador de cantidad en el core. Impacto en el diagrama de dominio (4.1.3), reglas de préstamo (4.1.5), decisiones validadas (4.1.7), evento `AssetQuantityChanged` (5.2.3), API (5.4.2, 5.4.3), modelo de datos (5.6), casos de uso con `AdjustAssetQuantity` (5.7), ejemplos de test (7) y `openapi.yaml` |
+| 2026-08-09 | Cierre de los puntos que dejó abiertos el enrolamiento (4.1.7): el alta de miembros pasa de **alta directa a invitación por correo** (`InviteUser` + `AcceptInvitation`), ahora que la verificación obligatoria trae la infraestructura de correo al primer día; aceptar una invitación verifica el correo por sí solo, y desaparece `mustChangePassword`, que solo existía para el alta directa. Los hogares sin verificar se purgan **a los 7 días** con `PurgeUnverifiedHouseholds`, el único borrado real del core. Revisadas y mantenidas abiertas las dos pendientes restantes: peso y volumen del asset, y los cuatro atributos propuestos. Corregida la afirmación de que crear un hogar era la única escritura sin autenticar — es la única que no exige credencial alguna |
 | 2026-08-08 | Enrolamiento de un inquilino (4.1.4): alta de hogar **autoservicio** con verificación de correo obligatoria en dos pasos (`CreateHousehold` + `VerifyEmail`), única escritura sin autenticar y sin delatar qué correos existen. Se separa `Identity` (credenciales, única en la instalación) de `HouseholdMember` (rol en un hogar), con una sola pertenencia activa en el MVP; `users` desaparece y todo lo que el dominio llamaba «usuario» pasa a la pertenencia, mientras los refresh tokens cuelgan de la identidad. Se hace explícito que un hogar puede tener **varias viviendas**, que son `Location` raíz de tipo `HOUSE`, y que el resto del dominio cuelga del hogar y no de la vivienda (4.1.2). `identities` queda fuera de RLS, lo que se marca como el único punto con datos personales a una sola capa (5.6). Impacto en 4.1.7, 5.2.3, 5.4.1, 5.4.2, 5.4.3, 5.6, 5.7, 7 y `openapi.yaml` |
 | 2026-08-08 | Autoría de los cambios en todo el core: cada entidad gana `createdBy` y `updatedBy` (4.1.1), anulables y con nulo significando «el sistema», nunca aceptadas del cliente, y con clave ajena compuesta para que una autoría no pueda cruzarse de hogar (5.6). El hogar queda fuera, porque cuando su fila nace no hay ningún usuario al que apuntar. Impacto en las tablas de atributos, el modelo de datos, los ejemplos de test (7) y `openapi.yaml`. Quedan cuatro atributos pendientes en 4.1.7 |
 | 2026-08-08 | Segunda pasada de nomenclatura: se traducen al inglés los **valores de los enumerados** (`DURABLE`, `CONSUMABLE`, `AVAILABLE`, `LENT`, `DECOMMISSIONED`, `ACTIVE`, `RETURNED`, `OVERDUE`, `HOUSEHOLD_ADMIN`…), los **nombres de los casos de uso** (`CreateAsset`, `RegisterConsumableIntake`, `MergeStockItems`, `MarkOverdueLoans`…) y los **nombres de clase** del modelo de dominio (`Article`, `Category`, `Document`, `User`, `Loan`, `Role`). La regla de 4.1.7 pasa a ser sin excepciones: todo nombre destinado a ser programado va en inglés. Los nombres de categoría sembrados dejan de parecer un enumerado y se escriben como lo que son, datos editables por el hogar |
