@@ -113,9 +113,29 @@ vencidos (README 4.1.5) no tiene token del que sacar el hogar. La salida fácil
 **toda** la aplicación, no solo para el proceso. Debe recorrer los hogares uno a
 uno fijando `app.household_id` en cada transacción, como cualquier petición.
 
+El otro caso es `CreateHousehold` (README 4.1.4), que además es **la única
+escritura sin autenticar** de la API: no parte de ningún hogar porque lo está
+creando. Tampoco necesita excepción — la aplicación genera el identificador del
+hogar antes de insertar, así que la transacción fija `app.household_id` con ese
+valor y todo nace ya dentro del contexto del inquilino.
+
 Toda fila del core lleva `created_by` y `updated_by`, que se toman **del token** y
 nunca del cuerpo de la petición. Nulo no es un hueco: significa que el cambio lo
 hizo el sistema y no una persona.
+
+**Y una tabla se queda fuera de RLS con datos personales dentro:** `identities`
+(README 4.1.4) no lleva `household_id` porque una persona no pertenece a un hogar
+—su pertenencia sí—, así que no puede tener política. Es la única tabla con
+nombre, correo y teléfono defendida por una sola capa. Su repositorio resuelve
+siempre por identidad autenticada: nada de listados ni de búsquedas por correo
+fuera del login.
+
+**Persona y papel están separados.** `Identity` son las credenciales, únicas en la
+instalación; `HouseholdMember` es el rol dentro de un hogar. Todo lo que el
+dominio llama «usuario» —propietario de un asset, prestador, receptor,
+`created_by`— apunta a la **pertenencia**; los refresh tokens, a la identidad. En
+el MVP una identidad tiene como mucho una pertenencia activa, garantizado por un
+índice único parcial que basta retirar para admitir varias.
 
 **2. Un asset es todo material del hogar**, no solo lo económicamente relevante, y
 se divide en dos naturalezas que se comportan distinto (README 4.1.1):

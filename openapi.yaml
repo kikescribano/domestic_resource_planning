@@ -12,6 +12,8 @@ servers:
     description: Entorno ilustrativo (a definir en el despliegue real)
 
 tags:
+  - name: households
+    description: Alta de un hogar y de su primer administrador
   - name: auth
     description: Autenticación de usuarios del hogar
   - name: articles
@@ -26,6 +28,8 @@ tags:
     description: Gestión de ubicaciones
   - name: users
     description: Gestión de usuarios del hogar
+  - name: invitations
+    description: Invitaciones para sumar a alguien a un hogar
   - name: loans
     description: Préstamos (concepto mínimo del core, ver readme.md 4.1.5)
 
@@ -33,6 +37,81 @@ security:
   - bearerAuth: []
 
 paths:
+  /households:
+    post:
+      tags: [households]
+      summary: Crear un hogar con su primer administrador
+      description: >
+        Unica escritura sin autenticar de la API. Crea la identidad sin
+        verificar, el hogar, la pertenencia HOUSEHOLD_ADMIN y las categorias
+        por defecto en una transaccion, y envia por correo un token de
+        verificacion de un solo uso. NO devuelve sesion -- el hogar no es
+        utilizable hasta verificar. Responde siempre 202, exista o no ya ese
+        correo: contestar otra cosa permitiria averiguar quien esta
+        registrado.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HouseholdInput" }
+      responses:
+        "202":
+          description: Solicitud aceptada. Sin cuerpo, y siempre la misma respuesta.
+
+  /auth/verify-email:
+    post:
+      tags: [auth]
+      summary: Verificar el correo y obtener sesion
+      description: >
+        Consume el token de un solo uso enviado por correo, marca la identidad
+        como verificada y devuelve el par de tokens. Si era el alta de un
+        hogar, es aqui donde se publica HouseholdCreated -- no al insertar la
+        fila, para que ningun modulo siembre datos de un hogar que quiza no
+        llegue a usarse.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "200":
+          description: Correo verificado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenPair" }
+        "409":
+          description: Token caducado, ya usado o inexistente (VERIFICATION_TOKEN_INVALID)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /auth/resend-verification:
+    post:
+      tags: [auth]
+      summary: Reenviar el enlace de verificacion
+      description: >
+        Invalida el token anterior y emite uno nuevo. Responde siempre igual,
+        exista o no la identidad, por el mismo motivo que el alta de hogar.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "202":
+          description: Solicitud aceptada. Sin cuerpo, y siempre la misma respuesta.
+
   /auth/login:
     post:
       tags: [auth]
@@ -56,7 +135,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/TokenPair"
         "401":
-          description: Credenciales inválidas
+          description: >
+            Credenciales inválidas, o correo sin verificar
+            (EMAIL_NOT_VERIFIED)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -570,21 +651,88 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/User" }
+  /invitations:
+    get:
+      tags: [invitations]
+      summary: Listar las invitaciones vivas (solo HOUSEHOLD_ADMIN)
+      responses:
+        "200":
+          description: Invitaciones ni aceptadas, ni revocadas, ni caducadas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Invitation" }
+        "403": { $ref: "#/components/responses/Forbidden" }
     post:
-      tags: [users]
-      summary: Dar de alta un miembro del hogar (solo HOUSEHOLD_ADMIN)
+      tags: [invitations]
+      summary: Invitar a alguien al hogar (solo HOUSEHOLD_ADMIN)
+      description: >
+        Emite un token de un solo uso con 7 dias de caducidad y lo envia por
+        correo. No crea identidad ni pertenencia: eso ocurre al aceptar.
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/UserInput" }
+            schema: { $ref: "#/components/schemas/InvitationInput" }
       responses:
         "201":
-          description: Usuario creado
+          description: Invitacion emitida
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/User" }
+              schema: { $ref: "#/components/schemas/Invitation" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: >
+            Ya es miembro activo del hogar (ALREADY_MEMBER) o ya hay una
+            invitacion viva para ese correo (INVITATION_ALREADY_PENDING)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /invitations/accept:
+    post:
+      tags: [invitations]
+      summary: Aceptar una invitacion
+      description: >
+        Sin autenticar -- lo autoriza el token recibido por correo. Crea la
+        identidad ya VERIFICADA, porque haber recibido el token prueba el
+        control de esa direccion, o vincula la que ya exista. name y password
+        solo hacen falta si la identidad no existia.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InvitationAcceptInput" }
+      responses:
+        "200":
+          description: Invitacion aceptada; se devuelve sesion
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenPair" }
+        "409":
+          description: >
+            Token caducado, ya usado o revocado (INVITATION_TOKEN_INVALID), o
+            la identidad ya pertenece a otro hogar (IDENTITY_ALREADY_MEMBER)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /invitations/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [invitations]
+      summary: Revocar una invitacion (solo HOUSEHOLD_ADMIN)
+      responses:
+        "204":
+          description: Invitacion revocada
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /users/{id}:
     parameters:
@@ -771,6 +919,23 @@ components:
       properties:
         createdBy: { type: string, format: uuid, nullable: true }
         updatedBy: { type: string, format: uuid, nullable: true }
+
+    HouseholdInput:
+      type: object
+      required: [name, timeZone, admin]
+      properties:
+        name: { type: string }
+        timeZone:
+          type: string
+          example: Europe/Madrid
+          description: Identificador IANA. Lo usa el proceso diario de vencidos
+        admin:
+          type: object
+          required: [name, email, password]
+          properties:
+            name: { type: string }
+            email: { type: string, format: email }
+            password: { type: string, format: password }
 
     UserRole:
       type: string
@@ -1087,37 +1252,72 @@ components:
             createdAt: { type: string, format: date-time }
         - $ref: "#/components/schemas/Authorship"
 
-    UserInput:
+    InvitationInput:
       type: object
-      required: [name, email, role]
+      required: [email, role]
       properties:
-        name: { type: string }
         email:
           type: string
           format: email
-          description: Único entre los usuarios activos del hogar, comparado en minúsculas
-        phone: { type: string }
+          description: Normalizado a minusculas, como en la identidad
         role: { $ref: "#/components/schemas/UserRole" }
 
+    Invitation:
+      type: object
+      description: >
+        El estado no es un campo: se deduce de expiresAt, acceptedAt y
+        revokedAt.
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role: { $ref: "#/components/schemas/UserRole" }
+        expiresAt: { type: string, format: date-time }
+        acceptedAt: { type: string, format: date-time, nullable: true }
+        revokedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        createdBy: { type: string, format: uuid, nullable: true }
+
+    InvitationAcceptInput:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string }
+        name:
+          type: string
+          description: Solo si la identidad no existia todavia
+        password:
+          type: string
+          format: password
+          description: Solo si la identidad no existia todavia
+
     User:
+      description: >
+        Es una PERTENENCIA a un hogar (HouseholdMember), no la identidad. id
+        es el memberId, que es lo que referencian propietario de asset,
+        prestamos y autoria. Los datos de la persona -- name, email, phone,
+        avatarUrl, lastLoginAt -- se resuelven desde su identidad, que vive
+        fuera del hogar.
       allOf:
         - type: object
           properties:
             id: { type: string, format: uuid }
+            identityId: { type: string, format: uuid }
             name: { type: string }
             email: { type: string, format: email }
             phone: { type: string, nullable: true }
             role: { $ref: "#/components/schemas/UserRole" }
             avatarUrl: { type: string, format: uri, nullable: true }
             lastLoginAt: { type: string, format: date-time, nullable: true }
-            mustChangePassword:
-              type: boolean
-              description: Lo activa el alta directa y lo apaga el primer cambio de contraseña
+            emailVerifiedAt:
+              type: string
+              format: date-time
+              nullable: true
+              description: Resuelto desde la identidad. Vacío impide iniciar sesión
             deactivatedAt:
               type: string
               format: date-time
               nullable: true
-              description: Informado si el usuario ha causado baja en el hogar
+              description: Informado si esa persona ha dejado este hogar -- no cierra su cuenta
         - $ref: "#/components/schemas/Authorship"
 
     LoanExternal:
