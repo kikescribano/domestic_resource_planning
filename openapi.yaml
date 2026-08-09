@@ -112,6 +112,90 @@ paths:
         "202":
           description: Solicitud aceptada. Sin cuerpo, y siempre la misma respuesta.
 
+  /auth/password-reset:
+    post:
+      tags: [auth]
+      summary: Solicitar el restablecimiento de contrasena
+      description: >
+        Sin credencial de ningun tipo. Si hay una identidad activa detras del
+        correo, invalida su token de restablecimiento anterior, emite uno
+        nuevo con una hora de caducidad y lo envia. Responde siempre 202,
+        exista o no ese correo y este o no dada de baja la identidad:
+        contestar otra cosa permitiria averiguar quien usa el sistema.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "202":
+          description: Solicitud aceptada. Sin cuerpo, y siempre la misma respuesta.
+
+  /auth/password-reset/confirm:
+    post:
+      tags: [auth]
+      summary: Fijar la contrasena nueva con el token recibido
+      description: >
+        Consume el token de un solo uso, fija la contrasena y marca el correo
+        como verificado si no lo estaba -- recibir el token prueba el control
+        de la direccion. Revoca TODOS los refresh tokens de la identidad
+        ANTES de emitir el par nuevo: si el motivo del restablecimiento era un
+        acceso ajeno, dejar sesiones abiertas anularia el gesto.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token: { type: string }
+                newPassword: { type: string, format: password }
+      responses:
+        "200":
+          description: Contrasena restablecida; se devuelve sesion nueva
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenPair" }
+        "409":
+          description: Token caducado, ya usado o inexistente (RESET_TOKEN_INVALID)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /auth/password:
+    post:
+      tags: [auth]
+      summary: Cambiar la contrasena estando autenticado
+      description: >
+        Exige la contrasena actual ademas de la nueva: sin ese requisito, un
+        access token robado bastaria para cambiarla y dejar fuera al dueno de
+        la cuenta. Revoca las DEMAS sesiones y conserva la que esta en uso.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, format: password }
+                newPassword: { type: string, format: password }
+      responses:
+        "204":
+          description: Contrasena cambiada
+        "401":
+          description: La contrasena actual no es correcta (CURRENT_PASSWORD_INVALID)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
   /auth/login:
     post:
       tags: [auth]
