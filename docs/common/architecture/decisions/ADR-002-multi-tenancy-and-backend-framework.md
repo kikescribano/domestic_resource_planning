@@ -102,5 +102,15 @@ quedaban abiertas en «Costes y riesgos» se han resuelto después:
 - La librería de migraciones se resuelve en
   [ADR-004](ADR-004-database-migrations.md): Flyway.
 - El flujo de alta de usuarios en un hogar existente se decide en la sección
-  4.1.7 del [`README principal`](../../../README.md): alta directa por un
-  administrador en el MVP, con invitación por email como evolución posterior.
+  4.1.7 del [`README principal`](../../../README.md). Se resolvió primero como
+  alta directa por un administrador y se revisó después, al hacerse obligatoria
+  la verificación de correo: hoy es **invitación por email**, y el alta directa
+  queda descartada.
+- El algoritmo de hash de contraseñas pasa de **BCrypt a Argon2id**, decidido en
+  la sección 4.1.7 del [`README principal`](../../../README.md). El motivo es
+  concreto: BCrypt ignora en silencio todo lo que exceda de 72 bytes, y la
+  política de contraseñas adoptada favorece frases largas, así que dos
+  contraseñas distintas que compartieran ese prefijo serían la misma para el
+  sistema. El resto de lo que fija esta ADR sobre autenticación —JWT firmado,
+  access token corto, refresh rotativo hasheado y tokens acotados por préstamo—
+  no cambia.

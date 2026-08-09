@@ -156,7 +156,10 @@ paths:
               required: [token, newPassword]
               properties:
                 token: { type: string }
-                newPassword: { type: string, format: password }
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 12
       responses:
         "200":
           description: Contrasena restablecida; se devuelve sesion nueva
@@ -186,7 +189,10 @@ paths:
               required: [currentPassword, newPassword]
               properties:
                 currentPassword: { type: string, format: password }
-                newPassword: { type: string, format: password }
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 12
       responses:
         "204":
           description: Contrasena cambiada
@@ -210,7 +216,13 @@ paths:
               required: [email, password]
               properties:
                 email: { type: string, format: email }
-                password: { type: string, format: password }
+                password:
+                  type: string
+                  format: password
+                  description: >
+                    Sin minimo declarado a proposito: aqui se comprueba una
+                    credencial existente, no se fija una nueva. Rechazarla por
+                    forma daria 400 donde debe darse 401."
       responses:
         "200":
           description: Autenticación correcta
@@ -1019,7 +1031,10 @@ components:
           properties:
             name: { type: string }
             email: { type: string, format: email }
-            password: { type: string, format: password }
+            password:
+              type: string
+              format: password
+              minLength: 12
 
     UserRole:
       type: string
@@ -1372,6 +1387,7 @@ components:
         password:
           type: string
           format: password
+          minLength: 12
           description: Solo si la identidad no existia todavia
 
     User:
