@@ -23,3 +23,4 @@ Usa [`ADR-template.md`](ADR-template.md) para crear una entrada.
 | [ADR-002](ADR-002-multi-tenancy-and-backend-framework.md) | Multi-tenancy por hogar y framework de backend | accepted | — |
 | [ADR-003](ADR-003-row-level-security.md) | Row-Level Security como segunda capa de aislamiento entre hogares | accepted | — |
 | [ADR-004](ADR-004-database-migrations.md) | Flyway como herramienta de migraciones de base de datos | accepted | — |
+| [ADR-005](ADR-005-local-file-storage.md) | Almacenamiento local de ficheros en el servidor | accepted | — |
