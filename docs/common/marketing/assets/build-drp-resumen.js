@@ -8,8 +8,12 @@
  *   npm install pptxgenjs
  *   node build-drp-resumen.js ../DRP-resumen.pptx
  *
- * Refleja el estado del README a 2026-08-07. Al cambiar el README de forma
+ * Refleja el estado del README a 2026-08-10. Al cambiar el README de forma
  * sustantiva, actualiza el contenido de aquí y vuelve a ejecutarlo.
+ *
+ * Ojo con una trampa de este fichero: no falla ni avisa cuando se queda atrás,
+ * simplemente sigue generando un deck que ya no es cierto. Estuvo congelado en
+ * el estado del 2026-08-07 mientras el README seguía avanzando.
  */
 const pptxgen = require("pptxgenjs");
 
@@ -109,9 +113,9 @@ function lines(items, o = {}) {
   });
 
   const chips = [
-    ["Fase 0 completada", TEAL],
-    ["Fase 1 · Core MVP", "24534F"],
-    ["2026-08-07", "24534F"],
+    ["Fase 1 en curso", TEAL],
+    ["Core MVP", "24534F"],
+    ["2026-08-10", "24534F"],
   ];
   let cx = 0.95;
   chips.forEach(([t, c]) => {
@@ -147,7 +151,7 @@ function lines(items, o = {}) {
     x: 7.75, y: 6.25, w: 4.95, h: 0.72, margin: 0, valign: "top", fontFace: SANS, fontSize: 10.5, italic: true, color: "7E9895", lineSpacing: 15,
   });
 
-  s.addNotes("Portada. Resumen del README.md de DRP (estado 2026-08-07): Fase 0 completada, sin decisiones de diseño abiertas.");
+  s.addNotes("Portada. Resumen del README.md de DRP (estado 2026-08-10): Fase 0 cerrada y Fase 1 (Core MVP) en curso.");
 }
 
 // ═══ 2 · Problema y visión ════════════════════════════════════════════════════
@@ -424,7 +428,7 @@ function lines(items, o = {}) {
   s.addText("Reglas", { x: rx + 0.4, y: 4.55, w: rw - 0.8, h: 0.32, margin: 0, valign: "middle", fontFace: SERIF, fontSize: 17, bold: true, color: INK });
   s.addText(lines([
     "Una ubicación no puede ser su propia ancestra",
-    "Si se informa capacidad, el sistema debería avisar al superarla (bloquear o no, por definir)",
+    "Si se informa capacidad, superarla advierte pero no bloquea: el sistema solo cuenta unidades con certeza",
     "Una Location no es un recurso del hogar: es el contenedor físico",
   ], { bullet: true }), {
     x: rx + 0.45, y: 4.97, w: rw - 0.9, h: 1.4, margin: 0, valign: "top", fontFace: SANS, fontSize: 13, color: BODY, paraSpaceAfter: 6, lineSpacing: 19,
@@ -519,7 +523,7 @@ function lines(items, o = {}) {
   head(s, "ARQUITECTURA", "Dos componentes, un monolito modular", true);
 
   card(s, { x: M, y: 1.5, w: CW, h: 0.8, fill: "1B4B48", line: "2F6360", shadow: false });
-  s.addText("Frontend Web · TypeScript + React · mobile-first, de 375 px a ultrawide", {
+  s.addText("Frontend Web · React sobre Vite · mobile-first, de 375 px a ultrawide", {
     x: M, y: 1.5, w: CW, h: 0.8, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 15, bold: true, color: WHITE,
   });
 
@@ -531,12 +535,13 @@ function lines(items, o = {}) {
     x: M, y: 2.95, w: CW, h: 0.8, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 15, bold: true, color: WHITE,
   });
 
+  // Muestra de los cuatro de prioridad alta; la lista entera son trece.
   const mods = [
     ["Core", "Recursos / Assets", true],
-    ["Eventos temporales", "opcional", false],
-    ["CMMS", "opcional", false],
     ["Warehouse", "opcional", false],
-    ["Planificador", "opcional", false],
+    ["Mantenimiento", "opcional", false],
+    ["Compras", "opcional", false],
+    ["Proveedores", "opcional", false],
   ];
   const mw = 2.25, mgap = 0.22;
   mods.forEach((m, i) => {
@@ -724,11 +729,11 @@ function lines(items, o = {}) {
     ["Backend", "Kotlin + Spring Boot", "Monolito modular, Clean Architecture"],
     ["Persistencia", "PostgreSQL 16+", "Row-Level Security como segunda capa"],
     ["Migraciones", "Flyway", "SQL plano versionado, esquema y políticas juntos"],
-    ["Comunicación BE", "Event bus in-process", "Contrato definido; librería por definir"],
+    ["Comunicación BE", "Event bus in-process", "Puerto propio sobre Spring, sin dependencia añadida"],
     ["Comunicación FE ↔ BE", "API REST + JWT", "Spring Security; tokens acotados de préstamo"],
-    ["Contratos", "OpenAPI 3.0", "openapi.yaml + ejemplos en el README"],
-    ["Frontend", "TypeScript + React", "Mobile-first, de 375 px a ultrawide"],
-    ["Testing", "Por definir", "Kotest/JUnit5 + Testcontainers, Vitest/Jest"],
+    ["Contratos", "OpenAPI 3.0", "openapi.yaml es la fuente de verdad de la API"],
+    ["Frontend", "React sobre Vite", "Mobile-first, de 375 px a ultrawide; WCAG 2.2 AA"],
+    ["Testing", "JUnit 5 + Testcontainers", "Vitest y Playwright en el frontend"],
   ];
   const cw = 2.9, gap = 0.18, chh = 1.9;
   stack.forEach((t, i) => {
@@ -741,11 +746,11 @@ function lines(items, o = {}) {
   });
 
   card(s, { x: M, y: 6.05, w: CW, h: 0.62, fill: INK, shadow: false });
-  s.addText("Cuatro ADR recogen el porqué y las alternativas descartadas: monolito modular · Kotlin + Spring Boot · Row-Level Security · Flyway", {
-    x: M, y: 6.05, w: CW, h: 0.62, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 12.5, color: "CFE1DE",
+  s.addText("Nueve ADR recogen el porqué y las alternativas descartadas: monolito modular · Spring Boot · Row-Level Security · Flyway · ficheros en disco · React + Vite · contrato como fuente de verdad · monorepo · correo saliente", {
+    x: M, y: 6.05, w: CW, h: 0.62, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 11, color: "CFE1DE",
   });
   foot(s);
-  s.addNotes("README §6 y ADR-001 a ADR-004.");
+  s.addNotes("README §6 y ADR-001 a ADR-009.");
 }
 
 // ═══ 16 · Testing ═════════════════════════════════════════════════════════════
@@ -791,8 +796,8 @@ function lines(items, o = {}) {
 
   const fases = [
     ["Fase 0", "Definición", "Arquitectura, stack, alcance del core y estrategia de testing", "Completada", TEAL, WHITE],
-    ["Fase 1", "Core MVP", "Assets, autenticación, API REST, event bus y FE responsive básico", "Siguiente", TERRA, WHITE],
-    ["Fase 2", "Primer módulo", "Candidato por definir: CMMS o Warehouse", "Pendiente", "C3D2CF", INK],
+    ["Fase 1", "Core MVP", "Assets, autenticación, API REST, event bus y cliente web completo del core", "En curso", TERRA, WHITE],
+    ["Fase 2", "Primer módulo", "Candidato a definir entre los cuatro de prioridad alta", "Pendiente", "C3D2CF", INK],
     ["Fase 3", "Módulos adicionales", "Según el backlog de módulos futuros", "Pendiente", "C3D2CF", INK],
   ];
   const cw = 2.9, gap = 0.18, cy = 1.85, chh = 3.55;
@@ -811,14 +816,14 @@ function lines(items, o = {}) {
     x: M, y: 5.65, w: CW, h: 0.55, margin: 0, valign: "top", fontFace: SANS, fontSize: 13, italic: true, color: TEAL, lineSpacing: 19,
   });
   foot(s);
-  s.addNotes("README §8: roadmap y estado. Fase 0 cerrada el 2026-08-07.");
+  s.addNotes("README §8: roadmap y estado. Fase 0 cerrada el 2026-08-07; Fase 1 arrancada el 2026-08-10, con su alcance y sus cinco hitos en la §8.2.");
 }
 
 // ═══ 18 · Cierre ══════════════════════════════════════════════════════════════
 {
   const s = newSlide(true);
-  head(s, "SIGUIENTE PASO", "La Fase 0 queda cerrada", true);
-  s.addText("No hay decisiones de diseño abiertas: modelo de datos, casos de uso, autenticación y contratos de API están definidos.", {
+  head(s, "SIGUIENTE PASO", "La Fase 1 está en marcha", true);
+  s.addText("Con la definición cerrada y el andamiaje en pie, lo que queda es construir: el core completo, entregado en hitos que atraviesan las capas en vertical.", {
     x: M, y: 1.45, w: 9.5, h: 0.62, margin: 0, valign: "top", fontFace: SANS, fontSize: 15, color: "C4D4D1", lineSpacing: 21,
   });
 
@@ -837,8 +842,8 @@ function lines(items, o = {}) {
   });
 
   const closing = [
-    ["Primera tarea de la Fase 1", "Repartir a docs/ las secciones del README que corresponden por ámbito: 4.1.x, 5.4.3, 5.6 y 5.7, dejando aquí un resumen y el enlace."],
-    ["Módulos con prioridad alta", "CMMS doméstico y Warehouse, ambos por diseñar. El resto queda en backlog abierto."],
+    ["Hito 0, ya cerrado", "Monorepo, integración continua, contrato saneado y el reparto del README a docs/, que la Fase 0 había aplazado a propósito."],
+    ["Módulos con prioridad alta", "Warehouse, mantenimiento (CMMS), compras y proveedores, los cuatro por diseñar. El resto queda en backlog abierto."],
   ];
   closing.forEach((c, i) => {
     const x = M + i * (5.85 + 0.43);
@@ -847,11 +852,11 @@ function lines(items, o = {}) {
     s.addText(c[1], { x: x + 0.38, y: 5.0, w: 5.1, h: 0.9, margin: 0, valign: "top", fontFace: SANS, fontSize: 12.5, color: "BFD3D0", lineSpacing: 18 });
   });
 
-  s.addText("Fuente: README.md · documento vivo, última actualización 2026-08-07", {
+  s.addText("Fuente: README.md · documento vivo, última actualización 2026-08-10", {
     x: M, y: 6.35, w: CW, h: 0.35, margin: 0, valign: "middle", fontFace: SANS, fontSize: 11, color: "7E9895",
   });
   foot(s, true);
-  s.addNotes("README §8, §9 y §11: cierre de la Fase 0 y arranque de la Fase 1.");
+  s.addNotes("README §8.2: alcance, hitos y criterio de aceptación de la Fase 1.");
 }
 
 const out = process.argv[2] || "DRP-resumen.pptx";

@@ -2,27 +2,48 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Lo primero: aquí todavía no hay código
+## Lo primero: el código acaba de empezar
 
-DRP está en la transición de Fase 0 (definición) a Fase 1 (Core MVP). El
-repositorio contiene **solo documentación**: no hay build, ni tests, ni
-dependencias, ni estructura `backend/` o `frontend/`. No busques un `package.json`
-o un `build.gradle.kts` — no existen todavía.
+DRP está en la **Fase 1 (Core MVP)**, recién arrancada. El repositorio dejó de
+ser solo documentación: hay un monorepo con `backend/` (Kotlin, Gradle con Kotlin
+DSL) y `frontend/` (TypeScript, React sobre Vite), más `compose.yaml`, `scripts/`
+y `.github/workflows/`.
 
-La documentación está **en español de España**. Manténla así.
+Lo que hay es **andamiaje con una regla de dominio dentro**, no el core
+implementado. El alcance, los cinco hitos y el criterio de aceptación están en la
+sección 8.2 del README. No des por hecho que un caso de uso existe porque esté
+definido: casi ninguno lo está todavía.
+
+La documentación está **en español de España**. Manténla así. El código sigue la
+misma frontera que la documentación: prosa y comentarios en castellano, todo
+identificador en inglés.
 
 ## Dónde vive la verdad
 
-El [`README.md`](README.md) raíz (~720 líneas) es la **fuente vigente** de toda la
-definición del core: modelo de dominio, modelo de datos, casos de uso, event bus,
-API y estrategia de testing. No es un README de presentación: es el documento de
-diseño.
+**El reparto del README a `docs/` ya está hecho** (fue la tarea de arranque de la
+Fase 1). El [`README.md`](README.md) raíz pasó de 1821 líneas a poco más de 600 y
+conserva la visión de conjunto: qué es DRP, su alcance, su arquitectura, el stack,
+la estrategia de testing y el roadmap. **El detalle del core ya no está ahí:**
 
-`docs/` es en su mayor parte andamiaje — índices que declaran «Contenido
-previsto». Aplicando su propia regla de ubicación, parte del README debería vivir
-allí; **el reparto está deliberadamente aplazado a la Fase 1**, con el motivo y el
-destino de cada sección en [`docs/README.md`](docs/README.md). No lo adelantes sin
-que te lo pidan.
+| Buscas | Está en |
+|---|---|
+| Assets, artículos, ubicaciones, documentos (4.1.1–4.1.3) | [`docs/common/product/core-model.md`](docs/common/product/core-model.md) |
+| Usuarios, roles, contraseñas y tokens (4.1.4) | [`docs/common/product/users-and-access.md`](docs/common/product/users-and-access.md) |
+| Préstamos (4.1.5) | [`docs/common/product/loans.md`](docs/common/product/loans.md) |
+| Decisiones de diseño (4.1.7) | [`docs/common/product/decisions.md`](docs/common/product/decisions.md) |
+| Modelo de datos y RLS (5.6) | [`docs/common/architecture/data-model.md`](docs/common/architecture/data-model.md) |
+| Casos de uso (5.7) | [`docs/common/product/use-cases/`](docs/common/product/use-cases/README.md) |
+| Ejemplos JSON (5.4.3) | [`docs/common/contracts/json-examples.md`](docs/common/contracts/json-examples.md) |
+| Ficheros (5.8) | [`docs/backend/`](docs/backend/architecture/file-storage.md), repartido entre architecture, security y operations |
+
+**Los números de sección se conservan tras el traslado**, porque hay más de cien
+referencias cruzadas del tipo «ver 4.1.1» por todo el repositorio: 4.1.1 sigue
+llamándose 4.1.1 aunque viva en `docs/`. No los renumeres.
+
+De ahí la regla que más fácil es incumplir ahora: **el detalle no se escribe en el
+README**. Si tocas el modelo de datos, los casos de uso o la definición del core,
+va a su documento; el README solo se toca si cambia el resumen. El mapa completo
+está en su sección 9.1.
 
 El contrato de la API vive en [`openapi.yaml`](openapi.yaml) (OpenAPI 3.0.3), en la
 raíz. Los ejemplos comentados están en la sección 5.4.3 del README: si cambias uno,
@@ -30,20 +51,42 @@ cambia el otro.
 
 ## Verificación
 
-No hay suite de tests, pero sí dos comprobaciones que conviene pasar antes de
-entregar un cambio documental. Requieren `pip install pyyaml openapi-spec-validator`.
+Las cuatro comprobaciones que ejecuta [la CI](.github/workflows/ci.yml). Pásalas
+antes de entregar un cambio.
 
-Validar el contrato de la API:
+Validar el contrato de la API. Requiere `pip install pyyaml openapi-spec-validator`.
+Además de validar el esquema, exige `operationId` en todas las operaciones, que es
+lo que la ADR-007 necesita para generar el cliente:
 
 ```bash
-python -c "from openapi_spec_validator import validate; from openapi_spec_validator.readers import read_from_filename; s,_=read_from_filename('openapi.yaml'); validate(s); print('OK')"
+python scripts/validate-openapi.py
 ```
 
-Comprobar que ningún enlace relativo está roto (son ~170 y se rompen con facilidad
-al renumerar secciones):
+Comprobar que ningún enlace relativo está roto. Son unos 160 y se rompen con
+facilidad al renumerar secciones o al mover un fichero:
 
 ```bash
-python -c "import re,pathlib;bad=[f'{m.as_posix()} -> {l}' for m in pathlib.Path('.').rglob('*.md') if '.git' not in m.parts for l in re.findall(r'\]\(([^)#][^)]*)\)', m.read_text(encoding='utf-8')) if not l.startswith(('http','mailto')) and not (m.parent/l.split('#')[0]).resolve().exists()];print('\n'.join(bad) or 'OK')"
+python scripts/check-links.py
+```
+
+Construir y probar el backend. Las pruebas que tocan la base de datos levantan
+PostgreSQL con Testcontainers y corren con un usuario **sujeto a RLS** — nunca
+como superusuario, que daría cobertura falsa:
+
+```bash
+cd backend && ./gradlew build
+```
+
+Comprobar tipos, construir y probar el frontend:
+
+```bash
+cd frontend && npm run build && npm test
+```
+
+Y para levantar el entorno local (PostgreSQL y Mailpit; nginx llega con el Hito 3):
+
+```bash
+docker compose up -d
 ```
 
 ## Al fusionar un PR: alinear el estado local
@@ -202,9 +245,26 @@ incumplen sin querer:
 - La sección 11 del README explica qué tocar al avanzar el proyecto: léela antes de
   hacer una actualización amplia.
 
-## Al empezar la Fase 1
+## Cómo se ejecuta la Fase 1: un hito por sesión
 
-El criterio de validación ya está fijado en la ADR-001: un **recorrido vertical**
-que atraviese frontend, API autenticada, aplicación, dominio y PostgreSQL, con
-pruebas en los tres niveles. Ese recorrido es también lo que valida en la práctica
-las decisiones de las ADR-002/003/004.
+La Fase 1 se entrega en **cinco hitos**, y el Hito 0 ya está cerrado. La forma de
+trabajar es explícita y conviene respetarla:
+
+- **Un hito por sesión.** Arranca leyendo
+  [`docs/common/product/roadmap.md`](docs/common/product/roadmap.md), que es la
+  fuente del alcance, el criterio de aceptación y el estado. No mezcles hitos:
+  son bloques grandes y mezclarlos hace que ninguno se cierre del todo.
+- **Un pull request por hito**, y no se abre el siguiente hasta que el anterior
+  está fusionado. Al fusionar, sigue el procedimiento de alineación local de más
+  arriba.
+- **Al cerrar un hito**, actualiza su estado en `roadmap.md` y añade la fila de
+  historial al README. El estado de las *fases* vive en la sección 8 del README;
+  el de los *hitos*, en `roadmap.md`. Cada dato en un solo sitio.
+- **Cada hito atraviesa las capas en vertical** —dominio, aplicación, adaptador,
+  frontend y sus pruebas—, no una capa entera de cada vez.
+
+El criterio de validación estaba fijado desde la ADR-001: un **recorrido
+vertical** que atraviese frontend, API autenticada, aplicación, dominio y
+PostgreSQL, con pruebas en los tres niveles. Ese recorrido es también lo que
+valida en la práctica las decisiones de las ADR-002/003/004, y la ADR-005 lo
+amplía para que incluya subir una foto, verla adjunta y descargarla.

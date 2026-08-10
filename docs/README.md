@@ -51,46 +51,53 @@ Cuando un tema cruza componentes, `common/` conserva la decisión o el contrato 
 cada componente documenta únicamente su implementación, enlazando de vuelta a la
 fuente común.
 
-## Estado actual: la definición de Fase 0 vive en el README principal
+## Estado actual: el reparto ya está hecho
 
 | Campo | Valor |
 |---|---|
-| Estado | Decidido |
-| Fecha | 2026-08-07 |
-| Revisar en | Inicio de la Fase 1 |
+| Estado | Completado |
+| Fecha | 2026-08-10 |
+| Decidido el | 2026-08-07, y ejecutado al arrancar la Fase 1 |
 
-Aplicando la regla anterior al pie de la letra, buena parte del
-[`README principal`](../README.md) debería estar aquí: el modelo de datos (5.6),
-el catálogo de casos de uso (5.7) y los contratos de la API (5.4.3) son
-conocimiento transversal y les correspondería `common/architecture/` y
-`common/contracts/`. Hoy no lo están, y es deliberado.
-
-**Por qué se aplaza.** Durante la Fase 0 el README ha funcionado como documento
-único de definición: se lee de principio a fin, cada sección da contexto a la
-siguiente y las decisiones se han tomado leyéndolo entero. Partirlo ahora, justo
-antes de escribir la primera línea de código, añadiría indirección sin resolver
-ningún problema real — nadie está buscando el modelo de datos y fallando al
+Durante toda la Fase 0 la definición del core vivió en el
+[`README principal`](../README.md), en contra de la regla de ubicación de más
+arriba y a propósito: el README funcionaba como documento único, se leía de
+principio a fin y las decisiones se tomaban leyéndolo entero. Partirlo antes de
+escribir la primera línea de código habría añadido indirección sin resolver
+ningún problema real — nadie estaba buscando el modelo de datos y fallando al
 encontrarlo.
 
-**Cuándo se hace.** Al iniciar la **Fase 1**, cuando aparezca documentación
-propia de backend y frontend que necesite un sitio y empiece a competir con el
-README por ser la fuente de verdad. Ese es el momento en que el coste de no
-repartir supera al de repartir: dos documentos describiendo lo mismo es
-exactamente el problema que esta estructura existe para evitar.
+Al arrancar la **Fase 1** aparece documentación propia de backend y frontend que
+compite con él por ser la fuente de verdad, que era la condición que se había
+fijado para repartir. Hecho el reparto, el README pasó de 1821 líneas a poco más
+de 600 y conserva la visión de conjunto.
 
-**Qué se moverá entonces,** dejando en el README un resumen y el enlace:
+**Dónde vive ahora cada sección:**
 
-| Sección del README | Destino previsto |
+| Sección del README | Destino |
 |---|---|
-| 5.6 Modelo de datos | `common/architecture/` |
-| 5.7 Casos de uso del core | `common/architecture/` o `common/product/use-cases/` |
-| 5.4.3 Contratos JSON | `common/contracts/` |
-| 5.8 Almacenamiento de ficheros | `backend/architecture/`, con los controles OWASP en `backend/security/` y el dimensionado y las copias en `backend/operations/` |
-| 4.1.x Definición del core | `common/product/` (visión, glosario, capacidades) |
+| 4.1.1 – 4.1.3 Assets, artículos y ubicaciones | [`common/product/core-model.md`](common/product/core-model.md) |
+| 4.1.4 Usuarios y roles | [`common/product/users-and-access.md`](common/product/users-and-access.md) |
+| 4.1.5 Préstamos | [`common/product/loans.md`](common/product/loans.md) |
+| 4.1.7 Decisiones de diseño | [`common/product/decisions.md`](common/product/decisions.md) |
+| 5.4.3 Contratos JSON | [`common/contracts/json-examples.md`](common/contracts/json-examples.md) |
+| 5.6 Modelo de datos | [`common/architecture/data-model.md`](common/architecture/data-model.md) |
+| 5.7 Casos de uso del core | [`common/product/use-cases/`](common/product/use-cases/README.md) |
+| 5.8 Almacenamiento de ficheros | [`backend/architecture/`](backend/architecture/file-storage.md), con los controles OWASP en [`backend/security/`](backend/security/file-upload-controls.md) y el dimensionado y las copias en [`backend/operations/`](backend/operations/storage-sizing-and-backups.md) |
 
-Mientras tanto, **el README principal es la fuente vigente** para todo lo
-anterior, y los índices de este directorio enlazan a él en lugar de duplicar su
-contenido.
+De los dos destinos que se habían previsto para los casos de uso —
+`common/architecture/` o `common/product/use-cases/`— se eligió el segundo: un
+catálogo de comandos y queries describe **qué hace** el producto, no cómo está
+construido.
+
+> **Los números de sección se conservan.** Hay más de cien referencias cruzadas
+> del tipo «ver 4.1.1» repartidas por el repositorio, así que 4.1.1 sigue
+> llamándose 4.1.1 aunque su cuerpo viva ahora aquí. Renumerarlas las habría
+> roto todas de golpe, y sin que ninguna herramienta lo detectara.
+
+**La regla que esto hace fácil de incumplir:** el detalle ya no se escribe en el
+README. Un cambio en el modelo de datos, en los casos de uso o en la definición
+del core va a su documento; el README solo se toca si cambia el resumen.
 
 ## Convenciones
 

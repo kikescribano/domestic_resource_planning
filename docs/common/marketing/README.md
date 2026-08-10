@@ -28,7 +28,7 @@ solución completa, igual que la visión de producto. Aplicando la
 
 | Pieza | Contenido |
 |---|---|
-| [`DRP-resumen.pptx`](DRP-resumen.pptx) | Presentación de 18 diapositivas que resume el README principal: objetivo, analogía ERP → DRP, core mínimo, modelo de dominio, arquitectura, event bus, aislamiento multi-tenant, casos de uso, stack, testing y roadmap. Cada diapositiva lleva en sus notas la sección del README de la que procede. Refleja el estado del README a 2026-08-07 (Fase 0 completada). |
+| [`DRP-resumen.pptx`](DRP-resumen.pptx) | Presentación de 18 diapositivas que resume el README principal: objetivo, analogía ERP → DRP, core mínimo, modelo de dominio, arquitectura, event bus, aislamiento multi-tenant, casos de uso, stack, testing y roadmap. Cada diapositiva lleva en sus notas la sección del README de la que procede. Refleja el estado del README a 2026-08-10 (Fase 1 en curso, con el Hito 0 cerrado). |
 | [`assets/build-drp-resumen.js`](assets/build-drp-resumen.js) | Generador de la presentación anterior: es su fuente editable. La presentación **no se retoca a mano**, se regenera ejecutando este script. El procedimiento y su verificación están en [SKILL-001](../skills/SKILL-001-readme-to-deck.md). |
 | [`brand-guidelines-template.docx`](brand-guidelines-template.docx) | Plantilla en blanco de manual de marca (v1.0), en siete secciones: identidad, logo y sus variantes, paleta con HEX/RGB/CMYK, tipografía y jerarquía, iconografía, tono de voz y design tokens. Todo lo que aparece entre corchetes es un hueco por rellenar. |
 

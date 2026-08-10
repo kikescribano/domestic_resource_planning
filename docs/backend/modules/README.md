@@ -3,16 +3,18 @@
 Este directorio será el catálogo canónico de módulos del monolito. Cada módulo
 debe tener un documento propio y declarar sus límites antes de depender de otro.
 
-**El estado y la prioridad de cada módulo se mantienen en la sección 4.2 del
-[`README.md`](../../../README.md) raíz, y solo allí.** Este catálogo aporta la
-responsabilidad de cada uno y el enlace a su documento; duplicar aquí el estado
-solo consigue que las dos listas se contradigan.
+**Este catálogo fija el nombre y la responsabilidad de cada módulo. El estado y
+la prioridad se mantienen en la sección 4.2 del
+[`README.md`](../../../README.md) raíz, y solo allí.** Cada dato tiene un único
+dueño porque tenerlo en dos sitios acaba, sin falta, en dos versiones distintas —
+es exactamente lo que pasó con los nombres de «Mantenimiento (CMMS)» y «Eventos
+temporales», que durante un tiempo aparecían de otra forma en el README.
 
 ## Catálogo
 
 | Módulo | Responsabilidad | Documento |
 |---|---|---|
-| Core de recursos y activos | Gestión común de recursos y activos domésticos | [`README.md`](../../../README.md) §4.1 (fuente vigente hasta el reparto de la Fase 1) |
+| Core de recursos y activos | Gestión común de recursos y activos domésticos | [`common/product/`](../../common/product/README.md) (trasladado desde la §4.1 del README al arrancar la Fase 1) |
 | Proveedores y contactos de servicio | Quién arregla, quién cobra y quién responde de una garantía | Pendiente |
 | Compras y lista de la compra | Qué falta, qué hay que reponer y qué está pedido | Pendiente |
 | Warehouse | Existencias, ubicaciones y movimientos | Pendiente |

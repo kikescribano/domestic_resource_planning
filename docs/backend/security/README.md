@@ -4,6 +4,15 @@ Este directorio mantiene el modelo de amenazas y los controles aplicados dentro
 del backend. Los aspectos observables por clientes se enlazan desde los contratos
 comunes.
 
+## Documentos vigentes
+
+- [`file-upload-controls.md`](file-upload-controls.md): los controles de la OWASP
+  File Upload Cheat Sheet que se aplican desde el primer día — lista blanca por
+  contenido real, renombrado en disco, volumen `noexec` fuera del árbol web y
+  recodificación de imágenes. Trasladado desde la sección 5.8.5 del
+  [`README principal`](../../../README.md). El mecanismo que los rodea está en
+  [`../architecture/file-storage.md`](../architecture/file-storage.md).
+
 ## Contenido previsto
 
 - Límites de confianza y superficies de ataque.
