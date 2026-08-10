@@ -8,7 +8,7 @@
  *   npm install pptxgenjs
  *   node build-drp-resumen.js ../DRP-resumen.pptx
  *
- * Refleja el estado del README a 2026-08-07. Al cambiar el README de forma
+ * Refleja el estado del README a 2026-08-10. Al cambiar el README de forma
  * sustantiva, actualiza el contenido de aquí y vuelve a ejecutarlo.
  */
 const pptxgen = require("pptxgenjs");
@@ -111,7 +111,7 @@ function lines(items, o = {}) {
   const chips = [
     ["Fase 0 completada", TEAL],
     ["Fase 1 · Core MVP", "24534F"],
-    ["2026-08-07", "24534F"],
+    ["2026-08-10", "24534F"],
   ];
   let cx = 0.95;
   chips.forEach(([t, c]) => {
@@ -202,20 +202,22 @@ function lines(items, o = {}) {
     ["Activos productivos (maquinaria, líneas)", "Electrodomésticos, vehículos, mobiliario, herramientas"],
     ["Mantenimiento preventivo/correctivo (CMMS)", "Revisión de caldera, ITV, cambio de filtros, garantías"],
     ["Gestión de almacén / inventario", "Despensa, garaje, trastero, botiquín"],
-    ["Planificación de producción / tareas", "Tareas domésticas, turnos, rutinas familiares"],
+    ["Compras y aprovisionamiento", "Lista de la compra, reposición de lo que se agota"],
+    ["Maestro de proveedores", "Fontanero, servicio técnico de la caldera, taller"],
+    ["Planificación de producción / tareas", "Tareas domésticas, turnos, rutinas familiares, menú semanal"],
     ["Gestión de proyectos / eventos puntuales", "Mudanzas, reformas, celebraciones, viajes"],
   ];
-  const lw = 5.1, rw = 5.95, ax = M + lw + 0.35, rx = ax + 0.68;
-  let y = 1.85;
-  s.addText("ERP EMPRESARIAL", { x: M, y: 1.52, w: lw, h: 0.26, margin: 0, valign: "middle", fontFace: SANS, fontSize: 10, bold: true, charSpacing: 1.5, color: MUTED });
-  s.addText("DRP · HOGAR", { x: rx, y: 1.52, w: rw, h: 0.26, margin: 0, valign: "middle", fontFace: SANS, fontSize: 10, bold: true, charSpacing: 1.5, color: TEAL });
+  const lw = 5.1, rw = 5.95, ax = M + lw + 0.35, rx = ax + 0.68, rh = 0.6;
+  let y = 1.78;
+  s.addText("ERP EMPRESARIAL", { x: M, y: 1.46, w: lw, h: 0.26, margin: 0, valign: "middle", fontFace: SANS, fontSize: 10, bold: true, charSpacing: 1.5, color: MUTED });
+  s.addText("DRP · HOGAR", { x: rx, y: 1.46, w: rw, h: 0.26, margin: 0, valign: "middle", fontFace: SANS, fontSize: 10, bold: true, charSpacing: 1.5, color: TEAL });
   rows.forEach(([a, b]) => {
-    card(s, { x: M, y, w: lw, h: 0.8, fill: TINT, shadow: false });
-    s.addText(a, { x: M + 0.28, y, w: lw - 0.56, h: 0.8, margin: 0, valign: "middle", fontFace: SANS, fontSize: 13, color: BODY });
-    s.addShape(pres.ShapeType.rightArrow, { x: ax, y: y + 0.26, w: 0.5, h: 0.28, fill: { color: "C3D2CF" }, line: { color: "C3D2CF", width: 0.5 } });
-    card(s, { x: rx, y, w: rw, h: 0.8, fill: TINT2, shadow: false });
-    s.addText(b, { x: rx + 0.28, y, w: rw - 0.56, h: 0.8, margin: 0, valign: "middle", fontFace: SANS, fontSize: 13, bold: true, color: INK2 });
-    y += 0.95;
+    card(s, { x: M, y, w: lw, h: rh, fill: TINT, shadow: false });
+    s.addText(a, { x: M + 0.28, y, w: lw - 0.56, h: rh, margin: 0, valign: "middle", fontFace: SANS, fontSize: 12.5, color: BODY });
+    s.addShape(pres.ShapeType.rightArrow, { x: ax, y: y + 0.16, w: 0.5, h: 0.28, fill: { color: "C3D2CF" }, line: { color: "C3D2CF", width: 0.5 } });
+    card(s, { x: rx, y, w: rw, h: rh, fill: TINT2, shadow: false });
+    s.addText(b, { x: rx + 0.28, y, w: rw - 0.56, h: rh, margin: 0, valign: "middle", fontFace: SANS, fontSize: 12.5, bold: true, color: INK2 });
+    y += 0.68;
   });
   foot(s);
   s.addNotes("README §3: analogía ERP → DRP.");
@@ -260,16 +262,16 @@ function lines(items, o = {}) {
 
   const cw = 5.85, cy = 2.18, chh = 3.65;
   const cols = [
-    { x: M, fill: TINT, head: "DURADERO", chip: TEAL, rows: [
+    { x: M, fill: TINT, head: "DURABLE", chip: TEAL, rows: [
       ["Qué es", "Identidad propia; se usa de forma repetida sin agotarse"],
       ["Cómo se cuenta", "Una fila por unidad física"],
       ["Ejemplos", "Caldera, taladro, sofá, coche, cuadro"],
     ], note: "Único que puede ubicar a otros assets y único que se presta." },
-    { x: M + cw + 0.43, fill: TINT, head: "CONSUMIBLE", chip: TERRA, rows: [
+    { x: M + cw + 0.43, fill: TINT, head: "CONSUMABLE", chip: TERRA, rows: [
       ["Qué es", "Se agota o se repone; las unidades son intercambiables"],
       ["Cómo se cuenta", "Una fila por existencia —un artículo en una ubicación—, con cantidad"],
       ["Ejemplos", "Harina, detergente, pilas, bombillas"],
-    ], note: "Nunca está PRESTADO; llegar a cantidad 0 no lo da de baja." },
+    ], note: "Nunca está LENT; llegar a cantidad 0 no lo da de baja." },
   ];
   cols.forEach((c) => {
     card(s, { x: c.x, y: cy, w: cw, h: chh, fill: c.fill });
@@ -289,26 +291,28 @@ function lines(items, o = {}) {
     { text: "cambiar la naturaleza de un asset equivale a darlo de baja y crear otro. El core solo mantiene un contador — consumos, mínimos, caducidad y lotes son del módulo Warehouse.", options: { color: MUTED } },
   ], { x: M, y: 6.02, w: CW, h: 0.62, margin: 0, valign: "top", fontFace: SANS, fontSize: 13, lineSpacing: 19 });
   foot(s);
-  s.addNotes("README §4.1.1: naturaleza DURADERO / CONSUMIBLE y alcance deliberado del core.");
+  s.addNotes("README §4.1.1: naturaleza DURABLE / CONSUMABLE y alcance deliberado del core.");
 }
 
 // ═══ 6 · Artículo y existencia ════════════════════════════════════════════════
 {
   const s = newSlide();
   head(s, "CATÁLOGO Y EXISTENCIAS", "Definición y existencia van separadas");
-  s.addText("Un artículo no es un asset: no ocupa sitio, no tiene cantidad y no se presta. Es obligatorio en un CONSUMIBLE y opcional en un DURADERO, donde permite compartir modelo y documentación entre unidades idénticas.", {
+  s.addText("Un artículo no es un asset: no ocupa sitio, no tiene cantidad y no se presta. Es obligatorio en un CONSUMABLE y opcional en un DURABLE, donde permite compartir modelo y documentación entre unidades idénticas.", {
     x: M, y: 1.38, w: CW, h: 0.6, margin: 0, valign: "top", fontFace: SANS, fontSize: 14, color: MUTED, lineSpacing: 20,
   });
 
   const ay = 2.08, ah = 2.6;
   card(s, { x: M, y: ay, w: 4.2, h: ah, fill: TINT, line: TEAL, lineW: 1.25 });
-  s.addText("Articulo", { x: M + 0.35, y: ay + 0.28, w: 3.5, h: 0.4, margin: 0, valign: "middle", fontFace: SERIF, fontSize: 19, bold: true, color: INK });
-  s.addText("tabla catalog_items", { x: M + 0.35, y: ay + 0.66, w: 3.5, h: 0.26, margin: 0, fontFace: MONO, fontSize: 10.5, color: TEAL });
+  s.addText("Artículo", { x: M + 0.35, y: ay + 0.28, w: 3.5, h: 0.4, margin: 0, valign: "middle", fontFace: SERIF, fontSize: 19, bold: true, color: INK });
+  s.addText("tabla articles", { x: M + 0.35, y: ay + 0.66, w: 3.5, h: 0.26, margin: 0, fontFace: MONO, fontSize: 10.5, color: TEAL });
+  // El nombre de la categoría es dato del hogar y se muestra al usuario: va en
+  // castellano, a diferencia de la unidad, que sí es un enumerado.
   s.addText(lines([
-    "nombre · Azúcar",
-    "categoria · ALIMENTACION",
-    "unidad · GRAMO",
-    "marca, codigoBarras (opcionales)",
+    "name · Azúcar",
+    "categoryId · Alimentación",
+    "unit · GRAM",
+    "brand, barcode (opcionales)",
   ]), { x: M + 0.35, y: ay + 1.05, w: 3.5, h: 1.35, margin: 0, valign: "top", fontFace: SANS, fontSize: 12.5, color: BODY, lineSpacing: 19 });
 
   s.addShape(pres.ShapeType.rightArrow, { x: 4.95, y: ay + 1.05, w: 0.62, h: 0.32, fill: { color: TEAL }, line: { color: TEAL, width: 0.5 } });
@@ -320,7 +324,7 @@ function lines(items, o = {}) {
   ];
   ex.forEach((e) => {
     card(s, { x: e.x, y: ay, w: 3.3, h: ah, fill: TINT2 });
-    s.addText("Asset CONSUMIBLE", { x: e.x + 0.32, y: ay + 0.28, w: 2.7, h: 0.26, margin: 0, fontFace: SANS, fontSize: 10, bold: true, charSpacing: 1, color: TERRA });
+    s.addText("Asset CONSUMABLE", { x: e.x + 0.32, y: ay + 0.28, w: 2.7, h: 0.26, margin: 0, fontFace: SANS, fontSize: 10, bold: true, charSpacing: 1, color: TERRA });
     s.addText("Existencia · " + e.loc, { x: e.x + 0.32, y: ay + 0.56, w: 2.7, h: 0.36, margin: 0, valign: "middle", fontFace: SERIF, fontSize: 16, bold: true, color: INK });
     s.addText([
       { text: e.qty, options: { fontSize: 34, bold: true, color: INK2, fontFace: SERIF } },
@@ -331,8 +335,8 @@ function lines(items, o = {}) {
 
   const rules = [
     ["La unidad la fija el artículo", "Todas sus existencias van en la misma unidad; convertir es cosa de Warehouse."],
-    ["Una existencia viva por artículo y ubicación", "Índice único parcial con NULLS NOT DISTINCT que excluye estado = BAJA."],
-    ["La entrada suma; el PATCH sustituye", "RegistrarEntradaConsumible acumula; la cantidad del PATCH es absoluta."],
+    ["Una existencia viva por artículo y ubicación", "Índice único parcial con NULLS NOT DISTINCT que excluye status = DECOMMISSIONED."],
+    ["La entrada suma; el PATCH sustituye", "RegisterConsumableIntake acumula; la cantidad del PATCH es absoluta."],
   ];
   const rw = 3.83;
   rules.forEach((r, i) => {
@@ -342,7 +346,7 @@ function lines(items, o = {}) {
     s.addText(r[1], { x: x + 0.28, y: 5.7, w: rw - 0.56, h: 0.62, margin: 0, valign: "top", fontFace: SANS, fontSize: 11.5, color: MUTED, lineSpacing: 16 });
   });
   foot(s);
-  s.addNotes("README §4.1.1: artículo y existencia; RegistrarEntradaConsumible y FusionarExistencias.");
+  s.addNotes("README §4.1.1: artículo y existencia; RegisterConsumableIntake y MergeStockItems.");
 }
 
 // ═══ 7 · Reglas de negocio ════════════════════════════════════════════════════
@@ -353,8 +357,8 @@ function lines(items, o = {}) {
   const rules = [
     ["Sin ciclos en la jerarquía", "Ningún asset ni ubicación puede ser su propio ancestro."],
     ["Una ubicación, nunca dos", "O un Asset o una Location, jamás las dos a la vez."],
-    ["La baja es siempre lógica", "estado = BAJA; nada se borra. No se da de baja con hijos o préstamo activo."],
-    ["Solo un DURADERO ubica y se presta", "Una estantería contiene cosas; un paquete de harina, no."],
+    ["La baja es siempre lógica", "status = DECOMMISSIONED; nada se borra. No se da de baja con hijos o préstamo abierto."],
+    ["Solo un DURABLE ubica y se presta", "Una estantería contiene cosas; un paquete de harina, no."],
     ["Llegar a cero no da de baja nada", "Un consumible agotado sigue existiendo, pendiente de reposición."],
     ["El artículo se retira, no se borra", "retired_at cuando no le queda existencia viva: las bajas siguen apuntando a él."],
   ];
@@ -368,8 +372,8 @@ function lines(items, o = {}) {
     s.addText(r[1], { x: x + 0.94, y: y + 0.62, w: cw - 1.3, h: 0.55, margin: 0, valign: "top", fontFace: SANS, fontSize: 12, color: MUTED, lineSpacing: 16 });
   });
 
-  s.addText("Juntar dos existencias del mismo artículo creadas por separado es FusionarExistencias, no un MoverAsset: la fusión decide qué ubicación y qué propietario sobreviven, y eso lo elige el usuario.", {
-    x: M, y: 6.2, w: CW, h: 0.45, margin: 0, valign: "top", fontFace: SANS, fontSize: 12.5, italic: true, color: TEAL, lineSpacing: 18,
+  s.addText("Juntar dos existencias del mismo artículo creadas por separado es MergeStockItems, no un MoveAsset: la fusión decide qué ubicación y qué propietario sobreviven, y eso lo elige el usuario.", {
+    x: M, y: 6.16, w: CW, h: 0.56, margin: 0, valign: "top", fontFace: SANS, fontSize: 12.5, italic: true, color: TEAL, lineSpacing: 18,
   });
   foot(s);
   s.addNotes("README §4.1.1 y §4.1.7: reglas mínimas de negocio y decisiones validadas.");
@@ -470,21 +474,23 @@ function lines(items, o = {}) {
   const s = newSlide();
   head(s, "PRÉSTAMOS", "Un concepto mínimo dentro del core");
 
+  // Son los estados del préstamo, no los del asset: el asset solo acompaña, y
+  // mezclar ambas máquinas es lo que hacía esta diapositiva antes.
   const st = [
-    { x: 0.9, t: "DISPONIBLE", c: TEAL },
-    { x: 5.05, t: "PRESTADO", c: INK2 },
-    { x: 9.2, t: "VENCIDO", c: TERRA },
+    { x: 0.9, t: "ACTIVE", c: TEAL },
+    { x: 5.05, t: "OVERDUE", c: TERRA },
+    { x: 9.2, t: "RETURNED", c: INK2 },
   ];
   st.forEach((n) => {
     card(s, { x: n.x, y: 1.72, w: 3.2, h: 0.95, fill: n.c });
     s.addText(n.t, { x: n.x, y: 1.72, w: 3.2, h: 0.95, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 16, bold: true, charSpacing: 1, color: WHITE });
   });
-  [[4.25, "se inicia un préstamo"], [8.4, "supera la fecha prevista"]].forEach(([ax, lbl]) => {
+  [[4.25, "el proceso diario ve la fecha superada"], [8.4, "devolución confirmada"]].forEach(([ax, lbl]) => {
     s.addShape(pres.ShapeType.rightArrow, { x: ax, y: 2.05, w: 0.62, h: 0.3, fill: { color: "AFC2BF" }, line: { color: "AFC2BF", width: 0.5 } });
-    s.addText(lbl, { x: ax - 0.75, y: 2.74, w: 2.1, h: 0.28, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 10, color: MUTED });
+    s.addText(lbl, { x: ax - 1.0, y: 2.7, w: 2.6, h: 0.42, margin: 0, align: "center", valign: "top", fontFace: SANS, fontSize: 10, color: MUTED, lineSpacing: 13 });
   });
-  s.addShape(pres.ShapeType.leftArrow, { x: 0.9, y: 3.16, w: 11.5, h: 0.42, fill: { color: TINT2 }, line: { color: "C3D2CF", width: 0.75 } });
-  s.addText("devolución confirmada — desde PRESTADO o desde VENCIDO", { x: 1.4, y: 3.16, w: 10.5, h: 0.42, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 11.5, bold: true, color: INK2 });
+  card(s, { x: 0.9, y: 3.16, w: 11.5, h: 0.42, fill: TINT2, line: "C3D2CF", shadow: false });
+  s.addText("Un ACTIVE también se devuelve sin pasar por OVERDUE · el asset acompaña: LENT mientras el préstamo está abierto, AVAILABLE al devolverlo", { x: 1.0, y: 3.16, w: 11.3, h: 0.42, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 11.5, bold: true, color: INK2 });
 
   const cw = 5.85, cy = 3.92, chh = 2.35;
   card(s, { x: M, y: cy, w: cw, h: chh, fill: TINT });
@@ -493,7 +499,7 @@ function lines(items, o = {}) {
     "Identificador y asset prestado",
     "Prestador y receptor: del hogar o personas externas",
     "Fecha de inicio, de devolución prevista y real",
-    "Estado: ACTIVO, DEVUELTO o VENCIDO",
+    "Estado: ACTIVE, RETURNED u OVERDUE",
   ], { bullet: true }), {
     x: M + 0.45, y: cy + 0.78, w: cw - 0.9, h: 1.45, margin: 0, valign: "top", fontFace: SANS, fontSize: 12.5, color: BODY, paraSpaceAfter: 6, lineSpacing: 18,
   });
@@ -502,9 +508,9 @@ function lines(items, o = {}) {
   card(s, { x: rx, y: cy, w: cw, h: chh, fill: TINT2 });
   s.addText("Reglas y alcance", { x: rx + 0.4, y: cy + 0.28, w: cw - 0.8, h: 0.36, margin: 0, valign: "middle", fontFace: SERIF, fontSize: 17, bold: true, color: INK });
   s.addText(lines([
-    "Un solo préstamo ACTIVO por asset (índice único parcial)",
-    "Solo se prestan assets DURADERO",
-    "Ceder un consumible es un AjustarCantidadAsset, no un préstamo",
+    "Un solo préstamo abierto por asset: un OVERDUE sigue ocupándolo",
+    "Solo se prestan assets DURABLE",
+    "Ceder un consumible es un AdjustAssetQuantity, no un préstamo",
     "Si el préstamo crece, saldrá del core como módulo propio",
   ], { bullet: true }), {
     x: rx + 0.45, y: cy + 0.78, w: cw - 0.9, h: 1.45, margin: 0, valign: "top", fontFace: SANS, fontSize: 12.5, color: BODY, paraSpaceAfter: 6, lineSpacing: 18,
@@ -513,7 +519,88 @@ function lines(items, o = {}) {
   s.addNotes("README §4.1.5: préstamos, máquina de estados y alcance mínimo.");
 }
 
-// ═══ 11 · Arquitectura ════════════════════════════════════════════════════════
+// ═══ 11 · Módulos futuros ═════════════════════════════════════════════════════
+{
+  const s = newSlide();
+  head(s, "MÓDULOS FUTUROS", "Trece módulos, activables por prioridad");
+  s.addText("Ninguno es obligatorio: el core funciona con todos desactivados. Cada uno se activa cuando el hogar lo necesita.", {
+    x: M, y: 1.42, w: CW, h: 0.32, margin: 0, valign: "middle", fontFace: SANS, fontSize: 14, color: MUTED,
+  });
+
+  // Cada banda es una prioridad de la sección 4.2. El detalle decrece con ella:
+  // los de prioridad alta llevan descripción, los de baja solo el nombre.
+  const bands = [
+    {
+      label: "PRIORIDAD ALTA", y: 1.9, h: 1.46, accent: TEAL,
+      fill: TEAL, line: TEAL, title: WHITE, desc: "CFE4E0",
+      mods: [
+        ["Proveedores y contactos de servicio", "Quién arregla, quién cobra y quién responde de una garantía."],
+        ["Compras y lista de la compra", "Qué falta, qué reponer y qué está pedido. Cierra el ciclo de Warehouse."],
+        ["Warehouse", "Despensa, garaje y trastero: stock, consumo, mínimos y caducidad."],
+        ["CMMS doméstico", "Mantenimiento preventivo y correctivo: planes, avisos e histórico."],
+      ],
+    },
+    {
+      label: "PRIORIDAD MEDIA", y: 3.52, h: 1.22, accent: INK2,
+      fill: TINT2, line: "C3D2CF", title: INK, desc: MUTED,
+      mods: [
+        ["Planificador de tareas", "Rutinas, turnos entre miembros del hogar y recordatorios."],
+        ["Gastos y presupuesto", "Lo que cuesta lo que entra en casa, y el presupuesto por periodo."],
+        ["Gestión de eventos temporales", "Mudanzas, reformas, viajes y celebraciones, con inicio y fin."],
+      ],
+    },
+    {
+      label: "PRIORIDAD BAJA", y: 4.9, h: 0.86, accent: "9BAFAC",
+      fill: WHITE, line: "D3DFDC", title: INK2, desc: null,
+      mods: [
+        ["Préstamos avanzados"], ["Recetas y menú semanal"], ["Reservas de uso"],
+        ["Fin de vida"], ["Garantías y seguros"], ["Mascotas y plantas"],
+      ],
+    },
+  ];
+
+  const railW = 1.5, mx = M + railW + 0.15, maw = W - M - mx, mgap = 0.16;
+  bands.forEach((b) => {
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: b.y, w: 0.07, h: b.h, fill: { color: b.accent }, line: { color: b.accent, width: 0.5 }, rectRadius: 0.03 });
+    s.addText(b.label, {
+      x: M + 0.2, y: b.y, w: railW - 0.2, h: b.h / 2, margin: 0, valign: "bottom",
+      fontFace: SANS, fontSize: 10.5, bold: true, charSpacing: 1.2, color: b.accent,
+    });
+    s.addText(`${b.mods.length} módulos`, {
+      x: M + 0.2, y: b.y + b.h / 2, w: railW - 0.2, h: b.h / 2, margin: 0, valign: "top",
+      fontFace: SANS, fontSize: 11, color: MUTED,
+    });
+
+    const mw = (maw - (b.mods.length - 1) * mgap) / b.mods.length;
+    b.mods.forEach((m, i) => {
+      const x = mx + i * (mw + mgap);
+      card(s, { x, y: b.y, w: mw, h: b.h, fill: b.fill, line: b.line, shadow: false });
+      if (b.desc) {
+        s.addText(m[0], {
+          x: x + 0.2, y: b.y + 0.14, w: mw - 0.4, h: 0.44, margin: 0, valign: "top",
+          fontFace: SANS, fontSize: 12.5, bold: true, color: b.title, lineSpacing: 16,
+        });
+        s.addText(m[1], {
+          x: x + 0.2, y: b.y + 0.62, w: mw - 0.4, h: b.h - 0.76, margin: 0, valign: "top",
+          fontFace: SANS, fontSize: 10.5, color: b.desc, lineSpacing: 14,
+        });
+      } else {
+        s.addText(m[0], {
+          x: x + 0.14, y: b.y, w: mw - 0.28, h: b.h, margin: 0, align: "center", valign: "middle",
+          fontFace: SANS, fontSize: 11, bold: true, color: b.title, lineSpacing: 15,
+        });
+      }
+    });
+  });
+
+  s.addText("La lista no está cerrada, pero ya no hay cajón de sastre: un candidato entra con estado y prioridad propios, o no entra.", {
+    x: M, y: 6.05, w: CW, h: 0.5, margin: 0, valign: "top", fontFace: SANS, fontSize: 13, italic: true, color: TEAL, lineSpacing: 19,
+  });
+  foot(s);
+  s.addNotes("README §4.2: módulos futuros activables, cada uno con estado y prioridad. Trece filas, sin fila de backlog.");
+}
+
+// ═══ 12 · Arquitectura ════════════════════════════════════════════════════════
 {
   const s = newSlide(true);
   head(s, "ARQUITECTURA", "Dos componentes, un monolito modular", true);
@@ -531,37 +618,43 @@ function lines(items, o = {}) {
     x: M, y: 2.95, w: CW, h: 0.8, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 15, bold: true, color: WHITE,
   });
 
+  // Los trece módulos van agrupados por prioridad, no uno a uno: nombrarlos aquí
+  // repetiría la diapositiva anterior y llenaría la banda de tarjetas ilegibles.
+  // Es el mismo criterio con el que el README redibujó su diagrama de 5.1.
   const mods = [
-    ["Core", "Recursos / Assets", true],
-    ["Eventos temporales", "opcional", false],
-    ["CMMS", "opcional", false],
-    ["Warehouse", "opcional", false],
-    ["Planificador", "opcional", false],
+    ["Core", "Recursos / Assets · obligatorio", true],
+    ["Prioridad alta", "4 módulos · opcionales", false],
+    ["Prioridad media", "3 módulos · opcionales", false],
+    ["Prioridad baja", "6 módulos · opcionales", false],
   ];
-  const mw = 2.25, mgap = 0.22;
+  const mgap = 0.22, mw = (CW - (mods.length - 1) * mgap) / mods.length;
   mods.forEach((m, i) => {
     const x = M + i * (mw + mgap);
-    card(s, { x, y: 4.02, w: mw, h: 1.05, fill: m[2] ? INK2 : "163A38", line: m[2] ? TEALLT : "2F5754", shadow: false });
-    s.addText(m[0], { x: x + 0.12, y: 4.2, w: mw - 0.24, h: 0.42, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 13.5, bold: true, color: m[2] ? WHITE : "BFD3D0" });
-    s.addText(m[1], { x: x + 0.12, y: 4.6, w: mw - 0.24, h: 0.3, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 10.5, italic: !m[2], color: m[2] ? TEALLT : "7E9B98" });
-    s.addShape(pres.ShapeType.line, { x: x + mw / 2, y: 5.07, w: 0, h: 0.23, line: { color: "3C6663", width: 1.25, dashType: m[2] ? "solid" : "dash" } });
+    card(s, { x, y: 3.92, w: mw, h: 1.0, fill: m[2] ? INK2 : "163A38", line: m[2] ? TEALLT : "2F5754", shadow: false });
+    s.addText(m[0], { x: x + 0.12, y: 4.08, w: mw - 0.24, h: 0.42, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 13.5, bold: true, color: m[2] ? WHITE : "BFD3D0" });
+    s.addText(m[1], { x: x + 0.12, y: 4.48, w: mw - 0.24, h: 0.3, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 10.5, italic: !m[2], color: m[2] ? TEALLT : "7E9B98" });
+    s.addShape(pres.ShapeType.line, { x: x + mw / 2, y: 4.92, w: 0, h: 0.2, line: { color: "3C6663", width: 1.25, dashType: m[2] ? "solid" : "dash" } });
   });
 
-  card(s, { x: M, y: 5.3, w: CW, h: 0.72, fill: "1B4B48", line: TEALLT, shadow: false });
+  card(s, { x: M, y: 5.12, w: CW, h: 0.66, fill: "1B4B48", line: TEALLT, shadow: false });
   s.addText("Event Bus interno (in-process) · publicación y suscripción entre módulos, sin que el core sepa quién escucha", {
-    x: M, y: 5.3, w: CW, h: 0.72, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 13.5, bold: true, color: WHITE,
+    x: M, y: 5.12, w: CW, h: 0.66, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 13.5, bold: true, color: WHITE,
   });
 
-  card(s, { x: 4.4, y: 6.2, w: 4.53, h: 0.62, fill: "163A38", line: "2F5754", shadow: false });
-  s.addText("PostgreSQL 16+ · RLS activado", { x: 4.4, y: 6.2, w: 4.53, h: 0.62, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 13, bold: true, color: "BFD3D0" });
+  s.addText("El agrupamiento es la prioridad de la sección 4.2, no una dependencia: dentro de un grupo los módulos no se necesitan entre sí.", {
+    x: M, y: 5.84, w: CW, h: 0.3, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 11.5, italic: true, color: "7E9B98",
+  });
+
+  card(s, { x: 4.4, y: 6.18, w: 4.53, h: 0.58, fill: "163A38", line: "2F5754", shadow: false });
+  s.addText("PostgreSQL 16+ · RLS activado", { x: 4.4, y: 6.18, w: 4.53, h: 0.58, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 13, bold: true, color: "BFD3D0" });
   foot(s, true);
-  s.addNotes("README §5.1: visión de componentes. Los módulos punteados son opcionales.");
+  s.addNotes("README §5.1: visión de componentes. Los módulos punteados son opcionales y van agrupados por prioridad, como en el diagrama del README; el detalle de los trece está en la diapositiva anterior.");
 }
 
-// ═══ 12 · Event bus ═══════════════════════════════════════════════════════════
+// ═══ 13 · Event bus ═══════════════════════════════════════════════════════════
 {
   const s = newSlide();
-  head(s, "EVENT BUS INTERNO", "Un contrato y nueve eventos");
+  head(s, "EVENT BUS INTERNO", "Un contrato y trece eventos");
 
   card(s, { x: M, y: 1.62, w: 4.6, h: 3.1, fill: TINT });
   s.addText("DomainEvent", { x: M + 0.32, y: 1.85, w: 4, h: 0.36, margin: 0, valign: "middle", fontFace: SERIF, fontSize: 17, bold: true, color: INK });
@@ -589,28 +682,32 @@ function lines(items, o = {}) {
   s.addText("Catálogo inicial de eventos del core", { x: rx + 0.35, y: 1.85, w: rw - 0.7, h: 0.36, margin: 0, valign: "middle", fontFace: SERIF, fontSize: 17, bold: true, color: INK });
 
   const evs = [
-    ["CatalogItemCreated", "se crea un artículo en el catálogo del hogar"],
+    ["HouseholdCreated", "un hogar queda verificado y utilizable"],
+    ["ArticleCreated", "se crea un artículo en el catálogo"],
     ["AssetCreated", "se da de alta un asset o la primera existencia"],
     ["AssetMoved", "cambia la ubicación de un asset"],
     ["AssetHierarchyChanged", "cambia el asset padre o la composición"],
-    ["AssetQuantityChanged", "cambia la cantidad de un CONSUMIBLE"],
-    ["AssetDeactivated", "se da de baja un asset o se fusiona una existencia"],
+    ["AssetQuantityChanged", "cambia la cantidad de un CONSUMABLE"],
+    ["AssetDeactivated", "se da de baja un asset o se fusiona"],
     ["LocationCreated", "se crea una ubicación"],
+    ["DocumentAttached", "se adjunta un documento a un asset o artículo"],
+    ["UserDeactivated", "alguien deja el hogar, no su cuenta"],
     ["LoanStarted", "se inicia un préstamo"],
+    ["LoanOverdue", "el proceso diario ve la fecha superada"],
     ["LoanReturned", "se confirma la devolución"],
   ];
-  let ey = 2.38;
+  let ey = 2.34;
   evs.forEach((e) => {
-    circle(s, rx + 0.38, ey + 0.13, 0.14, TEAL);
-    s.addText(e[0], { x: rx + 0.66, y: ey, w: 2.6, h: 0.4, margin: 0, valign: "middle", fontFace: MONO, fontSize: 11.5, bold: true, color: INK });
-    s.addText("· " + e[1], { x: rx + 3.3, y: ey, w: rw - 3.7, h: 0.4, margin: 0, valign: "middle", fontFace: SANS, fontSize: 11.5, color: MUTED });
-    ey += 0.45;
+    circle(s, rx + 0.38, ey + 0.09, 0.13, TEAL);
+    s.addText(e[0], { x: rx + 0.64, y: ey, w: 2.35, h: 0.31, margin: 0, valign: "middle", fontFace: MONO, fontSize: 10.5, bold: true, color: INK });
+    s.addText("· " + e[1], { x: rx + 3.02, y: ey, w: rw - 3.42, h: 0.31, margin: 0, valign: "middle", fontFace: SANS, fontSize: 10.5, color: MUTED });
+    ey += 0.31;
   });
   foot(s);
   s.addNotes("README §5.2: contrato de evento, mecanismo interno y catálogo inicial.");
 }
 
-// ═══ 13 · Multi-tenant ════════════════════════════════════════════════════════
+// ═══ 14 · Multi-tenant ════════════════════════════════════════════════════════
 {
   const s = newSlide();
   head(s, "MODELO DE DATOS", "Aislamiento multi-tenant en dos capas");
@@ -656,66 +753,61 @@ function lines(items, o = {}) {
   s.addNotes("README §5.6: modelo de datos multi-tenant y Row-Level Security.");
 }
 
-// ═══ 14 · Casos de uso ════════════════════════════════════════════════════════
+// ═══ 15 · Casos de uso ════════════════════════════════════════════════════════
 {
   const s = newSlide();
   head(s, "CAPA DE APLICACIÓN", "Los casos de uso del core");
 
   card(s, { x: M, y: 1.62, w: 7.6, h: 4.75, fill: TINT });
-  s.addText("Comandos · 14", { x: M + 0.38, y: 1.84, w: 7.0, h: 0.38, margin: 0, valign: "middle", fontFace: SERIF, fontSize: 18, bold: true, color: INK });
+  s.addText("Comandos · 30", { x: M + 0.38, y: 1.84, w: 7.0, h: 0.38, margin: 0, valign: "middle", fontFace: SERIF, fontSize: 18, bold: true, color: INK });
   s.addText("Cada uno valida sus reglas y, cuando corresponde, publica su evento en el bus", {
     x: M + 0.38, y: 2.2, w: 7.0, h: 0.28, margin: 0, valign: "middle", fontFace: SANS, fontSize: 11.5, color: MUTED,
   });
 
-  const cmds = [
-    ["CrearArticulo", "CatalogItemCreated"],
-    ["CrearAsset", "AssetCreated"],
-    ["RegistrarEntradaConsumible", "AssetCreated / QuantityChanged"],
-    ["MoverAsset", "AssetMoved / HierarchyChanged"],
-    ["FusionarExistencias", "QuantityChanged + Deactivated"],
-    ["AjustarCantidadAsset", "AssetQuantityChanged"],
-    ["DarDeBajaAsset", "AssetDeactivated"],
-    ["RetirarArticulo", "—"],
-    ["CrearLocation", "LocationCreated"],
-    ["CrearUsuario", "—"],
-    ["ModificarRolUsuario", "—"],
-    ["IniciarPrestamo", "LoanStarted"],
-    ["ConfirmarDevolucion", "LoanReturned"],
-    ["GenerarTokenAccesoExterno", "—"],
+  // Treinta nombres no caben legibles: van por área, con el recuento completo y
+  // tres ejemplos de cada una. El catálogo entero está en el README §5.7.
+  const areas = [
+    ["Catálogo y assets", 11, ["CreateArticle", "RegisterConsumableIntake", "MergeStockItems"]],
+    ["Hogar, identidad y acceso", 11, ["CreateHousehold", "VerifyEmail", "InviteUser"]],
+    ["Documentos y ficheros", 5, ["AttachDocument", "UploadFile", "SetIdentityAvatar"]],
+    ["Préstamos", 3, ["StartLoan", "ConfirmReturn", "GenerateExternalAccessToken"]],
   ];
-  let cy2 = 2.62;
-  cmds.forEach((c, i) => {
+  const aw = 3.38, ah = 1.5;
+  areas.forEach((a, i) => {
     const col = i % 2, row = Math.floor(i / 2);
-    const x = M + 0.38 + col * 3.62, y = cy2 + row * 0.5;
-    circle(s, x, y + 0.12, 0.13, TEAL);
-    s.addText(c[0], { x: x + 0.24, y: y - 0.04, w: 3.3, h: 0.26, margin: 0, valign: "middle", fontFace: SANS, fontSize: 12, bold: true, color: INK });
-    s.addText(c[1], { x: x + 0.24, y: y + 0.19, w: 3.3, h: 0.24, margin: 0, valign: "middle", fontFace: MONO, fontSize: 9.5, color: MUTED });
+    const x = M + 0.38 + col * (aw + 0.24), y = 2.55 + row * (ah + 0.1);
+    card(s, { x, y, w: aw, h: ah, fill: WHITE, line: "D3DFDC", shadow: false });
+    s.addText(a[0].toUpperCase(), { x: x + 0.22, y: y + 0.16, w: aw - 0.9, h: 0.24, margin: 0, valign: "middle", fontFace: SANS, fontSize: 9, bold: true, charSpacing: 1, color: TEAL });
+    s.addText(String(a[1]), { x: x + aw - 0.72, y: y + 0.12, w: 0.55, h: 0.32, margin: 0, align: "right", valign: "middle", fontFace: SERIF, fontSize: 18, bold: true, color: INK });
+    s.addText(lines(a[2]), { x: x + 0.22, y: y + 0.48, w: aw - 0.44, h: 0.9, margin: 0, valign: "top", fontFace: MONO, fontSize: 9, color: MUTED, lineSpacing: 14 });
+  });
+
+  card(s, { x: M + 0.38, y: 5.78, w: 7.0 - 0.16, h: 0.5, fill: INK2, shadow: false });
+  s.addText("Comandos de sistema · 3 — PurgeUnverifiedHouseholds · PurgeUnusedFiles · MarkOverdueLoans", {
+    x: M + 0.38, y: 5.78, w: 7.0 - 0.16, h: 0.5, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 10, bold: true, color: "CFE1DE",
   });
 
   const rx = 8.5, rw = W - M - rx;
   card(s, { x: rx, y: 1.62, w: rw, h: 4.75, fill: TINT2 });
-  s.addText("Consultas · 6", { x: rx + 0.38, y: 1.84, w: rw - 0.76, h: 0.38, margin: 0, valign: "middle", fontFace: SERIF, fontSize: 18, bold: true, color: INK });
+  s.addText("Consultas · 12", { x: rx + 0.38, y: 1.84, w: rw - 0.76, h: 0.38, margin: 0, valign: "middle", fontFace: SERIF, fontSize: 18, bold: true, color: INK });
   s.addText("Lectura del catálogo, los assets y el hogar", {
     x: rx + 0.38, y: 2.2, w: rw - 0.76, h: 0.28, margin: 0, valign: "middle", fontFace: SANS, fontSize: 11.5, color: MUTED,
   });
   s.addText(lines([
-    "ListarArticulos",
-    "ListarAssets",
-    "ObtenerAsset / ListarHijosDeAsset",
-    "ListarLocations / ObtenerLocation",
-    "ListarUsuarios",
-    "ObtenerPrestamo",
-  ], { bullet: true, opts: { fontFace: SANS } }), {
-    x: rx + 0.42, y: 2.62, w: rw - 0.84, h: 2.28, margin: 0, valign: "top", fontFace: SANS, fontSize: 12.5, bold: true, color: INK, paraSpaceAfter: 8, lineSpacing: 18,
+    "ListArticles", "ListAssets", "GetAsset", "ListCategories",
+    "ListLocations", "ListUsers", "ListInvitations", "GetLoan",
+    "ListDocuments", "ListFiles", "DownloadFile", "GetStorageUsage",
+  ], { bullet: true, opts: { fontFace: MONO } }), {
+    x: rx + 0.42, y: 2.6, w: rw - 0.84, h: 2.6, margin: 0, valign: "top", fontFace: MONO, fontSize: 11, bold: true, color: INK, lineSpacing: 15,
   });
   s.addText("Toda consulta queda acotada al householdId del token. Los listados excluyen por defecto los assets dados de baja y los artículos retirados.", {
-    x: rx + 0.42, y: 4.95, w: rw - 0.84, h: 1.1, margin: 0, valign: "top", fontFace: SANS, fontSize: 11.5, italic: true, color: MUTED, lineSpacing: 17,
+    x: rx + 0.42, y: 5.25, w: rw - 0.84, h: 1.0, margin: 0, valign: "top", fontFace: SANS, fontSize: 11.5, italic: true, color: MUTED, lineSpacing: 17,
   });
   foot(s);
   s.addNotes("README §5.7: catálogo de comandos y queries de la capa de aplicación.");
 }
 
-// ═══ 15 · Stack ═══════════════════════════════════════════════════════════════
+// ═══ 16 · Stack ═══════════════════════════════════════════════════════════════
 {
   const s = newSlide();
   head(s, "STACK TECNOLÓGICO", "Decisiones ya cerradas");
@@ -741,14 +833,14 @@ function lines(items, o = {}) {
   });
 
   card(s, { x: M, y: 6.05, w: CW, h: 0.62, fill: INK, shadow: false });
-  s.addText("Cuatro ADR recogen el porqué y las alternativas descartadas: monolito modular · Kotlin + Spring Boot · Row-Level Security · Flyway", {
-    x: M, y: 6.05, w: CW, h: 0.62, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 12.5, color: "CFE1DE",
+  s.addText("Cinco ADR recogen el porqué y las alternativas descartadas: monolito modular · Kotlin + Spring Boot · Row-Level Security · Flyway · almacenamiento local de ficheros", {
+    x: M, y: 6.05, w: CW, h: 0.62, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 12, color: "CFE1DE",
   });
   foot(s);
-  s.addNotes("README §6 y ADR-001 a ADR-004.");
+  s.addNotes("README §6 y ADR-001 a ADR-005.");
 }
 
-// ═══ 16 · Testing ═════════════════════════════════════════════════════════════
+// ═══ 17 · Testing ═════════════════════════════════════════════════════════════
 {
   const s = newSlide();
   head(s, "CALIDAD", "Estrategia de testing, igual en BE y FE");
@@ -769,7 +861,7 @@ function lines(items, o = {}) {
 
   const levels = [
     ["60 %", "Unitarios de dominio", "Entidades y reglas puras, sin dependencias externas. Ej.: un Asset no puede ser su propio ancestro.", TEAL],
-    ["25 %", "Integración de casos de uso", "Orquestación completa con dependencias reales o en memoria. Ej.: CrearAsset persiste y publica AssetCreated.", TERRA],
+    ["25 %", "Integración de casos de uso", "Orquestación completa con dependencias reales o en memoria. Ej.: CreateAsset persiste y publica AssetCreated.", TERRA],
     ["15 %", "Contrato de adaptadores y E2E", "El adaptador cumple el contrato externo. Ej.: POST /assets/intake responde 201 y luego 200 acumulando.", INK2],
   ];
   const rx = 6.35, rw = W - M - rx, chh = 1.4;
@@ -784,7 +876,7 @@ function lines(items, o = {}) {
   s.addNotes("README §7: distribución 60/25/15 y ejemplos por nivel.");
 }
 
-// ═══ 17 · Roadmap ═════════════════════════════════════════════════════════════
+// ═══ 18 · Roadmap ═════════════════════════════════════════════════════════════
 {
   const s = newSlide();
   head(s, "ESTADO ACTUAL", "Roadmap por fases");
@@ -792,8 +884,8 @@ function lines(items, o = {}) {
   const fases = [
     ["Fase 0", "Definición", "Arquitectura, stack, alcance del core y estrategia de testing", "Completada", TEAL, WHITE],
     ["Fase 1", "Core MVP", "Assets, autenticación, API REST, event bus y FE responsive básico", "Siguiente", TERRA, WHITE],
-    ["Fase 2", "Primer módulo", "Candidato por definir: CMMS o Warehouse", "Pendiente", "C3D2CF", INK],
-    ["Fase 3", "Módulos adicionales", "Según el backlog de módulos futuros", "Pendiente", "C3D2CF", INK],
+    ["Fase 2", "Primer módulo", "Candidato a definir entre los cuatro de prioridad alta", "Pendiente", "C3D2CF", INK],
+    ["Fase 3", "Módulos adicionales", "Los nueve restantes, por orden de prioridad (sección 4.2)", "Pendiente", "C3D2CF", INK],
   ];
   const cw = 2.9, gap = 0.18, cy = 1.85, chh = 3.55;
   fases.forEach((f, i) => {
@@ -814,7 +906,7 @@ function lines(items, o = {}) {
   s.addNotes("README §8: roadmap y estado. Fase 0 cerrada el 2026-08-07.");
 }
 
-// ═══ 18 · Cierre ══════════════════════════════════════════════════════════════
+// ═══ 19 · Cierre ══════════════════════════════════════════════════════════════
 {
   const s = newSlide(true);
   head(s, "SIGUIENTE PASO", "La Fase 0 queda cerrada", true);
@@ -838,7 +930,7 @@ function lines(items, o = {}) {
 
   const closing = [
     ["Primera tarea de la Fase 1", "Repartir a docs/ las secciones del README que corresponden por ámbito: 4.1.x, 5.4.3, 5.6 y 5.7, dejando aquí un resumen y el enlace."],
-    ["Módulos con prioridad alta", "CMMS doméstico y Warehouse, ambos por diseñar. El resto queda en backlog abierto."],
+    ["Módulos con prioridad alta", "Cuatro, todos por diseñar: proveedores y contactos de servicio, compras y lista de la compra, Warehouse y CMMS doméstico."],
   ];
   closing.forEach((c, i) => {
     const x = M + i * (5.85 + 0.43);
@@ -847,7 +939,7 @@ function lines(items, o = {}) {
     s.addText(c[1], { x: x + 0.38, y: 5.0, w: 5.1, h: 0.9, margin: 0, valign: "top", fontFace: SANS, fontSize: 12.5, color: "BFD3D0", lineSpacing: 18 });
   });
 
-  s.addText("Fuente: README.md · documento vivo, última actualización 2026-08-07", {
+  s.addText("Fuente: README.md · documento vivo, última actualización 2026-08-10", {
     x: M, y: 6.35, w: CW, h: 0.35, margin: 0, valign: "middle", fontFace: SANS, fontSize: 11, color: "7E9895",
   });
   foot(s, true);
