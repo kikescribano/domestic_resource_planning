@@ -59,14 +59,17 @@ midan solos.
 - [x] **Reparto del README a `docs/`**, la tarea de arranque que la Fase 0 había aplazado: 1192 líneas trasladadas.
 - [x] **Entorno local verificado** contra PostgreSQL 16 real: el usuario de la aplicación nace sin `SUPERUSER` ni `BYPASSRLS`, y el aislamiento entre hogares funciona.
 
-> **Cabo suelto del Hito 0: la CI no se ha llegado a ejecutar nunca.** El
-> workflow está commiteado y su YAML es válido, las cuatro comprobaciones pasan
-> **en local**, y Actions figura como habilitado — pero el repositorio no
-> registra ni un solo *run*, ni siquiera encolado. Es privado, y no se pudo
-> mirar el consumo de minutos porque el token no tiene el permiso necesario.
-> Conviene resolverlo antes de apoyarse en la CI: hasta que se ejecute una vez,
-> el workflow es código sin probar. Empezar por la pestaña *Actions* del
-> repositorio, que suele explicar el motivo cuando nunca ha corrido nada.
+- [x] **CI verde**, verificada de verdad y no solo en local: contrato y documentación en 28 s, frontend en 22 s y backend en 2 min 13 s.
+
+> **Un detalle de la CI que conviene conocer.** Al abrir el pull request no se
+> ejecutó nada —ni un *run* encolado—, probablemente porque el workflow acababa
+> de nacer en el repositorio. Arrancó sola con el primer push posterior a la
+> rama. Si un PR aparece sin comprobaciones, basta con empujar un commit.
+>
+> Queda pendiente algo menor: `actions/checkout`, `setup-java`,
+> `upload-artifact` y `setup-gradle` van en v4 y el runner ya avisa de que Node
+> 20 está descatalogado. Hoy es solo un aviso; el día que deje de serlo, la CI
+> se cae sin haber tocado nada.
 
 ### Hito 1 — Aislamiento y enrolamiento · Pendiente
 
