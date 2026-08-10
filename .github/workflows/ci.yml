@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Un push nuevo sobre la misma rama cancela la ejecucion anterior.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Contrato y documentacion
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar el validador
+        run: pip install pyyaml openapi-spec-validator
+
+      - name: Validar el contrato
+        run: python scripts/validate-openapi.py
+
+      - name: Comprobar los enlaces relativos
+        run: python scripts/check-links.py
+
+      - name: Spectral
+        run: npx --yes @stoplight/spectral-cli lint openapi.yaml --ruleset .spectral.yaml
+
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Las pruebas que tocan la base de datos levantan PostgreSQL con
+      # Testcontainers y corren con un usuario sujeto a RLS (ADR-003 y ADR-008).
+      # El runner de ubuntu ya trae Docker.
+      - name: Construir y probar
+        run: ./gradlew build --no-daemon
+        working-directory: backend
+
+      - name: Publicar el informe de pruebas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-report
+          path: backend/build/reports/tests/test
+          if-no-files-found: ignore
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+        working-directory: frontend
+
+      - name: Comprobar tipos y construir
+        run: npm run build
+        working-directory: frontend
+
+      - name: Probar
+        run: npm test
+        working-directory: frontend

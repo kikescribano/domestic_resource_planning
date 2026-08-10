@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: drp
+
+  datasource:
+    # Usuario de la aplicacion: NO es el propietario del esquema y NO tiene
+    # BYPASSRLS. Ver docker/postgres/init/01-app-role.sql y ADR-003.
+    url: jdbc:postgresql://localhost:5432/drp
+    username: drp_app
+    password: drp_app
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    # Flyway migra con el propietario del esquema, no con el usuario de la
+    # aplicacion: crear tablas y politicas exige permisos que drp_app no tiene
+    # ni debe tener.
+    user: drp_owner
+    password: drp_owner
+
+  mail:
+    # Mailpit, levantado por compose.yaml. En produccion se sustituye por el
+    # SMTP del proveedor sin tocar codigo (ADR-009).
+    host: localhost
+    port: 1025
+
+server:
+  servlet:
+    context-path: /

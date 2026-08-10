@@ -1,0 +1,36 @@
+# Entorno local de desarrollo.
+#
+# Reproduce el despliegue real en lo que condiciona el diseno. nginx llega con
+# el Hito 3, cuando su configuracion --X-Accel-Redirect, dominio separado y URL
+# firmada-- deja de ser un hueco y pasa a ser la entrega de ficheros que exige
+# la ADR-005.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: drp
+      # Propietario del esquema: es quien ejecuta las migraciones de Flyway.
+      # La aplicacion NO usa este usuario; ver init/01-app-role.sql.
+      POSTGRES_USER: drp_owner
+      POSTGRES_PASSWORD: drp_owner
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./.data/postgres:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U drp_owner -d drp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    ports:
+      - "1025:1025"  # SMTP, al que apunta el adaptador de EmailSender
+      - "8025:8025"  # interfaz web y API, de donde el recorrido vertical lee el correo
