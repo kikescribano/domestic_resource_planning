@@ -8,7 +8,7 @@
  *   npm install pptxgenjs
  *   node build-drp-resumen.js ../DRP-resumen.pptx
  *
- * Refleja el estado del README a 2026-08-07. Al cambiar el README de forma
+ * Refleja el estado del README a 2026-08-10. Al cambiar el README de forma
  * sustantiva, actualiza el contenido de aquí y vuelve a ejecutarlo.
  */
 const pptxgen = require("pptxgenjs");
@@ -111,7 +111,7 @@ function lines(items, o = {}) {
   const chips = [
     ["Fase 0 completada", TEAL],
     ["Fase 1 · Core MVP", "24534F"],
-    ["2026-08-07", "24534F"],
+    ["2026-08-10", "24534F"],
   ];
   let cx = 0.95;
   chips.forEach(([t, c]) => {
@@ -202,20 +202,22 @@ function lines(items, o = {}) {
     ["Activos productivos (maquinaria, líneas)", "Electrodomésticos, vehículos, mobiliario, herramientas"],
     ["Mantenimiento preventivo/correctivo (CMMS)", "Revisión de caldera, ITV, cambio de filtros, garantías"],
     ["Gestión de almacén / inventario", "Despensa, garaje, trastero, botiquín"],
-    ["Planificación de producción / tareas", "Tareas domésticas, turnos, rutinas familiares"],
+    ["Compras y aprovisionamiento", "Lista de la compra, reposición de lo que se agota"],
+    ["Maestro de proveedores", "Fontanero, servicio técnico de la caldera, taller"],
+    ["Planificación de producción / tareas", "Tareas domésticas, turnos, rutinas familiares, menú semanal"],
     ["Gestión de proyectos / eventos puntuales", "Mudanzas, reformas, celebraciones, viajes"],
   ];
-  const lw = 5.1, rw = 5.95, ax = M + lw + 0.35, rx = ax + 0.68;
-  let y = 1.85;
-  s.addText("ERP EMPRESARIAL", { x: M, y: 1.52, w: lw, h: 0.26, margin: 0, valign: "middle", fontFace: SANS, fontSize: 10, bold: true, charSpacing: 1.5, color: MUTED });
-  s.addText("DRP · HOGAR", { x: rx, y: 1.52, w: rw, h: 0.26, margin: 0, valign: "middle", fontFace: SANS, fontSize: 10, bold: true, charSpacing: 1.5, color: TEAL });
+  const lw = 5.1, rw = 5.95, ax = M + lw + 0.35, rx = ax + 0.68, rh = 0.6;
+  let y = 1.78;
+  s.addText("ERP EMPRESARIAL", { x: M, y: 1.46, w: lw, h: 0.26, margin: 0, valign: "middle", fontFace: SANS, fontSize: 10, bold: true, charSpacing: 1.5, color: MUTED });
+  s.addText("DRP · HOGAR", { x: rx, y: 1.46, w: rw, h: 0.26, margin: 0, valign: "middle", fontFace: SANS, fontSize: 10, bold: true, charSpacing: 1.5, color: TEAL });
   rows.forEach(([a, b]) => {
-    card(s, { x: M, y, w: lw, h: 0.8, fill: TINT, shadow: false });
-    s.addText(a, { x: M + 0.28, y, w: lw - 0.56, h: 0.8, margin: 0, valign: "middle", fontFace: SANS, fontSize: 13, color: BODY });
-    s.addShape(pres.ShapeType.rightArrow, { x: ax, y: y + 0.26, w: 0.5, h: 0.28, fill: { color: "C3D2CF" }, line: { color: "C3D2CF", width: 0.5 } });
-    card(s, { x: rx, y, w: rw, h: 0.8, fill: TINT2, shadow: false });
-    s.addText(b, { x: rx + 0.28, y, w: rw - 0.56, h: 0.8, margin: 0, valign: "middle", fontFace: SANS, fontSize: 13, bold: true, color: INK2 });
-    y += 0.95;
+    card(s, { x: M, y, w: lw, h: rh, fill: TINT, shadow: false });
+    s.addText(a, { x: M + 0.28, y, w: lw - 0.56, h: rh, margin: 0, valign: "middle", fontFace: SANS, fontSize: 12.5, color: BODY });
+    s.addShape(pres.ShapeType.rightArrow, { x: ax, y: y + 0.16, w: 0.5, h: 0.28, fill: { color: "C3D2CF" }, line: { color: "C3D2CF", width: 0.5 } });
+    card(s, { x: rx, y, w: rw, h: rh, fill: TINT2, shadow: false });
+    s.addText(b, { x: rx + 0.28, y, w: rw - 0.56, h: rh, margin: 0, valign: "middle", fontFace: SANS, fontSize: 12.5, bold: true, color: INK2 });
+    y += 0.68;
   });
   foot(s);
   s.addNotes("README §3: analogía ERP → DRP.");
@@ -513,7 +515,88 @@ function lines(items, o = {}) {
   s.addNotes("README §4.1.5: préstamos, máquina de estados y alcance mínimo.");
 }
 
-// ═══ 11 · Arquitectura ════════════════════════════════════════════════════════
+// ═══ 11 · Módulos futuros ═════════════════════════════════════════════════════
+{
+  const s = newSlide();
+  head(s, "MÓDULOS FUTUROS", "Trece módulos, activables por prioridad");
+  s.addText("Ninguno es obligatorio: el core funciona con todos desactivados. Cada uno se activa cuando el hogar lo necesita.", {
+    x: M, y: 1.42, w: CW, h: 0.32, margin: 0, valign: "middle", fontFace: SANS, fontSize: 14, color: MUTED,
+  });
+
+  // Cada banda es una prioridad de la sección 4.2. El detalle decrece con ella:
+  // los de prioridad alta llevan descripción, los de baja solo el nombre.
+  const bands = [
+    {
+      label: "PRIORIDAD ALTA", y: 1.9, h: 1.46, accent: TEAL,
+      fill: TEAL, line: TEAL, title: WHITE, desc: "CFE4E0",
+      mods: [
+        ["Proveedores y contactos de servicio", "Quién arregla, quién cobra y quién responde de una garantía."],
+        ["Compras y lista de la compra", "Qué falta, qué reponer y qué está pedido. Cierra el ciclo de Warehouse."],
+        ["Warehouse", "Despensa, garaje y trastero: stock, consumo, mínimos y caducidad."],
+        ["CMMS doméstico", "Mantenimiento preventivo y correctivo: planes, avisos e histórico."],
+      ],
+    },
+    {
+      label: "PRIORIDAD MEDIA", y: 3.52, h: 1.22, accent: INK2,
+      fill: TINT2, line: "C3D2CF", title: INK, desc: MUTED,
+      mods: [
+        ["Planificador de tareas", "Rutinas, turnos entre miembros del hogar y recordatorios."],
+        ["Gastos y presupuesto", "Lo que cuesta lo que entra en casa, y el presupuesto por periodo."],
+        ["Gestión de eventos temporales", "Mudanzas, reformas, viajes y celebraciones, con inicio y fin."],
+      ],
+    },
+    {
+      label: "PRIORIDAD BAJA", y: 4.9, h: 0.86, accent: "9BAFAC",
+      fill: WHITE, line: "D3DFDC", title: INK2, desc: null,
+      mods: [
+        ["Préstamos avanzados"], ["Recetas y menú semanal"], ["Reservas de uso"],
+        ["Fin de vida"], ["Garantías y seguros"], ["Mascotas y plantas"],
+      ],
+    },
+  ];
+
+  const railW = 1.5, mx = M + railW + 0.15, maw = W - M - mx, mgap = 0.16;
+  bands.forEach((b) => {
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: b.y, w: 0.07, h: b.h, fill: { color: b.accent }, line: { color: b.accent, width: 0.5 }, rectRadius: 0.03 });
+    s.addText(b.label, {
+      x: M + 0.2, y: b.y, w: railW - 0.2, h: b.h / 2, margin: 0, valign: "bottom",
+      fontFace: SANS, fontSize: 10.5, bold: true, charSpacing: 1.2, color: b.accent,
+    });
+    s.addText(`${b.mods.length} módulos`, {
+      x: M + 0.2, y: b.y + b.h / 2, w: railW - 0.2, h: b.h / 2, margin: 0, valign: "top",
+      fontFace: SANS, fontSize: 11, color: MUTED,
+    });
+
+    const mw = (maw - (b.mods.length - 1) * mgap) / b.mods.length;
+    b.mods.forEach((m, i) => {
+      const x = mx + i * (mw + mgap);
+      card(s, { x, y: b.y, w: mw, h: b.h, fill: b.fill, line: b.line, shadow: false });
+      if (b.desc) {
+        s.addText(m[0], {
+          x: x + 0.2, y: b.y + 0.14, w: mw - 0.4, h: 0.44, margin: 0, valign: "top",
+          fontFace: SANS, fontSize: 12.5, bold: true, color: b.title, lineSpacing: 16,
+        });
+        s.addText(m[1], {
+          x: x + 0.2, y: b.y + 0.62, w: mw - 0.4, h: b.h - 0.76, margin: 0, valign: "top",
+          fontFace: SANS, fontSize: 10.5, color: b.desc, lineSpacing: 14,
+        });
+      } else {
+        s.addText(m[0], {
+          x: x + 0.14, y: b.y, w: mw - 0.28, h: b.h, margin: 0, align: "center", valign: "middle",
+          fontFace: SANS, fontSize: 11, bold: true, color: b.title, lineSpacing: 15,
+        });
+      }
+    });
+  });
+
+  s.addText("La lista no está cerrada, pero ya no hay cajón de sastre: un candidato entra con estado y prioridad propios, o no entra.", {
+    x: M, y: 6.05, w: CW, h: 0.5, margin: 0, valign: "top", fontFace: SANS, fontSize: 13, italic: true, color: TEAL, lineSpacing: 19,
+  });
+  foot(s);
+  s.addNotes("README §4.2: módulos futuros activables, cada uno con estado y prioridad. Trece filas, sin fila de backlog.");
+}
+
+// ═══ 12 · Arquitectura ════════════════════════════════════════════════════════
 {
   const s = newSlide(true);
   head(s, "ARQUITECTURA", "Dos componentes, un monolito modular", true);
@@ -531,34 +614,40 @@ function lines(items, o = {}) {
     x: M, y: 2.95, w: CW, h: 0.8, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 15, bold: true, color: WHITE,
   });
 
+  // Los trece módulos van agrupados por prioridad, no uno a uno: nombrarlos aquí
+  // repetiría la diapositiva anterior y llenaría la banda de tarjetas ilegibles.
+  // Es el mismo criterio con el que el README redibujó su diagrama de 5.1.
   const mods = [
-    ["Core", "Recursos / Assets", true],
-    ["Eventos temporales", "opcional", false],
-    ["CMMS", "opcional", false],
-    ["Warehouse", "opcional", false],
-    ["Planificador", "opcional", false],
+    ["Core", "Recursos / Assets · obligatorio", true],
+    ["Prioridad alta", "4 módulos · opcionales", false],
+    ["Prioridad media", "3 módulos · opcionales", false],
+    ["Prioridad baja", "6 módulos · opcionales", false],
   ];
-  const mw = 2.25, mgap = 0.22;
+  const mgap = 0.22, mw = (CW - (mods.length - 1) * mgap) / mods.length;
   mods.forEach((m, i) => {
     const x = M + i * (mw + mgap);
-    card(s, { x, y: 4.02, w: mw, h: 1.05, fill: m[2] ? INK2 : "163A38", line: m[2] ? TEALLT : "2F5754", shadow: false });
-    s.addText(m[0], { x: x + 0.12, y: 4.2, w: mw - 0.24, h: 0.42, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 13.5, bold: true, color: m[2] ? WHITE : "BFD3D0" });
-    s.addText(m[1], { x: x + 0.12, y: 4.6, w: mw - 0.24, h: 0.3, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 10.5, italic: !m[2], color: m[2] ? TEALLT : "7E9B98" });
-    s.addShape(pres.ShapeType.line, { x: x + mw / 2, y: 5.07, w: 0, h: 0.23, line: { color: "3C6663", width: 1.25, dashType: m[2] ? "solid" : "dash" } });
+    card(s, { x, y: 3.92, w: mw, h: 1.0, fill: m[2] ? INK2 : "163A38", line: m[2] ? TEALLT : "2F5754", shadow: false });
+    s.addText(m[0], { x: x + 0.12, y: 4.08, w: mw - 0.24, h: 0.42, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 13.5, bold: true, color: m[2] ? WHITE : "BFD3D0" });
+    s.addText(m[1], { x: x + 0.12, y: 4.48, w: mw - 0.24, h: 0.3, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 10.5, italic: !m[2], color: m[2] ? TEALLT : "7E9B98" });
+    s.addShape(pres.ShapeType.line, { x: x + mw / 2, y: 4.92, w: 0, h: 0.2, line: { color: "3C6663", width: 1.25, dashType: m[2] ? "solid" : "dash" } });
   });
 
-  card(s, { x: M, y: 5.3, w: CW, h: 0.72, fill: "1B4B48", line: TEALLT, shadow: false });
+  card(s, { x: M, y: 5.12, w: CW, h: 0.66, fill: "1B4B48", line: TEALLT, shadow: false });
   s.addText("Event Bus interno (in-process) · publicación y suscripción entre módulos, sin que el core sepa quién escucha", {
-    x: M, y: 5.3, w: CW, h: 0.72, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 13.5, bold: true, color: WHITE,
+    x: M, y: 5.12, w: CW, h: 0.66, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 13.5, bold: true, color: WHITE,
   });
 
-  card(s, { x: 4.4, y: 6.2, w: 4.53, h: 0.62, fill: "163A38", line: "2F5754", shadow: false });
-  s.addText("PostgreSQL 16+ · RLS activado", { x: 4.4, y: 6.2, w: 4.53, h: 0.62, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 13, bold: true, color: "BFD3D0" });
+  s.addText("El agrupamiento es la prioridad de la sección 4.2, no una dependencia: dentro de un grupo los módulos no se necesitan entre sí.", {
+    x: M, y: 5.84, w: CW, h: 0.3, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 11.5, italic: true, color: "7E9B98",
+  });
+
+  card(s, { x: 4.4, y: 6.18, w: 4.53, h: 0.58, fill: "163A38", line: "2F5754", shadow: false });
+  s.addText("PostgreSQL 16+ · RLS activado", { x: 4.4, y: 6.18, w: 4.53, h: 0.58, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 13, bold: true, color: "BFD3D0" });
   foot(s, true);
-  s.addNotes("README §5.1: visión de componentes. Los módulos punteados son opcionales.");
+  s.addNotes("README §5.1: visión de componentes. Los módulos punteados son opcionales y van agrupados por prioridad, como en el diagrama del README; el detalle de los trece está en la diapositiva anterior.");
 }
 
-// ═══ 12 · Event bus ═══════════════════════════════════════════════════════════
+// ═══ 13 · Event bus ═══════════════════════════════════════════════════════════
 {
   const s = newSlide();
   head(s, "EVENT BUS INTERNO", "Un contrato y nueve eventos");
@@ -610,7 +699,7 @@ function lines(items, o = {}) {
   s.addNotes("README §5.2: contrato de evento, mecanismo interno y catálogo inicial.");
 }
 
-// ═══ 13 · Multi-tenant ════════════════════════════════════════════════════════
+// ═══ 14 · Multi-tenant ════════════════════════════════════════════════════════
 {
   const s = newSlide();
   head(s, "MODELO DE DATOS", "Aislamiento multi-tenant en dos capas");
@@ -656,7 +745,7 @@ function lines(items, o = {}) {
   s.addNotes("README §5.6: modelo de datos multi-tenant y Row-Level Security.");
 }
 
-// ═══ 14 · Casos de uso ════════════════════════════════════════════════════════
+// ═══ 15 · Casos de uso ════════════════════════════════════════════════════════
 {
   const s = newSlide();
   head(s, "CAPA DE APLICACIÓN", "Los casos de uso del core");
@@ -715,7 +804,7 @@ function lines(items, o = {}) {
   s.addNotes("README §5.7: catálogo de comandos y queries de la capa de aplicación.");
 }
 
-// ═══ 15 · Stack ═══════════════════════════════════════════════════════════════
+// ═══ 16 · Stack ═══════════════════════════════════════════════════════════════
 {
   const s = newSlide();
   head(s, "STACK TECNOLÓGICO", "Decisiones ya cerradas");
@@ -748,7 +837,7 @@ function lines(items, o = {}) {
   s.addNotes("README §6 y ADR-001 a ADR-004.");
 }
 
-// ═══ 16 · Testing ═════════════════════════════════════════════════════════════
+// ═══ 17 · Testing ═════════════════════════════════════════════════════════════
 {
   const s = newSlide();
   head(s, "CALIDAD", "Estrategia de testing, igual en BE y FE");
@@ -784,7 +873,7 @@ function lines(items, o = {}) {
   s.addNotes("README §7: distribución 60/25/15 y ejemplos por nivel.");
 }
 
-// ═══ 17 · Roadmap ═════════════════════════════════════════════════════════════
+// ═══ 18 · Roadmap ═════════════════════════════════════════════════════════════
 {
   const s = newSlide();
   head(s, "ESTADO ACTUAL", "Roadmap por fases");
@@ -792,8 +881,8 @@ function lines(items, o = {}) {
   const fases = [
     ["Fase 0", "Definición", "Arquitectura, stack, alcance del core y estrategia de testing", "Completada", TEAL, WHITE],
     ["Fase 1", "Core MVP", "Assets, autenticación, API REST, event bus y FE responsive básico", "Siguiente", TERRA, WHITE],
-    ["Fase 2", "Primer módulo", "Candidato por definir: CMMS o Warehouse", "Pendiente", "C3D2CF", INK],
-    ["Fase 3", "Módulos adicionales", "Según el backlog de módulos futuros", "Pendiente", "C3D2CF", INK],
+    ["Fase 2", "Primer módulo", "Candidato a definir entre los cuatro de prioridad alta", "Pendiente", "C3D2CF", INK],
+    ["Fase 3", "Módulos adicionales", "Los nueve restantes, por orden de prioridad (sección 4.2)", "Pendiente", "C3D2CF", INK],
   ];
   const cw = 2.9, gap = 0.18, cy = 1.85, chh = 3.55;
   fases.forEach((f, i) => {
@@ -814,7 +903,7 @@ function lines(items, o = {}) {
   s.addNotes("README §8: roadmap y estado. Fase 0 cerrada el 2026-08-07.");
 }
 
-// ═══ 18 · Cierre ══════════════════════════════════════════════════════════════
+// ═══ 19 · Cierre ══════════════════════════════════════════════════════════════
 {
   const s = newSlide(true);
   head(s, "SIGUIENTE PASO", "La Fase 0 queda cerrada", true);
@@ -838,7 +927,7 @@ function lines(items, o = {}) {
 
   const closing = [
     ["Primera tarea de la Fase 1", "Repartir a docs/ las secciones del README que corresponden por ámbito: 4.1.x, 5.4.3, 5.6 y 5.7, dejando aquí un resumen y el enlace."],
-    ["Módulos con prioridad alta", "CMMS doméstico y Warehouse, ambos por diseñar. El resto queda en backlog abierto."],
+    ["Módulos con prioridad alta", "Cuatro, todos por diseñar: proveedores y contactos de servicio, compras y lista de la compra, Warehouse y CMMS doméstico."],
   ];
   closing.forEach((c, i) => {
     const x = M + i * (5.85 + 0.43);
@@ -847,7 +936,7 @@ function lines(items, o = {}) {
     s.addText(c[1], { x: x + 0.38, y: 5.0, w: 5.1, h: 0.9, margin: 0, valign: "top", fontFace: SANS, fontSize: 12.5, color: "BFD3D0", lineSpacing: 18 });
   });
 
-  s.addText("Fuente: README.md · documento vivo, última actualización 2026-08-07", {
+  s.addText("Fuente: README.md · documento vivo, última actualización 2026-08-10", {
     x: M, y: 6.35, w: CW, h: 0.35, margin: 0, valign: "middle", fontFace: SANS, fontSize: 11, color: "7E9895",
   });
   foot(s, true);
