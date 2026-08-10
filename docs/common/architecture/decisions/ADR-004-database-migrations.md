@@ -9,7 +9,7 @@
 ## Contexto
 
 El esquema del core está definido (sección 5.6 del
-[`README principal`](../../../README.md)) y la [ADR-003](ADR-003-row-level-security.md)
+[`README principal`](../../../../README.md)) y la [ADR-003](ADR-003-row-level-security.md)
 añade políticas de Row-Level Security que forman parte del esquema tanto como
 las tablas. Ambas cosas necesitan versionarse, aplicarse de forma reproducible en
 cada entorno y ejecutarse durante el despliegue.

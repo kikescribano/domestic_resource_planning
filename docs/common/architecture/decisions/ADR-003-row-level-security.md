@@ -91,3 +91,21 @@ ADR-002 y debe ejecutarse contra PostgreSQL real, no contra una base en memoria.
 
 Desactivar RLS requerirá una nueva ADR que explique qué mecanismo asume el
 aislamiento en su lugar.
+
+## Posterior a esta decisión
+
+El cuerpo de esta ADR se conserva tal y como se aceptó. La decisión no cambia,
+pero la **expresión concreta de la política** sí se ha afinado al probarla contra
+PostgreSQL 16 en el entorno local (2026-08-10):
+
+- Tal y como aparece más arriba, `current_setting('app.household_id')::uuid`
+  **lanza un error** cuando el ajuste no está fijado en la sesión y, menos
+  evidente, después de un `RESET`, que lo deja en **cadena vacía** en lugar de
+  sin valor. La forma vigente añade el segundo argumento de `current_setting` y
+  un `nullif`, de modo que en ambos casos la comparación dé `NULL` y no se
+  devuelva ninguna fila: falla cerrada, en vez de reventar con un error de
+  conversión. El razonamiento completo está en
+  [`data-model.md`](../data-model.md), que es la forma que hay que migrar.
+- Queda confirmado en el entorno local que el usuario de la aplicación se crea
+  sin `SUPERUSER` ni `BYPASSRLS`, y que sin `app.household_id` fijado no se
+  devuelve fila alguna — tampoco pidiendo el identificador de otro hogar.

@@ -58,3 +58,29 @@ La base se validará con el primer recorrido vertical que atraviese frontend, AP
 autenticada, aplicación, dominio y PostgreSQL, acompañado por pruebas en los tres
 niveles. Dividir un módulo en un servicio o sustituir una restricción aceptada
 requerirá una nueva ADR con evidencia de la necesidad.
+
+## Posterior a esta decisión
+
+El cuerpo de esta ADR se conserva tal y como se aceptó. De lo que quedaba por
+decidir en «Costes y riesgos» —autenticación, autorización, frameworks y
+despliegue— se ha resuelto casi todo al arrancar la Fase 1:
+
+- **Autenticación y autorización**, y el framework de backend, en
+  [ADR-002](ADR-002-multi-tenancy-and-backend-framework.md): Spring Boot con
+  Spring Security y JWT.
+- **El framework de frontend**, en
+  [ADR-006](ADR-006-frontend-stack-and-design-system.md). Aquella
+  «recomendación pendiente de confirmación» queda confirmada: React, sobre Vite,
+  con React Router y TanStack Query. La misma ADR cierra los otros dos huecos que
+  esta dejaba implícitos —dirección visual y objetivo de accesibilidad— con un
+  sistema de diseño propio y WCAG 2.2 AA.
+- **La cadena de construcción y las herramientas de prueba** de los tres niveles
+  que esta ADR exige, en
+  [ADR-008](ADR-008-repository-layout-and-build-chain.md).
+- **El despliegue sigue abierto a propósito.** La configuración concreta del VPS
+  es lo que fija el tamaño del volumen de ficheros, y se decide al cerrar la
+  Fase 1 con consumo medido en lugar de estimado.
+
+La distribución 60 / 25 / 15 y el recorrido vertical como criterio de validación
+no cambian; la [ADR-005](ADR-005-local-file-storage.md) amplía ese recorrido para
+que incluya subir una foto, verla adjunta a un asset y descargarla.

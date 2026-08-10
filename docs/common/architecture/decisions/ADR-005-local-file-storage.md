@@ -11,7 +11,7 @@
 Hasta ahora el core no guardaba binarios. La documentación asociada era una
 entidad `Document` con una `url` obligatoria, y las fotos de asset, artículo y
 ubicación eran también enlaces. La decisión, registrada en la sección 4.1.7 del
-[`README principal`](../../../README.md), dejó explícitamente anotada la subida
+[`README principal`](../../../../README.md), dejó explícitamente anotada la subida
 de ficheros como evolución posterior y no como alternativa descartada.
 
 Esa evolución tiene ahora dos motivos y un destino. Los motivos: depender de un
