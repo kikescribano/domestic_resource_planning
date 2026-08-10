@@ -59,6 +59,15 @@ midan solos.
 - [x] **Reparto del README a `docs/`**, la tarea de arranque que la Fase 0 había aplazado: 1192 líneas trasladadas.
 - [x] **Entorno local verificado** contra PostgreSQL 16 real: el usuario de la aplicación nace sin `SUPERUSER` ni `BYPASSRLS`, y el aislamiento entre hogares funciona.
 
+> **Cabo suelto del Hito 0: la CI no se ha llegado a ejecutar nunca.** El
+> workflow está commiteado y su YAML es válido, las cuatro comprobaciones pasan
+> **en local**, y Actions figura como habilitado — pero el repositorio no
+> registra ni un solo *run*, ni siquiera encolado. Es privado, y no se pudo
+> mirar el consumo de minutos porque el token no tiene el permiso necesario.
+> Conviene resolverlo antes de apoyarse en la CI: hasta que se ejecute una vez,
+> el workflow es código sin probar. Empezar por la pestaña *Actions* del
+> repositorio, que suele explicar el motivo cuando nunca ha corrido nada.
+
 ### Hito 1 — Aislamiento y enrolamiento · Pendiente
 
 El recorrido vertical de verdad, y el hito que valida ADR-002, ADR-003, ADR-004 y
