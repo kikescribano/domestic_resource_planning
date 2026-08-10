@@ -85,6 +85,7 @@ exactamente el problema que esta estructura existe para evitar.
 | 5.6 Modelo de datos | `common/architecture/` |
 | 5.7 Casos de uso del core | `common/architecture/` o `common/product/use-cases/` |
 | 5.4.3 Contratos JSON | `common/contracts/` |
+| 5.8 Almacenamiento de ficheros | `backend/architecture/`, con los controles OWASP en `backend/security/` y el dimensionado y las copias en `backend/operations/` |
 | 4.1.x Definición del core | `common/product/` (visión, glosario, capacidades) |
 
 Mientras tanto, **el README principal es la fuente vigente** para todo lo

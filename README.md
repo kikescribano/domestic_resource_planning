@@ -119,7 +119,7 @@ graph TD
 | Cantidad (`quantity`) | Solo `CONSUMABLE` | Existencia actual, expresada en la unidad de su artículo |
 | Número de serie (`serialNumber`) | Solo `DURABLE`, opcional | Lo que distingue dos unidades por lo demás idénticas, y lo que pide un fabricante al reclamar una garantía |
 | Fecha de adquisición (`acquiredOn`) | Solo `DURABLE`, opcional | Cuándo entró en el hogar. Es procedencia, no valor: el importe pertenece al módulo de gastos |
-| Foto (`photoUrl`) | Ambos, opcional | Enlace a una imagen. Reconocer una cosa de un vistazo es la mitad de un inventario doméstico, y el mismo criterio que en la documentación: se guarda el enlace, no el fichero |
+| Foto (`photoUrl` / `photoFileId`) | Ambos, opcional | Una imagen, en forma de **enlace externo o de fichero guardado en el servidor** —nunca las dos a la vez— igual que en la documentación (ver «Ficheros almacenados»). Reconocer una cosa de un vistazo es la mitad de un inventario doméstico |
 | Notas (`notes`) | Ambos, opcional | Texto libre |
 | Fecha de alta (`createdAt`) | Ambos | — |
 | Última modificación (`updatedAt`) | Ambos | — |
@@ -139,7 +139,7 @@ graph TD
 | Modelo (`model`) | Opcional. Marca y modelo juntos son la identidad real de un duradero, y lo que hace que compartir artículo entre dos unidades signifique algo |
 | Código de barras (`barcode`) | Opcional. Si se informa, es único en el hogar y sirve para localizar el artículo al dar entrada |
 | Contenido por envase (`packSize`) | Opcional, en la unidad del artículo. Es lo que permite dar entrada a «dos paquetes» de algo que se lleva en gramos sin que nadie multiplique a mano — la fricción que quedó señalada al subir la unidad al artículo |
-| Foto (`photoUrl`) | Opcional. Sirve a todas sus existencias a la vez |
+| Foto (`photoUrl` / `photoFileId`) | Opcional, enlace o fichero como en el asset. Sirve a todas sus existencias a la vez |
 | Notas (`notes`) | Texto libre, opcional |
 | Fecha de alta (`createdAt`) | — |
 | Última modificación (`updatedAt`) | — |
@@ -168,13 +168,14 @@ Se retira igual que un artículo, y por el mismo motivo: los assets la referenci
 
 **Documentación asociada.**
 
-Facturas, garantías y manuales se modelan como una entidad `Document` que **guarda un enlace, no el fichero**. El core no almacena binarios: la factura suele estar ya en el correo y el manual en la web del fabricante, y sostener subida de ficheros exigiría decidir almacenamiento, tamaños y tipos permitidos antes de escribir la primera línea de la Fase 1. Subir el fichero queda como evolución posterior, y encaja sin romper nada: el día que exista, es una segunda forma de rellenar el mismo `url`.
+Facturas, garantías y manuales se modelan como una entidad `Document` que apunta **a un enlace externo o a un fichero guardado en el servidor**, nunca a los dos. Las dos vías conviven porque las dos son reales: la factura ya está en el correo y el manual en la web del fabricante, así que obligar a descargarlos y volverlos a subir sería trabajo inventado; pero la garantía que llegó en un sobre y el manual que solo existe en papel no tienen URL ninguna, y hasta ahora no cabían en el modelo.
 
 | Atributo | Descripción |
 |---|---|
 | Identificador (`id`) | — |
 | Tipo (`type`) | `INVOICE`, `WARRANTY`, `MANUAL`, `OTHER` |
-| Enlace (`url`) | URL al documento. Obligatorio |
+| Enlace (`url`) | URL al documento, cuando vive fuera. **Exactamente uno** de `url` o `fileId` |
+| Fichero (`fileId`) | Referencia al `StoredFile` subido, cuando vive aquí. Ver «Ficheros almacenados» |
 | Descripción (`description`) | Texto libre, opcional |
 | Fecha del documento (`date`) | Cuándo se emitió: la fecha de la factura, la de la garantía. Opcional |
 | Válido hasta (`validUntil`) | Cuándo deja de valer, que en una garantía es el dato que importa. Opcional, y distinto del anterior: tenerlos en un solo campo obligaba a elegir cuál de los dos se pierde |
@@ -184,6 +185,38 @@ Facturas, garantías y manuales se modelan como una entidad `Document` que **gua
 | Modificado por (`updatedBy`) | Ídem |
 
 Un documento cuelga **de un asset o de un artículo, nunca de ambos**, y la distinción es la que ya estaba implícita en el modelo: la factura y la garantía son de la unidad física que compraste, y el manual es del modelo. Colgarlo del artículo es lo que hace que dos taladros idénticos compartan manual sin duplicarlo, que es justo lo que 4.1.7 prometía al abrir el artículo a los duraderos.
+
+**Ficheros almacenados.**
+
+Un `StoredFile` es un binario guardado en el servidor: la foto que alguien acaba de hacer con el móvil, el manual escaneado, la garantía que llegó en papel. **No es un asset** —no ocupa sitio en el hogar, no se clasifica ni se presta— igual que tampoco lo es un artículo: es un adjunto, con dueño, tamaño y fecha.
+
+| Atributo | Descripción |
+|---|---|
+| Identificador (`id`) | — |
+| Nombre original (`originalName`) | El nombre con el que llegó, saneado. Es **solo un dato**: nunca forma parte de la ruta en disco (ver 5.8) |
+| Tipo de contenido (`contentType`) | El **detectado** al inspeccionar el contenido, no el que declaró quien subió el fichero |
+| Tamaño (`sizeBytes`) | El del fichero ya almacenado, después de recodificarlo si era una imagen. Es lo que suma la cuota |
+| Suma de verificación (`checksum`) | SHA-256 del contenido. Detecta corrupción silenciosa y permite cuadrar una restauración contra la base de datos |
+| Clave de almacenamiento (`storageKey`) | Ruta relativa dentro del volumen de ficheros. **La genera la aplicación** a partir del identificador y no se acepta jamás de la petición. Se guarda en vez de recalcularse al vuelo para que cambiar la distribución en disco —o migrar a otro almacén— no obligue a reescribir la historia |
+| Fecha de alta (`createdAt`) | — |
+| Creado por (`createdBy`) | Ver «Autoría de los cambios» |
+| Subida completada (`uploadedAt`) | Nulo mientras la subida está en curso: la fila existe y **ya ocupa cuota**, pero el fichero todavía no se puede adjuntar (ver 5.8.3) |
+| Borrado (`deletedAt`) | Marca de retirada. Los bytes los desenlaza un proceso diario, no la transacción que borra la fila |
+
+No lleva `updatedAt` ni `updatedBy`: un fichero no se modifica. Cambiar la foto de un asset es subir otra y apuntar a ella, no editar la que había — así el `checksum` sigue significando algo.
+
+**Toda imagen tiene miniatura**, generada al subirla y servida en los listados para que un móvil no descargue el original a tamaño completo. No es un atributo: existe siempre que el fichero sea una imagen, porque generarla forma parte de la misma recodificación que le quita el EXIF — si no se puede generar, es que tampoco se ha podido recodificar, y entonces el fichero se rechaza. Un PDF no tiene.
+
+**Un gigabyte por hogar.** Varios hogares comparten un mismo servidor, así que el almacenamiento es un recurso común, y sin límite se lo queda entero el primero que suba los vídeos de la reforma. Cada hogar dispone de **1 GB**, que es la suma de `sizeBytes` de sus ficheros vivos. De ahí salen cuatro consecuencias que conviene no descubrir tarde:
+
+- **La cuota se comprueba dos veces**: contra el tamaño declarado antes de recibir nada, y contra el real mientras se recibe, abortando en cuanto se pasa. Lo declarado lo escribe el cliente, así que no es una fuente de verdad.
+- **Cuenta lo que hay, no lo que se usa.** Un fichero subido y nunca adjuntado ocupa cuota mientras exista; si nadie lo adjunta, el proceso diario lo retira a las 24 horas.
+- **Dar de baja un asset no libera nada.** Su foto y sus facturas siguen ahí, porque el historial es justo lo que protege la baja lógica. Liberar espacio es un gesto explícito —borrar el documento, quitar la foto—, nunca un efecto colateral.
+- **Las miniaturas no cuentan.** Las genera el sistema para que un listado en un móvil no descargue el original, así que no son decisión del hogar. El disco realmente ocupado por un hogar es algo mayor que su cuota, y eso es cosa del dimensionado (ver 5.8), no del usuario.
+
+**El avatar no es un fichero del hogar.** Una `Identity` no pertenece a ninguno (ver 4.1.4), así que su avatar no se puede cargar a ninguna cuota ni proteger con Row-Level Security. Por eso **no** es un `StoredFile`: vive en columnas de la propia `identities`, es uno solo y **siempre se sustituye**, y su límite no es una cuota acumulable sino un tamaño máximo por fichero —1 MB—. Sin acumulación posible no hay nada que contar.
+
+Cómo se guardan, se validan y se sirven estos ficheros es materia de arquitectura, y está en **5.8**.
 
 **Autoría de los cambios (transversal).**
 
@@ -200,7 +233,7 @@ Tres cosas que se derivan y conviene no olvidar:
 - **Nunca se aceptan del cliente.** Salen del token de quien hace la petición, igual que el `householdId`. Un campo de autoría que el cliente pueda rellenar no vale para nada, porque se puede falsear.
 - **El usuario referenciado puede estar de baja.** Como los usuarios no se borran (ver 4.1.4), la referencia sigue resolviendo: el historial no pierde el nombre de quien hizo las cosas cuando esa persona deja el hogar.
 
-El hogar es la excepción: no lleva autoría propia porque, en el instante en que su fila nace, todavía no existe ningún usuario que pueda figurar.
+El hogar es la excepción: no lleva autoría propia porque, en el instante en que su fila nace, todavía no existe ningún usuario que pueda figurar. Un fichero lleva solo la mitad —`createdBy`—, porque no se modifica nunca (ver «Ficheros almacenados»).
 
 **Reglas mínimas de negocio:**
 - Un asset no puede ser su propio ancestro en la jerarquía de composición (evita ciclos).
@@ -212,6 +245,12 @@ El hogar es la excepción: no lleva autoría propia porque, en el instante en qu
 - El nombre y la categoría efectivos de un asset son los de su artículo cuando lo tiene; un asset sin artículo debe informarlos él. No se guardan por duplicado.
 - Una categoría no se borra: se retira cuando el hogar deja de usarla, y los assets que ya la tenían la conservan.
 - Un documento cuelga de un asset **o** de un artículo, nunca de los dos ni de ninguno.
+- Un documento apunta a un enlace **o** a un fichero, nunca a los dos ni a ninguno. Una foto también es enlace **o** fichero, pero ahí sí caben los dos vacíos: no tener foto es lo normal.
+- Un fichero pertenece a un hogar y **no puede referenciarse desde otro**, ni siquiera adjuntándolo a mano por identificador.
+- Un fichero se adjunta **una sola vez**: ni dos documentos ni un documento y una foto comparten fichero. Compartir haría ambiguo qué pasa al borrar y qué cuenta en la cuota; para que dos unidades idénticas compartan manual ya está el artículo.
+- La suma de los ficheros vivos de un hogar no puede superar **1 GB**, y ningún fichero suelto puede pasar de **25 MB**.
+- Borrar un fichero no borra sus bytes en el acto: marca la fila, y un proceso diario los desenlaza. La **cuota sí se libera en el acto**, aunque el disco tarde hasta 24 horas en enterarse; ese desfase lo absorbe el dimensionado del volumen (ver 5.8.2), no el usuario esperando. Ese margen no es una función de deshacer —no hay ningún gesto que restaure lo borrado— sino la ventana en la que un operador todavía puede recuperar un borrado por error sin ir a la copia de seguridad.
+- **Cerrar la cuenta borra el avatar.** Es la única imagen que retrata a una persona, y la baja de la identidad es el momento en que deja de haber motivo para conservarla. Los ficheros del hogar no se van con ella: son del hogar, no suyos.
 - El propietario de un asset es opcional: queda vacío cuando quien lo tenía a su nombre causa baja en el hogar (ver 4.1.4).
 - No puede haber dos existencias vivas del mismo artículo en la misma ubicación: dar entrada sobre una existente suma cantidad. Cuando dos existencias del mismo artículo ya están creadas por separado y se quieren juntar, eso es `MergeStockItems` (ver 5.7), no un movimiento.
 - Una existencia dada de baja deja de ocupar su hueco: se puede volver a dar entrada de ese artículo en esa ubicación, y la fila antigua se conserva por historial.
@@ -234,7 +273,7 @@ Una **ubicación (Location)** representa un espacio físico de almacenaje y, al 
 | Ubicación padre (`parentLocationId`) | Opcional, para la jerarquía |
 | Capacidad (`capacity`) | Opcional, y con forma única: un tipo (`WEIGHT`, `VOLUME`, `UNITS`), un máximo numérico y su unidad. No se modela por tipo de ubicación — un estante aguanta kilos y un armario litros, pero ambos caben en la misma terna |
 | Condiciones ambientales (`environmentalConditions`) | Opcionales, todas: temperatura mínima y máxima en °C, humedad mínima y máxima en %, y exposición a la luz (`DIRECT`, `INDIRECT`, `DARKNESS`). Solo se informan si son relevantes para esa ubicación |
-| Foto (`photoUrl`) | Opcional. Una foto del estante ahorra describir dónde está la caja |
+| Foto (`photoUrl` / `photoFileId`) | Opcional, enlace o fichero como en el asset. Una foto del estante ahorra describir dónde está la caja |
 | Notas (`notes`) | Texto libre, opcional |
 | Fecha de alta (`createdAt`) | — |
 | Última modificación (`updatedAt`) | — |
@@ -285,6 +324,13 @@ classDiagram
         +description
         +date
     }
+    class StoredFile {
+        +id
+        +originalName
+        +contentType
+        +sizeBytes
+        +checksum
+    }
     class Location {
         +id
         +name
@@ -321,6 +367,10 @@ classDiagram
     Article "0..*" --> "1" Category : clasificado en
     Document "0..*" --> "0..1" Asset : adjunto a
     Document "0..*" --> "0..1" Article : adjunto a
+    Document "0..*" --> "0..1" StoredFile : contenido, o url
+    Asset "0..*" --> "0..1" StoredFile : foto, o photoUrl
+    Article "0..*" --> "0..1" StoredFile : foto, o photoUrl
+    Location "0..*" --> "0..1" StoredFile : foto, o photoUrl
     Location "0..1" --> "0..1" Location : ubicación padre
     HouseholdMember "0..*" --> "1" Identity : es
     HouseholdMember "1" --> "1" Role : tiene
@@ -380,7 +430,7 @@ De la separación salen cuatro consecuencias que conviene tener presentes:
 | Teléfono (`phone`) | Opcional. Al participante externo de un préstamo ya se le exige un canal para mandarle el enlace; al miembro del hogar no se le pedía ninguno |
 | Hash de contraseña (`passwordHash`) | `Argon2id`, nunca la contraseña en claro (ver 5.4.1) |
 | Correo verificado (`emailVerifiedAt`) | Mientras esté vacío no se puede iniciar sesión |
-| Avatar (`avatarUrl`) | Opcional. Enlace a una imagen, mismo criterio que las demás |
+| Avatar (`avatarUrl` / `avatarFile`) | Opcional. Enlace a una imagen **o** un fichero subido, nunca los dos. El subido **no** es un `StoredFile`: son columnas de esta misma tabla, uno solo, siempre sustituido y con 1 MB de tope, porque una identidad no tiene hogar al que cargarle cuota (ver 4.1.1) |
 | Último acceso (`lastLoginAt`) | Deja ver cuentas dormidas antes de decidir una baja |
 | Baja (`deactivatedAt`) | La cuenta entera, que es distinto de dejar un hogar |
 | Fecha de alta (`createdAt`) | — |
@@ -474,7 +524,7 @@ La regla se aplica en los **cuatro** puntos donde se fija una contraseña: al cr
 Son dos operaciones distintas, y la separación entre identidad y pertenencia es lo que permite distinguirlas:
 
 - **Dejar el hogar** marca `deactivatedAt` en la **pertenencia**. La persona deja de ver ese hogar, pero su identidad sigue existiendo. La fila permanece porque los préstamos y el historial la referencian.
-- **Cerrar la cuenta** marca `deactivatedAt` en la **identidad**, revoca sus refresh tokens y le impide autenticarse en cualquier hogar.
+- **Cerrar la cuenta** marca `deactivatedAt` en la **identidad**, revoca sus refresh tokens, le impide autenticarse en cualquier hogar y **borra su avatar**: es lo único del sistema que retrata a una persona, y la fila que se conserva por historial no necesita su cara. Los ficheros del hogar se quedan, porque son del hogar y no suyos.
 
 Al dejar un hogar, sus assets **quedan sin propietario**, no se reasignan solos. Aparecen en un listado de huérfanos (`ListAssets` con el filtro correspondiente, ver 5.7) y se reasignan cuando el hogar decida. La alternativa —exigir el destino de todo lo suyo en el mismo gesto— convierte una baja en un inventario completo, y con cuarenta cosas a su nombre eso significa que la baja no se hace.
 
@@ -553,6 +603,8 @@ Las siguientes decisiones, inicialmente abiertas, han quedado validadas:
 
 - **Clasificación funcional:** `category` deja de ser texto libre y pasa a ser un **catálogo por hogar** (entidad `Category`, ver 4.1.1), sembrado con un juego por defecto al crear el hogar y editable después. Se descartó la lista fija con `CHECK`, que es más consistente con `type`/`status`/`unit` pero obliga a una migración cada vez que un hogar guarda algo que no encaja en cinco cajones pensados por otro; y se descartó dejarlo en texto libre, que no da filtros ni agrupaciones fiables. Se retira lógicamente, igual que un artículo y por el mismo motivo de clave ajena.
 - **Documentación asociada:** se modela como entidad `Document` que guarda **un enlace, no el fichero** (ver 4.1.1). El core no gana almacenamiento de binarios, que exigiría decidir backend de ficheros, tamaños y tipos permitidos, y modificar el stack antes de empezar la Fase 1. Subir el fichero queda como evolución, no como alternativa descartada: cuando exista, será otra forma de rellenar el mismo campo. Un documento cuelga de un asset o de un artículo, lo que hace que el manual se comparta entre unidades idénticas y la factura no.
+
+  **Revisada más abajo** («Almacenamiento local de ficheros»): la evolución que esta decisión dejaba anotada se ha ejecutado, y el enlace convive ahora con el fichero subido. El razonamiento original se conserva tal cual, porque sigue explicando por qué el enlace no desaparece.
 - **Baja de un usuario:** baja lógica (`deactivatedAt`), y sus assets **quedan sin propietario** en lugar de reasignarse (ver 4.1.4). Se descartó exigir la reasignación en el mismo gesto porque convierte la baja en un inventario completo y, con muchos assets a nombre de esa persona, en la práctica hace que la baja no se ejecute. El precio es aceptar assets huérfanos, que se acota con un filtro de listado para localizarlos. `owner_id` pasa a ser opcional en `assets`.
 - **Transición a `OVERDUE`:** la marca un **proceso programado** diario, que además publica `LoanOverdue` (ver 4.1.5 y 5.2.3). Se descartó derivar el estado al leer —más simple, sin proceso de fondo, pero un valor calculado no tiene un instante en el que ocurra y por tanto no puede publicar el evento del que colgarán los recordatorios— y marcarlo en la consulta, que convierte una lectura en escritura y deja el estado a merced de que alguien mire. El proceso no nace de una petición, así que debe recorrer los hogares fijando `app.household_id` en cada transacción, nunca con `BYPASSRLS`.
 
@@ -576,6 +628,16 @@ Las siguientes decisiones, inicialmente abiertas, han quedado validadas:
 > No es una pregunta del core: **corresponde al módulo Warehouse** (ver 4.2), que es quien necesitará medir lo que ocupa cada cosa para gestionar existencias de verdad. Se resolverá al definir los módulos, y hasta entonces se queda abierta a propósito. Mientras tanto el core no cambia: se descartó tanto añadir los campos como retirar la capacidad de `Location`, y el aviso se limita a lo que el sistema sabe con certeza.
 
 - **Autoría de los cambios:** toda entidad del core lleva `createdBy` y `updatedBy` (ver 4.1.1). Un hogar es un sitio compartido y la pregunta que más se hace no es qué cambió sino quién lo cambió. Ambas son anulables y **nulo significa el sistema**, que es lo que deja el proceso de vencidos al no actuar en nombre de nadie; se descartó inventar un usuario técnico porque daría una autoría falsa. Nunca se aceptan del cliente: salen del token, igual que el `householdId`. El hogar es la única excepción — cuando su fila nace no existe todavía ningún usuario al que apuntar.
+
+- **Almacenamiento local de ficheros:** el core pasa a guardar binarios **en el disco del servidor**, con los metadatos en una tabla `files` y una cuota de **1 GB por hogar** (ver 4.1.1 y 5.8). Revisa la decisión «Documentación asociada» de más arriba, cuyo cuerpo se conserva: el enlace externo **no desaparece**, sino que convive — un documento apunta a una URL o a un fichero, exactamente a uno de los dos. El motivo del cambio es doble: depender de un tercero como Dropbox para el manual escaneado deja una instalación doméstica en manos de un servicio ajeno, y todo lo que llegó en papel —la garantía del sobre, la factura de la tienda de barrio— simplemente no cabía en un modelo que solo admitía URL. Se descartaron tres alternativas. Guardar los binarios en PostgreSQL (`bytea`) sería la única con RLS sobre los propios bytes y una sola copia de seguridad, pero infla los volcados a decenas de gigabytes y alarga cada restauración hasta hacerla un evento. Montar un S3 autoalojado (MinIO, Garage) en la misma máquina da portabilidad real, pero paga otro proceso, otras credenciales y otra superficie de ataque para acabar escribiendo en el mismo disco; la portabilidad se conserva donde no cuesta nada, usando el almacén a través de un puerto `FileStorage`, de modo que migrar a S3 el día que haga falta sea escribir un segundo adaptador. Y sustituir el enlace en lugar de convivir con él obligaría a descargar y volver a subir facturas que ya viven en un correo. **El precio aceptado:** el sistema de ficheros no tiene Row-Level Security, así que la segunda capa de la [ADR-003](docs/common/architecture/decisions/ADR-003-row-level-security.md) no alcanza a los bytes; se mitiga derivando la ruta siempre de una fila que ya pasó por la política —nunca de nada que venga del cliente— y renunciando a deduplicar contenido entre hogares, que rompería esa herencia. Registrado en [ADR-005](docs/common/architecture/decisions/ADR-005-local-file-storage.md).
+
+- **El avatar queda fuera de ese mecanismo:** una identidad no pertenece a ningún hogar, así que su imagen no tiene cuota a la que sumar ni política de RLS que la cubra. En vez de forzarla dentro de `files` con un `household_id` prestado —que es exactamente el tipo de referencia cruzada que 5.6 se esfuerza en impedir—, es un **único fichero sustituible** en columnas de `identities`, con tope propio de 1 MB. Sin acumulación posible no hay cuota que llevar. Se descartó cargarlo al hogar de su pertenencia, que deja de tener sentido el día que una identidad esté en dos hogares, y dejarlo solo como enlace externo, que sería la única foto del sistema que no se puede subir.
+
+- **Entrega de las imágenes con URL firmada:** una imagen se muestra mediante una **URL firmada de vida corta** que sirve nginx sin preguntar a la aplicación, mientras que un documento sigue bajando por el endpoint autorizado, que comprueba el hogar en cada petición (ver 5.8.4). El motivo es un límite del navegador y no una preferencia: un `<img src>` **no puede enviar la cabecera `Authorization`**, así que autenticar la imagen por cabecera obliga a descargarla con JavaScript y a renunciar a `loading="lazy"`, `srcset`, caché y renderizado progresivo — un coste que se paga en cada listado y para siempre. Se descartaron las otras dos salidas. Descargar con `fetch()` y pintar desde un blob conserva la autorización por petición, pero añade un preflight CORS **por cada URL**, retiene cada imagen en memoria hasta revocarla a mano y devuelve los bytes al origen de la aplicación —un `blob:` hereda el origen de quien lo crea—, que es justo lo que separar el dominio pretendía evitar. Una cookie acotada al dominio de ficheros funciona con `<img>` nativo, pero exige `SameSite=None` en un contexto que los navegadores llevan años restringiendo, lo que en la práctica empuja a que ficheros y aplicación compartan dominio registrable —la versión débil del aislamiento— y reintroduce superficie de CSRF en un sistema que hoy es inmune por construcción. **El precio aceptado** es que la autorización de una imagen se comprueba al *emitir* la URL y no al descargarla, con una ventana de quince minutos que no es una exposición nueva: el access token de esa misma persona tampoco se puede revocar antes de expirar. Y dos condiciones que lo hacen aceptable: la firma cubre ruta **y** caducidad, y la cadena de consulta **no se registra en ningún log**.
+
+> **Pendiente, y con motivo (2026-08-10):** con ficheros reales aparecen datos personales que pesan —fotos del interior de una vivienda, facturas con nombre y dirección— y el core no tiene más vía de supresión que borrarlos uno a uno. Cerrar la cuenta ya se lleva el avatar (4.1.1), que es lo único que retrata a una persona; lo que falta es qué ocurre con los ficheros de un hogar que quiere marcharse entero. No se resuelve aquí porque no es una pregunta de ficheros sino de **baja de un hogar**, que el core todavía no contempla — hoy el único borrado real es el de los hogares sin verificar. Se anota para resolverla cuando exista ese caso de uso, en lugar de inventar ahora media solución.
+
+> **Pendiente, y anotado a propósito (2026-08-10):** los ficheros subidos **no se analizan con antivirus**. La lista blanca de tipos, la comprobación del contenido real, la recodificación de las imágenes y servirlo todo como adjunto desde otro origen (ver 5.8) cubren buena parte de lo que un antivirus atraparía aquí, y un `clamd` residente cuesta del orden de 1,5 GB de memoria — una fracción notable de la máquina prevista. No es una alternativa descartada: es la defensa que toca añadir el día que un fichero pueda salir del hogar que lo subió, porque hasta entonces el riesgo asumido es que alguien guarde un fichero malicioso y se lo descargue él mismo.
 
 > **Pendiente de validar:** cuatro atributos quedaron propuestos y sin decidir, todos por el mismo motivo — son útiles, pero rozan el alcance de un módulo futuro o meten la UI en el dominio. **Estado de conservación** y **condición en entrega y devolución de un préstamo** («volvió rayado») son lo primero que se llevarán el CMMS y la gestión avanzada de préstamos. **Etiquetas libres** en un asset amplían la clasificación más allá de una sola categoría, a costa de otra entidad recién después de añadir el catálogo de categorías. **Icono y color** de una categoría los va a querer el frontend mobile-first, pero son presentación. Revisados el 2026-08-09, los cuatro siguen fuera: ninguno se añade hasta que haya un caso de uso que lo pida.
 
@@ -807,8 +869,16 @@ graph TD
 
 **Documentos**
 - `GET /api/v1/documents` — listar (filtros: `assetId`, `articleId`, `type`)
-- `POST /api/v1/documents` — adjuntar a un asset o a un artículo
-- `DELETE /api/v1/documents/{id}` — eliminar el enlace
+- `POST /api/v1/documents` — adjuntar a un asset o a un artículo, con `url` **o** con `fileId`
+- `DELETE /api/v1/documents/{id}` — eliminar el documento; si tenía fichero, lo marca para su retirada
+
+**Ficheros**
+- `POST /api/v1/files` — subir un fichero (`multipart/form-data`). Devuelve sus metadatos; adjuntarlo es un paso aparte, así que el frontend puede subir mientras se rellena el formulario
+- `GET /api/v1/files` — listar los del hogar, **por tamaño descendente** (filtros: `attached`, `type`). Con `attached=false` salen los subidos y nunca adjuntados: es la respuesta a «¿qué está ocupando mi gigabyte?»
+- `GET /api/v1/files/{id}` — metadatos (nombre, tipo, tamaño, fecha)
+- `GET /api/v1/files/{id}/content` — descargar. La aplicación autoriza y los bytes se sirven por delegación. Es el camino de los **documentos**; una imagen se muestra con la URL firmada que ya viene en la entidad (ver 5.8.4)
+- `DELETE /api/v1/files/{id}` — retirar uno que no esté adjunto a nada
+- `GET /api/v1/storage` — bytes ocupados y cuota del hogar
 
 **Locations**
 - `GET /api/v1/locations` — listar
@@ -821,6 +891,8 @@ graph TD
 - `GET /api/v1/invitations` — listar las invitaciones vivas
 - `DELETE /api/v1/invitations/{id}` — revocar una invitación
 - `POST /api/v1/invitations/accept` — aceptar con el token recibido; **sin autenticar**, lo autoriza el token
+- `PUT /api/v1/users/me/avatar` — subir o sustituir el avatar (`multipart/form-data`, máx. 1 MB). `me` resuelve a la **identidad** del token, no a la pertenencia: el avatar es de la persona
+- `DELETE /api/v1/users/me/avatar` — quitarlo
 - `PATCH /api/v1/users/{id}/roles` — modificar roles
 - `DELETE /api/v1/users/{id}` — sacar del hogar (solo administrador; sus assets quedan sin propietario). Retira la pertenencia, no la cuenta
 
@@ -870,6 +942,35 @@ El contrato completo, con todos los recursos, parámetros y esquemas de error, s
 }
 ```
 > Colgado del artículo, lo comparten todas las unidades idénticas. La factura y la garantía irían con `assetId`, porque son de la unidad concreta que se compró. Informar los dos, o ninguno, se rechaza con `409` y el código `DOCUMENT_TARGET_INVALID`.
+
+**`POST /api/v1/files`** — response, subir la garantía escaneada
+```json
+{
+  "id": "3f2a55c1-...-00000000001a",
+  "originalName": "garantia-caldera.pdf",
+  "contentType": "application/pdf",
+  "sizeBytes": 184320,
+  "checksum": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+  "url": "https://files.drp.example/f/orig/3f2a55c1-...?e=1786400000&s=Wm5rSk...",
+  "thumbnailUrl": null,
+  "uploadedAt": "2026-08-10T18:22:04Z",
+  "createdAt": "2026-08-10T18:22:01Z",
+  "createdBy": "b2d1f0a4-...-000000000003"
+}
+```
+> El `contentType` es el **detectado**, no el que declaró el cliente, y el `sizeBytes` es el del fichero ya almacenado — si era una imagen, después de recodificarla. La `url` viene **firmada y caduca en unos quince minutos**: sirve para enseñar el fichero recién subido, no para guardarla. La `thumbnailUrl` es nula porque un PDF no tiene miniatura. Un tipo fuera de la lista blanca se rechaza con `415` y `FILE_TYPE_NOT_ALLOWED`; pasar de 25 MB, con `413`; y agotar el gigabyte del hogar, con `409` y `STORAGE_QUOTA_EXCEEDED`.
+
+**`POST /api/v1/documents`** — el mismo documento, ahora con el fichero recién subido
+```json
+{
+  "assetId": "9c4e1f77-...-000000000004",
+  "type": "WARRANTY",
+  "fileId": "3f2a55c1-...-00000000001a",
+  "description": "Garantía de la caldera",
+  "validUntil": "2030-03-14"
+}
+```
+> `url` y `fileId` son excluyentes: informar los dos, o ninguno, se rechaza con `409` y `DOCUMENT_CONTENT_INVALID` — el mismo patrón que `DOCUMENT_TARGET_INVALID` y por el mismo motivo. Adjuntar un fichero que ya cuelga de otro sitio se rechaza con `FILE_ALREADY_ATTACHED`, y uno de otro hogar responde `404`: contestar otra cosa confirmaría que existe.
 
 **`POST /api/v1/households`** — request, alta de un hogar
 ```json
@@ -1005,8 +1106,13 @@ erDiagram
     ARTICLES ||--o{ ASSETS : "define"
     CATEGORIES ||--o{ ASSETS : "clasifica"
     CATEGORIES ||--o{ ARTICLES : "clasifica"
+    HOUSEHOLDS ||--o{ FILES : "almacena"
     ASSETS ||--o{ DOCUMENTS : "adjunta"
     ARTICLES ||--o{ DOCUMENTS : "adjunta"
+    FILES ||--o| DOCUMENTS : "contenido de"
+    FILES ||--o{ ASSETS : "foto de"
+    FILES ||--o{ ARTICLES : "foto de"
+    FILES ||--o{ LOCATIONS : "foto de"
     HOUSEHOLD_MEMBERS ||--o{ ASSETS : "es propietario de"
     ASSETS ||--o{ ASSETS : "ubicación (contenedor)"
     LOCATIONS ||--o{ LOCATIONS : "ubicación padre"
@@ -1030,6 +1136,9 @@ erDiagram
         text phone
         text password_hash
         text avatar_url
+        text avatar_storage_key
+        text avatar_content_type
+        bigint avatar_size_bytes
         timestamptz email_verified_at
         timestamptz last_login_at
         timestamptz created_at
@@ -1089,6 +1198,7 @@ erDiagram
         uuid household_id FK
         uuid asset_id FK
         uuid article_id FK
+        uuid file_id FK
         text type
         text url
         text description
@@ -1098,6 +1208,19 @@ erDiagram
         timestamptz updated_at
         uuid created_by FK
         uuid updated_by FK
+    }
+    FILES {
+        uuid id PK
+        uuid household_id FK
+        text original_name
+        text content_type
+        bigint size_bytes
+        text checksum
+        text storage_key
+        timestamptz created_at
+        uuid created_by FK
+        timestamptz uploaded_at
+        timestamptz deleted_at
     }
     ARTICLES {
         uuid id PK
@@ -1110,6 +1233,7 @@ erDiagram
         text barcode
         numeric pack_size
         text photo_url
+        uuid photo_file_id FK
         text notes
         timestamptz created_at
         timestamptz updated_at
@@ -1132,6 +1256,7 @@ erDiagram
         text serial_number
         date acquired_on
         text photo_url
+        uuid photo_file_id FK
         text notes
         timestamptz created_at
         timestamptz updated_at
@@ -1147,6 +1272,7 @@ erDiagram
         jsonb capacity
         jsonb environmental_conditions
         text photo_url
+        uuid photo_file_id FK
         text notes
         timestamptz created_at
         timestamptz updated_at
@@ -1193,13 +1319,14 @@ erDiagram
 | Tabla | Restricciones clave |
 |---|---|
 | `households` | `time_zone` con un identificador IANA válido; se valida en el caso de uso, no como `CHECK`. No lleva `created_by` ni `updated_by`: cuando la fila nace no existe ningún usuario al que apuntar. Es lo que usa el proceso de vencidos para saber cuándo ha pasado la fecha en ese hogar |
-| `identities` | `email` único en **toda la instalación**, comparado en minúsculas: índice único sobre `lower(email)`. Ya no es parcial por baja — la identidad sobrevive a cualquier hogar, así que su correo no se libera. Sin el `lower()`, `Kike@x.com` y `kike@x.com` serían dos cuentas. **No lleva `household_id`**: queda fuera de RLS (ver más abajo) |
+| `identities` | `email` único en **toda la instalación**, comparado en minúsculas: índice único sobre `lower(email)`. Ya no es parcial por baja — la identidad sobrevive a cualquier hogar, así que su correo no se libera. Sin el `lower()`, `Kike@x.com` y `kike@x.com` serían dos cuentas. **No lleva `household_id`**: queda fuera de RLS (ver más abajo). El avatar subido vive en tres columnas de aquí y no en `files`, con `CHECK (avatar_url IS NULL OR avatar_storage_key IS NULL)` —enlace o fichero, nunca los dos— y `CHECK (avatar_size_bytes IS NULL OR avatar_size_bytes <= 1048576)`, el megabyte de tope. Al ser una sola columna que se sustituye, no hay acumulación que contar |
 | `household_members` | `UNIQUE (household_id, identity_id)` — nadie pertenece dos veces al mismo hogar; `role` con `CHECK IN ('HOUSEHOLD_ADMIN','HOUSEHOLD_MEMBER')`. Que en el MVP una identidad tenga como mucho **una** pertenencia activa se garantiza con un índice único parcial `(identity_id) WHERE deactivated_at IS NULL`: quitarlo es todo lo que hará falta el día que se admitan varias. Que no se pueda dar de baja al único `HOUSEHOLD_ADMIN` activo no es expresable como `CHECK`: se valida en el caso de uso |
 | `invitations` | `token_hash` único; una sola invitación viva por correo y hogar, con índice único parcial `(household_id, lower(email)) WHERE accepted_at IS NULL AND revoked_at IS NULL`; `role` con `CHECK IN ('HOUSEHOLD_ADMIN','HOUSEHOLD_MEMBER')`. El estado no es una columna: se deduce de `expires_at`, `accepted_at` y `revoked_at` |
 | `password_reset_tokens` | `token_hash` único; un solo token vivo por identidad, con índice único parcial `(identity_id) WHERE used_at IS NULL` — pedir uno nuevo marca el anterior como usado antes de insertar. Caduca a la hora. Tabla propia y no un `purpose` compartido con la verificación: con una sola tabla, un filtro mal escrito convierte un token de verificación en uno de cambio de contraseña, que es una clase de vulnerabilidad conocida |
 | `email_verification_tokens` | `token_hash` único; un solo uso, marcado con `used_at`; expira. Mismo patrón que `loan_access_tokens`, y por el mismo motivo: el token viaja por correo y hay que poder comprobar reutilización |
 | `categories` | `name` único entre las categorías vigentes del hogar, con índice único parcial sobre `(household_id, lower(unaccent(name))) WHERE retired_at IS NULL` — mismo tratamiento que `articles`, y por el mismo motivo: la retirada es lógica porque `assets` y `articles` la referencian |
-| `documents` | Cuelga de exactamente uno de los dos, con `CHECK ((asset_id IS NULL) <> (article_id IS NULL))`; `type` con `CHECK IN ('INVOICE','WARRANTY','MANUAL','OTHER')`; `url` obligatorio; `CHECK (valid_until IS NULL OR date IS NULL OR valid_until >= date)`, porque una garantía no puede caducar antes de emitirse. Borrar un documento sí es un `DELETE` real: no lo referencia nada y no forma parte del historial de ninguna otra entidad |
+| `documents` | Cuelga de exactamente uno de los dos, con `CHECK ((asset_id IS NULL) <> (article_id IS NULL))`; `type` con `CHECK IN ('INVOICE','WARRANTY','MANUAL','OTHER')`; el contenido, también en exactamente uno, con `CHECK ((url IS NULL) <> (file_id IS NULL))` — misma forma que el destino, y por el mismo motivo; `CHECK (valid_until IS NULL OR date IS NULL OR valid_until >= date)`, porque una garantía no puede caducar antes de emitirse. Borrar un documento sigue siendo un `DELETE` real: no lo referencia nada y no forma parte del historial de ninguna otra entidad. Si tenía fichero, la misma transacción marca su `deleted_at` en `files`; los bytes los desenlaza el proceso diario |
+| `files` | `UNIQUE (household_id, id)`, que es lo que permite declarar las claves ajenas compuestas que impiden adjuntar el fichero de otro hogar — la misma técnica que ya protege la autoría, más abajo; `storage_key` único; `CHECK (size_bytes > 0 AND size_bytes <= 26214400)`, los 25 MB de tope por fichero; `content_type` con `CHECK IN ('image/jpeg','image/png','image/webp','application/pdf')`, que es la lista blanca de 5.8.3 expresada también aquí — ampliarla exige una migración, y esa fricción es deliberada. Índice `(household_id) WHERE deleted_at IS NULL` para que la suma de la cuota no recorra los borrados. `uploaded_at` a nulo marca la reserva de una subida en curso, que ya ocupa cuota y todavía no se puede adjuntar (ver 5.8.3). **La cuota de 1 GB no es un `CHECK`:** es una suma sobre las filas vivas del hogar, y se valida en el caso de uso con la fila del hogar bloqueada durante la reserva. El borrado es lógico aunque no lo referencie nadie, porque los bytes se desenlazan aparte: borrar la fila en el acto dejaría el fichero en disco sin nadie que supiera que sobra |
 | `articles` | `name` único entre los artículos **vigentes** del hogar, sin distinguir mayúsculas ni acentos: índice único parcial sobre `(household_id, lower(unaccent(name))) WHERE retired_at IS NULL` — requiere la extensión `unaccent`, que se instala en su propia migración; `barcode` con el mismo tratamiento, `(household_id, barcode) WHERE barcode IS NOT NULL AND retired_at IS NULL`; `unit` con `CHECK IN ('UNIT','GRAM','KILOGRAM','MILLILITER','LITER','METER','PACK')`; `CHECK (pack_size IS NULL OR pack_size > 0)`. La retirada es **lógica** (`retired_at`), no un `DELETE`: las existencias dadas de baja conservan su `article_id`, así que borrar la fila rompería la clave ajena y con ella el historial |
 | `assets` | `CHECK (location_asset_id IS NULL OR location_id IS NULL)` — nunca ambas ubicaciones a la vez; `type` con `CHECK IN ('DURABLE','CONSUMABLE')`; `status` con `CHECK IN ('AVAILABLE','LENT','DECOMMISSIONED')`; coherencia de cantidad y artículo con `CHECK ((type = 'CONSUMABLE' AND article_id IS NOT NULL AND quantity IS NOT NULL AND quantity >= 0) OR (type = 'DURABLE' AND quantity IS NULL))`; todo asset tiene nombre y categoría efectivos, con `CHECK (article_id IS NOT NULL OR (name IS NOT NULL AND category_id IS NOT NULL))`; un consumible nunca está prestado, con `CHECK (type = 'DURABLE' OR status <> 'LENT')`; `serial_number` y `acquired_on` solo tienen sentido en un duradero, con `CHECK (type = 'DURABLE' OR (serial_number IS NULL AND acquired_on IS NULL))`. `owner_id` es **anulable**: lo deja vacío la baja de su propietario (ver 4.1.4). Que `location_asset_id` apunte a un `DURABLE` no es expresable como `CHECK` simple: se valida en el caso de uso |
 | `assets` (existencias) | Una sola existencia **viva** por artículo y ubicación: `CREATE UNIQUE INDEX ON assets (household_id, article_id, location_asset_id, location_id) NULLS NOT DISTINCT WHERE type = 'CONSUMABLE' AND status <> 'DECOMMISSIONED'`. El `NULLS NOT DISTINCT` (PostgreSQL 15+) es lo que hace que la regla siga aplicando cuando la existencia aún no tiene ubicación asignada; sin él, cada entrada sin ubicar crearía una fila nueva. El `status <> 'DECOMMISSIONED'` es igual de necesario: sin él, una existencia dada de baja o fusionada seguiría ocupando su hueco para siempre y ningún `RegisterConsumableIntake` posterior podría volver a usar esa ubicación |
@@ -1208,11 +1335,24 @@ erDiagram
 | `loan_access_tokens` | `token_hash` único; `role` con `CHECK IN ('LENDER','BORROWER')` |
 | `refresh_tokens` | `token_hash` único; cuelga de `identities`, no de la pertenencia; se marca `revoked_at` en lugar de borrarse, para poder auditar |
 
+**Foto: enlace o fichero.** Las tres tablas con foto —`assets`, `articles` y `locations`— llevan `CHECK (photo_url IS NULL OR photo_file_id IS NULL)`. Es un `OR` y no el `<>` de `documents` a propósito: un documento sin contenido no es nada, pero un asset sin foto es lo habitual.
+
+**Un fichero no cruza de hogar.** `photo_file_id` y `documents.file_id` no son claves ajenas simples, sino compuestas contra el `UNIQUE (household_id, id)` de `files`, exactamente igual que la autoría:
+
+```sql
+ALTER TABLE assets ADD CONSTRAINT assets_photo_same_household
+    FOREIGN KEY (household_id, photo_file_id) REFERENCES files (household_id, id);
+```
+
+Así, aunque alguien acertara el identificador de un fichero ajeno y el caso de uso se despistara, la base de datos rechaza la referencia. Es la misma defensa en dos capas de siempre, aplicada al único sitio donde un identificador de otro hogar podría llegar del cliente.
+
 Todas las tablas del core incluyen `household_id` para el filtrado multi-tenant, con cinco excepciones: `loan_access_tokens` cuelga de `loans`, y `refresh_tokens`, `email_verification_tokens`, `password_reset_tokens` e `identities` cuelgan de la identidad, que por definición no pertenece a ningún hogar.
 
-> **Ojo con `identities`.** Las otras tres excepciones son tablas de tokens, sin más contenido que un hash. `identities` no: guarda nombre, correo y teléfono de personas reales, y al no llevar `household_id` **no puede tener política de RLS**. Es la única tabla con datos personales que depende de una sola capa de aislamiento, la de la aplicación. Su repositorio debe resolver siempre por identidad autenticada —nunca listar, nunca buscar por correo salvo en el login— porque ahí no hay red debajo.
+> **Ojo con `identities`.** Las otras tres excepciones son tablas de tokens, sin más contenido que un hash. `identities` no: guarda nombre, correo y teléfono de personas reales, y al no llevar `household_id` **no puede tener política de RLS**. Es la única tabla con datos personales que depende de una sola capa de aislamiento, la de la aplicación. Su repositorio debe resolver siempre por identidad autenticada —nunca listar, nunca buscar por correo salvo en el login— porque ahí no hay red debajo. Lo mismo vale ahora para el avatar que cuelga de ella: es la única imagen del sistema sin política de RLS detrás, y su ruta se deriva del `identityId`, resuelto del token y jamás recibido como parámetro.
 
-**Autoría, y su integridad entre hogares.** Todas ellas llevan además `created_by` y `updated_by`, ambas anulables y referenciando a `household_members`: nulo significa que el cambio no lo hizo una persona sino el sistema (ver 4.1.1). `households` es la excepción, porque en el instante de crearse no existe todavía ningún usuario al que apuntar.
+> **Y ojo con lo que RLS no alcanza.** Las políticas protegen filas, no ficheros: los bytes de `files` viven en el disco, donde PostgreSQL no manda. La segunda capa se sostiene ahí porque **la ruta se deriva de una fila que ya pasó por la política** (ver 5.8.1), nunca de un dato del cliente. Cualquier atajo que construya una ruta a partir de algo recibido —un nombre de fichero, una clave de almacenamiento— desactiva esa herencia sin que nada falle de forma visible.
+
+**Autoría, y su integridad entre hogares.** Todas ellas llevan además `created_by` y `updated_by`, ambas anulables y referenciando a `household_members`: nulo significa que el cambio no lo hizo una persona sino el sistema (ver 4.1.1). `households` es la excepción, porque en el instante de crearse no existe todavía ningún usuario al que apuntar, y `files` lleva solo `created_by`, porque un fichero no se modifica.
 
 Que esas referencias no puedan cruzarse de hogar sí es expresable en base de datos, y merece la pena porque es exactamente el tipo de fuga que ADR-003 quiere evitar en dos capas. Con `UNIQUE (household_id, id)` en `household_members`, cada tabla puede declarar la clave ajena compuesta:
 
@@ -1222,6 +1362,14 @@ ALTER TABLE assets ADD CONSTRAINT assets_created_by_same_household
 ```
 
 Así la propia base de datos rechaza atribuir un cambio a un usuario de otro hogar, aunque el caso de uso se despistara.
+
+**Y lo que la base de datos no puede garantizar de los ficheros.** Que un fichero se adjunte **una sola vez** (ver 4.1.1) solo es expresable a medias. Un índice único parcial en cada columna que apunta a `files` —`documents (file_id)`, y `photo_file_id` en `assets`, `articles` y `locations`— impide que dos documentos compartan fichero, o dos assets la misma foto:
+
+```sql
+CREATE UNIQUE INDEX documents_file_unique ON documents (file_id) WHERE file_id IS NOT NULL;
+```
+
+Lo que ninguno de los cuatro ve es el cruce: un documento y una foto apuntando al mismo fichero. Eso no cabe en una restricción y **se valida en el caso de uso**, igual que el anti-ciclo de la jerarquía o que la ubicación de un asset tenga que ser `DURABLE`.
 
 ### 5.7 Casos de uso del core (comandos y queries)
 
@@ -1233,8 +1381,11 @@ Catálogo ilustrativo de los comandos y queries que expone la capa de aplicació
 | Comando | `RetireCategory` | categoryId | retirada lógica; deja de ofrecerse al clasificar, y los assets y artículos que ya la tenían la conservan | — |
 | Comando | `CreateArticle` | nombre, categoryId, unidad, marca y código de barras (opcionales) | nombre único en el hogar (normalizado); código de barras único si se informa; la categoría debe estar vigente | `ArticleCreated` |
 | Comando | `CreateAsset` | nombre, tipo `DURABLE`, categoryId, ownerId, ubicación y articleId (opcionales) | ubicación no puede ser Asset y Location a la vez; no admite `quantity`; sin `articleId` son obligatorios nombre y categoría; un `CONSUMABLE` no entra por aquí, sino por `RegisterConsumableIntake` | `AssetCreated` |
-| Comando | `AttachDocument` | assetId **o** articleId, tipo, enlace, descripción y fecha (opcionales) | exactamente uno de los dos destinos; el core guarda el enlace, no el fichero | `DocumentAttached` |
-| Comando | `DeleteDocument` | documentId | borrado real: no lo referencia nada | — |
+| Comando | `AttachDocument` | assetId **o** articleId, enlace **o** fileId, tipo, descripción y fecha (opcionales) | exactamente un destino y exactamente un contenido; el fichero debe ser del mismo hogar y no estar ya adjunto en ningún otro sitio | `DocumentAttached` |
+| Comando | `DeleteDocument` | documentId | borrado real: no lo referencia nada. Si tenía fichero, lo marca en la misma transacción | — |
+| Comando | `UploadFile` | contenido y nombre original | **reserva** la cuota antes de transmitir, con la fila del hogar bloqueada solo durante la reserva; valida el tipo **real** contra la lista blanca, recodifica las imágenes quitando el EXIF y genera la miniatura; 25 MB por fichero y 1 GB por hogar; en disco se renombra (ver 5.8.3) | — |
+| Comando | `DeleteFile` | fileId | falla si un documento o una foto lo referencian — primero se desadjunta; marca `deletedAt` y deja los bytes al proceso diario | — |
+| Comando | `SetIdentityAvatar` | contenido | solo imagen y hasta 1 MB; **sustituye** siempre el anterior, así que no acumula ni consume cuota de ningún hogar; la ruta se deriva del `identityId` del token | — |
 | Comando | `RegisterConsumableIntake` | articleId **o** datos de artículo nuevo, ubicación, cantidad, ownerId | crea el artículo si no existe; resuelve la existencia de ese artículo en esa ubicación y **suma** la cantidad, o la crea si no hay ninguna; la cantidad de entrada debe ser > 0 y va en la unidad del artículo | `ArticleCreated` (si creó artículo) + `AssetCreated` o `AssetQuantityChanged` |
 | Comando | `MoveAsset` | assetId, nueva ubicación | evita ciclos en la jerarquía; si la ubicación es un Asset, este debe ser `DURABLE`; mover una existencia a una ubicación que ya tiene otra viva del mismo artículo se rechaza con `EXISTENCE_ALREADY_IN_LOCATION` — eso es una fusión, y se resuelve con `MergeStockItems` | `AssetMoved` / `AssetHierarchyChanged` |
 | Comando | `MergeStockItems` | assetId origen, assetId destino | ambas `CONSUMABLE` vivas del **mismo artículo** y distintas entre sí; el destino se queda con la suma de las cantidades y conserva su ubicación y su propietario; el origen queda a `quantity = 0` y `status = DECOMMISSIONED` | `AssetQuantityChanged` (destino) + `AssetDeactivated` (origen) |
@@ -1256,12 +1407,16 @@ Catálogo ilustrativo de los comandos y queries que expone la capa de aplicació
 | Comando | `StartLoan` | assetId, prestador, receptor, fecha de devolución prevista | el asset debe ser `DURABLE` y no tener otro préstamo abierto: un `OVERDUE` sigue ocupándolo | `LoanStarted` |
 | Comando | `ConfirmReturn` | loanId | solo prestador, receptor o un usuario del hogar | `LoanReturned` |
 | Comando | `GenerateExternalAccessToken` | loanId, rol (`LENDER`\|`BORROWER`) | vinculado a un préstamo abierto —también `OVERDUE`, que es justo cuando hace falta reclamar la devolución—; expira | — |
-| Comando de sistema | `PurgeUnverifiedHouseholds` | — (proceso diario) | borra los hogares sin verificar con más de 7 días, y la identidad que los abrió si nunca se verificó. **El único borrado real del core.** Como el proceso de vencidos, no nace de una petición: recorre los hogares fijando `app.household_id`, nunca con `BYPASSRLS` | — |
+| Comando de sistema | `PurgeUnverifiedHouseholds` | — (proceso diario) | borra los hogares sin verificar con más de 7 días, y la identidad que los abrió si nunca se verificó. **El único borrado real del core.** Como el proceso de vencidos, no nace de una petición: recorre los hogares fijando `app.household_id`, nunca con `BYPASSRLS`. No puede dejar bytes huérfanos, porque sin correo verificado no hay sesión y sin sesión no hay subidas; el día que eso cambie, tendrá que borrar también el directorio del hogar | — |
+| Comando de sistema | `PurgeUnusedFiles` | — (proceso diario) | desenlaza del disco tres cosas: los ficheros marcados hace más de 24 h, los que se subieron y nunca llegaron a adjuntarse, y las **reservas que nunca se completaron** —`uploadedAt` nulo con más de una hora—, que son las subidas cortadas a medias. Como los otros dos procesos, recorre los hogares fijando `app.household_id`, nunca con `BYPASSRLS`. Idempotente: solo mira lo que ya sobra | — |
 | Comando de sistema | `MarkOverdueLoans` | — (proceso diario) | pasa a `OVERDUE` los `ACTIVE` con `dueAt` ya superada; ignora los que no la tienen. No nace de una petición: recorre los hogares fijando `app.household_id` en cada transacción, nunca con `BYPASSRLS`. Idempotente por construcción — solo mira los `ACTIVE` | `LoanOverdue` por cada préstamo marcado |
 | Query | `ListArticles` | filtros: texto de búsqueda, categoría, código de barras | acotado al hogar; excluye los retirados salvo que se pidan; alimenta el autocompletado del alta de consumibles | — |
 | Query | `ListAssets` | filtros: locationId, parentAssetId, ownerId, status, type, articleId, categoryId, withoutOwner | resultado acotado al `householdId` del token; excluye los `DECOMMISSIONED` salvo que se filtre por ese estado; `withoutOwner` devuelve los huérfanos de una baja de usuario; el nombre y la categoría se resuelven desde el artículo cuando el asset lo tiene | — |
 | Query | `ListCategories` | — | excluye las retiradas salvo que se pidan | — |
 | Query | `ListDocuments` | filtros: assetId, articleId, type | acotado al hogar | — |
+| Query | `ListFiles` | filtros: `attached`, `type` | acotado al hogar, **ordenado por tamaño descendente**, que es la pregunta real cuando la cuota se agota: qué la está ocupando. Con `attached=false` devuelve los subidos y nunca adjuntados, que es lo que se puede borrar sin perder nada | — |
+| Query | `DownloadFile` | fileId | acotado al hogar; autoriza la aplicación y sirven los bytes por delegación. Es el camino de los documentos; una imagen se muestra con la URL firmada que ya trae la entidad (ver 5.8.4) | — |
+| Query | `GetStorageUsage` | — | bytes ocupados y cuota del hogar. Es lo que permite avisar **antes** de que una subida falle, en vez de después | — |
 | Query | `GetAsset` / `ListAssetChildren` | assetId | — | — |
 | Query | `ListLocations` / `GetLocation` | filtros: parentLocationId | — | — |
 | Query | `ListInvitations` | — | solo `HOUSEHOLD_ADMIN`; excluye aceptadas, revocadas y caducadas salvo que se pidan | — |
@@ -1270,8 +1425,114 @@ Catálogo ilustrativo de los comandos y queries que expone la capa de aplicació
 
 > **Por qué `MergeStockItems` no publica un evento propio.** Emite los dos que ya existen —`AssetQuantityChanged` sobre el destino y `AssetDeactivated` sobre el origen— y los correlaciona por payload: el primero lleva `mergedFromAssetId` y el segundo `mergedIntoAssetId`. Así un módulo que solo escuche cambios de cantidad no se pierde el del destino, que es lo que pasaría si la fusión se anunciara únicamente con un evento nuevo; y Warehouse, que sí necesita saber que las existencias del origen se mudan al destino en vez de haberse perdido, lo distingue por la referencia cruzada.
 
+> **Por qué los ficheros no publican ningún evento.** Un fichero recién subido y todavía sin adjuntar no significa nada para nadie: lo que le interesa a otro módulo es que se adjuntó un documento, y eso ya lo anuncia `DocumentAttached` (ver 5.2.3). Añadir un `FileUploaded` obligaría a cada suscriptor a esperar un segundo evento para saber si aquello llegó a servir para algo.
+
 > Este catálogo es ilustrativo y crecerá a medida que se implementen los casos de uso; cada nuevo comando/query debería añadirse aquí siguiendo el mismo formato.
 >
+
+### 5.8 Almacenamiento de ficheros
+
+Los ficheros de 4.1.1 se guardan **en el disco del propio servidor**, no en un servicio externo. La base de datos guarda la fila y el disco guarda los bytes: son dos sistemas distintos, y casi todo lo que sigue existe para que no acaben contradiciéndose.
+
+#### 5.8.1 Dónde viven los bytes
+
+Los ficheros ocupan un **volumen separado** del sistema operativo y de PostgreSQL, montado con `noexec,nodev,nosuid` y fuera de cualquier árbol que sirva el servidor web. La separación no es cosmética: sin ella, un disco lleno de fotos no degrada las subidas, sino que tumba la base de datos y con ella la aplicación entera. Con ella, llenarlo solo impide subir más.
+
+La ruta se deriva del identificador del fichero, nunca de nada que haya enviado el cliente:
+
+```
+<raíz>/<householdId>/<2 primeros caracteres del fileId>/<fileId>
+```
+
+Sin extensión —nada debe poder interpretarse por su nombre— y con el nombre original guardado solo como dato en la fila. El troceado por dos caracteres evita directorios de decenas de miles de entradas.
+
+Que el `householdId` aparezca en la ruta no es lo que aísla. **Lo que aísla es que para construir la ruta hay que haber leído antes la fila**, y esa lectura ya pasó por la política de RLS. De ahí sale una consecuencia que parece una optimización desaprovechada y no lo es: **no se deduplica contenido entre hogares**. Dos hogares con el mismo manual guardan dos copias, porque compartir una ruta rompería justo esa herencia.
+
+#### 5.8.2 La cuota por hogar no protege al servidor
+
+El gigabyte por hogar impide que **uno** se quede el disco, que es para lo que está. No impide que se lo queden **todos**: con el alta en autoservicio abierto (4.1.7) el número de hogares no está acotado, y unas decenas llenando su cuota agotan cualquier VPS razonable. Hacen falta dos controles más, que son de operación y no de dominio:
+
+- **Un techo global sobre el volumen**, que rechaza subidas nuevas al superar un umbral —del orden del 90 %— aunque al hogar le sobre cuota. Una subida rechazada siempre es mejor noticia que un volumen al 100 %.
+- **Sobrecompromiso consciente y medido**: la suma de las cuotas puede superar el tamaño del volumen, apostando a que el uso real es una fracción, pero eso exige métrica de ocupación y alerta. Sin medirlo, no es una apuesta sino un descuido.
+
+Hay un atenuante que ya estaba en el diseño: no se puede subir nada sin correo verificado, y los hogares sin verificar se purgan a los siete días (`PurgeUnverifiedHouseholds`), así que dar de alta hogares en masa no regala almacenamiento.
+
+#### 5.8.3 El camino de subida
+
+1. **Tope duro antes de leer el cuerpo**, en la configuración del contenedor: 25 MB. Una petición mayor se corta sin llegar al caso de uso.
+2. **Reserva de cuota**, en una transacción corta: se bloquea la fila del hogar (`SELECT … FOR UPDATE`), se suma lo vivo más el tamaño declarado y, si cabe, se inserta la fila del fichero con `uploadedAt` a nulo. Confirmar y soltar.
+3. **Escritura a un fichero temporal**, ya **sin ningún bloqueo**, contando bytes y abortando si se supera lo reservado.
+4. **Detección del tipo real** inspeccionando el contenido, no la extensión ni el `Content-Type` declarado. Si el tipo real no está en la lista blanca, se rechaza.
+5. **Recodificación de las imágenes**, con tope de dimensiones comprobado *antes* de decodificar —un PNG de 50 000 × 50 000 revienta la memoria al abrirlo, no al leerlo— y generación de la miniatura.
+6. **Movimiento al destino definitivo y cierre de la fila:** tamaño real, `checksum`, tipo detectado y `uploadedAt`. Los bytes se escriben antes de cerrar la fila, de modo que en cualquier instante el disco contiene todo lo que la base de datos da por bueno.
+
+**Por qué la reserva, y no comprobar la cuota y ya.** Si el bloqueo se tomara antes de transmitir y se soltara al confirmar, duraría **toda la subida**: un fichero de 25 MB por una conexión mala dejaría al hogar entero sin poder subir nada durante un minuto. Reservando primero, el bloqueo dura milisegundos y la transmisión no bloquea a nadie. El precio es una fila a medias mientras dura la subida, que es exactamente lo que `uploadedAt` a nulo significa — ocupa cuota, no se puede adjuntar, y si la subida se corta la recoge el proceso diario.
+
+El tamaño real solo puede ser **menor** que el reservado, porque recodificar encoge y porque la transmisión aborta si lo supera. Así que cerrar la fila nunca aumenta lo consumido: solo devuelve lo que sobraba.
+
+El `Content-Length` sirve para reservar y para rechazar antes de recibir, nunca para creerse el tamaño: quien lo escribe es el cliente, y el paso 3 lo comprueba contando.
+
+**Recodificar es sobre todo por el EXIF.** Una foto hecha con el móvil dentro de casa lleva incrustadas las coordenadas GPS de la casa. Es el dato más sensible que va a atravesar este mecanismo y nadie lo introduce a sabiendas: quitar los metadatos al recodificar no es un ahorro de bytes, es la razón principal para hacerlo. De paso destruye cualquier carga útil escondida en el fichero.
+
+**La miniatura sale del mismo paso.** 320 px en el lado largo y en WebP, que es de sobra para una rejilla en un móvil de 375 px. Se guarda junto al original, bajo la misma clave y otro prefijo, y **no cuenta en la cuota del hogar** (ver 4.1.1): la decide el sistema, no el usuario. Sí ocupa disco, así que el dimensionado del volumen cuenta con un margen sobre la suma de las cuotas — del orden de un 5 %.
+
+**Lista blanca de tipos:** `image/jpeg`, `image/png`, `image/webp` y `application/pdf`. Nada más, con dos exclusiones deliberadas:
+
+- **SVG queda fuera.** Es XML con scripts dentro, y nadie fotografía una caldera en SVG.
+- **HEIC queda fuera por ahora**, aunque sea lo que produce un iPhone por defecto: la JVM no lo decodifica sin librerías nativas. Lo convierte el frontend antes de subirlo.
+
+El PDF sí entra —los manuales y las facturas son PDF— pero nunca se muestra incrustado dentro de la aplicación.
+
+#### 5.8.4 El camino de descarga
+
+Hay **dos caminos**, y lo que los separa no es la técnica sino el riesgo de lo que transportan.
+
+**Imágenes: URL firmada de vida corta.** Un `<img src>` no puede enviar la cabecera `Authorization` — el HTML no ofrece ninguna forma de adjuntar cabeceras a la carga de un subrecurso. Autenticar la imagen por cabecera obligaría al frontend a descargarla con JavaScript y a renunciar a `loading="lazy"`, a `srcset`, a la caché del navegador y al renderizado progresivo, justo en la pantalla donde más se nota: una rejilla de existencias en un móvil. Por eso la aplicación **emite la URL ya firmada** al devolver la entidad:
+
+```
+https://files.drp.example/f/thumb/3f2a55c1-…?e=1786400000&s=<HMAC>
+```
+
+nginx verifica la firma con el módulo `secure_link` y sirve **sin preguntar a la aplicación**. El HMAC cubre la ruta **y** la caducidad, así que alargarla editando el parámetro invalida la firma; y la ruta es un UUID v4, que no se enumera.
+
+**Caduca con el access token que la generó**, unos quince minutos (ver 5.4.1). La simetría no es estética: cuando el frontend renueva el token vuelve a leer las entidades y recibe URL frescas, así que no hay dos relojes que cuadrar. De ahí una consecuencia para el contrato — **un `photoUrl` no se guarda**: vale para pintar ahora, no para almacenar en el estado del cliente ni para compartir.
+
+**Documentos y descargas explícitas: el endpoint autorizado.** `GET /api/v1/files/{id}/content` comprueba que el fichero pertenece al hogar del token y responde con `X-Accel-Redirect` a una ruta interna que resuelve nginx. Descargar una factura es un clic, y un clic ya es JavaScript: ahí no hay ninguna razón para renunciar a comprobar el hogar en cada petición. En desarrollo, sin nginx delante, el mismo endpoint transmite los bytes directamente.
+
+**El reparto es de proporción.** Lo que pierde la comprobación por petición durante quince minutos es una foto de un estante, ya recodificada, sin EXIF y con nombre no adivinable. Lo que la conserva es la factura con nombre y dirección y la garantía con el número de serie.
+
+> **La condición sin la cual esto no sería aceptable: no registrar la cadena de consulta.** nginx escribe la URL completa en el log de acceso por defecto, firma incluida. Con la retención habitual de un log, eso convierte el propio registro en un almacén de credenciales vivas — y de las que nadie vigila. En el `location` de ficheros se registra la ruta **sin parámetros**, y la aplicación tampoco los traza. Se completa con `Referrer-Policy: no-referrer`, para que la firma no viaje en la cabecera `Referer` de ninguna navegación posterior.
+
+**Lo que se acepta a cambio.** La autorización de una imagen se comprueba **al emitir la URL**, no al descargarla, así que sacar a alguien del hogar no invalida las que ya tuviera en pantalla: siguen sirviendo hasta que caduquen. No es una clase de exposición nueva — el access token de esa misma persona tampoco se puede revocar antes de expirar (ver 5.4.1)—, pero conviene que esté escrito y no descubierto.
+
+Tres cabeceras que no son opcionales en ninguno de los dos caminos: `Content-Disposition: attachment` con el nombre original codificado según RFC 6266, `X-Content-Type-Options: nosniff` y `Content-Security-Policy: default-src 'none'; sandbox`. El `attachment` **no impide** que un `<img>` pinte la imagen: el navegador solo lo honra en navegaciones y descargas, no en subrecursos. Es decir, se puede exigir siempre sin romper nada.
+
+Y los ficheros **se sirven desde otro dominio**, no desde una ruta de la aplicación. Es lo que impide que un fichero que se cuele pese a todo lo anterior comparta origen con la sesión, el token y los datos del hogar.
+
+#### 5.8.5 Controles OWASP aplicados
+
+Las medidas anteriores no son invención propia: son la [File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html) de OWASP y el capítulo V12 de ASVS, aterrizados en este diseño.
+
+| Control | Dónde se aplica aquí |
+|---|---|
+| Lista blanca de tipos, nunca lista negra | 5.8.3, paso 4. Cuatro tipos admitidos; todo lo demás se rechaza |
+| Validar el contenido, no la extensión ni lo declarado | 5.8.3, paso 4. El `contentType` que se guarda es el detectado |
+| Renombrar el fichero en disco | 5.8.1. La ruta sale del `fileId`; el nombre original es un dato, no una ruta. Cierra de una vez el path traversal, los bytes nulos y las dobles extensiones (`x.pdf.php`) |
+| Guardar fuera del árbol web, sin permiso de ejecución | 5.8.1. Volumen propio con `noexec` |
+| Limitar tamaño y frecuencia | 25 MB por fichero, 1 GB por hogar (4.1.1) y límite de frecuencia por identidad en el endpoint de subida |
+| Neutralizar el contenido activo | 5.8.3. SVG excluido, imágenes recodificadas, PDF servido siempre como adjunto |
+| Servir desde otro origen y como adjunto | 5.8.4. Dominio distinto, `Content-Disposition: attachment`, `nosniff` y CSP restrictiva |
+| Identificadores no adivinables | UUID v4 en la ruta y en la API, nunca un contador |
+| Autorizar el acceso a cada fichero | 5.8.4. En un documento, comprobando el hogar **en cada petición**; en una imagen, **al emitir** la URL firmada, que caduca en quince minutos |
+| No exponer credenciales de sesión en la URL (ASVS) | La firma **no es un token de sesión**: es una autorización de solo lectura sobre un único objeto, con caducidad, que no da acceso a la cuenta ni a ningún otro fichero. Aun así no se registra en ningún log, ni se filtra por `Referer` (5.8.4) |
+| Registrar quién sube qué | `createdBy` y `sizeBytes` en la fila (4.1.1) |
+| No registrar credenciales | 5.8.4. La cadena de consulta queda fuera del log de acceso de nginx y de las trazas de la aplicación |
+
+#### 5.8.6 Copias de seguridad
+
+Con los ficheros fuera de la base de datos, una restauración puede dejar filas apuntando a bytes que no están, o bytes que ya no referencia nadie. Lo segundo es inofensivo —el barrendero diario los recoge—; lo primero es un error duro, y el orden lo evita: **primero el volcado de la base de datos, después el árbol de ficheros**, con la ventana de purga configurada más larga que la ventana de copia. Como los bytes se escriben antes que la fila (5.8.3), todo lo que el volcado referencia ya estaba en disco.
+
+Una instantánea del VPS completo resuelve el problema por otra vía, capturando ambos en el mismo instante, y es lo que da la copia diaria automática incluida en el plan. Conviene tener las dos: la instantánea protege del desastre y el volcado lógico, del error humano.
 
 ---
 
@@ -1286,6 +1547,9 @@ Catálogo ilustrativo de los comandos y queries que expone la capa de aplicació
 | Comunicación interna BE | Event bus (in-process) | Contrato definido (ver 5.2); librería concreta por definir; candidato a evolucionar con patrón Outbox |
 | Comunicación FE ↔ BE | API REST autenticada | Spring Security + JWT para usuarios del hogar; tokens acotados de vida corta (tabla `loan_access_tokens`) para usuarios externos de préstamo (ver 5.4.1) |
 | Contratos de API | OpenAPI 3.0 (`openapi.yaml`) + ejemplos en el README | Ver 5.4.3 |
+| Almacenamiento de ficheros | Sistema de ficheros del servidor, en volumen propio | Metadatos en PostgreSQL y cuota de 1 GB por hogar; se usa tras un puerto `FileStorage`, de modo que migrar a S3 sea un segundo adaptador (ver 5.8 y ADR-005) |
+| Entrega de ficheros | nginx delante del backend | La aplicación autoriza y nginx sirve (`X-Accel-Redirect`), desde un **dominio distinto** al de la aplicación (ver 5.8.4) |
+| Despliegue | VPS (OVHcloud VPS-2 o VPS-3) | Configuración concreta **por decidir**; es lo que fija el tamaño del volumen de ficheros y, con él, cuántos hogares caben (ver 5.8.2) |
 | Frontend | TypeScript | |
 | Librería de UI sugerida | React | |
 | Testing | Por definir (candidatos: Kotest/JUnit5 + Testcontainers en BE, Vitest/Jest + Testing Library en FE) | A confirmar |
@@ -1349,6 +1613,27 @@ pie title Distribución de la batería de tests
 - *Integración de caso de uso:* `MarkOverdueLoans` debe dejar `updatedBy` a nulo, porque no actúa en nombre de nadie.
 - *Contrato de adaptador:* la clave ajena compuesta debe rechazar un `createdBy` que apunte a un usuario de otro hogar.
 - *Integración de caso de uso:* dar de baja a un usuario no debe borrar su rastro — las filas que creó siguen resolviendo su nombre.
+
+**Ejemplos derivados del almacenamiento de ficheros:**
+- *Unitario de dominio:* un `Document` no puede llevar enlace y fichero a la vez, ni quedarse sin ninguno de los dos; un asset sí puede quedarse sin foto.
+- *Unitario de dominio:* un SVG no está en la lista blanca por mucho que se declare como `image/png`.
+- *Integración de caso de uso:* `UploadFile` con un fichero que dice ser `image/png` y cuyo contenido es otra cosa debe rechazarse por el tipo **real**, no por la extensión ni por lo declarado.
+- *Integración de caso de uso:* subir una foto con coordenadas GPS en el EXIF debe almacenarla **sin ellas**, y el `sizeBytes` guardado debe ser el del fichero ya recodificado.
+- *Integración de caso de uso:* una subida que transmite más de lo reservado debe abortar sin dejar bytes en disco, y su reserva debe desaparecer.
+- *Integración de caso de uso:* dos reservas simultáneas que juntas superan lo que queda de cuota deben dejar pasar **una y solo una** — es lo que comprueba que el bloqueo de la fila del hogar está puesto.
+- *Integración de caso de uso:* mientras una subida grande está transmitiendo, otra del mismo hogar **no debe quedarse esperando** — es lo que distingue reservar de bloquear durante toda la subida.
+- *Integración de caso de uso:* una subida cortada a la mitad debe dejar la reserva con `uploadedAt` a nulo, seguir ocupando cuota, no poder adjuntarse, y desaparecer en la siguiente pasada de `PurgeUnusedFiles`.
+- *Integración de caso de uso:* subir una imagen debe dejar también su miniatura, que **no** debe sumar a la cuota; un PDF no debe generar ninguna.
+- *Integración de caso de uso:* adjuntar como foto un fichero que ya cuelga de un documento debe fallar — es el cruce que ningún índice único llega a ver.
+- *Integración de caso de uso:* cerrar la cuenta debe borrar el avatar y no tocar ningún fichero del hogar.
+- *Contrato de adaptador / E2E:* una URL firmada con la caducidad manipulada debe rechazarse, y la misma URL válida debe dejar de servir pasada su ventana.
+- *Contrato de adaptador:* el log de acceso no debe contener la cadena de consulta de ninguna descarga — si aparece la firma, el control no está puesto.
+- *Integración de caso de uso:* `DeleteDocument` sobre uno con fichero debe liberar la cuota en el acto y dejar los bytes en disco hasta que pase `PurgeUnusedFiles`.
+- *Integración de caso de uso:* `PurgeUnusedFiles` debe desenlazar los marcados hace más de 24 h y los subidos y nunca adjuntados, sin tocar ninguno vivo, y no debe necesitar `BYPASSRLS` para recorrer los hogares.
+- *Contrato de adaptador:* adjuntar un `fileId` de otro hogar debe responder `404`, y la clave ajena compuesta debe rechazarlo también si el caso de uso llegara a intentarlo.
+- *Contrato de adaptador / E2E:* `GET /api/v1/files/{id}/content` debe responder siempre con `Content-Disposition: attachment` y `X-Content-Type-Options: nosniff`, incluso para una imagen.
+- *Contrato de adaptador / E2E:* un nombre de fichero con `../` o con byte nulo debe almacenarse igual y no debe aparecer nunca en la ruta en disco.
+- *Integración de caso de uso:* `SetIdentityAvatar` dos veces debe dejar un solo fichero, y no debe alterar la cuota de ningún hogar.
 
 **Ejemplos derivados de la profundización de atributos:**
 - *Unitario de dominio:* un `Document` no puede colgar a la vez de un asset y de un artículo, ni de ninguno de los dos.
@@ -1414,8 +1699,8 @@ El contrato completo de la API vive en [`openapi.yaml`](openapi.yaml) (OpenAPI
 
 > **Este documento sigue siendo la fuente vigente de la definición del core.**
 > Parte de su contenido (5.4.3, 5.6, 5.7) corresponde por ámbito a `docs/common/`,
-> y se repartirá al iniciar la Fase 1, cuando exista documentación propia de
-> backend y frontend que compita con él. El motivo del aplazamiento y el destino
+> y la 5.8 a `docs/backend/`; todo ello se repartirá al iniciar la Fase 1, cuando
+> exista documentación propia de backend y frontend que compita con él. El motivo del aplazamiento y el destino
 > previsto de cada sección están en
 > [`docs/README.md`](docs/README.md#estado-actual-la-definición-de-fase-0-vive-en-el-readme-principal).
 
@@ -1437,7 +1722,9 @@ El contrato completo de la API vive en [`openapi.yaml`](openapi.yaml) (OpenAPI
 | 2026-08-09 | Política de contraseñas (4.1.4, 4.1.7): **mínimo 12 caracteres sin reglas de composición**, más rechazo de las más comunes contra lista local, sin caducidad ni historial. Al fijarla salió que **BCrypt trunca en silencio a partir de 72 bytes**, justo lo que la política fomenta, así que el hash pasa a `Argon2id`; la ADR-002 no se reescribe y la revisión queda enlazada al final de esa ADR. El mínimo se declara en `openapi.yaml` en los cuatro puntos donde se fija una contraseña, y **no** en el login, donde validar la forma daría `400` en lugar de `401`. La configuración mínima de Argon2id queda fijada en la recomendada por OWASP: 19 MiB, 2 iteraciones y paralelismo 1 |
 | 2026-08-09 | Recuperación y cambio de contraseña (4.1.4, 5.4.1, 5.7): `RequestPasswordReset` + `ResetPassword` con token de un solo uso de **una hora**, en tabla propia `password_reset_tokens` para no arriesgar confusión de propósito con la verificación; restablecer revoca **todas** las sesiones antes de emitir la nueva y marca el correo como verificado. Se añade `ChangePassword` para quien ya está autenticado, que exige la contraseña actual y conserva su sesión — hasta ahora no había ninguna forma de cambiar la contraseña. Anotada como pendiente la **política de contraseñas**, inexistente y ahora exigible en tres puntos distintos |
 | 2026-08-09 | Cierre de los puntos que dejó abiertos el enrolamiento (4.1.7): el alta de miembros pasa de **alta directa a invitación por correo** (`InviteUser` + `AcceptInvitation`), ahora que la verificación obligatoria trae la infraestructura de correo al primer día; aceptar una invitación verifica el correo por sí solo, y desaparece `mustChangePassword`, que solo existía para el alta directa. Los hogares sin verificar se purgan **a los 7 días** con `PurgeUnverifiedHouseholds`, el único borrado real del core. Revisadas y mantenidas abiertas las dos pendientes restantes: peso y volumen del asset, y los cuatro atributos propuestos. Corregida la afirmación de que crear un hogar era la única escritura sin autenticar — es la única que no exige credencial alguna |
-| 2026-08-10 | Refinado el listado de módulos futuros (4.2), que pasa de cinco filas más un cajón de sastre a **trece módulos con prioridad**. Entran seis nuevos: **proveedores y contactos de servicio** y **compras y lista de la compra** en prioridad alta, y **recetas y menú semanal**, **reservas de uso**, **fin de vida** y **mascotas y plantas** en baja. Este último cierra además una pregunta de alcance: un ser vivo no es material del hogar, así que no es un asset ni cabe en CMMS — el módulo trae su propia entidad en lugar de forzarla en el core. **Gastos y presupuesto** (media) y **garantías y seguros** (baja) suben de la fila «(otros a definir)» a fila propia, y con ellos desaparece esa fila: un candidato nuevo entra con estado y prioridad o no entra. Se retira **energía**, demasiado lejos del modelo de assets. La analogía ERP→DRP (3) gana las dos áreas que quedaban sin equivalente, compras y maestro de proveedores, y el diagrama de componentes (5.1) se redibuja con los doce módulos agrupados por prioridad |
+| 2026-08-10 | **Almacenamiento local de ficheros** (4.1.1, 4.1.7, nueva 5.8, [ADR-005](docs/common/architecture/decisions/ADR-005-local-file-storage.md)): el core deja de depender de un servicio externo para las fotos y la documentación y guarda los binarios en el disco del servidor, con la entidad `StoredFile` (tabla `files`) y **1 GB de cuota por hogar**. El enlace externo no desaparece: un documento apunta a `url` **o** a `fileId`, nunca a los dos, y lo mismo vale para las fotos de asset, artículo y ubicación. Se aplican los controles de la File Upload Cheat Sheet de OWASP — lista blanca por contenido real, renombrado en disco, volumen propio `noexec` fuera del árbol web, recodificación de imágenes que de paso borra el EXIF con la geolocalización de la casa, y entrega como adjunto desde otro dominio. El avatar de una identidad queda **fuera** del mecanismo por no tener hogar al que cargarle cuota, y pasa a columnas de `identities` con tope de 1 MB. Queda anotado que la cuota por hogar **no** protege el disco por sí sola mientras el alta sea autoservicio: hacen falta volumen propio y techo global (5.8.2). El análisis antivirus se anota como pendiente con motivo, no como descartado. Impacto en 4.1.2, 4.1.3, 4.1.4, 5.4.2, 5.4.3, 5.6, 5.7, 6, 7 y `openapi.yaml` |
+| 2026-08-10 | Cierre de la revisión del mecanismo de ficheros. **Las imágenes se entregan con URL firmada de vida corta** que sirve nginx sin preguntar a la aplicación, porque un `<img>` no puede enviar la cabecera `Authorization`; los documentos siguen por el endpoint autorizado, que comprueba el hogar en cada petición (4.1.7, 5.8.4). Se descartaron `fetch()` + blob —preflight por URL, memoria retenida y los bytes de vuelta en el origen de la app— y la cookie acotada al dominio de ficheros, que exige `SameSite=None` y empuja a compartir dominio registrable. Se añade la condición de **no registrar la cadena de consulta** en ningún log, sin la cual la firma acabaría en claro en el log de acceso. La cuota pasa a **reservarse** antes de transmitir, para que el bloqueo del hogar dure milisegundos y no toda la subida (5.8.3, columna `uploaded_at` nueva). Se define la miniatura —320 px, WebP, fuera de la cuota—, se añade `GET /api/v1/files` para poder ver qué ocupa el gigabyte, se hace explícito que «un fichero se adjunta una sola vez» solo es expresable a medias en la base de datos (5.6), y **cerrar la cuenta pasa a borrar el avatar** (4.1.4). Queda anotada como pendiente la supresión de los ficheros de un hogar entero, que es una pregunta de baja de hogar y no de ficheros. Impacto en 5.4.2, 5.6, 5.7, 7, `openapi.yaml` y ADR-005 |
+| 2026-08-10 | Refinado el listado de módulos futuros (4.2), que pasa de cinco filas más un cajón de sastre a **trece módulos con prioridad**. Entran seis nuevos: **proveedores y contactos de servicio** y **compras y lista de la compra** en prioridad alta, y **recetas y menú semanal**, **reservas de uso**, **fin de vida** y **mascotas y plantas** en baja. Este último cierra además una pregunta de alcance: un ser vivo no es material del hogar, así que no es un asset ni cabe en CMMS — el módulo trae su propia entidad en lugar de forzarla en el core. **Gastos y presupuesto** (media) y **garantías y seguros** (baja) suben de la fila «(otros a definir)» a fila propia, y con ellos desaparece esa fila: un candidato nuevo entra con estado y prioridad o no entra. Se retira **energía**, demasiado lejos del modelo de assets. La analogía ERP→DRP (3) gana las dos áreas que quedaban sin equivalente, compras y maestro de proveedores, y el diagrama de componentes (5.1) se redibuja con los trece módulos agrupados por prioridad |
 | 2026-08-10 | Resueltas las tres fronteras que el listado ampliado dejaba en disputa (4.2, 5.2.3): la **lista de la compra** pasa del planificador de tareas al módulo de compras, su dueño natural; el **recordatorio de devolución** se queda en el planificador y se traspasa a gestión avanzada de préstamos cuando ese módulo exista, único traspaso previsto y ahora anotado; y el **aviso por fecha** —caducidad, revisión, garantía, devolución, riego— no gana módulo propio: cada módulo posee su regla y el mecanismo de programación y entrega es plataforma, como el correo que el core ya usa. Un módulo de avisos centralizado dejaría a cinco módulos dependiendo de que estuviera activo, que es lo que el event bus existe para evitar. El core no cambia en ninguno de los tres casos |
 | 2026-08-08 | Enrolamiento de un inquilino (4.1.4): alta de hogar **autoservicio** con verificación de correo obligatoria en dos pasos (`CreateHousehold` + `VerifyEmail`), única escritura sin autenticar y sin delatar qué correos existen. Se separa `Identity` (credenciales, única en la instalación) de `HouseholdMember` (rol en un hogar), con una sola pertenencia activa en el MVP; `users` desaparece y todo lo que el dominio llamaba «usuario» pasa a la pertenencia, mientras los refresh tokens cuelgan de la identidad. Se hace explícito que un hogar puede tener **varias viviendas**, que son `Location` raíz de tipo `HOUSE`, y que el resto del dominio cuelga del hogar y no de la vivienda (4.1.2). `identities` queda fuera de RLS, lo que se marca como el único punto con datos personales a una sola capa (5.6). Impacto en 4.1.7, 5.2.3, 5.4.1, 5.4.2, 5.4.3, 5.6, 5.7, 7 y `openapi.yaml` |
 | 2026-08-08 | Autoría de los cambios en todo el core: cada entidad gana `createdBy` y `updatedBy` (4.1.1), anulables y con nulo significando «el sistema», nunca aceptadas del cliente, y con clave ajena compuesta para que una autoría no pueda cruzarse de hogar (5.6). El hogar queda fuera, porque cuando su fila nace no hay ningún usuario al que apuntar. Impacto en las tablas de atributos, el modelo de datos, los ejemplos de test (7) y `openapi.yaml`. Quedan cuatro atributos pendientes en 4.1.7 |
