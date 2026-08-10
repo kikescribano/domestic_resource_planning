@@ -2,14 +2,28 @@ openapi: 3.0.3
 info:
   title: DRP · Domestic Resource Planning API
   description: >
-    API REST del core mínimo de DRP (Domestic Resource Planning).
-    Especificación ilustrativa de la Fase 0 — sujeta a cambios a medida
-    que avance el desarrollo. Ver readme.md del proyecto para el contexto
-    completo (modelo de dominio, event bus, roadmap).
-  version: "0.1.0-fase0"
+    API REST del core de DRP (Domestic Resource Planning).
+
+
+    Este documento es la **fuente de verdad** de la API, no una ilustración
+    de ella (ver ADR-007): se edita antes que el código que lo implementa, el
+    frontend genera de él sus tipos y su cliente, y el backend se verifica
+    contra él con las pruebas de contrato. Ver readme.md del proyecto para el
+    contexto completo — modelo de dominio, event bus y roadmap.
+
+
+    Dos convenciones transversales. Los **errores de forma** responden 400 con
+    código `VALIDATION_ERROR`; los de **regla de negocio**, 409 con el código
+    concreto. Y todas las colecciones se devuelven **paginadas**, con la misma
+    envoltura `{ items, page, size, total }`.
+  version: "0.2.0-fase1"
+  license:
+    name: Ver LICENSE del repositorio
 servers:
   - url: https://api.drp.example/api/v1
-    description: Entorno ilustrativo (a definir en el despliegue real)
+    description: Entorno ilustrativo (el real se fija al elegir el VPS, al cerrar la Fase 1)
+  - url: http://localhost:8080/api/v1
+    description: Desarrollo local, levantado por compose.yaml
 
 tags:
   - name: households
@@ -41,6 +55,7 @@ security:
 paths:
   /households:
     post:
+      operationId: createHousehold
       tags: [households]
       summary: Crear un hogar con su primer administrador
       description: >
@@ -60,9 +75,13 @@ paths:
       responses:
         "202":
           description: Solicitud aceptada. Sin cuerpo, y siempre la misma respuesta.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /auth/verify-email:
     post:
+      operationId: verifyEmail
       tags: [auth]
       summary: Verificar el correo y obtener sesion
       description: >
@@ -92,9 +111,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /auth/resend-verification:
     post:
+      operationId: resendVerification
       tags: [auth]
       summary: Reenviar el enlace de verificacion
       description: >
@@ -113,9 +136,13 @@ paths:
       responses:
         "202":
           description: Solicitud aceptada. Sin cuerpo, y siempre la misma respuesta.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /auth/password-reset:
     post:
+      operationId: requestPasswordReset
       tags: [auth]
       summary: Solicitar el restablecimiento de contrasena
       description: >
@@ -137,9 +164,13 @@ paths:
       responses:
         "202":
           description: Solicitud aceptada. Sin cuerpo, y siempre la misma respuesta.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /auth/password-reset/confirm:
     post:
+      operationId: resetPassword
       tags: [auth]
       summary: Fijar la contrasena nueva con el token recibido
       description: >
@@ -173,9 +204,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /auth/password:
     post:
+      operationId: changePassword
       tags: [auth]
       summary: Cambiar la contrasena estando autenticado
       description: >
@@ -203,9 +238,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /auth/login:
     post:
+      operationId: login
       tags: [auth]
       summary: Iniciar sesión (usuarios del hogar)
       security: []
@@ -239,9 +277,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /auth/refresh:
     post:
+      operationId: refreshSession
       tags: [auth]
       summary: Renovar el access token
       security: []
@@ -266,24 +308,59 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /auth/logout:
+    post:
+      operationId: revokeSession
+      tags: [auth]
+      summary: Cerrar la sesión en curso
+      description: >
+        Revoca el refresh token indicado, que es lo único revocable: un access
+        token no se puede retirar y sigue valiendo hasta que caduque, unos 15
+        minutos. Para tumbar todas las sesiones a la vez está el cambio de
+        contraseña. Responde igual con un token válido que con uno que ya no
+        existe: no hay nada que averiguar por la respuesta.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "204":
+          description: Sesión cerrada
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /categories:
     get:
+      operationId: listCategories
       tags: [categories]
       summary: Listar las categorías del hogar
       parameters:
         - name: includeRetired
           in: query
           schema: { type: boolean, default: false }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
       responses:
         "200":
           description: Listado de categorías vigentes
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/Category" }
+              schema: { $ref: "#/components/schemas/CategoryPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
     post:
+      operationId: createCategory
       tags: [categories]
       summary: Crear una categoría
       requestBody:
@@ -302,6 +379,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /categories/{id}:
     parameters:
@@ -309,7 +389,36 @@ paths:
         in: path
         required: true
         schema: { type: string, format: uuid }
+    patch:
+      operationId: updateCategory
+      tags: [categories]
+      summary: Renombrar o anotar una categoría
+      description: >
+        El nombre sigue siendo único entre las vigentes del hogar, comparado
+        normalizado. Renombrar no toca a los assets ni a los artículos que la
+        usan: la referencian por identificador, no por texto.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CategoryInput" }
+      responses:
+        "200":
+          description: Categoría actualizada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Category" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Ya hay otra categoría vigente con ese nombre (CATEGORY_DUPLICATE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
     delete:
+      operationId: retireCategory
       tags: [categories]
       summary: Retirar una categoría
       description: >
@@ -319,9 +428,13 @@ paths:
         "204":
           description: Categoría retirada
         "404": { $ref: "#/components/responses/NotFound" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /documents:
     get:
+      operationId: listDocuments
       tags: [documents]
       summary: Listar documentos del hogar
       parameters:
@@ -334,15 +447,19 @@ paths:
         - name: type
           in: query
           schema: { $ref: "#/components/schemas/DocumentType" }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
       responses:
         "200":
           description: Listado de documentos
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/Document" }
+              schema: { $ref: "#/components/schemas/DocumentPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
     post:
+      operationId: attachDocument
       tags: [documents]
       summary: Adjuntar un documento a un asset o a un artículo
       requestBody:
@@ -373,6 +490,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /documents/{id}:
     parameters:
@@ -381,6 +501,7 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     delete:
+      operationId: deleteDocument
       tags: [documents]
       summary: Eliminar un documento
       description: >
@@ -391,9 +512,13 @@ paths:
         "204":
           description: Documento eliminado
         "404": { $ref: "#/components/responses/NotFound" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /files:
     get:
+      operationId: listFiles
       tags: [files]
       summary: Listar los ficheros del hogar
       description: >
@@ -408,17 +533,25 @@ paths:
             borrar sin perder nada.
         - name: type
           in: query
-          schema: { type: string }
-          description: Filtra por tipo de contenido
+          schema:
+            type: string
+            enum: [image/jpeg, image/png, image/webp, application/pdf]
+          description: >
+            Filtra por tipo de contenido. Los mismos cuatro de la lista blanca
+            de subida: no puede haber almacenado nada fuera de ellos.
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
       responses:
         "200":
           description: Listado de ficheros
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/StoredFile" }
+              schema: { $ref: "#/components/schemas/StoredFilePage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
     post:
+      operationId: uploadFile
       tags: [files]
       summary: Subir un fichero
       description: >
@@ -468,6 +601,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /files/{id}:
     parameters:
@@ -476,6 +613,7 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      operationId: getFile
       tags: [files]
       summary: Metadatos de un fichero
       responses:
@@ -485,7 +623,11 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/StoredFile" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
     delete:
+      operationId: deleteFile
       tags: [files]
       summary: Retirar un fichero
       description: >
@@ -501,6 +643,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /files/{id}/content:
     parameters:
@@ -509,6 +654,7 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      operationId: downloadFile
       tags: [files]
       summary: Descargar el contenido de un fichero
       description: >
@@ -535,9 +681,13 @@ paths:
             application/octet-stream:
               schema: { type: string, format: binary }
         "404": { $ref: "#/components/responses/NotFound" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /storage:
     get:
+      operationId: getStorageUsage
       tags: [files]
       summary: Uso de almacenamiento del hogar
       description: >
@@ -548,9 +698,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/StorageUsage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /articles:
     get:
+      operationId: listArticles
       tags: [articles]
       summary: Listar y buscar artículos del catálogo del hogar
       description: >
@@ -571,15 +724,19 @@ paths:
           in: query
           description: Por defecto false -- los artículos retirados no se ofrecen en el alta
           schema: { type: boolean, default: false }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
       responses:
         "200":
           description: Listado de artículos vigentes
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/Article" }
+              schema: { $ref: "#/components/schemas/ArticlePage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
     post:
+      operationId: createArticle
       tags: [articles]
       summary: Crear un artículo en el catálogo
       requestBody:
@@ -596,10 +753,13 @@ paths:
         "409":
           description: >
             Ya existe un artículo con ese name normalizado o ese código de
-            barras en el hogar (CATALOG_ITEM_DUPLICATE)
+            barras en el hogar (ARTICLE_DUPLICATE)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /articles/{id}:
     parameters:
@@ -608,6 +768,7 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      operationId: getArticle
       tags: [articles]
       summary: Detalle de un artículo
       responses:
@@ -617,7 +778,43 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Article" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+    patch:
+      operationId: updateArticle
+      tags: [articles]
+      summary: Corregir la ficha de un artículo
+      description: >
+        Cambia la definición, no las existencias. La unidad es el único campo
+        que deja de poder cambiarse en cuanto el artículo tiene existencias
+        vivas: alterarla reinterpretaría en silencio toda la cantidad ya
+        contada, que se lleva en esa unidad.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ArticlePatch" }
+      responses:
+        "200":
+          description: Artículo actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Article" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            Ya hay otro artículo vigente con ese nombre o ese código de barras
+            (ARTICLE_DUPLICATE), o se intenta cambiar la unidad de uno que ya
+            tiene existencias (ARTICLE_UNIT_IMMUTABLE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
     delete:
+      operationId: retireArticle
       tags: [articles]
       summary: Retirar un artículo del catálogo
       description: >
@@ -632,13 +829,17 @@ paths:
         "409":
           description: >
             Al artículo aún le quedan existencias vivas
-            (CATALOG_ITEM_HAS_EXISTENCES)
+            (ARTICLE_HAS_EXISTENCES)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /assets:
     get:
+      operationId: listAssets
       tags: [assets]
       summary: Listar assets del hogar
       parameters:
@@ -663,6 +864,8 @@ paths:
           in: query
           description: Devuelve los assets huérfanos que dejó una baja de usuario
           schema: { type: boolean, default: false }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
       responses:
         "200":
           description: >
@@ -670,10 +873,12 @@ paths:
             status=DECOMMISSIONED.
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/Asset" }
+              schema: { $ref: "#/components/schemas/AssetPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
     post:
+      operationId: createAsset
       tags: [assets]
       summary: Dar de alta un asset DURABLE
       description: >
@@ -696,9 +901,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /assets/intake:
     post:
+      operationId: registerConsumableIntake
       tags: [assets]
       summary: Dar entrada a un consumible
       description: >
@@ -731,15 +940,19 @@ paths:
           description: >
             Conflicto de ubicación, cantidad no positiva
             (INTAKE_QUANTITY_NOT_POSITIVE) o artículo duplicado
-            (CATALOG_ITEM_DUPLICATE)
+            (ARTICLE_DUPLICATE)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /assets/{id}:
     parameters:
       - $ref: "#/components/parameters/AssetId"
     get:
+      operationId: getAsset
       tags: [assets]
       summary: Detalle de un asset
       responses:
@@ -749,7 +962,11 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Asset" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
     patch:
+      operationId: updateAsset
       tags: [assets]
       summary: Modificar un asset (ubicación, asset padre o cantidad de un consumible)
       description: >
@@ -782,7 +999,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
     delete:
+      operationId: decommissionAsset
       tags: [assets]
       summary: Dar de baja un asset
       description: >
@@ -802,11 +1023,15 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /assets/{id}/merge:
     parameters:
       - $ref: "#/components/parameters/AssetId"
     post:
+      operationId: mergeStockItems
       tags: [assets]
       summary: Fusionar dos existencias del mismo artículo
       description: >
@@ -831,46 +1056,60 @@ paths:
         "409":
           description: >
             Las dos existencias no son del mismo artículo
-            (MERGE_CATALOG_ITEM_MISMATCH), origen y destino coinciden
+            (MERGE_ARTICLE_MISMATCH), origen y destino coinciden
             (MERGE_SAME_ASSET), alguna no es CONSUMABLE
-            (MERGE_NOT_CONSUMIBLE) o alguna está dada de baja
+            (MERGE_NOT_CONSUMABLE) o alguna está dada de baja
             (MERGE_ASSET_DEACTIVATED)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /assets/{id}/children:
     parameters:
       - $ref: "#/components/parameters/AssetId"
     get:
+      operationId: listAssetChildren
       tags: [assets]
       summary: Hijos directos en la jerarquía de composición
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
       responses:
         "200":
           description: Listado de assets hijos
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/Asset" }
+              schema: { $ref: "#/components/schemas/AssetPage" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /locations:
     get:
+      operationId: listLocations
       tags: [locations]
       summary: Listar ubicaciones del hogar
       parameters:
         - name: parentLocationId
           in: query
           schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
       responses:
         "200":
           description: Listado de ubicaciones
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/Location" }
+              schema: { $ref: "#/components/schemas/LocationPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
     post:
+      operationId: createLocation
       tags: [locations]
       summary: Crear una ubicación
       requestBody:
@@ -884,6 +1123,93 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Location" }
+        "409":
+          description: >
+            Ya hay otra ubicación con ese nombre bajo el mismo padre
+            (LOCATION_DUPLICATE). El nombre solo es único entre hermanas, no en
+            todo el hogar: dos armarios pueden llamarse igual en cuartos
+            distintos.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /locations/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getLocation
+      tags: [locations]
+      summary: Detalle de una ubicación
+      responses:
+        "200":
+          description: Ubicación
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Location" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+    patch:
+      operationId: updateLocation
+      tags: [locations]
+      summary: Modificar una ubicación
+      description: >
+        Cambiar parentLocationId la mueve dentro de la jerarquía. Una ubicación
+        no puede acabar siendo su propia antecesora, y eso lo comprueba el caso
+        de uso: no hay forma de expresarlo en el esquema ni en la base de datos.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LocationPatch" }
+      responses:
+        "200":
+          description: Ubicación actualizada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Location" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            Ya hay otra ubicación con ese nombre bajo el mismo padre
+            (LOCATION_DUPLICATE), o el movimiento crearía un ciclo
+            (LOCATION_CYCLE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+    delete:
+      operationId: deleteLocation
+      tags: [locations]
+      summary: Eliminar una ubicación
+      description: >
+        Borrado REAL, a diferencia de la baja de un asset o la retirada de un
+        artículo: una ubicación vacía no deja historial que preservar. Por eso
+        solo se puede eliminar si no le cuelga nada -- ni ubicaciones hijas ni
+        assets dentro--, y hay que vaciarla antes a mano.
+      responses:
+        "204":
+          description: Ubicación eliminada
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            Tiene ubicaciones hijas (LOCATION_HAS_CHILDREN) o assets dentro
+            (LOCATION_HAS_ASSETS)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /locations/{id}/children:
     parameters:
@@ -892,36 +1218,47 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      operationId: listLocationChildren
       tags: [locations]
       summary: Hijos directos en la jerarquía
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
       responses:
         "200":
           description: Listado de ubicaciones hijas
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/Location" }
+              schema: { $ref: "#/components/schemas/LocationPage" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /users:
     get:
+      operationId: listUsers
       tags: [users]
       summary: Listar miembros del hogar
       parameters:
         - name: includeDeactivated
           in: query
           schema: { type: boolean, default: false }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
       responses:
         "200":
           description: Listado de usuarios activos
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/User" }
+              schema: { $ref: "#/components/schemas/UserPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /users/me/avatar:
     put:
+      operationId: setIdentityAvatar
       tags: [users]
       summary: Subir o sustituir el avatar propio
       description: >
@@ -954,27 +1291,40 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        default: { $ref: "#/components/responses/ServerError" }
     delete:
+      operationId: deleteIdentityAvatar
       tags: [users]
       summary: Quitar el avatar propio
       responses:
         "204":
           description: Avatar retirado
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /invitations:
     get:
+      operationId: listInvitations
       tags: [invitations]
       summary: Listar las invitaciones vivas (solo HOUSEHOLD_ADMIN)
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
       responses:
         "200":
           description: Invitaciones ni aceptadas, ni revocadas, ni caducadas
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/Invitation" }
+              schema: { $ref: "#/components/schemas/InvitationPage" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
     post:
+      operationId: inviteUser
       tags: [invitations]
       summary: Invitar a alguien al hogar (solo HOUSEHOLD_ADMIN)
       description: >
@@ -999,9 +1349,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /invitations/accept:
     post:
+      operationId: acceptInvitation
       tags: [invitations]
       summary: Aceptar una invitacion
       description: >
@@ -1028,6 +1382,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /invitations/{id}:
     parameters:
@@ -1036,6 +1393,7 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     delete:
+      operationId: revokeInvitation
       tags: [invitations]
       summary: Revocar una invitacion (solo HOUSEHOLD_ADMIN)
       responses:
@@ -1043,6 +1401,9 @@ paths:
           description: Invitacion revocada
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /users/{id}:
     parameters:
@@ -1051,6 +1412,7 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     delete:
+      operationId: deactivateUser
       tags: [users]
       summary: Dar de baja a un usuario del hogar (solo HOUSEHOLD_ADMIN)
       description: >
@@ -1071,6 +1433,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /users/{id}/roles:
     parameters:
@@ -1079,6 +1444,7 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     patch:
+      operationId: changeUserRole
       tags: [users]
       summary: Modificar el rol estructural de un usuario (solo HOUSEHOLD_ADMIN)
       requestBody:
@@ -1097,11 +1463,27 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/User" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            Dejaría al hogar sin ningún HOUSEHOLD_ADMIN activo
+            (USER_LAST_ADMIN). Un hogar sin administrador no puede invitar,
+            cambiar roles ni dar de baja a nadie: quedaría bloqueado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /loans:
     post:
+      operationId: startLoan
       tags: [loans]
       summary: Iniciar un préstamo
+      description: >
+        Solo un DURABLE puede prestarse, y solo si no tiene ya un préstamo
+        abierto. OVERDUE cuenta como abierto: vencer no libera el asset.
       requestBody:
         required: true
         content:
@@ -1121,6 +1503,38 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+    get:
+      operationId: listLoans
+      tags: [loans]
+      summary: Listar los préstamos del hogar
+      description: >
+        Solo para usuarios del hogar; un token acotado de préstamo no alcanza
+        aquí, únicamente al préstamo concreto para el que se emitió.
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [ACTIVE, RETURNED, OVERDUE] }
+        - name: assetId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: open
+          in: query
+          description: Con true devuelve los abiertos, que son ACTIVE y OVERDUE juntos
+          schema: { type: boolean }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+      responses:
+        "200":
+          description: Listado de préstamos
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoanPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /loans/{id}:
     parameters:
@@ -1129,6 +1543,7 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      operationId: getLoan
       tags: [loans]
       summary: Consultar el estado de un préstamo
       security:
@@ -1144,6 +1559,9 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Loan" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
   /loans/{id}/return:
     parameters:
@@ -1152,6 +1570,7 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     post:
+      operationId: confirmReturn
       tags: [loans]
       summary: Confirmar la devolución de un préstamo
       security:
@@ -1163,6 +1582,15 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Loan" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: El préstamo ya estaba devuelto (LOAN_ALREADY_RETURNED)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
 
 components:
   securitySchemes:
@@ -1170,7 +1598,12 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT de usuarios del hogar (claims -- sub, householdId, role)
+      description: >
+        JWT de usuarios del hogar. Claims -- sub (identityId), memberId
+        (pertenencia en el hogar), householdId y role. La distincion entre sub y
+        memberId importa: todo lo que el dominio llama "usuario" --propietario de
+        un asset, prestador, receptor, createdBy-- apunta a la pertenencia,
+        mientras que los refresh tokens cuelgan de la identidad.
     loanToken:
       type: http
       scheme: bearer
@@ -1191,6 +1624,16 @@ components:
       name: parentAssetId
       in: query
       schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      description: Pagina solicitada, empezando en 0
+      schema: { type: integer, minimum: 0, default: 0 }
+    Size:
+      name: size
+      in: query
+      description: Elementos por pagina
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
 
   responses:
     NotFound:
@@ -1203,14 +1646,112 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Falta el token, ha caducado o no es válido
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    BadRequest:
+      description: >
+        El cuerpo o los parámetros no cumplen el contrato (VALIDATION_ERROR).
+        Es el error de forma; los de negocio van en 409. `details` lleva un
+        campo por atributo rechazado.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    TooManyRequests:
+      description: >
+        Se ha superado el límite de frecuencia (RATE_LIMITED). Se aplica sobre
+        los endpoints sin autenticar y sobre la subida de ficheros.
+      headers:
+        Retry-After:
+          description: Segundos que conviene esperar antes de reintentar
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ServerError:
+      description: >
+        Error no previsto (INTERNAL_ERROR). El cuerpo nunca lleva detalle
+        interno: la traza va al log, no a la respuesta.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
 
   schemas:
     Error:
       type: object
+      required: [code, message]
+      description: >
+        Forma única de todo error de la API. `code` es lo que el cliente trata;
+        `message` es texto para diagnóstico, no para mostrar tal cual.
       properties:
-        code: { type: string, example: ASSET_LOCATION_CONFLICT }
+        code:
+          type: string
+          example: ASSET_LOCATION_CONFLICT
+          description: >
+            Enumerado a propósito: el cliente decide qué hacer por el código, y
+            un código que no esté aquí es un fallo del contrato, no un caso que
+            el frontend deba adivinar.
+          enum:
+            - ALREADY_MEMBER
+            - ARTICLE_DUPLICATE
+            - ARTICLE_HAS_EXISTENCES
+            - ARTICLE_UNIT_IMMUTABLE
+            - ASSET_HAS_ACTIVE_LOAN
+            - ASSET_HAS_CHILDREN
+            - ASSET_LOCATION_CONFLICT
+            - ASSET_QUANTITY_NEGATIVE
+            - ASSET_QUANTITY_NOT_APPLICABLE
+            - CATEGORY_DUPLICATE
+            - CURRENT_PASSWORD_INVALID
+            - DOCUMENT_CONTENT_INVALID
+            - DOCUMENT_TARGET_INVALID
+            - EMAIL_NOT_VERIFIED
+            - EXISTENCE_ALREADY_IN_LOCATION
+            - FILE_ALREADY_ATTACHED
+            - FILE_IN_USE
+            - FILE_TOO_LARGE
+            - FILE_TYPE_NOT_ALLOWED
+            - IDENTITY_ALREADY_MEMBER
+            - INTAKE_QUANTITY_NOT_POSITIVE
+            - INTERNAL_ERROR
+            - INVITATION_ALREADY_PENDING
+            - INVITATION_TOKEN_INVALID
+            - LOAN_ALREADY_RETURNED
+            - LOAN_ASSET_ALREADY_LENT
+            - LOAN_ASSET_NOT_DURABLE
+            - LOCATION_CYCLE
+            - LOCATION_DUPLICATE
+            - LOCATION_HAS_ASSETS
+            - LOCATION_HAS_CHILDREN
+            - MERGE_ARTICLE_MISMATCH
+            - MERGE_ASSET_DEACTIVATED
+            - MERGE_NOT_CONSUMABLE
+            - MERGE_SAME_ASSET
+            - RATE_LIMITED
+            - RESET_TOKEN_INVALID
+            - STORAGE_QUOTA_EXCEEDED
+            - USER_LAST_ADMIN
+            - VALIDATION_ERROR
+            - VERIFICATION_TOKEN_INVALID
         message: { type: string }
-        details: { type: object }
+        details:
+          type: object
+          description: Contexto adicional del error; su forma depende del código
+
+    PageMeta:
+      type: object
+      required: [page, size, total]
+      description: >
+        Metadatos de paginación, comunes a todas las colecciones. Son las mismas
+        en las diez sin excepción por tamaño esperado: una sola forma que
+        aprender en el cliente, y ninguna migración el día que una lista que se
+        creía pequeña deje de serlo.
+      properties:
+        page: { type: integer, minimum: 0, example: 0, description: "Página devuelta, empezando en 0" }
+        size: { type: integer, minimum: 1, example: 50, description: Tamaño de página aplicado }
+        total: { type: integer, format: int64, example: 137, description: Total de elementos que cumplen el filtro }
 
     TokenPair:
       type: object
@@ -1335,6 +1876,15 @@ components:
           type: string
           format: date
           description: Cuándo deja de valer. En una garantía es el dato que importa
+      # Las dos exclusiones que la prosa describe, ahora expresadas: un validador
+      # de esquema las ve, y hasta ahora no.
+      allOf:
+        - oneOf:
+            - required: [assetId]
+            - required: [articleId]
+        - oneOf:
+            - required: [url]
+            - required: [fileId]
 
     Document:
       allOf:
@@ -1457,6 +2007,36 @@ components:
             Foto subida al servidor. Excluyente con photoUrl -- se admite una
             de las dos o ninguna, porque no tener foto es lo normal.
         notes: { type: string }
+      not:
+        required: [photoUrl, photoFileId]
+
+    ArticlePatch:
+      type: object
+      description: >
+        Todos los campos son opcionales; solo se aplica lo que llegue. unit no
+        se acepta si el artículo ya tiene existencias vivas -- responde
+        ARTICLE_UNIT_IMMUTABLE--, porque la cantidad ya contada se lleva en ella.
+      properties:
+        name: { type: string }
+        categoryId: { type: string, format: uuid }
+        unit: { $ref: "#/components/schemas/MeasurementUnit" }
+        brand: { type: string, nullable: true }
+        model: { type: string, nullable: true }
+        barcode: { type: string, nullable: true }
+        packSize:
+          type: number
+          nullable: true
+          exclusiveMinimum: true
+          minimum: 0
+        photoUrl: { type: string, format: uri, nullable: true }
+        photoFileId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Nulo desadjunta la foto sin borrar el fichero
+        notes: { type: string, nullable: true }
+      not:
+        required: [photoUrl, photoFileId]
 
     Article:
       allOf:
@@ -1482,7 +2062,11 @@ components:
 
     LocationRef:
       type: object
-      description: Referencia polimórfica a la ubicación de un asset -- exactamente uno de los dos campos.
+      description: >
+        Referencia polimórfica a la ubicación de un asset. Los dos campos van
+        juntos: type dice si apunta a otro asset o a una ubicación, e id a cuál.
+        Solo un DURABLE puede hacer de ubicación de otros assets.
+      required: [type, id]
       properties:
         type: { type: string, enum: [ASSET, LOCATION] }
         id: { type: string, format: uuid }
@@ -1528,6 +2112,14 @@ components:
           format: uuid
           description: Foto subida al servidor. Excluyente con photoUrl
         notes: { type: string }
+      # name y categoryId son obligatorios salvo que se herede del articulo.
+      anyOf:
+        - required: [articleId]
+        - required: [name, categoryId]
+      # Foto: enlace o fichero, nunca los dos. Los dos vacios SI valen -- no
+      # tener foto es lo normal --, asi que esto es "como mucho uno", no oneOf.
+      not:
+        required: [photoUrl, photoFileId]
 
     AssetIntakeInput:
       type: object
@@ -1546,6 +2138,9 @@ components:
           exclusiveMinimum: true
           minimum: 0
           description: Cantidad que entra, se suma a la existencia si ya la hay
+      oneOf:
+        - required: [articleId]
+        - required: [article]
 
     AssetMergeInput:
       type: object
@@ -1696,6 +2291,49 @@ components:
           format: uuid
           description: Foto subida al servidor. Excluyente con photoUrl
         notes: { type: string }
+      not:
+        required: [photoUrl, photoFileId]
+
+    LocationPatch:
+      type: object
+      description: >
+        Todos los campos son opcionales. Cambiar parentLocationId mueve la
+        ubicación dentro de la jerarquía; el tipo también puede corregirse,
+        porque no cambia el comportamiento de nada.
+      properties:
+        name: { type: string }
+        type: { $ref: "#/components/schemas/LocationType" }
+        parentLocationId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Nulo la convierte en raíz, que es lo que representa una vivienda
+        capacity:
+          type: object
+          nullable: true
+          required: [type, max, unit]
+          properties:
+            type: { type: string, enum: [WEIGHT, VOLUME, UNITS] }
+            max: { type: number }
+            unit: { type: string, example: kg }
+        environmentalConditions:
+          type: object
+          nullable: true
+          properties:
+            minTemperature: { type: number }
+            maxTemperature: { type: number }
+            minHumidity: { type: number }
+            maxHumidity: { type: number }
+            lightExposure: { type: string, enum: [DIRECT, INDIRECT, DARKNESS] }
+        photoUrl: { type: string, format: uri, nullable: true }
+        photoFileId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Nulo desadjunta la foto sin borrar el fichero
+        notes: { type: string, nullable: true }
+      not:
+        required: [photoUrl, photoFileId]
 
     Location:
       allOf:
@@ -1806,6 +2444,11 @@ components:
       properties:
         userId: { type: string, format: uuid }
         external: { $ref: "#/components/schemas/LoanExternal" }
+      # Con los dos presentes ambas ramas encajan y oneOf exige exactamente una,
+      # asi que rechaza tanto los dos a la vez como ninguno.
+      oneOf:
+        - required: [userId]
+        - required: [external]
 
     LoanInput:
       type: object
@@ -1844,3 +2487,97 @@ components:
             returnedAt: { type: string, format: date-time, nullable: true }
             notes: { type: string, nullable: true }
         - $ref: "#/components/schemas/Authorship"
+
+    # --- Colecciones paginadas -------------------------------------------
+    # Una por tipo, porque OpenAPI 3.0 no tiene genericos. Todas comparten
+    # PageMeta, asi que el cliente generado ve la misma forma en las diez.
+
+    ArticlePage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Article" }
+
+    AssetPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Asset" }
+
+    CategoryPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Category" }
+
+    DocumentPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Document" }
+
+    InvitationPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Invitation" }
+
+    LoanPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Loan" }
+
+    LocationPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Location" }
+
+    StoredFilePage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/StoredFile" }
+
+    UserPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/User" }
