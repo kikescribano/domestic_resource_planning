@@ -74,7 +74,7 @@ PostgreSQL con Testcontainers y corren con un usuario **sujeto a RLS** — nunca
 como superusuario, que daría cobertura falsa:
 
 ```bash
-cd backend && ./gradlew build
+cd backend && ./gradlew build --no-daemon
 ```
 
 Comprobar tipos, construir y probar el frontend:
@@ -83,11 +83,37 @@ Comprobar tipos, construir y probar el frontend:
 cd frontend && npm run build && npm test
 ```
 
-Y para levantar el entorno local (PostgreSQL y Mailpit; nginx llega con el Hito 3):
+## Entorno local: para desarrollar, no para probar
+
+`compose.yaml` levanta PostgreSQL y Mailpit **para ejecutar la aplicación**, no
+para las pruebas: las de integración usan Testcontainers, que arranca su propio
+PostgreSQL efímero y lo destruye al terminar. Si solo vas a construir y probar,
+no hace falta levantar nada.
 
 ```bash
 docker compose up -d
 ```
+
+nginx no está todavía; llega con el Hito 3, junto a la entrega de ficheros.
+
+**Deja la máquina como la encontraste.** Lo que se arranca para comprobar algo
+se apaga en cuanto la comprobación está hecha:
+
+```bash
+docker compose down && rm -rf .data
+```
+
+`.data/` es el volcado de PostgreSQL que crea el arranque; se regenera solo. Y
+el `--no-daemon` de más arriba no es un detalle: **el daemon de Gradle no muere
+al acabar el build**, sobrevive unas tres horas para acelerar el siguiente. Eso
+está bien trabajando en bucle y estorba en una ejecución puntual, que es por lo
+que la CI también lo usa. Si acabas con daemons vivos, `--stop` solo alcanza a
+los de **su misma versión**: con varias conviviendo hay que invocar cada
+distribución por separado.
+
+Cuidado al hacer limpieza con un proceso que lo parece y no lo es: el servidor
+de la extensión Gradle de VS Code (`vscode-gradle`, reconocible por su
+`--parentPid`) es del editor, no del build.
 
 ## Al fusionar un PR: alinear el estado local
 

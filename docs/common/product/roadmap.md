@@ -86,6 +86,12 @@ ADR-009.
 > [`data-model.md`](../architecture/data-model.md): la versión directa lanza un
 > error de conversión cuando el ajuste está sin fijar o en cadena vacía, en vez
 > de denegar limpiamente.
+>
+> **Este es el hito en el que aparece Testcontainers**, así que Docker tiene que
+> estar arrancado para poder construir. Ojo con la distinción: Testcontainers
+> levanta y destruye lo suyo, y `compose.yaml` es para ejecutar la aplicación —
+> no hace falta para las pruebas. Al terminar, dejar la máquina como estaba (ver
+> la sección de verificación del `CLAUDE.md`).
 
 ### Hito 2 — Catálogo, ubicaciones y assets · Pendiente
 
