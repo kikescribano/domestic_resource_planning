@@ -10,6 +10,9 @@
  *
  * Refleja el estado del README a 2026-08-10. Al cambiar el README de forma
  * sustantiva, actualiza el contenido de aquí y vuelve a ejecutarlo.
+ *
+ * Ojo con una trampa de este fichero: no falla ni avisa cuando se queda atrás,
+ * simplemente sigue generando un deck que ya no es cierto.
  */
 const pptxgen = require("pptxgenjs");
 
@@ -109,8 +112,8 @@ function lines(items, o = {}) {
   });
 
   const chips = [
-    ["Fase 0 completada", TEAL],
-    ["Fase 1 · Core MVP", "24534F"],
+    ["Fase 1 en curso", TEAL],
+    ["Core MVP", "24534F"],
     ["2026-08-10", "24534F"],
   ];
   let cx = 0.95;
@@ -147,7 +150,7 @@ function lines(items, o = {}) {
     x: 7.75, y: 6.25, w: 4.95, h: 0.72, margin: 0, valign: "top", fontFace: SANS, fontSize: 10.5, italic: true, color: "7E9895", lineSpacing: 15,
   });
 
-  s.addNotes("Portada. Resumen del README.md de DRP (estado 2026-08-07): Fase 0 completada, sin decisiones de diseño abiertas.");
+  s.addNotes("Portada. Resumen del README.md de DRP (estado 2026-08-10): Fase 0 cerrada y Fase 1 (Core MVP) en curso, con el Hito 0 completado.");
 }
 
 // ═══ 2 · Problema y visión ════════════════════════════════════════════════════
@@ -816,11 +819,11 @@ function lines(items, o = {}) {
     ["Backend", "Kotlin + Spring Boot", "Monolito modular, Clean Architecture"],
     ["Persistencia", "PostgreSQL 16+", "Row-Level Security como segunda capa"],
     ["Migraciones", "Flyway", "SQL plano versionado, esquema y políticas juntos"],
-    ["Comunicación BE", "Event bus in-process", "Contrato definido; librería por definir"],
+    ["Comunicación BE", "Event bus in-process", "Puerto propio sobre Spring, sin dependencia añadida"],
     ["Comunicación FE ↔ BE", "API REST + JWT", "Spring Security; tokens acotados de préstamo"],
-    ["Contratos", "OpenAPI 3.0", "openapi.yaml + ejemplos en el README"],
-    ["Frontend", "TypeScript + React", "Mobile-first, de 375 px a ultrawide"],
-    ["Testing", "Por definir", "Kotest/JUnit5 + Testcontainers, Vitest/Jest"],
+    ["Contratos", "OpenAPI 3.0", "openapi.yaml es la fuente de verdad de la API"],
+    ["Frontend", "React sobre Vite", "Mobile-first, de 375 px a ultrawide; WCAG 2.2 AA"],
+    ["Testing", "JUnit 5 + Testcontainers", "Vitest y Playwright en el frontend"],
   ];
   const cw = 2.9, gap = 0.18, chh = 1.9;
   stack.forEach((t, i) => {
@@ -833,11 +836,11 @@ function lines(items, o = {}) {
   });
 
   card(s, { x: M, y: 6.05, w: CW, h: 0.62, fill: INK, shadow: false });
-  s.addText("Cinco ADR recogen el porqué y las alternativas descartadas: monolito modular · Kotlin + Spring Boot · Row-Level Security · Flyway · almacenamiento local de ficheros", {
-    x: M, y: 6.05, w: CW, h: 0.62, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 12, color: "CFE1DE",
+  s.addText("Nueve ADR recogen el porqué y las alternativas descartadas: monolito modular · Spring Boot · Row-Level Security · Flyway · ficheros en disco · React + Vite · contrato como fuente de verdad · monorepo · correo saliente", {
+    x: M, y: 6.05, w: CW, h: 0.62, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 11, color: "CFE1DE",
   });
   foot(s);
-  s.addNotes("README §6 y ADR-001 a ADR-005.");
+  s.addNotes("README §6 y ADR-001 a ADR-009.");
 }
 
 // ═══ 17 · Testing ═════════════════════════════════════════════════════════════
@@ -883,7 +886,7 @@ function lines(items, o = {}) {
 
   const fases = [
     ["Fase 0", "Definición", "Arquitectura, stack, alcance del core y estrategia de testing", "Completada", TEAL, WHITE],
-    ["Fase 1", "Core MVP", "Assets, autenticación, API REST, event bus y FE responsive básico", "Siguiente", TERRA, WHITE],
+    ["Fase 1", "Core MVP", "Assets, autenticación, API REST, event bus y cliente web completo del core", "En curso", TERRA, WHITE],
     ["Fase 2", "Primer módulo", "Candidato a definir entre los cuatro de prioridad alta", "Pendiente", "C3D2CF", INK],
     ["Fase 3", "Módulos adicionales", "Los nueve restantes, por orden de prioridad (sección 4.2)", "Pendiente", "C3D2CF", INK],
   ];
@@ -903,14 +906,14 @@ function lines(items, o = {}) {
     x: M, y: 5.65, w: CW, h: 0.55, margin: 0, valign: "top", fontFace: SANS, fontSize: 13, italic: true, color: TEAL, lineSpacing: 19,
   });
   foot(s);
-  s.addNotes("README §8: roadmap y estado. Fase 0 cerrada el 2026-08-07.");
+  s.addNotes("README §8: roadmap y estado. Fase 0 cerrada el 2026-08-07; Fase 1 arrancada el 2026-08-10, con sus cinco hitos en docs/common/product/roadmap.md.");
 }
 
 // ═══ 19 · Cierre ══════════════════════════════════════════════════════════════
 {
   const s = newSlide(true);
-  head(s, "SIGUIENTE PASO", "La Fase 0 queda cerrada", true);
-  s.addText("No hay decisiones de diseño abiertas: modelo de datos, casos de uso, autenticación y contratos de API están definidos.", {
+  head(s, "SIGUIENTE PASO", "La Fase 1 está en marcha", true);
+  s.addText("Con la definición cerrada y el andamiaje en pie, lo que queda es construir: el core completo, entregado en hitos que atraviesan las capas en vertical.", {
     x: M, y: 1.45, w: 9.5, h: 0.62, margin: 0, valign: "top", fontFace: SANS, fontSize: 15, color: "C4D4D1", lineSpacing: 21,
   });
 
@@ -929,8 +932,8 @@ function lines(items, o = {}) {
   });
 
   const closing = [
-    ["Primera tarea de la Fase 1", "Repartir a docs/ las secciones del README que corresponden por ámbito: 4.1.x, 5.4.3, 5.6 y 5.7, dejando aquí un resumen y el enlace."],
-    ["Módulos con prioridad alta", "Cuatro, todos por diseñar: proveedores y contactos de servicio, compras y lista de la compra, Warehouse y CMMS doméstico."],
+    ["Hito 0, ya cerrado", "Monorepo, integración continua, contrato saneado y el reparto del README a docs/, que la Fase 0 había aplazado a propósito."],
+    ["Módulos con prioridad alta", "Cuatro, todos por diseñar: proveedores y contactos de servicio, compras y lista de la compra, Warehouse y mantenimiento (CMMS)."],
   ];
   closing.forEach((c, i) => {
     const x = M + i * (5.85 + 0.43);

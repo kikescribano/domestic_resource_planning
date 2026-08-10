@@ -1,2 +1,35 @@
+# Python (utillaje de documentacion y marketing)
 __pycache__/
 *.pyc
+
+# Gradle y Kotlin
+.gradle/
+backend/build/
+backend/bin/
+backend/out/
+
+# Node, Vite y Playwright
+node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+frontend/.vite/
+
+# Cliente TypeScript generado desde openapi.yaml: se regenera, no se versiona
+frontend/src/api/generated/
+
+# Entorno y secretos
+.env
+.env.*
+!.env.example
+
+# Volumenes locales levantados por compose.yaml
+.data/
+
+# Editores
+.idea/
+*.iml
+.vscode/
+*.swp
+.DS_Store

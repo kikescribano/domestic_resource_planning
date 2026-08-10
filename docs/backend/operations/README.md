@@ -2,6 +2,15 @@
 
 Este directorio documentará cómo ejecutar y mantener el backend en cada entorno.
 
+## Documentos vigentes
+
+- [`storage-sizing-and-backups.md`](storage-sizing-and-backups.md): por qué la
+  cuota por hogar no protege al servidor y qué hace falta además —techo global y
+  sobrecompromiso medido—, más el orden en que hay que copiar base de datos y
+  ficheros para que una restauración no deje filas apuntando a bytes que no
+  están. Trasladado desde las secciones 5.8.2 y 5.8.6 del
+  [`README principal`](../../../README.md).
+
 ## Contenido previsto
 
 - Requisitos y arranque local reproducible.

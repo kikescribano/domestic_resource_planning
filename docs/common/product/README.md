@@ -2,13 +2,33 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Borrador |
-| Responsable | Por decidir |
+| Estado | Vigente |
+| Responsable | Equipo DRP |
 | Ámbito | Toda la solución |
-| Última revisión | 2026-08-06 |
+| Última revisión | 2026-08-10 |
 
 Este espacio describe qué problema resuelve DRP y qué comportamiento espera el
 usuario, sin entrar en la implementación.
+
+## Definición del core
+
+Trasladada aquí desde la sección 4.1 del [`README principal`](../../../README.md)
+al arrancar la Fase 1. **Los números de sección se conservan**, porque hay más de
+cien referencias cruzadas del tipo «ver 4.1.1» por todo el repositorio.
+
+| Documento | Contenido |
+|---|---|
+| [`core-model.md`](core-model.md) | 4.1.1 – 4.1.3. Assets con sus dos naturalezas, artículos, categorías, documentos, ficheros y ubicaciones; sus atributos, sus reglas de negocio y el diagrama de dominio. |
+| [`users-and-access.md`](users-and-access.md) | 4.1.4. Identidad frente a pertenencia, enrolamiento, invitaciones, roles, política de contraseñas y tokens. |
+| [`loans.md`](loans.md) | 4.1.5. El concepto mínimo de préstamo que vive en el core. |
+| [`decisions.md`](decisions.md) | 4.1.7. Registro vivo de decisiones: las validadas con su alternativa descartada, y las que siguen abiertas. |
+| [`use-cases/`](use-cases/README.md) | 5.7. Catálogo de comandos y queries, con la regla clave y el evento de cada uno. |
+
+## Ejecución
+
+| Documento | Contenido |
+|---|---|
+| [`roadmap.md`](roadmap.md) | Los cinco hitos de la Fase 1, su alcance, su criterio de aceptación y su estado vivo. **Es lo que hay que leer para arrancar un hito**, y lo que hay que actualizar al cerrarlo. El estado de las *fases* sigue en la sección 8 del README. |
 
 ## Documentos previstos
 
@@ -16,9 +36,4 @@ usuario, sin entrar en la implementación.
 |---|---|
 | `vision.md` | Propósito, usuarios, resultados y límites del producto. |
 | `glossary.md` | Lenguaje ubicuo y diferencias entre recurso, activo y otros conceptos. |
-| `roadmap.md` | Hitos, resultados esperados y estado de cada iniciativa. |
-| `capabilities.md` | Mapa del core y de los módulos funcionales. |
-| `use-cases/` | Casos de uso y recorridos de usuario aceptados. |
-
-Hasta que estos documentos se creen, la visión vigente se encuentra en el
-[`README.md` principal](../../../README.md).
+| `capabilities.md` | Mapa de los módulos funcionales. El del core ya está en `core-model.md`. |

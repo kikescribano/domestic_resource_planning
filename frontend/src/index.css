@@ -1,0 +1,20 @@
+@import 'tailwindcss';
+
+/* Tokens del sistema de diseno. La direccion visual que los justifica se fija
+   en docs/frontend/product-design/look-and-feel.md; aqui solo viven sus valores.
+   Se completan en el Hito 1, al cerrar las ocho dimensiones. */
+@theme {
+  --color-surface: oklch(99% 0.005 250);
+  --color-surface-raised: oklch(100% 0 0);
+  --color-ink: oklch(25% 0.02 250);
+  --color-ink-muted: oklch(50% 0.02 250);
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-surface: oklch(20% 0.015 250);
+    --color-surface-raised: oklch(25% 0.02 250);
+    --color-ink: oklch(95% 0.005 250);
+    --color-ink-muted: oklch(70% 0.015 250);
+  }
+}

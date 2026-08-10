@@ -24,3 +24,7 @@ Usa [`ADR-template.md`](ADR-template.md) para crear una entrada.
 | [ADR-003](ADR-003-row-level-security.md) | Row-Level Security como segunda capa de aislamiento entre hogares | accepted | — |
 | [ADR-004](ADR-004-database-migrations.md) | Flyway como herramienta de migraciones de base de datos | accepted | — |
 | [ADR-005](ADR-005-local-file-storage.md) | Almacenamiento local de ficheros en el servidor | accepted | — |
+| [ADR-006](ADR-006-frontend-stack-and-design-system.md) | Stack de frontend y sistema de diseño | accepted | — |
+| [ADR-007](ADR-007-openapi-contract-as-source-of-truth.md) | El contrato OpenAPI como fuente de verdad de la API | accepted | — |
+| [ADR-008](ADR-008-repository-layout-and-build-chain.md) | Estructura del repositorio y cadena de construcción | accepted | — |
+| [ADR-009](ADR-009-outbound-email.md) | Envío de correo saliente | accepted | — |

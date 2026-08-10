@@ -1,0 +1,73 @@
+# 5.7 Casos de uso del core (comandos y queries)
+
+| Campo | Valor |
+|---|---|
+| Estado | Vigente |
+| Responsable | Equipo DRP |
+| Ámbito | Comandos y queries del core |
+| Última revisión | 2026-08-10 |
+
+> Trasladado desde la sección 5.7 del [`README principal`](../../../../README.md) al iniciar la Fase 1. **Los números de sección se conservan**: hay más de cien referencias cruzadas del tipo «ver 4.1.1» repartidas por el repositorio, y renumerarlas las rompería todas.
+
+Catálogo ilustrativo de los comandos y queries que expone la capa de aplicación del core (capa "Casos de uso" de Clean Architecture, ver 5.3). Cada comando valida sus reglas de negocio y, cuando corresponde, publica un evento en el bus (ver 5.2.3).
+
+| Tipo | Nombre | Entrada principal | Regla clave | Evento publicado |
+|---|---|---|---|---|
+| Comando | `CreateCategory` | nombre, notas (opcional) | nombre único entre las vigentes del hogar (normalizado) | — |
+| Comando | `UpdateCategory` | categoryId, nombre, notas | mismo requisito de unicidad normalizada que el alta. Renombrar no toca a los assets ni a los artículos que la usan: la referencian por identificador, no por texto | — |
+| Comando | `RetireCategory` | categoryId | retirada lógica; deja de ofrecerse al clasificar, y los assets y artículos que ya la tenían la conservan | — |
+| Comando | `CreateArticle` | nombre, categoryId, unidad, marca y código de barras (opcionales) | nombre único en el hogar (normalizado); código de barras único si se informa; la categoría debe estar vigente | `ArticleCreated` |
+| Comando | `UpdateArticle` | articleId, campos a corregir | mismas unicidades que el alta. La `unit` deja de admitirse en cuanto el artículo tiene existencias vivas (`ARTICLE_UNIT_IMMUTABLE`): cambiarla reinterpretaría en silencio toda la cantidad ya contada, que se lleva en esa unidad | — |
+| Comando | `CreateAsset` | nombre, tipo `DURABLE`, categoryId, ownerId, ubicación y articleId (opcionales) | ubicación no puede ser Asset y Location a la vez; no admite `quantity`; sin `articleId` son obligatorios nombre y categoría; un `CONSUMABLE` no entra por aquí, sino por `RegisterConsumableIntake` | `AssetCreated` |
+| Comando | `AttachDocument` | assetId **o** articleId, enlace **o** fileId, tipo, descripción y fecha (opcionales) | exactamente un destino y exactamente un contenido; el fichero debe ser del mismo hogar y no estar ya adjunto en ningún otro sitio | `DocumentAttached` |
+| Comando | `DeleteDocument` | documentId | borrado real: no lo referencia nada. Si tenía fichero, lo marca en la misma transacción | — |
+| Comando | `UploadFile` | contenido y nombre original | **reserva** la cuota antes de transmitir, con la fila del hogar bloqueada solo durante la reserva; valida el tipo **real** contra la lista blanca, recodifica las imágenes quitando el EXIF y genera la miniatura; 25 MB por fichero y 1 GB por hogar; en disco se renombra (ver 5.8.3) | — |
+| Comando | `DeleteFile` | fileId | falla si un documento o una foto lo referencian — primero se desadjunta; marca `deletedAt` y deja los bytes al proceso diario | — |
+| Comando | `SetIdentityAvatar` | contenido | solo imagen y hasta 1 MB; **sustituye** siempre el anterior, así que no acumula ni consume cuota de ningún hogar; la ruta se deriva del `identityId` del token | — |
+| Comando | `RegisterConsumableIntake` | articleId **o** datos de artículo nuevo, ubicación, cantidad, ownerId | crea el artículo si no existe; resuelve la existencia de ese artículo en esa ubicación y **suma** la cantidad, o la crea si no hay ninguna; la cantidad de entrada debe ser > 0 y va en la unidad del artículo | `ArticleCreated` (si creó artículo) + `AssetCreated` o `AssetQuantityChanged` |
+| Comando | `MoveAsset` | assetId, nueva ubicación | evita ciclos en la jerarquía; si la ubicación es un Asset, este debe ser `DURABLE`; mover una existencia a una ubicación que ya tiene otra viva del mismo artículo se rechaza con `EXISTENCE_ALREADY_IN_LOCATION` — eso es una fusión, y se resuelve con `MergeStockItems` | `AssetMoved` / `AssetHierarchyChanged` |
+| Comando | `MergeStockItems` | assetId origen, assetId destino | ambas `CONSUMABLE` vivas del **mismo artículo** y distintas entre sí; el destino se queda con la suma de las cantidades y conserva su ubicación y su propietario; el origen queda a `quantity = 0` y `status = DECOMMISSIONED` | `AssetQuantityChanged` (destino) + `AssetDeactivated` (origen) |
+| Comando | `AdjustAssetQuantity` | assetId, nueva cantidad (absoluta) o delta | solo sobre `CONSUMABLE`; la cantidad resultante no puede ser negativa. Es la corrección o el consumo, no la entrada de compra | `AssetQuantityChanged` |
+| Comando | `DecommissionAsset` | assetId | sin hijos activos ni préstamo abierto (`ACTIVE` o `OVERDUE`); llegar a `quantity = 0` no da de baja por sí solo. Si es una existencia con cantidad pendiente, la baja la lleva a 0: lo que quedaba se da por perdido | `AssetDeactivated`, precedido de `AssetQuantityChanged` si había cantidad que dar de baja |
+| Comando | `RetireArticle` | articleId | solo si no le queda ninguna existencia viva. Es una retirada **lógica** (`retired_at`): el artículo deja de salir en el catálogo y no admite nuevas entradas, pero la fila permanece porque las existencias dadas de baja siguen apuntando a ella. La `unit` de un artículo que ya tiene existencias no es modificable | — |
+| Comando | `CreateLocation` | nombre, parentLocationId (opcional), capacidad, condiciones | evita ciclos en la jerarquía; el nombre es único **entre hermanas**, no en todo el hogar: dos armarios pueden llamarse igual en cuartos distintos | `LocationCreated` |
+| Comando | `UpdateLocation` | locationId, campos a corregir | cambiar `parentLocationId` la mueve dentro de la jerarquía, con la misma comprobación anti-ciclo que el alta: una ubicación no puede acabar siendo su propia antecesora, y eso no lo puede garantizar la base de datos | — |
+| Comando | `DeleteLocation` | locationId | borrado **real**, a diferencia de la baja de un asset o la retirada de un artículo: una ubicación vacía no deja historial que preservar. Solo si no le cuelga nada — ni ubicaciones hijas ni assets dentro | — |
+| Comando | `CreateHousehold` | nombre y zona horaria del hogar; nombre, correo y contraseña de quien lo abre | sin autenticar; crea identidad sin verificar, hogar, pertenencia `HOUSEHOLD_ADMIN` y categorías por defecto en una transacción, fijando `app.household_id` con el identificador que genera la aplicación antes de insertar; emite el token de verificación y **no devuelve sesión**; responde igual exista o no el correo | — |
+| Comando | `VerifyEmail` | token de verificación | de un solo uso y con caducidad; marca la identidad verificada y devuelve el par de tokens | `HouseholdCreated` (si era el alta de un hogar) |
+| Comando | `ResendVerification` | correo | responde igual exista o no la identidad; invalida el token anterior | — |
+| Comando | `RequestPasswordReset` | email | sin credencial; responde igual exista o no la identidad; no hace nada si está dada de baja; invalida el token anterior y emite uno con 1 h de caducidad | — |
+| Comando | `ResetPassword` | token, contraseña nueva | de un solo uso y con caducidad; fija la contraseña, marca el correo verificado si no lo estaba y **revoca todos** los refresh tokens antes de emitir el par nuevo | — |
+| Comando | `ChangePassword` | contraseña actual, contraseña nueva | autenticado; exige la actual para que un access token robado no baste para expulsar al dueño; revoca las **demás** sesiones | — |
+| Comando | `RevokeSession` | refresh token | cerrar sesión. Revoca ese refresh token, que es lo único revocable: un access token no se puede retirar y sigue valiendo hasta caducar, unos 15 minutos. Responde igual con uno válido que con uno que ya no existe | — |
+| Comando | `InviteUser` | email, role | solo `HOUSEHOLD_ADMIN`; no puede invitarse a quien ya sea miembro activo del hogar; una sola invitación viva por correo y hogar; emite token de un solo uso con 7 días de caducidad | — |
+| Comando | `AcceptInvitation` | token, nombre y contraseña si la identidad no existe | sin autenticar, lo autoriza el token; crea la identidad **ya verificada** —recibir el token prueba el control del correo— o vincula la existente, y crea la pertenencia con el rol invitado; falla si la identidad ya tiene otra pertenencia activa | — |
+| Comando | `RevokeInvitation` | invitationId | solo `HOUSEHOLD_ADMIN`; solo sobre invitaciones vivas | — |
+| Comando | `ChangeUserRole` | userId, nuevo role | no puede quitarse el único `HOUSEHOLD_ADMIN` del hogar | — |
+| Comando | `DeactivateUser` | memberId | solo `HOUSEHOLD_ADMIN`; no puede ser el único administrador activo; marca `deactivated_at` en la **pertenencia** y deja sus assets **sin propietario**. La identidad y sus préstamos se conservan; cerrar la cuenta entera es otra cosa (ver 4.1.4) | `UserDeactivated` |
+| Comando | `StartLoan` | assetId, prestador, receptor, fecha de devolución prevista | el asset debe ser `DURABLE` y no tener otro préstamo abierto: un `OVERDUE` sigue ocupándolo | `LoanStarted` |
+| Comando | `ConfirmReturn` | loanId | solo prestador, receptor o un usuario del hogar | `LoanReturned` |
+| Comando | `GenerateExternalAccessToken` | loanId, rol (`LENDER`\|`BORROWER`) | vinculado a un préstamo abierto —también `OVERDUE`, que es justo cuando hace falta reclamar la devolución—; expira | — |
+| Comando de sistema | `PurgeUnverifiedHouseholds` | — (proceso diario) | borra los hogares sin verificar con más de 7 días, y la identidad que los abrió si nunca se verificó. **El único borrado real del core.** Como el proceso de vencidos, no nace de una petición: recorre los hogares fijando `app.household_id`, nunca con `BYPASSRLS`. No puede dejar bytes huérfanos, porque sin correo verificado no hay sesión y sin sesión no hay subidas; el día que eso cambie, tendrá que borrar también el directorio del hogar | — |
+| Comando de sistema | `PurgeUnusedFiles` | — (proceso diario) | desenlaza del disco tres cosas: los ficheros marcados hace más de 24 h, los que se subieron y nunca llegaron a adjuntarse, y las **reservas que nunca se completaron** —`uploadedAt` nulo con más de una hora—, que son las subidas cortadas a medias. Como los otros dos procesos, recorre los hogares fijando `app.household_id`, nunca con `BYPASSRLS`. Idempotente: solo mira lo que ya sobra | — |
+| Comando de sistema | `MarkOverdueLoans` | — (proceso diario) | pasa a `OVERDUE` los `ACTIVE` con `dueAt` ya superada; ignora los que no la tienen. No nace de una petición: recorre los hogares fijando `app.household_id` en cada transacción, nunca con `BYPASSRLS`. Idempotente por construcción — solo mira los `ACTIVE` | `LoanOverdue` por cada préstamo marcado |
+| Query | `ListArticles` | filtros: texto de búsqueda, categoría, código de barras | acotado al hogar; excluye los retirados salvo que se pidan; alimenta el autocompletado del alta de consumibles | — |
+| Query | `ListAssets` | filtros: locationId, parentAssetId, ownerId, status, type, articleId, categoryId, withoutOwner | resultado acotado al `householdId` del token; excluye los `DECOMMISSIONED` salvo que se filtre por ese estado; `withoutOwner` devuelve los huérfanos de una baja de usuario; el nombre y la categoría se resuelven desde el artículo cuando el asset lo tiene | — |
+| Query | `ListCategories` | — | excluye las retiradas salvo que se pidan | — |
+| Query | `ListDocuments` | filtros: assetId, articleId, type | acotado al hogar | — |
+| Query | `ListFiles` | filtros: `attached`, `type` | acotado al hogar, **ordenado por tamaño descendente**, que es la pregunta real cuando la cuota se agota: qué la está ocupando. Con `attached=false` devuelve los subidos y nunca adjuntados, que es lo que se puede borrar sin perder nada | — |
+| Query | `DownloadFile` | fileId | acotado al hogar; autoriza la aplicación y sirven los bytes por delegación. Es el camino de los documentos; una imagen se muestra con la URL firmada que ya trae la entidad (ver 5.8.4) | — |
+| Query | `GetStorageUsage` | — | bytes ocupados y cuota del hogar. Es lo que permite avisar **antes** de que una subida falle, en vez de después | — |
+| Query | `GetAsset` / `ListAssetChildren` | assetId | — | — |
+| Query | `ListLocations` / `GetLocation` | filtros: parentLocationId | — | — |
+| Query | `ListInvitations` | — | solo `HOUSEHOLD_ADMIN`; excluye aceptadas, revocadas y caducadas salvo que se pidan | — |
+| Query | `ListUsers` | — | solo usuarios del propio hogar; excluye las bajas salvo que se pidan | — |
+| Query | `GetLoan` | loanId | accesible por el hogar o por token acotado, con campos distintos (ver 5.4.3) | — |
+| Query | `ListLoans` | filtros: status, assetId, `open` | solo usuarios del hogar: un token acotado no alcanza aquí, únicamente al préstamo para el que se emitió. `open` agrupa `ACTIVE` y `OVERDUE`, que es la pregunta habitual — qué hay fuera de casa | — |
+
+> **Por qué `MergeStockItems` no publica un evento propio.** Emite los dos que ya existen —`AssetQuantityChanged` sobre el destino y `AssetDeactivated` sobre el origen— y los correlaciona por payload: el primero lleva `mergedFromAssetId` y el segundo `mergedIntoAssetId`. Así un módulo que solo escuche cambios de cantidad no se pierde el del destino, que es lo que pasaría si la fusión se anunciara únicamente con un evento nuevo; y Warehouse, que sí necesita saber que las existencias del origen se mudan al destino en vez de haberse perdido, lo distingue por la referencia cruzada.
+
+> **Por qué los ficheros no publican ningún evento.** Un fichero recién subido y todavía sin adjuntar no significa nada para nadie: lo que le interesa a otro módulo es que se adjuntó un documento, y eso ya lo anuncia `DocumentAttached` (ver 5.2.3). Añadir un `FileUploaded` obligaría a cada suscriptor a esperar un segundo evento para saber si aquello llegó a servir para algo.
+
+> Este catálogo es ilustrativo y crecerá a medida que se implementen los casos de uso; cada nuevo comando/query debería añadirse aquí siguiendo el mismo formato.
+>

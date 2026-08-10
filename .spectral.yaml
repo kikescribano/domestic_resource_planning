@@ -1,0 +1,31 @@
+# Reglas de estilo del contrato, sobre las de OpenAPI.
+#
+# La ADR-007 hace de openapi.yaml la fuente de verdad: el frontend genera de el
+# sus tipos y su cliente. Lo que aqui se exige es lo que esa generacion necesita
+# para producir algo utilizable, no preferencia de estilo.
+
+extends: ['spectral:oas']
+
+rules:
+  # Sin operationId el cliente generado recibe nombres inventados a partir de
+  # ruta y verbo, que cambian al renombrar una ruta.
+  operation-operationId: error
+  operation-operationId-unique: error
+  operation-operationId-valid-in-url: error
+
+  # Agrupar por recurso es lo que reparte el cliente generado en modulos.
+  operation-tags: error
+
+  # Una operacion sin descripcion llega asi al cliente y a la documentacion.
+  operation-description: warn
+  operation-parameters: error
+  operation-success-response: error
+
+  path-params: error
+  no-$ref-siblings: error
+  oas3-valid-media-example: error
+  oas3-valid-schema-example: error
+
+  # Los ejemplos del README y el contrato son dos sitios que mantener a la vez
+  # hasta que el reparto documental los reuna; que al menos el contrato valide.
+  duplicated-entry-in-enum: error

@@ -1,0 +1,23 @@
+# El repositorio se trabaja desde Windows y se construye en Linux. Sin esto,
+# gradlew acaba con finales de linea CRLF y el runner de la CI no lo arranca:
+# la primera linea pasa a ser "#!/bin/sh\r" y el error que da no menciona nunca
+# los finales de linea.
+* text=auto eol=lf
+
+# Lo que solo se ejecuta en Windows conserva CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Lo que arranca un interprete tiene que llevar LF si o si.
+gradlew text eol=lf
+*.sh text eol=lf
+
+# Binarios: que git no intente normalizarlos.
+*.jar binary
+*.png binary
+*.jpg binary
+*.webp binary
+*.pdf binary
+*.pptx binary
+*.docx binary
