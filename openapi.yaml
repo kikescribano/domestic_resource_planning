@@ -21,7 +21,9 @@ tags:
   - name: categories
     description: Catálogo de categorías del hogar (clasificación funcional, ver readme.md 4.1.1)
   - name: documents
-    description: Documentación asociada a assets y artículos -- enlaces, no ficheros
+    description: Documentación asociada a assets y artículos -- un enlace externo o un fichero subido
+  - name: files
+    description: Ficheros guardados en el servidor, con cuota de 1 GB por hogar (ver readme.md 5.8)
   - name: assets
     description: Gestión de recursos/assets
   - name: locations
@@ -354,10 +356,20 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Document" }
+        "404":
+          description: >
+            El fileId no existe en este hogar. Responde 404 y no 403 a
+            proposito: confirmar que existe delataria un fichero ajeno.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "409":
           description: >
             No se indicó exactamente un destino -- asset o artículo, nunca
-            ambos ni ninguno (DOCUMENT_TARGET_INVALID)
+            ambos ni ninguno (DOCUMENT_TARGET_INVALID); no se indicó
+            exactamente un contenido -- url o fileId (DOCUMENT_CONTENT_INVALID);
+            o el fichero ya cuelga de otro sitio (FILE_ALREADY_ATTACHED), porque
+            un fichero se adjunta una sola vez.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -371,11 +383,171 @@ paths:
     delete:
       tags: [documents]
       summary: Eliminar un documento
-      description: Borrado real -- no lo referencia ninguna otra entidad.
+      description: >
+        Borrado real -- no lo referencia ninguna otra entidad. Si el documento
+        tenia fichero, la misma transaccion lo marca para su retirada: la cuota
+        se libera en el acto y los bytes los desenlaza el proceso diario.
       responses:
         "204":
           description: Documento eliminado
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /files:
+    get:
+      tags: [files]
+      summary: Listar los ficheros del hogar
+      description: >
+        Ordenado por tamano DESCENDENTE, que es la pregunta real cuando la cuota
+        se agota: que la esta ocupando. Excluye los borrados.
+      parameters:
+        - name: attached
+          in: query
+          schema: { type: boolean }
+          description: >
+            Con false devuelve los subidos y nunca adjuntados -- lo que se puede
+            borrar sin perder nada.
+        - name: type
+          in: query
+          schema: { type: string }
+          description: Filtra por tipo de contenido
+      responses:
+        "200":
+          description: Listado de ficheros
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/StoredFile" }
+    post:
+      tags: [files]
+      summary: Subir un fichero
+      description: >
+        Sube el contenido y devuelve sus metadatos. Adjuntarlo es un paso
+        aparte -- POST /documents con fileId, o PATCH sobre el asset,
+        articulo o ubicacion con photoFileId -- para que el frontend pueda
+        subir mientras se rellena el formulario. Un fichero subido y nunca
+        adjuntado ocupa cuota, y el proceso diario lo retira a las 24 h.
+        El tipo se determina inspeccionando el contenido, no la extension ni
+        el Content-Type declarado, y las imagenes se recodifican, lo que
+        elimina los metadatos EXIF (ver readme.md 5.8.3).
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Maximo 25 MB
+      responses:
+        "201":
+          description: Fichero almacenado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StoredFile" }
+        "409":
+          description: >
+            El hogar ha agotado su gigabyte (STORAGE_QUOTA_EXCEEDED). Se
+            comprueba antes de recibir y otra vez mientras se recibe, asi que
+            tambien puede responderse con la subida a medias.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "413":
+          description: El fichero pasa de 25 MB (FILE_TOO_LARGE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "415":
+          description: >
+            El tipo real no esta en la lista blanca -- image/jpeg, image/png,
+            image/webp o application/pdf (FILE_TYPE_NOT_ALLOWED)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /files/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [files]
+      summary: Metadatos de un fichero
+      responses:
+        "200":
+          description: Metadatos del fichero
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StoredFile" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [files]
+      summary: Retirar un fichero
+      description: >
+        Solo sobre ficheros que no cuelgan de nada: primero se desadjunta.
+        Marca la fila y libera la cuota; los bytes los desenlaza el proceso
+        diario, lo que deja una ventana para deshacer un borrado equivocado.
+      responses:
+        "204":
+          description: Fichero marcado para su retirada
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Un documento o una foto todavia lo referencian (FILE_IN_USE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /files/{id}/content:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [files]
+      summary: Descargar el contenido de un fichero
+      description: >
+        Camino de los DOCUMENTOS y de cualquier descarga explicita: la
+        aplicacion comprueba el hogar EN CADA PETICION y delega los bytes en el
+        servidor web (ver readme.md 5.8.4). Una imagen no pasa por aqui para
+        mostrarse -- se pinta con la url firmada que ya trae la entidad, porque
+        un <img> no puede enviar la cabecera Authorization. Se sirve desde un
+        dominio distinto al de la aplicacion y siempre como adjunto, lo que no
+        impide que un <img> la pinte: el navegador solo honra
+        Content-Disposition en navegaciones y descargas, no en subrecursos.
+      responses:
+        "200":
+          description: Contenido del fichero
+          headers:
+            Content-Disposition:
+              schema: { type: string }
+              description: Siempre attachment, con el nombre original codificado segun RFC 6266
+            X-Content-Type-Options:
+              schema: { type: string, example: nosniff }
+            Content-Security-Policy:
+              schema: { type: string, example: "default-src 'none'; sandbox" }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /storage:
+    get:
+      tags: [files]
+      summary: Uso de almacenamiento del hogar
+      description: >
+        Permite avisar antes de que una subida falle, en lugar de despues.
+      responses:
+        "200":
+          description: Bytes ocupados y cuota
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StorageUsage" }
 
   /articles:
     get:
@@ -747,6 +919,48 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/User" }
+
+  /users/me/avatar:
+    put:
+      tags: [users]
+      summary: Subir o sustituir el avatar propio
+      description: >
+        "me" resuelve a la IDENTIDAD del token, no a la pertenencia: el avatar
+        es de la persona y sobrevive a cualquier hogar. Por eso NO es un fichero
+        del hogar -- no suma a su gigabyte ni tiene politica de RLS detras (ver
+        readme.md 4.1.1). Sustituye siempre al anterior, asi que no acumula.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Solo imagen, maximo 1 MB
+      responses:
+        "204":
+          description: Avatar guardado
+        "413":
+          description: El fichero pasa de 1 MB (FILE_TOO_LARGE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "415":
+          description: El tipo real no es una imagen admitida (FILE_TYPE_NOT_ALLOWED)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      tags: [users]
+      summary: Quitar el avatar propio
+      responses:
+        "204":
+          description: Avatar retirado
+
   /invitations:
     get:
       tags: [invitations]
@@ -1093,15 +1307,25 @@ components:
     DocumentInput:
       type: object
       description: >
-        Documento asociado. El core guarda el enlace, no el fichero. Cuelga de
-        exactamente uno de assetId o articleId -- factura y garantía son de
-        la unidad física, el manual es del modelo.
-      required: [type, url]
+        Documento asociado. Cuelga de exactamente uno de assetId o articleId
+        -- factura y garantía son de la unidad física, el manual es del
+        modelo -- y su contenido es exactamente uno de url o fileId: un
+        enlace a donde ya vivía, o un fichero subido al servidor.
+      required: [type]
       properties:
         assetId: { type: string, format: uuid }
         articleId: { type: string, format: uuid }
         type: { $ref: "#/components/schemas/DocumentType" }
-        url: { type: string, format: uri }
+        url:
+          type: string
+          format: uri
+          description: Cuando el documento vive fuera. Excluyente con fileId
+        fileId:
+          type: string
+          format: uuid
+          description: >
+            Cuando el documento se subió al servidor. Excluyente con url. Debe
+            ser un fichero del mismo hogar y que no cuelgue ya de ningún sitio.
         description: { type: string }
         date:
           type: string
@@ -1120,6 +1344,74 @@ components:
             id: { type: string, format: uuid }
             createdAt: { type: string, format: date-time }
         - $ref: "#/components/schemas/Authorship"
+
+    StoredFile:
+      type: object
+      description: >
+        Fichero guardado en el servidor. No es un asset -- no ocupa sitio en el
+        hogar, no se clasifica ni se presta. Es inmutable: cambiar una foto es
+        subir otra y apuntar a ella, no editar la que habia.
+      properties:
+        id: { type: string, format: uuid }
+        originalName:
+          type: string
+          description: >
+            El nombre con el que llego, saneado. Es solo un dato: nunca forma
+            parte de la ruta en disco.
+        contentType:
+          type: string
+          description: El tipo DETECTADO al inspeccionar el contenido, no el declarado
+          enum: [image/jpeg, image/png, image/webp, application/pdf]
+        sizeBytes:
+          type: integer
+          format: int64
+          description: >
+            Tamano del fichero ya almacenado -- si era una imagen, despues de
+            recodificarla. Es lo que suma la cuota del hogar.
+        checksum:
+          type: string
+          description: SHA-256 del contenido, en hexadecimal
+        url:
+          type: string
+          format: uri
+          description: >
+            URL FIRMADA de vida corta, servida desde el dominio de ficheros.
+            Caduca con el access token que la genero -- unos 15 minutos -- y NO
+            debe guardarse en el estado del cliente ni compartirse: vale para
+            pintar ahora (ver readme.md 5.8.4).
+        thumbnailUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: >
+            Miniatura firmada, 320 px en el lado largo y en WebP. Nula en un
+            PDF: solo las imagenes tienen. No cuenta en la cuota del hogar.
+        uploadedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            Nulo mientras la subida esta en curso. Una reserva sin completar ya
+            ocupa cuota y no se puede adjuntar; el proceso diario la retira.
+        createdAt: { type: string, format: date-time }
+        createdBy: { type: string, format: uuid, nullable: true }
+
+    StorageUsage:
+      type: object
+      description: Ocupacion y cuota del hogar. Las miniaturas no cuentan -- las genera el sistema.
+      properties:
+        usedBytes:
+          type: integer
+          format: int64
+          description: Suma de los ficheros vivos del hogar
+        quotaBytes:
+          type: integer
+          format: int64
+          example: 1073741824
+        maxFileBytes:
+          type: integer
+          format: int64
+          example: 26214400
 
     ArticleInput:
       type: object
@@ -1150,7 +1442,20 @@ components:
           description: >
             Contenido de un envase, en la unidad del artículo. Permite dar
             entrada a "dos paquetes" sin multiplicar a mano.
-        photoUrl: { type: string, format: uri }
+        photoUrl:
+          type: string
+          format: uri
+          description: >
+            En escritura, enlace externo a la imagen. En lectura, la URL con la
+            que se pinta: ese mismo enlace, o la URL FIRMADA de vida corta del
+            fichero subido, que caduca en unos 15 minutos y no debe guardarse
+            (ver readme.md 5.8.4).
+        photoFileId:
+          type: string
+          format: uuid
+          description: >
+            Foto subida al servidor. Excluyente con photoUrl -- se admite una
+            de las dos o ninguna, porque no tener foto es lo normal.
         notes: { type: string }
 
     Article:
@@ -1162,6 +1467,11 @@ components:
             category:
               type: string
               description: Nombre de la categoría, resuelto para lectura
+            photoThumbnailUrl:
+              type: string
+              format: uri
+              nullable: true
+              description: Miniatura firmada, para listados. Solo si la foto es un fichero subido
             createdAt: { type: string, format: date-time }
             retiredAt:
               type: string
@@ -1205,7 +1515,18 @@ components:
           type: string
           format: date
           description: Solo DURABLE
-        photoUrl: { type: string, format: uri }
+        photoUrl:
+          type: string
+          format: uri
+          description: >
+            En escritura, enlace externo a la imagen. En lectura, la URL con la
+            que se pinta: ese mismo enlace, o la URL FIRMADA de vida corta del
+            fichero subido, que caduca en unos 15 minutos y no debe guardarse
+            (ver readme.md 5.8.4).
+        photoFileId:
+          type: string
+          format: uuid
+          description: Foto subida al servidor. Excluyente con photoUrl
         notes: { type: string }
 
     AssetIntakeInput:
@@ -1257,6 +1578,15 @@ components:
         ownerId: { type: string, format: uuid }
         location: { $ref: "#/components/schemas/LocationRef" }
         quantity: { type: number, minimum: 0 }
+        photoUrl: { type: string, format: uri, nullable: true }
+        photoFileId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Excluyente con photoUrl. Ponerlo a null desadjunta la foto y marca
+            el fichero para su retirada: la cuota se libera en el acto y los
+            bytes los desenlaza el proceso diario.
         notes: { type: string }
 
     Asset:
@@ -1287,7 +1617,21 @@ components:
               description: Nulo si su propietario causó baja y aún no se ha reasignado.
             serialNumber: { type: string, nullable: true }
             acquiredOn: { type: string, format: date, nullable: true }
-            photoUrl: { type: string, format: uri, nullable: true }
+            photoUrl:
+              type: string
+              format: uri
+              nullable: true
+              description: >
+                Enlace externo, o URL FIRMADA de vida corta cuando la foto vive
+                aqui. Caduca con el access token y no debe guardarse.
+            photoThumbnailUrl:
+              type: string
+              format: uri
+              nullable: true
+              description: >
+                Miniatura firmada, para listados. Nula si la foto es un enlace
+                externo, porque de esa no se genera nada.
+            photoFileId: { type: string, format: uuid, nullable: true }
             notes: { type: string, nullable: true }
             location: { $ref: "#/components/schemas/LocationRef" }
             status: { $ref: "#/components/schemas/AssetStatus" }
@@ -1339,7 +1683,18 @@ components:
             lightExposure:
               type: string
               enum: [DIRECT, INDIRECT, DARKNESS]
-        photoUrl: { type: string, format: uri }
+        photoUrl:
+          type: string
+          format: uri
+          description: >
+            En escritura, enlace externo a la imagen. En lectura, la URL con la
+            que se pinta: ese mismo enlace, o la URL FIRMADA de vida corta del
+            fichero subido, que caduca en unos 15 minutos y no debe guardarse
+            (ver readme.md 5.8.4).
+        photoFileId:
+          type: string
+          format: uuid
+          description: Foto subida al servidor. Excluyente con photoUrl
         notes: { type: string }
 
     Location:
@@ -1348,6 +1703,11 @@ components:
         - type: object
           properties:
             id: { type: string, format: uuid }
+            photoThumbnailUrl:
+              type: string
+              format: uri
+              nullable: true
+              description: Miniatura firmada, para listados. Solo si la foto es un fichero subido
             createdAt: { type: string, format: date-time }
         - $ref: "#/components/schemas/Authorship"
 
@@ -1406,7 +1766,15 @@ components:
             email: { type: string, format: email }
             phone: { type: string, nullable: true }
             role: { $ref: "#/components/schemas/UserRole" }
-            avatarUrl: { type: string, format: uri, nullable: true }
+            avatarUrl:
+              type: string
+              format: uri
+              nullable: true
+              description: >
+                Enlace externo, o URL FIRMADA de vida corta del avatar subido
+                -- se pinta en un <img> como cualquier otra foto. Es de la
+                IDENTIDAD, no del hogar: no cuenta en la cuota de nadie (ver
+                readme.md 4.1.1), y cerrar la cuenta lo borra.
             lastLoginAt: { type: string, format: date-time, nullable: true }
             emailVerifiedAt:
               type: string
