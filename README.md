@@ -33,7 +33,9 @@ El proyecto se construye como dos componentes claramente diferenciados —**back
 | Activos productivos (maquinaria, líneas) | Electrodomésticos, vehículos, mobiliario, herramientas |
 | Mantenimiento preventivo/correctivo (CMMS) | Revisión de caldera, ITV, cambio de filtros, garantías |
 | Gestión de almacén / inventario | Despensa, garaje, trastero, botiquín |
-| Planificación de producción / tareas | Tareas domésticas, turnos, rutinas familiares |
+| Compras y aprovisionamiento | Lista de la compra, reposición de lo que se agota |
+| Maestro de proveedores | Fontanero, servicio técnico de la caldera, taller |
+| Planificación de producción / tareas | Tareas domésticas, turnos, rutinas familiares, menú semanal |
 | Gestión de proyectos / eventos puntuales | Mudanzas, reformas, celebraciones, viajes |
 
 ---
@@ -645,14 +647,23 @@ Las siguientes decisiones, inicialmente abiertas, han quedado validadas:
 
 | Módulo | Descripción | Estado | Prioridad |
 |---|---|---|---|
-| Gestión de eventos temporales | Mudanzas, reformas, viajes, celebraciones: proyectos con inicio/fin y recursos asociados | Por diseñar | Baja |
-| CMMS doméstico | Mantenimiento preventivo/correctivo de assets (planes, avisos, histórico) | Por diseñar | Alta |
+| Proveedores y contactos de servicio | Fontanero, servicio técnico de la caldera, taller: quién arregla, quién cobra y quién responde de una garantía. Es dato maestro compartido — sin módulo propio lo duplicarían CMMS, gastos y garantías | Por diseñar | Alta |
+| Compras y lista de la compra | Qué falta, qué hay que reponer y qué está pedido. Cierra el ciclo que abre Warehouse al detectar la falta y termina en gastos al pagarla | Por diseñar | Alta |
 | Warehouse | Inventario doméstico (despensa, garaje, trastero) con stock y consumo. Hereda la pregunta abierta sobre peso y volumen de un asset, de la que depende que el aviso de capacidad de una ubicación sirva para algo (ver 4.1.7) | Por diseñar | Alta |
+| CMMS doméstico | Mantenimiento preventivo/correctivo de assets (planes, avisos, histórico) | Por diseñar | Alta |
 | Planificador de tareas | Rutinas, turnos entre miembros del hogar, recordatorios | Por diseñar | Media |
+| Gastos y presupuesto | Lo que cuesta lo que entra en el hogar, y el presupuesto por periodo. El core guarda de dónde viene un asset, nunca cuánto valió (ver 4.1.1) | Por diseñar | Media |
+| Gestión de eventos temporales | Mudanzas, reformas, viajes, celebraciones: proyectos con inicio/fin y recursos asociados | Por diseñar | Media |
 | Gestión avanzada de préstamos | Recordatorios, penalizaciones, valoraciones e histórico extenso (el core ya cubre lo mínimo, ver 4.1.5) | Por diseñar | Baja |
-| *(otros a definir)* | Candidatos futuros: gastos/presupuesto, seguros y garantías, energía | Backlog abierto | — |
+| Recetas y menú semanal | Una receta es una lista de materiales y cocinar consume existencias: es la planificación de producción del hogar, y el consumidor natural de Warehouse | Por diseñar | Baja |
+| Reservas de uso | Reservar un `DURABLE` para una ventana de tiempo: el coche el sábado, la habitación de invitados. No es un préstamo — no sale de casa y tiene fecha firme | Por diseñar | Baja |
+| Fin de vida | Qué fue del asset cuando causa baja: venta, donación o retirada. El core publica `AssetDeactivated`, pero no guarda el destino | Por diseñar | Baja |
+| Garantías y seguros | Cobertura y vencimiento de un `DURABLE`, apoyados en su fecha de adquisición y en la documentación que el core ya guarda | Por diseñar | Baja |
+| Mascotas y plantas | Cuidados recurrentes de los seres vivos de la casa: vacunas, veterinario, desparasitación, riego, poda. **No son assets** — el core define un asset como todo el material del hogar, y un ser vivo no es material, así que el módulo trae su propia entidad en lugar de forzarla en el core. Tampoco es CMMS ni planificador de tareas, aunque comparta con ambos la forma del aviso recurrente: lo que se cuida aquí no está dado de alta en el core | Por diseñar | Baja |
 
-> Esta tabla es el punto principal a mantener actualizado: a medida que un módulo pase de "por diseñar" a "en desarrollo" o "en producción", se debe reflejar aquí.
+> Esta tabla es el punto principal a mantener actualizado: a medida que un módulo pase de "por diseñar" a "en desarrollo" o "en producción", se debe reflejar aquí. El catálogo canónico vive en [`docs/backend/modules/`](docs/backend/modules/README.md), que enlaza el documento de cada módulo; el estado y la prioridad se mantienen **solo aquí** para que no se contradigan. Un candidato nuevo entra como fila propia, no como cajón de sastre: la lista no está cerrada, pero no se guardan ideas sin estado.
+
+> **Un patrón que se repite, y no lo posee nadie:** avisar por una fecha aparece en cinco módulos — caducidad en Warehouse, revisión en CMMS, vencimiento en garantías, devolución en préstamos, vacuna o riego en mascotas y plantas. **Cada módulo posee su propia regla** de qué se avisa y cuándo; programar la comprobación y entregar el aviso son capacidad de plataforma, igual que el correo que el core ya usa para verificar una identidad o cursar una invitación. Se descartó un módulo de avisos que lo centralizara: dejaría a cinco módulos dependiendo de que estuviera activo, que es justo lo que el event bus evita (ver 5.2).
 
 ---
 
@@ -668,32 +679,44 @@ graph LR
     subgraph Servidor["Backend · Monolito modular (Kotlin)"]
         API["API REST<br/>(autenticada)"]
         EB{{"Event Bus interno"}}
-        M1["Módulo Core<br/>Recursos / Assets"]
-        M2["Módulo Eventos<br/>temporales"]
-        M3["Módulo CMMS<br/>Mantenimiento"]
-        M4["Módulo Warehouse"]
-        M5["Módulo Planificador<br/>de tareas"]
-        API --> M1
-        API -.-> M2
-        API -.-> M3
-        API -.-> M4
-        API -.-> M5
-        M1 <--> EB
-        M2 <--> EB
-        M3 <--> EB
-        M4 <--> EB
-        M5 <--> EB
+        CORE["Módulo Core<br/>Recursos / Assets"]
+        subgraph ALTA["Prioridad alta"]
+            M1["Proveedores y<br/>contactos de servicio"]
+            M2["Compras y<br/>lista de la compra"]
+            M3["Warehouse"]
+            M4["CMMS<br/>Mantenimiento"]
+        end
+        subgraph MEDIA["Prioridad media"]
+            M5["Planificador<br/>de tareas"]
+            M6["Gastos y<br/>presupuesto"]
+            M7["Eventos<br/>temporales"]
+        end
+        subgraph BAJA["Prioridad baja"]
+            M8["Préstamos<br/>avanzados"]
+            M9["Recetas y<br/>menú semanal"]
+            M10["Reservas de uso"]
+            M11["Fin de vida"]
+            M12["Garantías<br/>y seguros"]
+            M13["Mascotas<br/>y plantas"]
+        end
+        API --> CORE
+        API -.-> ALTA
+        API -.-> MEDIA
+        API -.-> BAJA
+        CORE <--> EB
+        ALTA <--> EB
+        MEDIA <--> EB
+        BAJA <--> EB
     end
     DB[("PostgreSQL 16+")]
     FE -- "HTTPS / REST + token" --> API
-    M1 --> DB
-    M2 -.-> DB
-    M3 -.-> DB
-    M4 -.-> DB
-    M5 -.-> DB
+    CORE --> DB
+    ALTA -.-> DB
+    MEDIA -.-> DB
+    BAJA -.-> DB
 ```
 
-*Las líneas discontinuas representan módulos opcionales: pueden no estar activos sin que el core deje de funcionar.*
+*Las líneas discontinuas representan módulos opcionales: pueden no estar activos sin que el core deje de funcionar. El agrupamiento es la **prioridad** de la sección 4.2, no una dependencia: dentro de un grupo los módulos no se necesitan entre sí, y cada uno habla con los demás solo por el event bus.*
 
 ### 5.2 Event bus interno
 
@@ -756,16 +779,18 @@ interface EventBus {
 | `AssetCreated` | Se da de alta un asset — incluida la primera existencia de un artículo en una ubicación | CMMS genera un plan de mantenimiento por defecto |
 | `AssetMoved` | Cambia la ubicación de un asset | Warehouse actualiza el stock por ubicación |
 | `AssetHierarchyChanged` | Cambia el asset padre/composición de un asset | Módulos que dependan de la estructura del hogar |
-| `AssetQuantityChanged` | Cambia la cantidad de un asset `CONSUMABLE`, por ajuste o por entrada sobre una existencia ya creada | Warehouse registra el movimiento de existencias; el planificador de tareas añade el producto a la lista de la compra al llegar a 0 |
+| `AssetQuantityChanged` | Cambia la cantidad de un asset `CONSUMABLE`, por ajuste o por entrada sobre una existencia ya creada | Warehouse registra el movimiento de existencias; compras añade el producto a la lista de la compra al llegar a 0 |
 | `AssetDeactivated` | Se da de baja un asset, o una existencia se fusiona en otra | CMMS cancela los planes de mantenimiento asociados |
 | `LocationCreated` | Se crea una ubicación | Warehouse la usa como posible punto de stock |
 | `DocumentAttached` | Se adjunta un documento a un asset o a un artículo | CMMS enlaza el manual en el plan de mantenimiento que genera |
 | `UserDeactivated` | Alguien deja el hogar — su pertenencia, no su cuenta | El planificador de tareas reparte sus rutinas entre el resto |
-| `LoanStarted` | Se inicia un préstamo | Planificador de tareas crea un recordatorio de devolución |
+| `LoanStarted` | Se inicia un préstamo | El planificador de tareas crea un recordatorio de devolución, hasta que exista gestión avanzada de préstamos |
 | `LoanOverdue` | El proceso diario detecta un préstamo pasado de fecha | Gestión avanzada de préstamos envía el aviso al receptor |
 | `LoanReturned` | Se confirma la devolución de un préstamo | Cierre de recordatorios asociados |
 
 > Crear o retirar una **categoría** no publica evento: es clasificación interna del hogar y ningún módulo previsto reacciona a ella. Se añadirá el día que alguno lo necesite, que es el criterio para entrar en este catálogo — no la simetría con las demás entidades.
+
+> **La columna de consumidores nombra al dueño de hoy, no un compromiso del core**, y se lee contra la tabla de módulos de 4.2. Dos casos tenían dos dueños a la vez y se han resuelto: la **lista de la compra** pasa del planificador de tareas al módulo de compras, que es quien la posee; y el **recordatorio de devolución** nace en el planificador de tareas y se traspasa a gestión avanzada de préstamos cuando ese módulo exista — es el único traspaso previsto, y se anota aquí para que no vuelva a quedar ambiguo. Al core no le afecta ninguno de los dos: publica igual y no sabe quién escucha.
 
 ### 5.3 Clean Architecture (aplicable a BE y FE)
 
@@ -1626,7 +1651,7 @@ pie title Distribución de la batería de tests
 |---|---|---|
 | **Fase 0 — Definición** | Arquitectura, stack, alcance del core, estrategia de testing | 🟢 Completada |
 | **Fase 1 — Core MVP** | Gestión de recursos/assets, autenticación, API REST, event bus, FE responsive básico | 🟡 Siguiente |
-| **Fase 2 — Primer módulo funcional** | Candidato a definir (CMMS o Warehouse) | ⚪ Pendiente |
+| **Fase 2 — Primer módulo funcional** | Candidato a definir entre los de prioridad alta de la sección 4.2 | ⚪ Pendiente |
 | **Fase 3 — Módulos adicionales** | Según backlog de la sección 4.2 | ⚪ Pendiente |
 
 > **Tarea de arranque de la Fase 1:** repartir a `docs/` las secciones de este
@@ -1699,6 +1724,8 @@ El contrato completo de la API vive en [`openapi.yaml`](openapi.yaml) (OpenAPI
 | 2026-08-09 | Cierre de los puntos que dejó abiertos el enrolamiento (4.1.7): el alta de miembros pasa de **alta directa a invitación por correo** (`InviteUser` + `AcceptInvitation`), ahora que la verificación obligatoria trae la infraestructura de correo al primer día; aceptar una invitación verifica el correo por sí solo, y desaparece `mustChangePassword`, que solo existía para el alta directa. Los hogares sin verificar se purgan **a los 7 días** con `PurgeUnverifiedHouseholds`, el único borrado real del core. Revisadas y mantenidas abiertas las dos pendientes restantes: peso y volumen del asset, y los cuatro atributos propuestos. Corregida la afirmación de que crear un hogar era la única escritura sin autenticar — es la única que no exige credencial alguna |
 | 2026-08-10 | **Almacenamiento local de ficheros** (4.1.1, 4.1.7, nueva 5.8, [ADR-005](docs/common/architecture/decisions/ADR-005-local-file-storage.md)): el core deja de depender de un servicio externo para las fotos y la documentación y guarda los binarios en el disco del servidor, con la entidad `StoredFile` (tabla `files`) y **1 GB de cuota por hogar**. El enlace externo no desaparece: un documento apunta a `url` **o** a `fileId`, nunca a los dos, y lo mismo vale para las fotos de asset, artículo y ubicación. Se aplican los controles de la File Upload Cheat Sheet de OWASP — lista blanca por contenido real, renombrado en disco, volumen propio `noexec` fuera del árbol web, recodificación de imágenes que de paso borra el EXIF con la geolocalización de la casa, y entrega como adjunto desde otro dominio. El avatar de una identidad queda **fuera** del mecanismo por no tener hogar al que cargarle cuota, y pasa a columnas de `identities` con tope de 1 MB. Queda anotado que la cuota por hogar **no** protege el disco por sí sola mientras el alta sea autoservicio: hacen falta volumen propio y techo global (5.8.2). El análisis antivirus se anota como pendiente con motivo, no como descartado. Impacto en 4.1.2, 4.1.3, 4.1.4, 5.4.2, 5.4.3, 5.6, 5.7, 6, 7 y `openapi.yaml` |
 | 2026-08-10 | Cierre de la revisión del mecanismo de ficheros. **Las imágenes se entregan con URL firmada de vida corta** que sirve nginx sin preguntar a la aplicación, porque un `<img>` no puede enviar la cabecera `Authorization`; los documentos siguen por el endpoint autorizado, que comprueba el hogar en cada petición (4.1.7, 5.8.4). Se descartaron `fetch()` + blob —preflight por URL, memoria retenida y los bytes de vuelta en el origen de la app— y la cookie acotada al dominio de ficheros, que exige `SameSite=None` y empuja a compartir dominio registrable. Se añade la condición de **no registrar la cadena de consulta** en ningún log, sin la cual la firma acabaría en claro en el log de acceso. La cuota pasa a **reservarse** antes de transmitir, para que el bloqueo del hogar dure milisegundos y no toda la subida (5.8.3, columna `uploaded_at` nueva). Se define la miniatura —320 px, WebP, fuera de la cuota—, se añade `GET /api/v1/files` para poder ver qué ocupa el gigabyte, se hace explícito que «un fichero se adjunta una sola vez» solo es expresable a medias en la base de datos (5.6), y **cerrar la cuenta pasa a borrar el avatar** (4.1.4). Queda anotada como pendiente la supresión de los ficheros de un hogar entero, que es una pregunta de baja de hogar y no de ficheros. Impacto en 5.4.2, 5.6, 5.7, 7, `openapi.yaml` y ADR-005 |
+| 2026-08-10 | Refinado el listado de módulos futuros (4.2), que pasa de cinco filas más un cajón de sastre a **trece módulos con prioridad**. Entran seis nuevos: **proveedores y contactos de servicio** y **compras y lista de la compra** en prioridad alta, y **recetas y menú semanal**, **reservas de uso**, **fin de vida** y **mascotas y plantas** en baja. Este último cierra además una pregunta de alcance: un ser vivo no es material del hogar, así que no es un asset ni cabe en CMMS — el módulo trae su propia entidad en lugar de forzarla en el core. **Gastos y presupuesto** (media) y **garantías y seguros** (baja) suben de la fila «(otros a definir)» a fila propia, y con ellos desaparece esa fila: un candidato nuevo entra con estado y prioridad o no entra. Se retira **energía**, demasiado lejos del modelo de assets. La analogía ERP→DRP (3) gana las dos áreas que quedaban sin equivalente, compras y maestro de proveedores, y el diagrama de componentes (5.1) se redibuja con los trece módulos agrupados por prioridad |
+| 2026-08-10 | Resueltas las tres fronteras que el listado ampliado dejaba en disputa (4.2, 5.2.3): la **lista de la compra** pasa del planificador de tareas al módulo de compras, su dueño natural; el **recordatorio de devolución** se queda en el planificador y se traspasa a gestión avanzada de préstamos cuando ese módulo exista, único traspaso previsto y ahora anotado; y el **aviso por fecha** —caducidad, revisión, garantía, devolución, riego— no gana módulo propio: cada módulo posee su regla y el mecanismo de programación y entrega es plataforma, como el correo que el core ya usa. Un módulo de avisos centralizado dejaría a cinco módulos dependiendo de que estuviera activo, que es lo que el event bus existe para evitar. El core no cambia en ninguno de los tres casos |
 | 2026-08-08 | Enrolamiento de un inquilino (4.1.4): alta de hogar **autoservicio** con verificación de correo obligatoria en dos pasos (`CreateHousehold` + `VerifyEmail`), única escritura sin autenticar y sin delatar qué correos existen. Se separa `Identity` (credenciales, única en la instalación) de `HouseholdMember` (rol en un hogar), con una sola pertenencia activa en el MVP; `users` desaparece y todo lo que el dominio llamaba «usuario» pasa a la pertenencia, mientras los refresh tokens cuelgan de la identidad. Se hace explícito que un hogar puede tener **varias viviendas**, que son `Location` raíz de tipo `HOUSE`, y que el resto del dominio cuelga del hogar y no de la vivienda (4.1.2). `identities` queda fuera de RLS, lo que se marca como el único punto con datos personales a una sola capa (5.6). Impacto en 4.1.7, 5.2.3, 5.4.1, 5.4.2, 5.4.3, 5.6, 5.7, 7 y `openapi.yaml` |
 | 2026-08-08 | Autoría de los cambios en todo el core: cada entidad gana `createdBy` y `updatedBy` (4.1.1), anulables y con nulo significando «el sistema», nunca aceptadas del cliente, y con clave ajena compuesta para que una autoría no pueda cruzarse de hogar (5.6). El hogar queda fuera, porque cuando su fila nace no hay ningún usuario al que apuntar. Impacto en las tablas de atributos, el modelo de datos, los ejemplos de test (7) y `openapi.yaml`. Quedan cuatro atributos pendientes en 4.1.7 |
 | 2026-08-08 | Segunda pasada de nomenclatura: se traducen al inglés los **valores de los enumerados** (`DURABLE`, `CONSUMABLE`, `AVAILABLE`, `LENT`, `DECOMMISSIONED`, `ACTIVE`, `RETURNED`, `OVERDUE`, `HOUSEHOLD_ADMIN`…), los **nombres de los casos de uso** (`CreateAsset`, `RegisterConsumableIntake`, `MergeStockItems`, `MarkOverdueLoans`…) y los **nombres de clase** del modelo de dominio (`Article`, `Category`, `Document`, `User`, `Loan`, `Role`). La regla de 4.1.7 pasa a ser sin excepciones: todo nombre destinado a ser programado va en inglés. Los nombres de categoría sembrados dejan de parecer un enumerado y se escriben como lo que son, datos editables por el hogar |
