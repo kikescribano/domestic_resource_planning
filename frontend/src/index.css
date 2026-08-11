@@ -1,20 +1,319 @@
 @import 'tailwindcss';
 
-/* Tokens del sistema de diseno. La direccion visual que los justifica se fija
-   en docs/frontend/product-design/look-and-feel.md; aqui solo viven sus valores.
-   Se completan en el Hito 1, al cerrar las ocho dimensiones. */
-@theme {
-  --color-surface: oklch(99% 0.005 250);
-  --color-surface-raised: oklch(100% 0 0);
-  --color-ink: oklch(25% 0.02 250);
-  --color-ink-muted: oklch(50% 0.02 250);
+/* ---------------------------------------------------------------------------
+   Tokens del sistema de diseño de DRP.
+
+   La dirección visual que los justifica se fija en
+   docs/frontend/product-design/look-and-feel.md; lo que significa cada nombre y
+   cuándo se usa, en docs/frontend/design-system/tokens/README.md. Aquí solo
+   viven los valores.
+
+   Tres reglas al tocar este fichero:
+
+   1. Los nombres son semánticos, no descriptivos: `--color-state-overdue`, no
+      `--color-red-600`. Un componente que necesita saber el color exacto que hay
+      detrás de un token está mal escrito.
+   2. Los colores van en `oklch()` porque su claridad es perceptual: dos tokens
+      con la misma L se ven igual de claros aunque cambie el tono, que es lo que
+      permite derivar el modo oscuro sin rehacer la paleta.
+   3. Cada par de color que acaba en pantalla está medido, no estimado. Los
+      ratios vigentes están en docs/frontend/accessibility/README.md; si cambias
+      un valor de aquí, esa tabla deja de ser cierta.
+   --------------------------------------------------------------------------- */
+
+/* La variante `dark:` sigue exactamente la misma regla que los tokens: manda
+   `data-theme` cuando está puesto y el sistema operativo cuando no. Sin esto,
+   `dark:` miraría solo a `prefers-color-scheme` y contradiría a los tokens en
+   cuanto alguien conmutase el tema a mano. */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:not([data-theme='light'], [data-theme='light'] *)) {
+      @slot;
+    }
+  }
+
+  &:where([data-theme='dark'], [data-theme='dark'] *) {
+    @slot;
+  }
 }
 
-@media (prefers-color-scheme: dark) {
-  @theme {
-    --color-surface: oklch(20% 0.015 250);
-    --color-surface-raised: oklch(25% 0.02 250);
-    --color-ink: oklch(95% 0.005 250);
-    --color-ink-muted: oklch(70% 0.015 250);
+/* `static` obliga a emitir todas las variables aunque todavía no haya un
+   componente que las use. El sistema de diseño llega antes que los componentes,
+   así que sin esto media paleta no existiría hasta que alguien la gastara. */
+@theme static {
+  /* -------------------------------------------------------------------------
+     Color
+
+     `light-dark()` resuelve contra `color-scheme`, que se fija más abajo: el
+     sistema por defecto y `data-theme` cuando el usuario elige. Un solo sitio
+     por token para los dos modos, y los controles nativos —barras de scroll,
+     selectores de fecha, autocompletado— acompañan solos.
+     ------------------------------------------------------------------------- */
+
+  /* Superficies, de atrás hacia delante. */
+  --color-surface: light-dark(oklch(98.4% 0.006 85), oklch(19% 0.012 70));
+  --color-surface-raised: light-dark(oklch(99.6% 0.003 85), oklch(23% 0.014 70));
+  --color-surface-sunken: light-dark(oklch(96% 0.009 82), oklch(15.5% 0.01 70));
+  --color-surface-hover: light-dark(oklch(96% 0.014 70), oklch(27% 0.016 70));
+  --color-scrim: light-dark(oklch(26% 0.02 60 / 0.5), oklch(10% 0.01 60 / 0.65));
+
+  /* Texto y iconos. `ink` es tinta sobre papel: el nombre recuerda que se
+     escribe sobre una superficie, no que sea «gris oscuro». */
+  --color-ink: light-dark(oklch(26% 0.02 60), oklch(95% 0.008 85));
+  --color-ink-muted: light-dark(oklch(47% 0.02 60), oklch(76% 0.012 80));
+  --color-ink-subtle: light-dark(oklch(52% 0.018 60), oklch(68% 0.012 80));
+  --color-ink-disabled: light-dark(oklch(65% 0.012 60), oklch(50% 0.01 70));
+  --color-ink-inverse: light-dark(oklch(99% 0.004 85), oklch(18% 0.02 60));
+
+  /* Bordes. `border-subtle` es decorativo —separa filas— y `border` delimita
+     controles, por lo que está obligado a 3:1 (WCAG 1.4.11). No son
+     intercambiables: usar el sutil en un `input` incumple. */
+  --color-border-subtle: light-dark(oklch(92% 0.008 80), oklch(30% 0.012 70));
+  --color-border: light-dark(oklch(62% 0.015 70), oklch(58% 0.018 70));
+  --color-border-strong: light-dark(oklch(45% 0.02 70), oklch(72% 0.02 70));
+
+  /* Acento: terracota. Es el único color de marca y marca la acción principal;
+     si aparece dos veces en una pantalla, una de las dos no era la principal. */
+  --color-accent: light-dark(oklch(52% 0.13 42), oklch(70% 0.12 45));
+  --color-accent-hover: light-dark(oklch(46% 0.13 42), oklch(76% 0.12 45));
+  --color-accent-ink: light-dark(oklch(47% 0.12 42), oklch(78% 0.1 50));
+  --color-accent-soft: light-dark(oklch(94% 0.03 55), oklch(30% 0.04 45));
+
+  /* Foco. Un solo color para todo el sistema, con 9,7:1 sobre el fondo en claro
+     y 11,7:1 en oscuro, para que el anillo se vea igual esté donde esté. */
+  --color-focus: light-dark(oklch(38% 0.05 60), oklch(85% 0.05 85));
+
+  /* Feedback del sistema: lo que la aplicación le responde a una acción. */
+  --color-success: light-dark(oklch(45% 0.1 152), oklch(78% 0.11 152));
+  --color-success-soft: light-dark(oklch(94.5% 0.028 152), oklch(28% 0.04 152));
+  --color-warning: light-dark(oklch(48% 0.09 70), oklch(80% 0.1 80));
+  --color-warning-soft: light-dark(oklch(95% 0.033 80), oklch(29% 0.04 80));
+  --color-danger: light-dark(oklch(48% 0.16 27), oklch(72% 0.14 27));
+  --color-danger-soft: light-dark(oklch(94.5% 0.022 27), oklch(28% 0.05 27));
+  --color-info: light-dark(oklch(45% 0.12 250), oklch(76% 0.1 250));
+  --color-info-soft: light-dark(oklch(94.5% 0.024 250), oklch(28% 0.04 250));
+
+  /* Estados del dominio: lo que le pasa a una cosa del hogar, que no es lo
+     mismo que lo que le pasa a una petición. Hoy tres de ellos comparten valor
+     con su equivalente de feedback; están separados porque un préstamo vencido
+     no es un error del sistema, y el día que el rojo de error cambie de tono el
+     inventario no debe repintarse detrás.
+
+     Las cinco tonalidades son distinguibles entre sí, pero el color nunca es el
+     único portador del significado: cada estado lleva además etiqueta e icono
+     propios (ver look-and-feel.md). El azul de «sin existencias» es el único
+     color frío del sistema, y eso es deliberado: sobrevive a una deuteranopia
+     que sí confunde verde, ámbar y rojo. */
+  --color-state-available: light-dark(oklch(45% 0.1 152), oklch(78% 0.11 152));
+  --color-state-available-soft: light-dark(oklch(94.5% 0.028 152), oklch(28% 0.04 152));
+  --color-state-lent: light-dark(oklch(48% 0.09 70), oklch(80% 0.1 80));
+  --color-state-lent-soft: light-dark(oklch(95% 0.033 80), oklch(29% 0.04 80));
+  --color-state-overdue: light-dark(oklch(48% 0.16 27), oklch(72% 0.14 27));
+  --color-state-overdue-soft: light-dark(oklch(94.5% 0.022 27), oklch(28% 0.05 27));
+  --color-state-decommissioned: light-dark(oklch(52% 0.012 70), oklch(68% 0.012 70));
+  --color-state-decommissioned-soft: light-dark(oklch(94.5% 0.006 70), oklch(28% 0.008 70));
+  --color-state-out-of-stock: light-dark(oklch(45% 0.12 250), oklch(76% 0.1 250));
+  --color-state-out-of-stock-soft: light-dark(oklch(94.5% 0.024 250), oklch(28% 0.04 250));
+
+  /* -------------------------------------------------------------------------
+     Tipografía
+
+     Dos familias con reparto explícito: la serif pone el carácter en los
+     titulares y la sans sostiene el trabajo. Las pilas son de sistema y no
+     descargan nada; el día que se autoalojen unas fuentes propias se cambia el
+     valor y ningún componente se entera. La serif no baja de 20 px ni entra en
+     una fila de listado (ver «Densidad» en look-and-feel.md).
+     ------------------------------------------------------------------------- */
+  --font-sans:
+    ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji';
+  --font-display:
+    'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, 'Noto Serif',
+    'Times New Roman', serif;
+  --font-mono:
+    ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  /* Escala por papel, no por tamaño: `text-body` sobrevive a que un día el
+     cuerpo mida 17 px. Los dos tamaños grandes usan `clamp()` porque el salto
+     de 375 px a ultrawide no se resuelve con un único valor. */
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.4;
+  --text-body-sm: 0.875rem;
+  --text-body-sm--line-height: 1.45;
+  --text-body: 1rem;
+  --text-body--line-height: 1.6;
+  --text-lead: 1.0625rem;
+  --text-lead--line-height: 1.55;
+  --text-title-sm: 1.125rem;
+  --text-title-sm--line-height: 1.35;
+  --text-title: clamp(1.375rem, 1.28rem + 0.4vw, 1.625rem);
+  --text-title--line-height: 1.25;
+  --text-display: clamp(1.75rem, 1.5rem + 1.1vw, 2.5rem);
+  --text-display--line-height: 1.15;
+
+  /* -------------------------------------------------------------------------
+     Espacio
+
+     La rejilla es de 4 px (`--spacing`), y sobre ella hay cuatro medidas con
+     nombre porque se repiten en todas las pantallas y conviene poder cambiarlas
+     de una vez.
+     ------------------------------------------------------------------------- */
+  --spacing: 0.25rem;
+  --spacing-gutter: 1rem;
+  --spacing-gutter-lg: 1.5rem;
+  --spacing-row: 0.75rem;
+  --spacing-row-compact: 0.375rem;
+
+  /* Objetivo táctil. WCAG 2.2 (2.5.8, AA) exige 24 px; DRP fija 44 px porque se
+     usa de pie en la cocina y con una mano. `touch-min` existe solo para las
+     excepciones que la propia norma admite, como un enlace dentro de un
+     párrafo. */
+  --spacing-touch: 2.75rem;
+  --spacing-touch-min: 1.5rem;
+
+  /* Medidas de composición. `reading` limita la línea de texto, `form` la
+     columna de un formulario y `shell` impide que en ultrawide la aplicación se
+     estire hasta ser ilegible. */
+  --container-form: 34rem;
+  --container-reading: 68ch;
+  --container-shell: 96rem;
+
+  /* Un único breakpoint propio, para el tramo ultrawide que Tailwind no cubre.
+     Los demás salen del contenido y son los que trae Tailwind de serie. */
+  --breakpoint-3xl: 100rem;
+
+  /* -------------------------------------------------------------------------
+     Forma y elevación
+
+     Radios amables pero contenidos: la calidez está en el color y en el espacio,
+     no en las esquinas. La elevación es tenue y de tono cálido —nunca negro
+     puro— y en modo oscuro casi no se ve, así que allí quien separa planos es la
+     claridad de la superficie más el borde.
+     ------------------------------------------------------------------------- */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+
+  --shadow-xs: 0 1px 2px light-dark(oklch(30% 0.03 60 / 0.07), oklch(0% 0 0 / 0.4));
+  --shadow-sm:
+    0 1px 2px light-dark(oklch(30% 0.03 60 / 0.06), oklch(0% 0 0 / 0.35)),
+    0 2px 6px -2px light-dark(oklch(30% 0.03 60 / 0.08), oklch(0% 0 0 / 0.4));
+  --shadow-md:
+    0 2px 4px -1px light-dark(oklch(30% 0.03 60 / 0.07), oklch(0% 0 0 / 0.4)),
+    0 8px 16px -6px light-dark(oklch(30% 0.03 60 / 0.1), oklch(0% 0 0 / 0.45));
+  --shadow-lg:
+    0 4px 8px -2px light-dark(oklch(30% 0.03 60 / 0.08), oklch(0% 0 0 / 0.45)),
+    0 16px 40px -12px light-dark(oklch(30% 0.03 60 / 0.14), oklch(0% 0 0 / 0.55));
+
+  /* -------------------------------------------------------------------------
+     Movimiento
+
+     Cuatro duraciones y tres curvas. El movimiento acompaña un cambio de estado
+     y nunca lo comunica: quitarlo entero —que es lo que hace
+     `prefers-reduced-motion` más abajo— no debe hacer perder información.
+     ------------------------------------------------------------------------- */
+  --duration-instant: 80ms;
+  --duration-fast: 140ms;
+  --duration-base: 220ms;
+  --duration-slow: 320ms;
+
+  --ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
+  --ease-out-soft: cubic-bezier(0.16, 0.84, 0.44, 1);
+  --ease-in-soft: cubic-bezier(0.5, 0, 0.75, 0);
+
+  --default-transition-duration: 140ms;
+  --default-transition-timing-function: cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+@layer base {
+  /* El esquema de color es a la vez el mecanismo de los tokens —`light-dark()`
+     resuelve contra él— y lo que hace que los controles nativos acompañen. Por
+     defecto manda el sistema; `data-theme` en `<html>` gana en las dos
+     direcciones, para que un usuario con el sistema en oscuro pueda quedarse en
+     claro. Sin JavaScript la aplicación sigue teniendo tema: el atributo es un
+     añadido, no un requisito. */
+  :root {
+    color-scheme: light dark;
+  }
+
+  :root[data-theme='light'] {
+    color-scheme: only light;
+  }
+
+  :root[data-theme='dark'] {
+    color-scheme: only dark;
+  }
+
+  html {
+    /* El zoom hasta el 200 % es un criterio de conformidad (1.4.4), así que el
+       ajuste automático del navegador no puede desactivarlo. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.6;
+  }
+
+  /* La serif solo se ata al `h1`, que es único por página y nunca cae dentro de
+     una fila de listado. Del `h2` hacia abajo se pide a mano con `font-display`,
+     y solo cuando titula una sección. */
+  h1 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+
+  /* Foco visible en todo lo que se enfoca, sin esperar a que cada componente se
+     acuerde. El desplazamiento de 2 px deja ver el fondo de la página entre el
+     control y el anillo, que es lo que salva el caso difícil: un botón de
+     relleno sólido, donde el anillo pegado se confundiría con el relleno. */
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  ::placeholder {
+    color: var(--color-ink-subtle);
+    opacity: 1;
+  }
+
+  ::selection {
+    background-color: var(--color-accent-soft);
+    color: var(--color-ink);
+  }
+}
+
+/* El anillo de foco como utilidad, para los pocos casos en que hay que
+   dibujarlo sobre un elemento distinto del que recibe el foco. */
+@utility focus-ring {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Reducción de movimiento. Se neutralizan las duraciones —para lo que las lea
+   desde los tokens— y además se corta cualquier animación o transición ya
+   declarada, que es lo único que alcanza al código de terceros. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-instant: 1ms;
+    --duration-fast: 1ms;
+    --duration-base: 1ms;
+    --duration-slow: 1ms;
+    --default-transition-duration: 1ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
   }
 }

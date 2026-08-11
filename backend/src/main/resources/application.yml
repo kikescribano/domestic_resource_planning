@@ -21,13 +21,72 @@ spring:
     # ni debe tener.
     user: drp_owner
     password: drp_owner
+    placeholders:
+      # A quien se conceden las funciones de resolucion de inquilino
+      # (V4__tenant_resolution.sql). Va como marcador y no escrito en la
+      # migracion para que el nombre del rol de la aplicacion siga siendo
+      # configuracion de despliegue y no algo grabado en el esquema.
+      applicationRole: ${spring.datasource.username}
 
   mail:
     # Mailpit, levantado por compose.yaml. En produccion se sustituye por el
     # SMTP del proveedor sin tocar codigo (ADR-009).
     host: localhost
     port: 1025
+    properties:
+      mail:
+        smtp:
+          # El nombre que se anuncia en el EHLO. Sin fijarlo, JavaMail lo
+          # resuelve preguntando por el nombre local de la maquina, y esa
+          # resolucion se va a varios segundos en algunos equipos --Windows,
+          # sobre todo-- en cada envio.
+          localhost: localhost
+          # Tiempos de espera, para que un servidor SMTP que no conteste no deje
+          # bloqueado el hilo que atiende la peticion. Treinta segundos y no
+          # cinco: la primera version puso cinco y **rompio la entrega en local**,
+          # porque la ida y vuelta contra el Mailpit de Testcontainers los supera
+          # en este equipo. El sintoma era el peor posible --"Mail server
+          # connection failed" registrado y ningun correo, con la aplicacion
+          # respondiendo 202 tan campante-- asi que el valor tiene que ser
+          # holgado: esto es una red de seguridad contra un servidor colgado, no
+          # un objetivo de latencia.
+          connectiontimeout: 30000
+          timeout: 30000
+          writetimeout: 30000
 
 server:
   servlet:
     context-path: /
+
+drp:
+  security:
+    jwt:
+      # Clave de firma HS256. Es un SECRETO DE DESPLIEGUE y no vive en el
+      # repositorio: el valor de aqui solo sirve para desarrollo y para las
+      # pruebas, y se sustituye por la variable de entorno al desplegar. El
+      # arranque falla si no llega a 32 bytes, que es lo que HS256 exige.
+      secret: ${DRP_JWT_SECRET:desarrollo-local-no-usar-en-produccion-32b+}
+      # Corta porque un access token NO se puede revocar: sigue valiendo hasta
+      # que caduca. Esa ventana es justo lo que acota su duracion.
+      access-token-ttl: 15m
+      # El refresh si es revocable --esta persistido y hasheado-- y rota en cada
+      # uso.
+      refresh-token-ttl: 30d
+  rate-limit:
+    # Limite de frecuencia de los endpoints sin autenticar (429 RATE_LIMITED).
+    # Los valores son holgados para un hogar --nadie inicia sesion veinte veces
+    # en cinco minutos-- y estrechos para quien enumera correos.
+    window: 5m
+    per-ip: 20
+    # Mas bajo, y por otra razon: no es enumeracion sino inundacion del buzon de
+    # una persona concreta. Cinco correos en cinco minutos ya es mas de lo que
+    # nadie necesita.
+    per-email: 5
+
+  mail:
+    # Remitente de los correos de enrolamiento (ADR-009).
+    from: no-reply@drp.local
+    # Base sobre la que se construyen los enlaces que viajan por correo. Apunta
+    # al frontend, no a la API: quien recibe el correo abre una pantalla, no un
+    # endpoint.
+    base-url: http://localhost:5173

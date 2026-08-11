@@ -13,7 +13,7 @@ arquitectura interna de cada componente permanece en su área correspondiente.
 ## Documentos vigentes
 
 - [`data-model.md`](data-model.md): el modelo de datos del core en PostgreSQL —
-  las 16 tablas, los índices únicos parciales, las políticas de Row-Level
+  las 15 tablas, los índices únicos parciales, las políticas de Row-Level
   Security y lo que la base de datos *no* puede garantizar. Trasladado desde la
   sección 5.6 del [`README principal`](../../../README.md) al arrancar la Fase 1.
 - [`decisions/`](decisions/README.md): registro de decisiones arquitectónicas.

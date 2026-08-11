@@ -29,3 +29,32 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO drp_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
     GRANT USAGE, SELECT ON SEQUENCES TO drp_app;
+
+-- Rol de resolucion de inquilino: el dueno de las tres funciones que responden
+-- "de que hogar es esto" antes de que haya contexto (V4__tenant_resolution.sql).
+--
+-- Existe por un motivo concreto y poco evidente. Esas funciones son SECURITY
+-- DEFINER, asi que se ejecutan con los privilegios de SU PROPIETARIO. La
+-- tentacion es dejar que las posea el propietario del esquema y dar por hecho
+-- que "el dueno de la tabla ve sus filas" -- pero eso es falso aqui, porque las
+-- politicas llevan FORCE ROW LEVEL SECURITY, que las aplica TAMBIEN al
+-- propietario de la tabla. Con ese montaje las funciones devolverian cero filas.
+--
+-- Hoy no lo hacen unicamente porque drp_owner es el usuario de arranque del
+-- contenedor y por tanto superusuario, y un superusuario se salta RLS pase lo
+-- que pase. Apoyarse en eso tiene dos problemas: la unica grieta deliberada del
+-- aislamiento correria con privilegios de superusuario, y endurecer drp_owner
+-- --que es hacia donde empuja la ADR-003-- romperia el recorrido de los procesos
+-- diarios EN SILENCIO, devolviendo cero hogares sin ningun error.
+--
+-- Asi que la excepcion se expresa donde se puede auditar: un rol propio, sin
+-- login, sin superusuario y SIN BYPASSRLS, al que las politicas le abren la
+-- puerta de forma explicita y solo para SELECT, tabla por tabla. Ver
+-- V5__tenant_resolution_role.sql.
+CREATE ROLE drp_resolver WITH
+    NOLOGIN
+    NOSUPERUSER
+    NOCREATEDB
+    NOCREATEROLE
+    NOBYPASSRLS
+    NOINHERIT;
