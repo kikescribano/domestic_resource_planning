@@ -187,6 +187,13 @@ class CreateHousehold(
 /**
  * Consumir el token de verificacion. Es el momento en que el hogar pasa a ser
  * utilizable, y por tanto el momento en que se devuelve sesion.
+ *
+ * **Falta publicar `HouseholdCreated`, y falta a proposito.** La definicion dice
+ * que el evento se publica aqui --no al insertar la fila, para que ningun modulo
+ * siembre datos de un hogar que quiza no llegue a usarse-- pero el event bus
+ * entra en el Hito 2, asi que hoy no hay donde publicarlo. Cuando ese hito monte
+ * el puerto sobre `ApplicationEventPublisher`, el evento va justo detras de
+ * marcar la identidad como verificada y dentro de esta misma transaccion.
  */
 @Service
 class VerifyEmail(
@@ -211,7 +218,12 @@ class VerifyEmail(
             throw BusinessRuleViolation(ErrorCode.VERIFICATION_TOKEN_INVALID, "Token de verificación no válido")
         }
 
+        // El `isActive` no sobra aunque hoy no haya forma de cerrar una cuenta:
+        // es el unico de los cinco caminos que emiten sesion que podria
+        // olvidarlo, y el dia que exista ese caso de uso, una identidad dada de
+        // baja con un token de verificacion vivo volveria a entrar por aqui.
         val identity = identities.findById(stored.identityId)
+            ?.takeIf { it.isActive }
             ?: throw BusinessRuleViolation(ErrorCode.VERIFICATION_TOKEN_INVALID, "Token de verificación no válido")
 
         val householdId = tenantResolver.householdOfActiveMember(identity.id)

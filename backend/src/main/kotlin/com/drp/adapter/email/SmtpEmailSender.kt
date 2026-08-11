@@ -16,6 +16,24 @@ import org.springframework.stereotype.Component
  * y lo expone por API --que es como el recorrido vertical lee el enlace de
  * verificacion sin ningun paso manual--. En produccion apunta al SMTP del
  * proveedor que se elija al desplegar, sin tocar codigo.
+ *
+ * **La entrega es sincrona, y eso deja un hueco conocido.** La ADR-009 pide que
+ * la respuesta al cliente no dependa del envio, y aqui no depende de su
+ * *resultado* --un fallo se registra y se sigue-- pero si de su *duracion*: en
+ * `RequestPasswordReset` y `ResendVerification` solo se envia cuando la
+ * identidad existe, asi que un correo registrado tarda la ida y vuelta SMTP
+ * entera y uno desconocido responde en el acto. Los dos devuelven `202`, pero el
+ * reloj los distingue.
+ *
+ * No afecta al alta de un hogar, que es el camino mas expuesto: ese envia en las
+ * **dos** ramas --verificacion, o aviso a quien ya tenia cuenta-- y ademas paga
+ * un Argon2id que domina el tiempo.
+ *
+ * Se intento sacar la entrega a un pool propio y se revirtio: cada mensaje abre
+ * una conexion SMTP nueva que en algunos equipos cuesta segundos, la cola se
+ * acumulaba por detras y el recorrido vertical dejaba de ser verificable. Sacarlo
+ * del hilo exige antes reutilizar la conexion o encolar de verdad, y eso es un
+ * cambio con entidad propia, no un ajuste. Queda anotado en 4.1.7.
  */
 @Component
 class SmtpEmailSender(

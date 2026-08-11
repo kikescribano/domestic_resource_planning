@@ -92,6 +92,42 @@ class RateLimitTest {
     }
 
     @Test
+    @DisplayName("el limite por correo NO se aplica al login: seria una forma de bloquear la cuenta de otro")
+    fun `el login no se limita por correo`() {
+        // Con el cubo por correo puesto aqui, bastaria conocer la direccion de
+        // alguien y gastarle el cubo para que recibiera 429 durante toda la
+        // ventana sin haber hecho nada. Ese cubo existe para proteger a quien
+        // **recibe** los correos, no para limitar a quien intenta entrar: de eso
+        // ya se ocupa el de IP.
+        val victim = "objetivo-${UUID.randomUUID()}@example.test"
+
+        val responses = (1..PER_EMAIL + 2).map { postJson("/api/v1/auth/login", victim) }
+
+        // Todas fallan por credenciales --401-- y ninguna por frecuencia.
+        responses.forEach { it.statusCode.shouldBe(HttpStatus.UNAUTHORIZED) }
+    }
+
+    @Test
+    @DisplayName("un cuerpo desmesurado se rechaza sin reservarlo entero en memoria")
+    fun `el cuerpo tiene tope`() {
+        // Se leia el cuerpo completo antes incluso de aplicar el limite, asi que
+        // un POST de cientos de megas contra un endpoint anonimo se reservaba en
+        // el heap aunque la peticion fuese a rechazarse.
+        val oversized = "x".repeat(128 * 1024)
+
+        val response = http.exchange<String>(
+            "/api/v1/auth/password-reset",
+            HttpMethod.POST,
+            HttpEntity(
+                """{"email":"a@example.test","relleno":"$oversized"}""",
+                HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON },
+            ),
+        )
+
+        response.statusCode.shouldBe(HttpStatus.PAYLOAD_TOO_LARGE)
+    }
+
+    @Test
     @DisplayName("los endpoints autenticados no llevan limite")
     fun `lo autenticado no se limita`() {
         // El limite protege lo que se puede llamar sin credencial. Ponerlo
@@ -112,7 +148,8 @@ class RateLimitTest {
         path,
         HttpMethod.POST,
         HttpEntity(
-            """{"email":"$email"}""",
+            // La contrasena solo la mira el login; los demas la ignoran.
+            """{"email":"$email","password":"una frase cualquiera larga"}""",
             HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON },
         ),
     )

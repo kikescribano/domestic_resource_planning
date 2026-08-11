@@ -40,8 +40,17 @@ class TenantAwareTransactionManager(
     }
 
     private fun applyHousehold() {
-        val factory = entityManagerFactory ?: return
-        val holder = TransactionSynchronizationManager.getResource(factory) as? EntityManagerHolder ?: return
+        // Falla ruidosamente en lugar de seguir sin contexto. Una transaccion sin
+        // `app.household_id` no es una fuga --la politica no deja pasar nada--
+        // pero convierte "no he podido fijar el contexto" en "no hay datos", y
+        // desde arriba las dos cosas son indistinguibles: la peticion responde
+        // una lista vacia y nadie se entera de que el mecanismo se ha roto.
+        val factory = checkNotNull(entityManagerFactory) {
+            "El gestor de transacciones necesita un EntityManagerFactory para fijar el contexto de inquilino"
+        }
+        val holder = checkNotNull(TransactionSynchronizationManager.getResource(factory) as? EntityManagerHolder) {
+            "No hay EntityManager enlazado a la transaccion: no se puede fijar el contexto de inquilino"
+        }
 
         holder.entityManager
             .createNativeQuery("SELECT set_config('app.household_id', ?1, true)")

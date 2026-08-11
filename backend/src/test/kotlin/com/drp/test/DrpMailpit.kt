@@ -54,11 +54,17 @@ class DrpMailpit : GenericContainer<DrpMailpit>(DockerImageName.parse(IMAGE)) {
     /**
      * El ultimo mensaje entregado a esa direccion, con su cuerpo.
      *
-     * Espera activamente porque el envio ocurre **fuera de la transaccion** y
-     * despues de que el endpoint haya respondido (ADR-009): cuando la prueba
-     * recibe el `202`, el correo puede no haber salido todavia.
+     * Espera activamente porque el envio ocurre **fuera de la transaccion**
+     * (ADR-009) y porque Mailpit tarda un instante en indexar lo que recibe:
+     * cuando la prueba recibe el `202`, el correo puede no estar todavia en su
+     * API.
+     *
+     * El plazo es holgado a proposito. La conexion SMTP contra el contenedor
+     * cuesta segundos en algunos equipos, y un plazo justo convierte esa lentitud
+     * en una prueba intermitente --que es peor que una que falla, porque se
+     * aprende a ignorarla.
      */
-    fun awaitMessageTo(recipient: String, timeoutMillis: Long = 5_000): MailpitMessage {
+    fun awaitMessageTo(recipient: String, timeoutMillis: Long = 30_000): MailpitMessage {
         val deadline = System.currentTimeMillis() + timeoutMillis
         while (System.currentTimeMillis() < deadline) {
             findMessageTo(recipient)?.let { return it }
@@ -67,8 +73,14 @@ class DrpMailpit : GenericContainer<DrpMailpit>(DockerImageName.parse(IMAGE)) {
         error("No llegó ningún correo a $recipient en $timeoutMillis ms")
     }
 
-    /** Comprueba que **no** llega correo. Espera el plazo entero a proposito. */
-    fun assertNoMessageTo(recipient: String, waitMillis: Long = 1_500) {
+    /**
+     * Comprueba que **no** llega correo. Espera el plazo entero a proposito.
+     *
+     * Tiene que ser mayor que lo que tarda una entrega real: si fuese mas corto,
+     * esta comprobacion pasaria tambien cuando el correo si se envia y solo va
+     * despacio, que es justo lo contrario de lo que quiere demostrar.
+     */
+    fun assertNoMessageTo(recipient: String, waitMillis: Long = 8_000) {
         Thread.sleep(waitMillis)
         val found = findMessageTo(recipient)
         check(found == null) { "Llegó un correo a $recipient y no debía: ${found?.subject}" }

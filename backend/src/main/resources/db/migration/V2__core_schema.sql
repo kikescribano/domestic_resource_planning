@@ -176,7 +176,8 @@ CREATE TABLE categories (
     updated_at   timestamptz NOT NULL DEFAULT now(),
     retired_at   timestamptz,
     created_by   uuid,
-    updated_by   uuid
+    updated_by   uuid,
+    CONSTRAINT categories_household_scoped_id UNIQUE (household_id, id)
 );
 
 -- Unico entre las vigentes del hogar, sin distinguir mayusculas ni acentos. La
@@ -234,7 +235,12 @@ ALTER TABLE files ADD CONSTRAINT files_created_by_same_household
 CREATE TABLE articles (
     id            uuid PRIMARY KEY,
     household_id  uuid        NOT NULL REFERENCES households (id) ON DELETE CASCADE,
-    category_id   uuid        NOT NULL REFERENCES categories (id),
+    -- La clave ajena se declara mas abajo, compuesta contra
+    -- (household_id, id): una simple contra categories(id) admitiria clasificar
+    -- un articulo con la categoria de otro hogar, y **eso RLS no lo impide**,
+    -- porque PostgreSQL comprueba las claves ajenas por dentro, sin pasar por
+    -- las politicas. Una fila invisible se puede referenciar.
+    category_id   uuid        NOT NULL,
     name          text        NOT NULL,
     unit          text        NOT NULL,
     brand         text,
@@ -256,7 +262,8 @@ CREATE TABLE articles (
     -- Enlace o fichero, o ninguno de los dos: un articulo sin foto es lo
     -- habitual. De ahi el OR y no el <> de documents.
     CONSTRAINT articles_photo_single_source
-        CHECK (photo_url IS NULL OR photo_file_id IS NULL)
+        CHECK (photo_url IS NULL OR photo_file_id IS NULL),
+    CONSTRAINT articles_household_scoped_id UNIQUE (household_id, id)
 );
 
 CREATE UNIQUE INDEX articles_name_unique_live
@@ -272,6 +279,8 @@ CREATE UNIQUE INDEX articles_photo_file_unique
     ON articles (photo_file_id)
     WHERE photo_file_id IS NOT NULL;
 
+ALTER TABLE articles ADD CONSTRAINT articles_category_same_household
+    FOREIGN KEY (household_id, category_id) REFERENCES categories (household_id, id);
 ALTER TABLE articles ADD CONSTRAINT articles_photo_same_household
     FOREIGN KEY (household_id, photo_file_id) REFERENCES files (household_id, id);
 ALTER TABLE articles ADD CONSTRAINT articles_created_by_same_household
@@ -289,7 +298,9 @@ CREATE TABLE locations (
     name                     text        NOT NULL,
     type                     text        NOT NULL,
     -- La validacion anti-ciclo no es expresable como CHECK: va en el caso de uso.
-    parent_location_id       uuid REFERENCES locations (id),
+    -- La clave ajena, compuesta y declarada mas abajo, para que una ubicacion no
+    -- pueda colgar de otra de otro hogar.
+    parent_location_id       uuid,
     capacity                 jsonb,
     environmental_conditions jsonb,
     photo_url                text,
@@ -302,7 +313,8 @@ CREATE TABLE locations (
     CONSTRAINT locations_type_valid
         CHECK (type IN ('HOUSE', 'FLOOR', 'ROOM', 'FURNITURE', 'SHELF', 'OTHER')),
     CONSTRAINT locations_photo_single_source
-        CHECK (photo_url IS NULL OR photo_file_id IS NULL)
+        CHECK (photo_url IS NULL OR photo_file_id IS NULL),
+    CONSTRAINT locations_household_scoped_id UNIQUE (household_id, id)
 );
 
 -- Unico entre hermanas, no en todo el hogar: dos armarios pueden llamarse igual
@@ -316,6 +328,8 @@ CREATE UNIQUE INDEX locations_photo_file_unique
     ON locations (photo_file_id)
     WHERE photo_file_id IS NOT NULL;
 
+ALTER TABLE locations ADD CONSTRAINT locations_parent_same_household
+    FOREIGN KEY (household_id, parent_location_id) REFERENCES locations (household_id, id);
 ALTER TABLE locations ADD CONSTRAINT locations_photo_same_household
     FOREIGN KEY (household_id, photo_file_id) REFERENCES files (household_id, id);
 ALTER TABLE locations ADD CONSTRAINT locations_created_by_same_household
@@ -329,14 +343,20 @@ ALTER TABLE locations ADD CONSTRAINT locations_updated_by_same_household
 CREATE TABLE assets (
     id                uuid PRIMARY KEY,
     household_id      uuid        NOT NULL REFERENCES households (id) ON DELETE CASCADE,
-    article_id        uuid REFERENCES articles (id),
-    category_id       uuid REFERENCES categories (id),
+    -- Las cinco referencias que pueden llegar del cliente van como claves ajenas
+    -- COMPUESTAS, declaradas mas abajo. Una simple contra articles(id) o
+    -- locations(id) dejaria que un asset del hogar A colgara de una fila del
+    -- hogar B, y **RLS no lo impide**: PostgreSQL comprueba las claves ajenas
+    -- por dentro, sin pasar por las politicas, asi que una fila invisible se
+    -- puede referenciar igualmente.
+    article_id        uuid,
+    category_id       uuid,
     name              text,
     type              text        NOT NULL,
     -- Anulable: lo deja vacio la baja de su propietario.
     owner_id          uuid,
-    location_asset_id uuid REFERENCES assets (id),
-    location_id       uuid REFERENCES locations (id),
+    location_asset_id uuid,
+    location_id       uuid,
     quantity          numeric,
     status            text        NOT NULL,
     serial_number     text,
@@ -370,7 +390,8 @@ CREATE TABLE assets (
     CONSTRAINT assets_durable_only_attributes
         CHECK (type = 'DURABLE' OR (serial_number IS NULL AND acquired_on IS NULL)),
     CONSTRAINT assets_photo_single_source
-        CHECK (photo_url IS NULL OR photo_file_id IS NULL)
+        CHECK (photo_url IS NULL OR photo_file_id IS NULL),
+    CONSTRAINT assets_household_scoped_id UNIQUE (household_id, id)
 );
 
 -- Una sola existencia VIVA por articulo y ubicacion.
@@ -390,6 +411,14 @@ CREATE UNIQUE INDEX assets_photo_file_unique
     ON assets (photo_file_id)
     WHERE photo_file_id IS NOT NULL;
 
+ALTER TABLE assets ADD CONSTRAINT assets_article_same_household
+    FOREIGN KEY (household_id, article_id) REFERENCES articles (household_id, id);
+ALTER TABLE assets ADD CONSTRAINT assets_category_same_household
+    FOREIGN KEY (household_id, category_id) REFERENCES categories (household_id, id);
+ALTER TABLE assets ADD CONSTRAINT assets_container_same_household
+    FOREIGN KEY (household_id, location_asset_id) REFERENCES assets (household_id, id);
+ALTER TABLE assets ADD CONSTRAINT assets_location_same_household
+    FOREIGN KEY (household_id, location_id) REFERENCES locations (household_id, id);
 ALTER TABLE assets ADD CONSTRAINT assets_photo_same_household
     FOREIGN KEY (household_id, photo_file_id) REFERENCES files (household_id, id);
 ALTER TABLE assets ADD CONSTRAINT assets_owner_same_household

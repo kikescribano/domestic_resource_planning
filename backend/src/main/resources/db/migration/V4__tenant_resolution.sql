@@ -23,9 +23,18 @@
 -- que es exactamente lo que la ADR-003 prohibe.
 --
 -- La salida elegida son tres funciones SECURITY DEFINER: se ejecutan con los
--- privilegios de su propietario --el del esquema-- en lugar de los de quien las
--- llama, asi que ven lo que la politica esconderia. Tres propiedades las hacen
--- aceptables donde BYPASSRLS no lo es:
+-- privilegios de su PROPIETARIO en lugar de los de quien las llama.
+--
+-- OJO, y esto es lo que esta migracion daba por sentado y no era cierto: eso NO
+-- basta por si solo para ver lo que la politica esconde. Las politicas de la V3
+-- llevan FORCE ROW LEVEL SECURITY, que las aplica tambien al propietario de la
+-- tabla, asi que una funcion cuyo dueno fuera el propietario del esquema
+-- devolveria cero filas. Quien decide es el rol propietario y lo que sus
+-- politicas le permitan. Lo resuelve V5__tenant_resolution_role.sql, que las
+-- pone a nombre de un rol sin login, sin superusuario y sin BYPASSRLS, y le abre
+-- la puerta con una politica de SELECT en cada una de las tres tablas.
+--
+-- Tres propiedades las hacen aceptables donde BYPASSRLS no lo es:
 --
 --   * El permiso queda en tres funciones concretas y auditables, no en el rol.
 --     El usuario de la aplicacion sigue siendo NOBYPASSRLS para todo lo demas.

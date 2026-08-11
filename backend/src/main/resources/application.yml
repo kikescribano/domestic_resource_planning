@@ -22,8 +22,8 @@ spring:
     user: drp_owner
     password: drp_owner
     placeholders:
-      # A quien se concede la funcion de apoyo de los procesos diarios
-      # (V4__system_process_support.sql). Va como marcador y no escrito en la
+      # A quien se conceden las funciones de resolucion de inquilino
+      # (V4__tenant_resolution.sql). Va como marcador y no escrito en la
       # migracion para que el nombre del rol de la aplicacion siga siendo
       # configuracion de despliegue y no algo grabado en el esquema.
       applicationRole: ${spring.datasource.username}
@@ -33,6 +33,26 @@ spring:
     # SMTP del proveedor sin tocar codigo (ADR-009).
     host: localhost
     port: 1025
+    properties:
+      mail:
+        smtp:
+          # El nombre que se anuncia en el EHLO. Sin fijarlo, JavaMail lo
+          # resuelve preguntando por el nombre local de la maquina, y esa
+          # resolucion se va a varios segundos en algunos equipos --Windows,
+          # sobre todo-- en cada envio.
+          localhost: localhost
+          # Tiempos de espera, para que un servidor SMTP que no conteste no deje
+          # bloqueado el hilo que atiende la peticion. Treinta segundos y no
+          # cinco: la primera version puso cinco y **rompio la entrega en local**,
+          # porque la ida y vuelta contra el Mailpit de Testcontainers los supera
+          # en este equipo. El sintoma era el peor posible --"Mail server
+          # connection failed" registrado y ningun correo, con la aplicacion
+          # respondiendo 202 tan campante-- asi que el valor tiene que ser
+          # holgado: esto es una red de seguridad contra un servidor colgado, no
+          # un objetivo de latencia.
+          connectiontimeout: 30000
+          timeout: 30000
+          writetimeout: 30000
 
 server:
   servlet:

@@ -137,18 +137,49 @@ data class SecurityProperties(
     val accessTokenTtl: Duration,
     val refreshTokenTtl: Duration,
 ) {
-    fun jwtSecretBytes(): ByteArray = jwtSecret.toByteArray()
+    /**
+     * Charset explicito. Con el de la plataforma, la misma clave podria dar
+     * bytes distintos en dos maquinas y los tokens firmados en una no valdrian
+     * en la otra.
+     */
+    fun jwtSecretBytes(): ByteArray = jwtSecret.toByteArray(Charsets.UTF_8)
 
-    fun validate() {
+    /**
+     * @param developmentEnvironment si el arranque es de desarrollo o de
+     *   pruebas, unicos sitios donde se tolera la clave de ejemplo.
+     */
+    fun validate(developmentEnvironment: Boolean) {
         // HS256 exige una clave de al menos 256 bits. Con una mas corta Nimbus
         // falla al firmar, y hacerlo aqui convierte un error en la primera
         // peticion en un error al arrancar, que es cuando se puede corregir.
         require(jwtSecretBytes().size >= MINIMUM_SECRET_BYTES) {
             "La clave de firma del JWT necesita al menos $MINIMUM_SECRET_BYTES bytes para HS256"
         }
+
+        // Y la comprobacion que de verdad importa. La clave de ejemplo del
+        // application.yml mide 43 bytes, asi que pasaba de sobra el minimo de
+        // longitud: un despliegue que olvidara DRP_JWT_SECRET arrancaba sin un
+        // solo aviso, firmando con una clave **publicada en el repositorio**.
+        //
+        // Y no seria un fallo cualquiera. El householdId del token es lo que
+        // alimenta el TenantContext y con el el app.household_id de las
+        // politicas, asi que quien pudiera forjar un token no atravesaria una
+        // capa de aislamiento sino las dos a la vez: la segunda obedeceria al
+        // identificador que el atacante hubiese escrito.
+        require(developmentEnvironment || jwtSecret != DEVELOPMENT_SECRET) {
+            "La clave de firma del JWT sigue siendo la de desarrollo. " +
+                "Define DRP_JWT_SECRET con un secreto propio antes de arrancar."
+        }
     }
 
     companion object {
         const val MINIMUM_SECRET_BYTES = 32
+
+        /**
+         * El valor por defecto del `application.yml`. Vive aqui para que el
+         * arranque pueda reconocerlo y rechazarlo fuera de desarrollo; si se
+         * cambia alli, hay que cambiarlo aqui.
+         */
+        const val DEVELOPMENT_SECRET = "desarrollo-local-no-usar-en-produccion-32b+"
     }
 }

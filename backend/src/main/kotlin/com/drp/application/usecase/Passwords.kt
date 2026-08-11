@@ -43,11 +43,20 @@ class RequestPasswordReset(
 
     fun handle(rawEmail: String) {
         val email = EmailAddress.of(rawEmail)
-        val identity = identities.findByEmail(email) ?: return
+        val identity = identities.findByEmail(email)
 
-        // Una identidad dada de baja no restablece contrasena. No recibe correo,
-        // y la respuesta es la misma que en cualquier otro caso.
-        if (!identity.isActive) return
+        // Una identidad dada de baja no restablece contrasena, y una que no
+        // existe tampoco. Ninguna de las dos recibe correo, y la respuesta es la
+        // misma que en cualquier otro caso.
+        //
+        // OJO: salir por aqui delata por el reloj mientras la entrega sea
+        // sincrona. Un correo desconocido responde en el acto y uno registrado
+        // tarda la ida y vuelta entera con el servidor SMTP, y aqui --a
+        // diferencia del alta de un hogar-- no hay ningun hash de Argon2id que
+        // enmascare la diferencia. El hueco esta anotado con su motivo en
+        // SmtpEmailSender y en 4.1.7; lo que lo cierra es sacar la entrega del
+        // hilo de la peticion, que es un cambio con entidad propia.
+        if (identity == null || !identity.isActive) return
 
         val now = clock.instant()
         val reset = secrets.generate()

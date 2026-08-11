@@ -107,6 +107,26 @@ class JwtAccessTokenIssuerTest {
     fun `la clave corta falla pronto`() {
         val weak = properties.copy(jwtSecret = "demasiado-corta")
 
-        org.junit.jupiter.api.assertThrows<IllegalArgumentException> { weak.validate() }
+        org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            weak.validate(developmentEnvironment = true)
+        }
+    }
+
+    @Test
+    @DisplayName("la clave de ejemplo del repositorio no arranca fuera de desarrollo")
+    fun `la clave de desarrollo no llega a produccion`() {
+        val defaulted = properties.copy(jwtSecret = SecurityProperties.DEVELOPMENT_SECRET)
+
+        // Mide 43 bytes, asi que pasaba de sobra el minimo de longitud: sin esta
+        // comprobacion, un despliegue que olvidara la variable de entorno
+        // arrancaba en silencio firmando con una clave publicada en el
+        // repositorio. Y como el householdId del token alimenta las politicas de
+        // RLS, forjar uno atraviesa las dos capas de aislamiento a la vez.
+        org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            defaulted.validate(developmentEnvironment = false)
+        }
+
+        // En desarrollo sigue valiendo, que es para lo que existe.
+        defaulted.validate(developmentEnvironment = true)
     }
 }

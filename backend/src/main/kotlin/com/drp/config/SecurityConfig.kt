@@ -4,8 +4,10 @@ import com.drp.adapter.security.JwtAuthenticationFilter
 import com.drp.adapter.security.SecurityProperties
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.env.Environment
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -44,12 +46,41 @@ class SecurityConfig {
     @Bean
     fun clock(): Clock = Clock.systemUTC()
 
+    /**
+     * Impide que el filtro de JWT se registre **dos veces**.
+     *
+     * Al ser un `@Component` de tipo `Filter`, Spring Boot lo registra por su
+     * cuenta en el contenedor de servlets, y ademas se anade a la cadena de
+     * seguridad mas abajo. Hoy la segunda pasada no hace nada --`OncePerRequestFilter`
+     * la descarta-- pero el dia que el filtro rechace una peticion, hacerlo dos
+     * veces y en dos sitios distintos deja de ser inocuo.
+     *
+     * Su sitio es la cadena de seguridad, donde el orden respecto a la
+     * autorizacion esta declarado; el registro automatico lo pondria fuera de
+     * ella. De ahi que se desactive este y no el otro.
+     */
+    @Bean
+    fun jwtFilterServletRegistration(
+        filter: JwtAuthenticationFilter,
+    ): FilterRegistrationBean<JwtAuthenticationFilter> =
+        FilterRegistrationBean(filter).apply { isEnabled = false }
+
     @Bean
     fun securityProperties(
+        environment: Environment,
         @Value("\${drp.security.jwt.secret}") jwtSecret: String,
         @Value("\${drp.security.jwt.access-token-ttl}") accessTokenTtl: Duration,
         @Value("\${drp.security.jwt.refresh-token-ttl}") refreshTokenTtl: Duration,
-    ): SecurityProperties = SecurityProperties(jwtSecret, accessTokenTtl, refreshTokenTtl).also { it.validate() }
+    ): SecurityProperties {
+        // Sin ningun perfil activo se considera desarrollo, que es como arranca
+        // `./gradlew bootRun` en una maquina local. Un despliegue de verdad
+        // declara su perfil, y ahi la clave de ejemplo deja de valer.
+        val development = environment.activeProfiles.isEmpty() ||
+            environment.activeProfiles.any { it in DEVELOPMENT_PROFILES }
+
+        return SecurityProperties(jwtSecret, accessTokenTtl, refreshTokenTtl)
+            .also { it.validate(developmentEnvironment = development) }
+    }
 
     @Bean
     fun securityFilterChain(http: HttpSecurity, jwtFilter: JwtAuthenticationFilter): SecurityFilterChain {
@@ -112,6 +143,8 @@ class SecurityConfig {
     }
 
     private companion object {
+        val DEVELOPMENT_PROFILES = setOf("dev", "test", "local")
+
         const val ARGON2 = "argon2"
 
         // Los tres de OWASP. Memoria en KiB, que es como los cuenta Argon2.

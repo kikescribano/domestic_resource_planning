@@ -4,14 +4,33 @@ Este directorio es la fuente documental de las decisiones visuales reutilizables
 y de los componentes de interfaz. Implementa la dirección definida en
 [`look-and-feel.md`](../product-design/look-and-feel.md) sin duplicarla.
 
-## Estructura prevista
+## Estructura
 
-- `foundations/`: color, tipografía, espacio, grid, forma, elevación y movimiento.
-- `tokens/`: nombres semánticos, valores, modos y proceso de distribución.
+Escrito, al cerrar el Hito 1 junto con las ocho dimensiones de la dirección
+visual:
+
+- [`foundations/`](foundations/README.md) — [color](foundations/color.md),
+  [tipografía](foundations/typography.md), [espacio](foundations/space.md),
+  [densidad](foundations/density.md),
+  [forma y elevación](foundations/shape-and-elevation.md),
+  [iconografía](foundations/iconography.md) y [movimiento](foundations/motion.md).
+- [`tokens/`](tokens/README.md) — nombres semánticos, valores, modos y de dónde
+  salen. Su implementación vive en
+  [`frontend/src/index.css`](../../../frontend/src/index.css), y los ratios de
+  contraste medidos, en [`accessibility/`](../accessibility/README.md).
+
+Previsto, y sin contenido todavía:
+
 - `components/`: anatomía, variantes, estados, comportamiento y accesibilidad.
 - `patterns/`: formularios, tablas, navegación, feedback y composición.
 - `content/`: terminología, voz, tono, etiquetas y mensajes.
 - `assets/`: iconos, logotipos y recursos con sus fuentes editables.
+
+> Los primeros componentes reales —botón, campo, aviso, distintivo de estado y el
+> shell responsive— ya existen en
+> [`frontend/src/ui/primitives.tsx`](../../../frontend/src/ui/primitives.tsx), pero
+> todavía no tienen ficha aquí: se escriben cuando el Hito 2 los ponga a prueba
+> contra listados largos, que es donde se sabrá si su anatomía aguanta.
 
 ## Ficha mínima de un componente
 

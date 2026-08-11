@@ -1600,10 +1600,19 @@ components:
       bearerFormat: JWT
       description: >
         JWT de usuarios del hogar. Claims -- sub (identityId), memberId
-        (pertenencia en el hogar), householdId y role. La distincion entre sub y
-        memberId importa: todo lo que el dominio llama "usuario" --propietario de
-        un asset, prestador, receptor, createdBy-- apunta a la pertenencia,
-        mientras que los refresh tokens cuelgan de la identidad.
+        (pertenencia en el hogar), householdId, role y sid. La distincion entre
+        sub y memberId importa: todo lo que el dominio llama "usuario"
+        --propietario de un asset, prestador, receptor, createdBy-- apunta a la
+        pertenencia, mientras que los refresh tokens cuelgan de la identidad.
+
+
+        sid identifica cual de las sesiones de esa persona es esta: es el
+        identificador del refresh token con el que se emitio. Existe porque
+        POST /auth/password revoca las DEMAS sesiones y conserva la que esta en
+        uso, y para conservarla hay que saber cual es. La alternativa era pedir
+        el refresh token en el cuerpo de esa operacion, que obligaria al cliente
+        a mandar una credencial de vida larga donde no hace falta. No es un
+        secreto: identifica una fila cuyo valor real esta hasheado.
     loanToken:
       type: http
       scheme: bearer

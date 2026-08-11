@@ -99,6 +99,25 @@ ADR-009.
 >   funciones `SECURITY DEFINER` que devuelven **solo identificadores de hogar**,
 >   en lugar de con `BYPASSRLS`.
 >
+> **Y dos barridos de verificación independientes al cerrar**, que encontraron
+> cuatro cosas que la implementación daba por buenas y **corregidas con prueba
+> propia**: que las funciones de resolución funcionaban solo porque su propietario
+> era superusuario —con `FORCE`, ser dueño de la tabla no basta—; que **la
+> comprobación de una clave ajena no pasa por RLS**, así que una fila invisible se
+> puede referenciar; que la clave de firma de ejemplo pasaba la validación de
+> arranque por medir más de 32 bytes; y que el límite por correo, aplicado también
+> al login, permitía bloquear la cuenta de otro.
+>
+> Un quinto hallazgo **queda anotado y no corregido**: la entrega de correo es
+> síncrona y deja un oráculo temporal en los dos endpoints que solo envían cuando
+> la identidad existe. El intento de sacarla del hilo de la petición se revirtió
+> porque hacía inverificable el recorrido vertical; el motivo completo está en
+> [`decisions.md`](decisions.md).
+>
+> Merece la pena anotar de dónde salieron: las cinco eran **afirmaciones escritas
+> en comentarios y en la documentación**. Ninguna se cazó leyendo, sino
+> comprobándolas contra PostgreSQL y contra el código en ejecución.
+>
 > **Este es el hito en el que aparece Testcontainers**, así que Docker tiene que
 > estar arrancado para poder construir. Ojo con la distinción: Testcontainers
 > levanta y destruye lo suyo —PostgreSQL **y Mailpit**—, y `compose.yaml` es para

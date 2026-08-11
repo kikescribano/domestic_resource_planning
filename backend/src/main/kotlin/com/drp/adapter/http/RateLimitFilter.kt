@@ -54,7 +54,13 @@ class RateLimitFilter(
         response: HttpServletResponse,
         filterChain: FilterChain,
     ) {
-        val path = request.requestURI
+        // servletPath y no requestURI: este ultimo incluye el context-path por
+        // especificacion de Servlet. Hoy es "/" y las dos formas coinciden, pero
+        // el dia que la aplicacion se despliegue bajo un prefijo, ninguna ruta
+        // casaria y **el limitador dejaria de aplicarse a los ocho endpoints sin
+        // error y sin log**, que es la peor forma de fallo para un control de
+        // seguridad: silenciosa y con apariencia de normalidad.
+        val path = request.servletPath.ifEmpty { request.requestURI }
         if (path !in LIMITED_PATHS) {
             filterChain.doFilter(request, response)
             return
@@ -64,9 +70,13 @@ class RateLimitFilter(
         // disponible para el controlador: el flujo de una peticion solo se puede
         // leer una vez.
         val cached = CachedBodyRequest(request)
+        if (cached.tooLarge) {
+            response.rejectOversized()
+            return
+        }
 
         val retryAfter = limiter.consume("ip:$path:${request.clientIp()}", perIpLimit)
-            ?: cached.emailInBody()?.let { limiter.consume("email:$path:$it", perEmailLimit) }
+            ?: cached.emailBucketFor(path)?.let { limiter.consume(it, perEmailLimit) }
 
         if (retryAfter != null) {
             response.reject(retryAfter)
@@ -76,16 +86,32 @@ class RateLimitFilter(
         filterChain.doFilter(cached, response)
     }
 
-    private fun HttpServletRequest.clientIp(): String =
-        getHeader("X-Forwarded-For")
-            // Detras de nginx (Hito 3) la IP real es la primera de la lista; la
-            // ultima es la del propio proxy. Sin proxy delante, esta cabecera no
-            // deberia llegar nunca del cliente.
-            ?.substringBefore(',')
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?: remoteAddr
-            ?: "desconocida"
+    /**
+     * El cubo por correo, **solo** en los tres endpoints que mandan un correo a
+     * una direccion que llega en el cuerpo.
+     *
+     * La restriccion no es cosmetica. Aplicarlo tambien al login regala una
+     * forma de bloquear la cuenta de otro: basta conocer la direccion de alguien
+     * y gastar su cubo para que reciba `429` durante toda la ventana, sin haber
+     * hecho nada. Ese cubo existe para proteger a quien recibe los correos, no
+     * para limitar a quien intenta entrar --de eso ya se ocupa el de IP.
+     */
+    private fun CachedBodyRequest.emailBucketFor(path: String): String? {
+        if (path !in EMAIL_SENDING_PATHS) return null
+        return emailInBody()?.let { "email:$path:$it" }
+    }
+
+    /**
+     * La IP del cliente.
+     *
+     * **`X-Forwarded-For` se ignora a proposito mientras no haya proxy delante.**
+     * La cabecera solo es fiable si la pone un intermediario de confianza; sin
+     * el, la escribe entera quien hace la peticion, y basta variarla en cada
+     * llamada para tener un cubo nuevo siempre --es decir, para no tener limite.
+     * nginx llega en el Hito 3, y es entonces cuando esta cabecera pasa a
+     * leerse, y solo si `remoteAddr` es el suyo.
+     */
+    private fun HttpServletRequest.clientIp(): String = remoteAddr ?: "desconocida"
 
     /** Busca `email` en la raiz y en `admin.email`, que son las dos formas del contrato. */
     private fun CachedBodyRequest.emailInBody(): String? = runCatching {
@@ -93,8 +119,22 @@ class RateLimitFilter(
         val root = objectMapper.readTree(body)
         val email = root.path("email").asText(null)
             ?: root.path("admin").path("email").asText(null)
-        email?.lowercase(Locale.ROOT)
+        // Se normaliza igual que `EmailAddress` --recortando ademas de bajar a
+        // minusculas-- para que el cubo no dependa de que la validacion de forma,
+        // que corre despues que este filtro, rechace los rellenos.
+        email?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.isNotEmpty() }
     }.getOrNull()
+
+    private fun HttpServletResponse.rejectOversized() {
+        status = HttpStatus.PAYLOAD_TOO_LARGE.value()
+        contentType = MediaType.APPLICATION_JSON_VALUE
+        characterEncoding = Charsets.UTF_8.name()
+        writer.write(
+            objectMapper.writeValueAsString(
+                ErrorResponse("VALIDATION_ERROR", "El cuerpo de la petición es demasiado grande"),
+            ),
+        )
+    }
 
     private fun HttpServletResponse.reject(retryAfterSeconds: Long) {
         status = HttpStatus.TOO_MANY_REQUESTS.value()
@@ -124,6 +164,16 @@ class RateLimitFilter(
             "/api/v1/auth/password-reset/confirm",
             "/api/v1/invitations/accept",
         )
+
+        /**
+         * Los tres que mandan un correo a una direccion que viene en el cuerpo, y
+         * los unicos donde el cubo por correo tiene sentido.
+         */
+        val EMAIL_SENDING_PATHS = setOf(
+            "/api/v1/households",
+            "/api/v1/auth/resend-verification",
+            "/api/v1/auth/password-reset",
+        )
     }
 }
 
@@ -139,10 +189,22 @@ const val RATE_LIMIT_FILTER_ORDER = -200
 /**
  * Guarda el cuerpo para poder leerlo dos veces: una el limitador, para sacar el
  * correo, y otra el controlador.
+ *
+ * **Con tope.** Leer el cuerpo entero era lo primero que ocurria, antes incluso
+ * de aplicar el limite, asi que un `POST` de cientos de megas contra un endpoint
+ * anonimo se reservaba integro en el heap --y tambien cuando la peticion iba a
+ * rechazarse con 429. Tomcat no acota por su cuenta un cuerpo `application/json`:
+ * `max-http-form-post-size` solo cubre formularios.
+ *
+ * El tope es holgadisimo para lo que estos ocho endpoints reciben --el mayor es
+ * un alta de hogar con cinco campos-- y sigue siendo pequeño para el heap.
  */
 private class CachedBodyRequest(request: HttpServletRequest) : HttpServletRequestWrapper(request) {
 
-    val body: ByteArray = request.inputStream.readBytes()
+    val body: ByteArray = request.inputStream.readNBytes(MAX_BODY_BYTES + 1)
+
+    /** Si llego a leerse un byte de mas, el cuerpo pasa del tope. */
+    val tooLarge: Boolean = body.size > MAX_BODY_BYTES
 
     override fun getInputStream(): ServletInputStream {
         val stream = ByteArrayInputStream(body)
@@ -156,4 +218,9 @@ private class CachedBodyRequest(request: HttpServletRequest) : HttpServletReques
 
     override fun getReader(): java.io.BufferedReader =
         java.io.BufferedReader(java.io.InputStreamReader(inputStream, characterEncoding ?: Charsets.UTF_8.name()))
+
+    companion object {
+        /** 64 KiB. El cuerpo mas grande de estos ocho endpoints no llega a 1 KiB. */
+        const val MAX_BODY_BYTES = 64 * 1024
+    }
 }

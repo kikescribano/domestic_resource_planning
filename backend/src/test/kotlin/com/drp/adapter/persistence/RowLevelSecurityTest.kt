@@ -9,6 +9,7 @@ import com.drp.test.queryOne
 import com.drp.test.seedHousehold
 import com.drp.test.useHousehold
 import com.drp.test.SeededHousehold
+import io.kotest.assertions.withClue
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.AfterAll
@@ -177,6 +178,70 @@ class RowLevelSecurityTest {
     @DisplayName("el esquema tiene las quince tablas del modelo, ni una mas")
     fun `el esquema tiene quince tablas`() {
         owner.queryAllTables().size.shouldBe(15)
+    }
+
+    @Test
+    @DisplayName("la resolucion de inquilino no corre con superusuario ni con BYPASSRLS")
+    fun `la excepcion de aislamiento no descansa en un privilegio`() {
+        // Es la propiedad de la que depende que la grieta deliberada sea
+        // estrecha, y no se ve en ninguna parte del codigo: una funcion SECURITY
+        // DEFINER se ejecuta con los privilegios de su PROPIETARIO, asi que si
+        // ese propietario fuese superusuario, las tres funciones tendrian acceso
+        // total a la base en lugar del acceso de solo lectura a tres tablas que
+        // sus politicas les conceden.
+        //
+        // Sin esta prueba, cambiar el dueno de una funcion --o dejarlo por
+        // omision en quien ejecute la migracion-- ampliaria el radio de la
+        // excepcion sin que nada fallara.
+        val owners = owner.queryAll(
+            """
+            SELECT p.proname, r.rolname, r.rolsuper, r.rolbypassrls
+            FROM pg_proc p
+            JOIN pg_roles r ON r.oid = p.proowner
+            JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'public'
+              AND p.prosecdef
+            ORDER BY p.proname
+            """.trimIndent(),
+        ) { Triple(it.getString(1), it.getString(2), it.getBoolean(3) || it.getBoolean(4)) }
+
+        owners.map { it.first }.shouldBe(
+            listOf(
+                "find_household_for_active_member",
+                "find_household_for_invitation_token",
+                "list_household_ids",
+            ),
+        )
+        owners.forEach { (function, role, privileged) ->
+            withClue("$function la posee $role, que es superusuario o tiene BYPASSRLS") {
+                privileged.shouldBeFalse()
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("y aun asi resuelven: la puerta se la abre una politica, no un privilegio")
+    fun `la resolucion funciona sin privilegios`() {
+        // La otra mitad de la prueba anterior. Que el propietario no tenga
+        // privilegios no serviria de nada si las funciones hubiesen dejado de
+        // funcionar: lo que se comprueba junto es que resuelven **y** que lo
+        // hacen por las politicas de SELECT que la V5 les concede.
+        application.useHousehold(null)
+
+        val households = application.queryAll("SELECT * FROM list_household_ids()") {
+            it.getObject(1, UUID::class.java)
+        }
+        val resolved = application.queryOne(
+            "SELECT find_household_for_active_member(?)",
+            householdA.identityId,
+        ) { it.getObject(1, UUID::class.java) }
+
+        households.contains(householdA.householdId).shouldBe(true)
+        resolved.shouldBe(householdA.householdId)
+
+        // Y lo que devuelven son identificadores, no acceso: leer el hogar sigue
+        // exigiendo contexto.
+        application.count("SELECT count(*) FROM households").shouldBe(0)
     }
 
     @Test
