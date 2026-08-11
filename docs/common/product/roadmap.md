@@ -71,27 +71,42 @@ midan solos.
 > 20 está descatalogado. Hoy es solo un aviso; el día que deje de serlo, la CI
 > se cae sin haber tocado nada.
 
-### Hito 1 — Aislamiento y enrolamiento · Pendiente
+### Hito 1 — Aislamiento y enrolamiento · **Completado (2026-08-11)**
 
 El recorrido vertical de verdad, y el hito que valida ADR-002, ADR-003, ADR-004 y
 ADR-009.
 
-- Flyway: esquema completo de las 16 tablas con sus `CHECK`, las claves ajenas compuestas de autoría y **todos** los índices únicos parciales; políticas de RLS con `FORCE`; extensión `unaccent`.
-- `TenantContext` que fija `SET LOCAL app.household_id` al abrir cada transacción. Los procesos diarios recorren los hogares uno a uno, **nunca con `BYPASSRLS`**.
-- Argon2id (19 MiB, 2 iteraciones, paralelismo 1) en los cuatro puntos donde se fija contraseña. JWT con `sub`, `memberId`, `householdId` y `role`; refresh rotativo y hasheado.
-- Casos de uso de alta, verificación, invitación, contraseñas, roles y baja, más `PurgeUnverifiedHouseholds` y `RevokeSession`.
-- Frontend: shell responsive, primera versión del sistema de diseño —cerrando las ocho dimensiones de [`look-and-feel.md`](../../frontend/product-design/look-and-feel.md)— y los flujos de enrolamiento.
+- [x] **Flyway: esquema completo de las 15 tablas** con sus `CHECK`, las claves ajenas compuestas de autoría y de fichero, y **todos** los índices únicos parciales —incluido el `NULLS NOT DISTINCT` de existencias con su exclusión de `DECOMMISSIONED`—; políticas de RLS con `FORCE` en las diez tablas con `household_id`; extensión `unaccent`.
+- [x] **`TenantContext`** que fija `SET LOCAL app.household_id` al abrir **cada** transacción, desde el claim del token. `PurgeUnverifiedHouseholds` recorre los hogares uno a uno, **sin `BYPASSRLS`**.
+- [x] **Argon2id** (19 MiB, 2 iteraciones, paralelismo 1) tras `DelegatingPasswordEncoder`, en los cuatro puntos donde se fija contraseña. JWT HS256 con `sub`, `memberId`, `householdId` y `role`; refresh rotativo y hasheado.
+- [x] **Las 16 operaciones del contrato** que caen en este hito, con sus casos de uso: alta, verificación, reenvío, login, renovación, cierre de sesión, contraseñas, invitaciones, roles y baja, más `PurgeUnverifiedHouseholds`.
+- [x] **Limitador de frecuencia** (`429 RATE_LIMITED`) sobre los ocho endpoints sin autenticar, por IP **y por correo**.
+- [x] **Frontend**: shell responsive de 375 px a ultrawide, primera versión del sistema de diseño con las **ocho dimensiones de [`look-and-feel.md`](../../frontend/product-design/look-and-feel.md) cerradas**, y los siete flujos de enrolamiento.
+- [x] **Auditoría de contraste** de los 36 pares en los dos modos, con [`scripts/check-contrast.py`](../../../scripts/check-contrast.py) en la CI para que no envejezca en silencio.
 
-> **Al escribir la política de RLS**, usar la forma con `nullif` que documenta
-> [`data-model.md`](../architecture/data-model.md): la versión directa lanza un
-> error de conversión cuando el ajuste está sin fijar o en cadena vacía, en vez
-> de denegar limpiamente.
+> **Tres cosas que la definición no preveía y que hubo que decidir al
+> implementar.** Están razonadas en [`data-model.md`](../architecture/data-model.md)
+> y en [`decisions.md`](decisions.md):
+>
+> - **Las «16 tablas» eran 15.** La cifra salía de contar las filas de la tabla de
+>   restricciones, donde `assets` aparece dos veces. Corregida en los tres sitios
+>   donde estaba escrita.
+> - **`unaccent` no es `IMMUTABLE`**, así que los tres índices que comparan
+>   nombres sin acentos no se pueden crear tal cual: hace falta un envoltorio.
+> - **Hay tres momentos en los que el hogar todavía no se conoce** —login,
+>   aceptación de invitación y procesos diarios— y la política deniega
+>   correctamente en los tres, impidiendo arrancar. Se resuelven con tres
+>   funciones `SECURITY DEFINER` que devuelven **solo identificadores de hogar**,
+>   en lugar de con `BYPASSRLS`.
 >
 > **Este es el hito en el que aparece Testcontainers**, así que Docker tiene que
 > estar arrancado para poder construir. Ojo con la distinción: Testcontainers
-> levanta y destruye lo suyo, y `compose.yaml` es para ejecutar la aplicación —
-> no hace falta para las pruebas. Al terminar, dejar la máquina como estaba (ver
-> la sección de verificación del `CLAUDE.md`).
+> levanta y destruye lo suyo —PostgreSQL **y Mailpit**—, y `compose.yaml` es para
+> ejecutar la aplicación: no hace falta para las pruebas. Y ojo con una trampa de
+> versión: el cliente de Docker que arrastra Testcontainers negocia una API que
+> Docker 29 rechaza, y el síntoma («Could not find a valid Docker environment») no
+> se parece a la causa. Se fija con `systemProperty("api.version", ...)` en
+> `backend/build.gradle.kts`.
 
 ### Hito 2 — Catálogo, ubicaciones y assets · Pendiente
 
@@ -130,4 +145,5 @@ No son olvidos: están anotados con motivo en
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-11 | **Hito 1 completado.** Esquema completo, RLS con `FORCE`, `TenantContext`, Argon2id y JWT, las 16 operaciones del enrolamiento, limitador de frecuencia y los flujos de frontend sobre un sistema de diseño con las ocho dimensiones cerradas. Se anotan las tres decisiones que hubo que tomar al implementar y que la definición no preveía. |
 | 2026-08-10 | Se crea al arrancar la Fase 1, con el detalle de los hitos trasladado desde la sección 8.2 del README. Hito 0 completado. |

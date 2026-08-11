@@ -30,6 +30,12 @@ jobs:
       - name: Comprobar los enlaces relativos
         run: python scripts/check-links.py
 
+      # La direccion visual dice que el contraste esta comprobado y no afirmado
+      # (docs/frontend/product-design/look-and-feel.md). Esto es lo que lo hace
+      # cierto: mide los tokens reales y falla si alguno baja de su minimo.
+      - name: Comprobar el contraste de los tokens
+        run: python scripts/check-contrast.py
+
       - name: Spectral
         run: npx --yes @stoplight/spectral-cli lint openapi.yaml --ruleset .spectral.yaml
 
