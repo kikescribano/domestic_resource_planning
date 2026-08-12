@@ -164,6 +164,28 @@ ADR-009.
 > prueba que le pregunta a PostgreSQL qué claves hay de verdad: las de recorrido
 > no podían, porque escriben y leen con el mismo código y se equivocan igual en
 > los dos sentidos.
+>
+> **Tres barridos de verificación al cerrar**, con instrucción expresa de
+> ejecutar y no de leer, que añadieron 33 pruebas y encontraron **un agujero
+> real, una guarda rota y cinco afirmaciones falsas**:
+>
+> - **El tope de profundidad de los dos CTE recursivos hacía lo contrario de lo
+>   que pretendía.** Estaba para no colgarse con datos ya cíclicos, y en una
+>   jerarquía de más de 100 niveles devolvía la cadena de ancestros **truncada**:
+>   el ancestro que faltaba no aparecía, el anti-ciclo respondía que el destino no
+>   estaba entre los ancestros y **dejaba crear el ciclo**. Medido con 102
+>   niveles, en las dos jerarquías. Se sustituye por la cláusula `CYCLE` de
+>   PostgreSQL 14+, que termina siempre sin adivinar ninguna profundidad máxima.
+> - **La guarda de idempotencia comprobaba primero y marcaba al terminar**, así
+>   que no servía justo cuando hace falta: ocho hilos con el mismo `eventId`
+>   pasaban los ocho la comprobación antes de que ninguno marcase. Ahora se
+>   **reserva** el identificador antes de atenderlo.
+> - **Cinco afirmaciones escritas en comentarios resultaron falsas al medirlas**,
+>   todas sobre el entorno en que corre un handler tras el commit. La más
+>   importante: la transacción **sigue activa** y unirse a ella devuelve **cero
+>   filas**, así que un handler que toque la base de datos necesita
+>   `REQUIRES_NEW`. Las que no se pueden arreglar quedan documentadas y escritas
+>   como pruebas que afirman el comportamiento **real** en lugar del deseado.
 
 ### Hito 3 — Ficheros y documentos · Pendiente
 
