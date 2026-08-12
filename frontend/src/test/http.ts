@@ -15,6 +15,20 @@ export interface StubbedResponse {
   headers?: Record<string, string>
 }
 
+/**
+ * Una respuesta fija, o una función que decide en cada llamada.
+ *
+ * La forma de función existe para lo que una respuesta fija no puede expresar:
+ * que la **misma** ruta conteste distinto la primera vez y las siguientes, que es
+ * justo el caso de un token que caduca y se renueva.
+ *
+ * No se usa un getter para eso, aunque parezca equivalente: los getters **se
+ * evalúan al hacer spread**, así que juntar dos mapas de respuestas con `{...a,
+ * ...b}` los dispararía una vez y congelaría el resultado. Con una función, lo
+ * que viaja por el spread es la función.
+ */
+export type StubbedRoute = StubbedResponse | (() => StubbedResponse)
+
 export interface RecordedCall {
   url: string
   method: string
@@ -22,7 +36,7 @@ export interface RecordedCall {
   authorization: string | null
 }
 
-export function stubFetch(responses: Record<string, StubbedResponse>) {
+export function stubFetch(responses: Record<string, StubbedRoute>) {
   const calls: RecordedCall[] = []
 
   const implementation = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -37,10 +51,12 @@ export function stubFetch(responses: Record<string, StubbedResponse>) {
       authorization: headers.get('Authorization'),
     })
 
-    const stub = responses[`${method} ${url}`] ?? responses[url]
-    if (!stub) {
+    const route = responses[`${method} ${url}`] ?? responses[url]
+    if (!route) {
       throw new Error(`Ninguna respuesta preparada para ${method} ${url}`)
     }
+
+    const stub = typeof route === 'function' ? route() : route
 
     return new Response(stub.body === undefined ? null : JSON.stringify(stub.body), {
       status: stub.status,
