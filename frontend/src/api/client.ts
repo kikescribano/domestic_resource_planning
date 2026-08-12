@@ -13,11 +13,30 @@
 /** Códigos de error de negocio, tal y como los enumera `openapi.yaml`. */
 export type ApiErrorCode =
   | 'ALREADY_MEMBER'
+  | 'ARTICLE_DUPLICATE'
+  | 'ARTICLE_HAS_EXISTENCES'
+  | 'ARTICLE_UNIT_IMMUTABLE'
+  | 'ASSET_HAS_ACTIVE_LOAN'
+  | 'ASSET_HAS_CHILDREN'
+  | 'ASSET_LOCATION_CONFLICT'
+  | 'ASSET_QUANTITY_NEGATIVE'
+  | 'ASSET_QUANTITY_NOT_APPLICABLE'
+  | 'CATEGORY_DUPLICATE'
   | 'CURRENT_PASSWORD_INVALID'
   | 'EMAIL_NOT_VERIFIED'
+  | 'EXISTENCE_ALREADY_IN_LOCATION'
   | 'IDENTITY_ALREADY_MEMBER'
+  | 'INTAKE_QUANTITY_NOT_POSITIVE'
   | 'INVITATION_ALREADY_PENDING'
   | 'INVITATION_TOKEN_INVALID'
+  | 'LOCATION_CYCLE'
+  | 'LOCATION_DUPLICATE'
+  | 'LOCATION_HAS_ASSETS'
+  | 'LOCATION_HAS_CHILDREN'
+  | 'MERGE_ARTICLE_MISMATCH'
+  | 'MERGE_ASSET_DEACTIVATED'
+  | 'MERGE_NOT_CONSUMABLE'
+  | 'MERGE_SAME_ASSET'
   | 'RATE_LIMITED'
   | 'RESET_TOKEN_INVALID'
   | 'USER_LAST_ADMIN'
@@ -27,6 +46,52 @@ export type ApiErrorCode =
   | 'FORBIDDEN'
   | 'NOT_FOUND'
   | 'INTERNAL_ERROR'
+
+/**
+ * El texto que se le enseña a una persona para cada código.
+ *
+ * Vive aquí y no en cada pantalla porque el mismo código sale por varias: el
+ * `message` que trae la respuesta es texto de diagnóstico —lo escribe el
+ * backend, para el log— y no está pensado para leerse en una interfaz.
+ */
+const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
+  ARTICLE_DUPLICATE: 'Ya hay un artículo con ese nombre o ese código de barras.',
+  ARTICLE_HAS_EXISTENCES: 'No se puede retirar: todavía quedan existencias de este artículo.',
+  ARTICLE_UNIT_IMMUTABLE: 'La unidad no se puede cambiar mientras haya existencias contadas en ella.',
+  ASSET_HAS_ACTIVE_LOAN: 'No se puede dar de baja: está prestado.',
+  ASSET_HAS_CHILDREN: 'No se puede dar de baja: todavía tiene cosas dentro.',
+  ASSET_LOCATION_CONFLICT: 'Ahí no cabe: solo un asset duradero puede contener otros.',
+  ASSET_QUANTITY_NEGATIVE: 'La cantidad no puede ser negativa.',
+  ASSET_QUANTITY_NOT_APPLICABLE: 'Este asset no lleva cantidad.',
+  CATEGORY_DUPLICATE: 'Ya hay una categoría con ese nombre.',
+  EXISTENCE_ALREADY_IN_LOCATION: 'Ahí ya hay una existencia de este artículo. Únelas en lugar de moverla.',
+  INTAKE_QUANTITY_NOT_POSITIVE: 'La cantidad que entra tiene que ser mayor que cero.',
+  LOCATION_CYCLE: 'No se puede mover ahí: el destino está dentro de lo que quieres mover.',
+  LOCATION_DUPLICATE: 'Ya hay algo con ese nombre en el mismo sitio.',
+  LOCATION_HAS_ASSETS: 'No se puede borrar: todavía hay cosas guardadas ahí.',
+  LOCATION_HAS_CHILDREN: 'No se puede borrar: cuelgan otras ubicaciones de ella.',
+  MERGE_ARTICLE_MISMATCH: 'Solo se pueden unir existencias del mismo artículo.',
+  MERGE_ASSET_DEACTIVATED: 'Alguna de las dos existencias está dada de baja.',
+  MERGE_NOT_CONSUMABLE: 'Solo se unen existencias de consumible.',
+  MERGE_SAME_ASSET: 'Origen y destino son la misma existencia.',
+  NOT_FOUND: 'Eso ya no está.',
+  FORBIDDEN: 'No tienes permiso para hacer esto.',
+  RATE_LIMITED: 'Demasiados intentos. Prueba de nuevo en un momento.',
+}
+
+/**
+ * Qué decirle al usuario de un error cualquiera.
+ *
+ * Con el genérico incluido: sin él, una pantalla que solo contempla los códigos
+ * que espera enmudece ante un fallo de red o un `500`, y el usuario se queda
+ * mirando un formulario que no hace nada.
+ */
+export function humanMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    return ERROR_MESSAGES[error.code] ?? 'No se ha podido completar la operación.'
+  }
+  return 'No se ha podido conectar. Comprueba la conexión e inténtalo otra vez.'
+}
 
 export interface ApiErrorBody {
   code: ApiErrorCode
@@ -95,6 +160,118 @@ export interface Page<T> {
   page: number
   size: number
   total: number
+}
+
+// --- Catálogo, ubicaciones y assets (Hito 2) ---------------------------------
+
+export type MeasurementUnit = 'UNIT' | 'GRAM' | 'KILOGRAM' | 'MILLILITER' | 'LITER' | 'METER' | 'PACK'
+export type LocationType = 'HOUSE' | 'FLOOR' | 'ROOM' | 'FURNITURE' | 'SHELF' | 'OTHER'
+export type AssetType = 'DURABLE' | 'CONSUMABLE'
+export type AssetStatus = 'AVAILABLE' | 'LENT' | 'DECOMMISSIONED'
+
+/** Cómo se escribe cada unidad al mostrarla. Son datos, así que van en castellano. */
+export const UNIT_LABELS: Record<MeasurementUnit, string> = {
+  UNIT: 'unidades',
+  GRAM: 'g',
+  KILOGRAM: 'kg',
+  MILLILITER: 'ml',
+  LITER: 'l',
+  METER: 'm',
+  PACK: 'paquetes',
+}
+
+export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
+  HOUSE: 'Vivienda',
+  FLOOR: 'Planta',
+  ROOM: 'Habitación',
+  FURNITURE: 'Mueble',
+  SHELF: 'Estante',
+  OTHER: 'Otro',
+}
+
+export interface Category {
+  id: string
+  name: string
+  notes: string | null
+  createdAt: string
+  retiredAt: string | null
+}
+
+export interface Article {
+  id: string
+  name: string
+  categoryId: string
+  category: string | null
+  unit: MeasurementUnit
+  brand: string | null
+  model: string | null
+  barcode: string | null
+  packSize: number | null
+  notes: string | null
+  retiredAt: string | null
+}
+
+export interface Capacity {
+  type: 'WEIGHT' | 'VOLUME' | 'UNITS'
+  max: number
+  unit: string
+}
+
+export interface Location {
+  id: string
+  name: string
+  type: LocationType
+  parentLocationId: string | null
+  capacity: Capacity | null
+  notes: string | null
+}
+
+/** La referencia polimórfica: los dos campos van juntos. */
+export interface LocationRef {
+  type: 'ASSET' | 'LOCATION'
+  id: string
+}
+
+/** Un aviso que acompaña a una operación **con éxito**. No es un error. */
+export interface ApiWarning {
+  code: string
+  message: string
+}
+
+export interface Asset {
+  id: string
+  name: string
+  type: AssetType
+  categoryId: string | null
+  category: string | null
+  articleId: string | null
+  ownerId: string | null
+  location: LocationRef | null
+  status: AssetStatus
+  quantity: number | null
+  unit: MeasurementUnit | null
+  serialNumber: string | null
+  notes: string | null
+  warnings: ApiWarning[]
+}
+
+export interface AssetFilters {
+  locationId?: string
+  parentAssetId?: string
+  articleId?: string
+  categoryId?: string
+  type?: AssetType
+  status?: AssetStatus
+  withoutOwner?: boolean
+}
+
+function queryString(params: Record<string, string | number | boolean | undefined>): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') search.set(key, String(value))
+  }
+  const text = search.toString()
+  return text ? `?${text}` : ''
 }
 
 const BASE_URL = '/api/v1'
@@ -220,4 +397,84 @@ export const api = {
 
   acceptInvitation: (input: AcceptInvitationInput) =>
     request<TokenPair>('/invitations/accept', { method: 'POST', body: input }),
+
+  // --- Categorías -----------------------------------------------------------
+  listCategories: (accessToken: string, includeRetired = false) =>
+    request<Page<Category>>(`/categories${queryString({ includeRetired, size: 200 })}`, { accessToken }),
+
+  createCategory: (body: { name: string; notes?: string }, accessToken: string) =>
+    request<Category>('/categories', { method: 'POST', body, accessToken }),
+
+  updateCategory: (id: string, body: { name: string; notes?: string }, accessToken: string) =>
+    request<Category>(`/categories/${id}`, { method: 'PATCH', body, accessToken }),
+
+  retireCategory: (id: string, accessToken: string) =>
+    request<void>(`/categories/${id}`, { method: 'DELETE', accessToken }),
+
+  // --- Artículos ------------------------------------------------------------
+  listArticles: (
+    accessToken: string,
+    filters: { q?: string; categoryId?: string; includeRetired?: boolean } = {},
+  ) => request<Page<Article>>(`/articles${queryString({ ...filters, size: 200 })}`, { accessToken }),
+
+  getArticle: (id: string, accessToken: string) => request<Article>(`/articles/${id}`, { accessToken }),
+
+  createArticle: (body: Record<string, unknown>, accessToken: string) =>
+    request<Article>('/articles', { method: 'POST', body, accessToken }),
+
+  updateArticle: (id: string, body: Record<string, unknown>, accessToken: string) =>
+    request<Article>(`/articles/${id}`, { method: 'PATCH', body, accessToken }),
+
+  retireArticle: (id: string, accessToken: string) =>
+    request<void>(`/articles/${id}`, { method: 'DELETE', accessToken }),
+
+  // --- Ubicaciones ----------------------------------------------------------
+  /** Sin `parentLocationId` devuelve el hogar entero, que es como se pinta el árbol. */
+  listLocations: (accessToken: string, parentLocationId?: string) =>
+    request<Page<Location>>(`/locations${queryString({ parentLocationId, size: 200 })}`, { accessToken }),
+
+  getLocation: (id: string, accessToken: string) => request<Location>(`/locations/${id}`, { accessToken }),
+
+  listLocationChildren: (id: string, accessToken: string) =>
+    request<Page<Location>>(`/locations/${id}/children${queryString({ size: 200 })}`, { accessToken }),
+
+  createLocation: (body: Record<string, unknown>, accessToken: string) =>
+    request<Location>('/locations', { method: 'POST', body, accessToken }),
+
+  updateLocation: (id: string, body: Record<string, unknown>, accessToken: string) =>
+    request<Location>(`/locations/${id}`, { method: 'PATCH', body, accessToken }),
+
+  deleteLocation: (id: string, accessToken: string) =>
+    request<void>(`/locations/${id}`, { method: 'DELETE', accessToken }),
+
+  // --- Assets ---------------------------------------------------------------
+  listAssets: (accessToken: string, filters: AssetFilters = {}) =>
+    request<Page<Asset>>(`/assets${queryString({ ...filters, size: 200 })}`, { accessToken }),
+
+  getAsset: (id: string, accessToken: string) => request<Asset>(`/assets/${id}`, { accessToken }),
+
+  listAssetChildren: (id: string, accessToken: string) =>
+    request<Page<Asset>>(`/assets/${id}/children${queryString({ size: 200 })}`, { accessToken }),
+
+  createAsset: (body: Record<string, unknown>, accessToken: string) =>
+    request<Asset>('/assets', { method: 'POST', body, accessToken }),
+
+  /**
+   * Dar entrada a un consumible. La misma llamada crea la existencia o **suma**
+   * sobre la que ya haya en esa ubicación: quien la usa no tiene que saber cuál
+   * de las dos cosas va a pasar.
+   */
+  registerIntake: (body: Record<string, unknown>, accessToken: string) =>
+    request<Asset>('/assets/intake', { method: 'POST', body, accessToken }),
+
+  /** Mover, ajustar cantidad y corregir la ficha, según lo que lleve el cuerpo. */
+  updateAsset: (id: string, body: Record<string, unknown>, accessToken: string) =>
+    request<Asset>(`/assets/${id}`, { method: 'PATCH', body, accessToken }),
+
+  /** El asset de la ruta es el que desaparece; el del cuerpo, el que se queda con la suma. */
+  mergeStockItems: (sourceId: string, targetAssetId: string, accessToken: string) =>
+    request<Asset>(`/assets/${sourceId}/merge`, { method: 'POST', body: { targetAssetId }, accessToken }),
+
+  decommissionAsset: (id: string, accessToken: string) =>
+    request<void>(`/assets/${id}`, { method: 'DELETE', accessToken }),
 }

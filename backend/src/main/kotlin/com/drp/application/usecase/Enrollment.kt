@@ -3,6 +3,7 @@ package com.drp.application.usecase
 import com.drp.application.EnrollmentEmails
 import com.drp.application.SessionIssuer
 import com.drp.application.TokenPair
+import com.drp.application.event.CoreEvents
 import com.drp.application.port.CategoryRepository
 import com.drp.application.port.EmailSender
 import com.drp.application.port.EmailVerificationTokenRepository
@@ -188,12 +189,9 @@ class CreateHousehold(
  * Consumir el token de verificacion. Es el momento en que el hogar pasa a ser
  * utilizable, y por tanto el momento en que se devuelve sesion.
  *
- * **Falta publicar `HouseholdCreated`, y falta a proposito.** La definicion dice
- * que el evento se publica aqui --no al insertar la fila, para que ningun modulo
- * siembre datos de un hogar que quiza no llegue a usarse-- pero el event bus
- * entra en el Hito 2, asi que hoy no hay donde publicarlo. Cuando ese hito monte
- * el puerto sobre `ApplicationEventPublisher`, el evento va justo detras de
- * marcar la identidad como verificada y dentro de esta misma transaccion.
+ * Y el momento en que se publica `HouseholdCreated`, que el Hito 1 dejo pendiente
+ * por no haber bus donde publicarlo. Se publica **aqui y no al insertar la fila**
+ * para que ningun modulo siembre datos de un hogar que quiza no llegue a usarse.
  */
 @Service
 class VerifyEmail(
@@ -205,6 +203,7 @@ class VerifyEmail(
     private val transactions: TransactionTemplate,
     private val sessions: SessionIssuer,
     private val secrets: SecretGenerator,
+    private val events: CoreEvents,
     private val clock: Clock,
 ) {
 
@@ -239,6 +238,18 @@ class VerifyEmail(
                         ErrorCode.VERIFICATION_TOKEN_INVALID,
                         "Token de verificación no válido",
                     )
+
+                // "Si era el alta de un hogar", que es lo que dice la definicion
+                // del evento. Quien abre un hogar es el unico miembro que se
+                // atribuye a si mismo --`CreateHousehold` pone `createdBy` al
+                // propio identificador de la pertenencia y nada mas lo hace--,
+                // asi que esa igualdad es la pregunta, sin necesidad de una
+                // columna nueva. Hoy es siempre cierta aqui, porque quien acepta
+                // una invitacion nace con el correo ya verificado y no pasa por
+                // este camino; el dia que deje de serlo, la condicion ya esta.
+                if (member.createdBy == member.id) {
+                    events.householdCreated(householdId)
+                }
 
                 sessions.issueFor(identity.id, member)
             }!!

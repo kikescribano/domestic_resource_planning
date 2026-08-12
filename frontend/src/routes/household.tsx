@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent, type ReactNode } from 'react'
-import { NavLink, Navigate, Outlet, useNavigate } from 'react-router'
+import { useState, type FormEvent } from 'react'
+import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router'
 
 import { ApiError, api, type UserRole } from '../api/client'
 import { useAuthenticatedSession, useSession } from '../auth/SessionProvider'
-import { Button, Field, Notice, Spinner, StatusBadge } from '../ui/primitives'
+import { Button, Field, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primitives'
 
 /**
  * Lo que vive detrás del login.
@@ -16,8 +16,11 @@ import { Button, Field, Notice, Spinner, StatusBadge } from '../ui/primitives'
 
 const NAVIGATION = [
   { to: '/', label: 'Hogar', end: true },
+  { to: '/inventario', label: 'Inventario', end: false },
+  { to: '/ubicaciones', label: 'Sitios', end: false },
+  { to: '/catalogo', label: 'Catálogo', end: false },
   { to: '/usuarios', label: 'Personas', end: false },
-  { to: '/cuenta', label: 'Tu cuenta', end: false },
+  { to: '/cuenta', label: 'Cuenta', end: false },
 ]
 
 export function RequireSession() {
@@ -90,24 +93,17 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
   ].join(' ')
 }
 
-function PageHeading({ title, action }: { title: string; action?: ReactNode }) {
-  return (
-    <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-title text-ink">{title}</h1>
-      {action}
-    </header>
-  )
-}
-
 export function HomePage() {
   const session = useAuthenticatedSession()
 
   return (
     <>
       <PageHeading title="Tu hogar" />
-      <Notice tone="info" title="El inventario llega en el próximo hito">
-        Por ahora puedes gestionar quién entra en el hogar y tu propia cuenta. Los
-        assets, las ubicaciones y el catálogo son el Hito 2.
+      <Notice tone="info" title="Por dónde empezar">
+        Crea primero las <Link to="/ubicaciones" className="underline">ubicaciones</Link> —la vivienda y
+        lo que hay dentro— y el <Link to="/catalogo" className="underline">catálogo</Link> de lo que
+        sueles tener en casa. Con eso, dar de alta algo en el{' '}
+        <Link to="/inventario" className="underline">inventario</Link> es elegir de una lista.
       </Notice>
       <dl className="mt-6 grid gap-4 sm:grid-cols-2">
         <div className="rounded-lg border border-border-subtle bg-surface-raised p-4">

@@ -1,25 +1,38 @@
 package com.drp.adapter.persistence
 
+import com.drp.application.port.ArticleFilter
+import com.drp.application.port.ArticleRepository
+import com.drp.application.port.AssetFilter
+import com.drp.application.port.AssetRepository
 import com.drp.application.port.CategoryRepository
 import com.drp.application.port.EmailVerificationTokenRepository
+import com.drp.application.port.HierarchyLock
 import com.drp.application.port.HouseholdMemberRepository
 import com.drp.application.port.HouseholdRepository
 import com.drp.application.port.IdentityRepository
 import com.drp.application.port.InvitationRepository
+import com.drp.application.port.LocationRepository
 import com.drp.application.port.Page
 import com.drp.application.port.Pagination
 import com.drp.application.port.PasswordResetTokenRepository
 import com.drp.application.port.RefreshTokenRepository
+import com.drp.application.port.StoredFileRepository
 import com.drp.application.port.TenantResolver
 import com.drp.application.tenant.TenantContext
+import com.drp.domain.catalog.Article
+import com.drp.domain.catalog.Category
 import com.drp.domain.household.Household
 import com.drp.domain.household.HouseholdMember
 import com.drp.domain.household.MemberRole
 import com.drp.domain.identity.EmailAddress
 import com.drp.domain.identity.Identity
+import com.drp.domain.inventory.Asset
+import com.drp.domain.inventory.AssetLocation
+import com.drp.domain.inventory.Location
 import com.drp.domain.invitation.Invitation
 import com.drp.domain.token.SingleUseToken
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.time.Instant
@@ -377,4 +390,346 @@ class CategoryRepositoryAdapter(
     }
 
     override fun countCurrent(): Long = categories.count()
+
+    /**
+     * El `household_id` lo pone el contexto, nunca el objeto de dominio --que por
+     * eso no lo lleva-- ni un parametro. Al modificar se conserva el que ya tenia
+     * la fila, que es el mismo: la politica no habria dejado leerla si no.
+     */
+    override fun save(category: Category): Category {
+        val householdId = requireNotNull(tenantContext.currentHousehold()) {
+            "Guardar una categoria exige contexto de inquilino"
+        }
+
+        return categories.save(
+            CategoryEntity(
+                id = category.id,
+                householdId = householdId,
+                name = category.name,
+                notes = category.notes,
+                createdAt = category.createdAt,
+                updatedAt = category.updatedAt,
+                retiredAt = category.retiredAt,
+                createdBy = category.createdBy,
+                updatedBy = category.updatedBy,
+            ),
+        ).toDomain()
+    }
+
+    override fun findById(categoryId: UUID): Category? =
+        categories.findById(categoryId).orElse(null)?.toDomain()
+
+    override fun findLiveByName(name: String): Category? =
+        categories.findLiveByNormalizedName(name)?.toDomain()
+
+    override fun list(includeRetired: Boolean, pagination: Pagination): Page<Category> {
+        val request = PageRequest.of(pagination.page, pagination.size, Sort.by("name"))
+        val found = if (includeRetired) {
+            categories.findAll(request)
+        } else {
+            categories.findAllByRetiredAtIsNull(request)
+        }
+        return Page(found.content.map { it.toDomain() }, pagination.page, pagination.size, found.totalElements)
+    }
+}
+
+internal fun CategoryEntity.toDomain() = Category(
+    id = id,
+    name = name,
+    notes = notes,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    retiredAt = retiredAt,
+    createdBy = createdBy,
+    updatedBy = updatedBy,
+)
+
+@Repository
+class AssetRepositoryAdapter(
+    private val assets: AssetJpaRepository,
+    private val tenantContext: TenantContext,
+) : AssetRepository {
+
+    override fun save(asset: Asset): Asset {
+        val householdId = requireNotNull(tenantContext.currentHousehold()) {
+            "Guardar un asset exige contexto de inquilino"
+        }
+
+        return assets.save(
+            AssetEntity(
+                id = asset.id,
+                householdId = householdId,
+                articleId = asset.articleId,
+                categoryId = asset.categoryId,
+                name = asset.name,
+                type = asset.type,
+                ownerId = asset.ownerId,
+                locationAssetId = asset.location?.assetId,
+                locationId = asset.location?.locationId,
+                quantity = asset.quantity,
+                status = asset.status,
+                serialNumber = asset.serialNumber,
+                acquiredOn = asset.acquiredOn,
+                photoUrl = asset.photoUrl,
+                photoFileId = asset.photoFileId,
+                notes = asset.notes,
+                createdAt = asset.createdAt,
+                updatedAt = asset.updatedAt,
+                createdBy = asset.createdBy,
+                updatedBy = asset.updatedBy,
+            ),
+        ).toDomain()
+    }
+
+    override fun findById(assetId: UUID): Asset? = assets.findById(assetId).orElse(null)?.toDomain()
+
+    override fun findLiveStockItem(articleId: UUID, location: AssetLocation?): Asset? =
+        assets.findLiveStockItem(articleId, location?.assetId, location?.locationId)?.toDomain()
+
+    override fun countChildren(assetId: UUID): Long = assets.countLiveChildren(assetId)
+
+    override fun ancestorsOf(assetId: UUID): List<UUID> = assets.ancestorIdsOf(assetId)
+
+    override fun countLiveIn(location: AssetLocation): Long =
+        assets.countLiveIn(location.assetId, location.locationId)
+
+    override fun hasOpenLoan(assetId: UUID): Boolean = assets.countOpenLoans(assetId) > 0
+
+    override fun list(filter: AssetFilter, pagination: Pagination): Page<Asset> {
+        val found = assets.search(
+            locationId = filter.locationId,
+            parentAssetId = filter.parentAssetId,
+            ownerId = filter.ownerId,
+            withoutOwner = filter.withoutOwner,
+            status = filter.status?.name,
+            type = filter.type?.name,
+            articleId = filter.articleId,
+            categoryId = filter.categoryId,
+            pageable = PageRequest.of(pagination.page, pagination.size),
+        )
+        return Page(found.content.map { it.toDomain() }, pagination.page, pagination.size, found.totalElements)
+    }
+}
+
+internal fun AssetEntity.toDomain() = Asset(
+    id = id,
+    type = type,
+    articleId = articleId,
+    name = name,
+    categoryId = categoryId,
+    ownerId = ownerId,
+    location = AssetLocation.from(locationAssetId, locationId),
+    status = status,
+    quantity = quantity,
+    serialNumber = serialNumber,
+    acquiredOn = acquiredOn,
+    photoUrl = photoUrl,
+    photoFileId = photoFileId,
+    notes = notes,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    createdBy = createdBy,
+    updatedBy = updatedBy,
+)
+
+@Repository
+class ArticleRepositoryAdapter(
+    private val articles: ArticleJpaRepository,
+    private val tenantContext: TenantContext,
+) : ArticleRepository {
+
+    override fun save(article: Article): Article {
+        val householdId = requireNotNull(tenantContext.currentHousehold()) {
+            "Guardar un articulo exige contexto de inquilino"
+        }
+
+        return articles.save(
+            ArticleEntity(
+                id = article.id,
+                householdId = householdId,
+                categoryId = article.categoryId,
+                name = article.name,
+                unit = article.unit,
+                brand = article.brand,
+                model = article.model,
+                barcode = article.barcode,
+                packSize = article.packSize,
+                photoUrl = article.photoUrl,
+                photoFileId = article.photoFileId,
+                notes = article.notes,
+                createdAt = article.createdAt,
+                updatedAt = article.updatedAt,
+                retiredAt = article.retiredAt,
+                createdBy = article.createdBy,
+                updatedBy = article.updatedBy,
+            ),
+        ).toDomain()
+    }
+
+    override fun findById(articleId: UUID): Article? =
+        articles.findById(articleId).orElse(null)?.toDomain()
+
+    override fun findLiveByName(name: String): Article? =
+        articles.findLiveByNormalizedName(name)?.toDomain()
+
+    override fun findLiveByBarcode(barcode: String): Article? =
+        articles.findFirstByBarcodeAndRetiredAtIsNull(barcode)?.toDomain()
+
+    override fun list(filter: ArticleFilter, pagination: Pagination): Page<Article> {
+        val found = articles.search(
+            query = filter.query?.takeIf { it.isNotBlank() },
+            categoryId = filter.categoryId,
+            barcode = filter.barcode?.takeIf { it.isNotBlank() },
+            includeRetired = filter.includeRetired,
+            pageable = PageRequest.of(pagination.page, pagination.size),
+        )
+        return Page(found.content.map { it.toDomain() }, pagination.page, pagination.size, found.totalElements)
+    }
+
+    override fun countLiveStockItems(articleId: UUID): Long = articles.countLiveStockItems(articleId)
+}
+
+internal fun ArticleEntity.toDomain() = Article(
+    id = id,
+    name = name,
+    categoryId = categoryId,
+    unit = unit,
+    brand = brand,
+    model = model,
+    barcode = barcode,
+    packSize = packSize,
+    photoUrl = photoUrl,
+    photoFileId = photoFileId,
+    notes = notes,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    retiredAt = retiredAt,
+    createdBy = createdBy,
+    updatedBy = updatedBy,
+)
+
+@Repository
+class LocationRepositoryAdapter(
+    private val locations: LocationJpaRepository,
+    private val tenantContext: TenantContext,
+) : LocationRepository {
+
+    override fun save(location: Location): Location {
+        val householdId = requireNotNull(tenantContext.currentHousehold()) {
+            "Guardar una ubicacion exige contexto de inquilino"
+        }
+
+        return locations.save(
+            LocationEntity(
+                id = location.id,
+                householdId = householdId,
+                name = location.name,
+                type = location.type,
+                parentLocationId = location.parentLocationId,
+                capacity = location.capacity,
+                environmentalConditions = location.environmentalConditions,
+                photoUrl = location.photoUrl,
+                photoFileId = location.photoFileId,
+                notes = location.notes,
+                createdAt = location.createdAt,
+                updatedAt = location.updatedAt,
+                createdBy = location.createdBy,
+                updatedBy = location.updatedBy,
+            ),
+        ).toDomain()
+    }
+
+    override fun findById(locationId: UUID): Location? =
+        locations.findById(locationId).orElse(null)?.toDomain()
+
+    override fun findByNameAmongSiblings(name: String, parentLocationId: UUID?): Location? =
+        locations.findByNormalizedNameAmongSiblings(name, parentLocationId)?.toDomain()
+
+    override fun list(parentLocationId: UUID?, onlyChildren: Boolean, pagination: Pagination): Page<Location> {
+        val request = PageRequest.of(pagination.page, pagination.size, Sort.by("name"))
+        val found = if (onlyChildren) {
+            locations.findAllByParentLocationId(parentLocationId, request)
+        } else {
+            locations.findAll(request)
+        }
+        return Page(found.content.map { it.toDomain() }, pagination.page, pagination.size, found.totalElements)
+    }
+
+    override fun countChildren(locationId: UUID): Long = locations.countByParentLocationId(locationId)
+
+    override fun countAssetsIn(locationId: UUID): Long = locations.countAssetsIn(locationId)
+
+    override fun ancestorsOf(locationId: UUID): List<UUID> = locations.ancestorIdsOf(locationId)
+
+    override fun delete(locationId: UUID) = locations.deleteById(locationId)
+}
+
+internal fun LocationEntity.toDomain() = Location(
+    id = id,
+    name = name,
+    type = type,
+    parentLocationId = parentLocationId,
+    capacity = capacity,
+    environmentalConditions = environmentalConditions,
+    photoUrl = photoUrl,
+    photoFileId = photoFileId,
+    notes = notes,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    createdBy = createdBy,
+    updatedBy = updatedBy,
+)
+
+/**
+ * Va por JDBC y sin entidad JPA a proposito: la pregunta es de si o no, y mapear
+ * `files` entera es trabajo del Hito 3. La consulta corre bajo RLS, asi que el
+ * fichero de otro hogar no aparece --y hoy no aparece ninguno, porque nada puede
+ * insertar en esa tabla todavia.
+ */
+@Repository
+class StoredFileRepositoryAdapter(private val jdbc: JdbcTemplate) : StoredFileRepository {
+
+    override fun existsUsable(fileId: UUID): Boolean =
+        jdbc.queryForObject(
+            """
+            SELECT count(*) FROM files
+            WHERE id = ? AND deleted_at IS NULL AND uploaded_at IS NOT NULL
+            """.trimIndent(),
+            Long::class.java,
+            fileId,
+        )!! > 0
+}
+
+/**
+ * El cerrojo de jerarquia, con un advisory lock de transaccion.
+ *
+ * Se elige `pg_advisory_xact_lock` y no un `SELECT ... FOR UPDATE` sobre las
+ * filas implicadas porque el bloqueo de filas cierra el ciclo de dos nodos y no
+ * el de tres: A→B, B→C y C→A a la vez bloquean parejas distintas y no coinciden
+ * en ninguna. Un cerrojo por hogar los cierra todos.
+ *
+ * Se libera solo al cerrar la transaccion --de ahi el `xact`--, asi que no hay
+ * forma de dejarselo puesto ni siquiera fallando a mitad.
+ *
+ * La clave se compone de un espacio de nombres fijo y del hash del hogar. Dos
+ * hogares distintos podrian colisionar en el mismo hash, y el efecto seria que
+ * uno espera al otro un instante: nunca un fallo de correccion.
+ */
+@Repository
+class AdvisoryHierarchyLock(
+    private val jdbc: JdbcTemplate,
+    private val tenantContext: TenantContext,
+) : HierarchyLock {
+
+    override fun acquire() {
+        val householdId = requireNotNull(tenantContext.currentHousehold()) {
+            "Tomar el cerrojo de jerarquia exige contexto de inquilino"
+        }
+
+        jdbc.queryForObject(
+            "SELECT pg_advisory_xact_lock(hashtext('drp.hierarchy'), hashtext(?))",
+            String::class.java,
+            householdId.toString(),
+        )
+    }
 }

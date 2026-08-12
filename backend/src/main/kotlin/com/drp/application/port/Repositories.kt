@@ -1,9 +1,16 @@
 package com.drp.application.port
 
+import com.drp.domain.catalog.Article
+import com.drp.domain.catalog.Category
 import com.drp.domain.household.Household
 import com.drp.domain.household.HouseholdMember
 import com.drp.domain.identity.EmailAddress
 import com.drp.domain.identity.Identity
+import com.drp.domain.inventory.Asset
+import com.drp.domain.inventory.AssetLocation
+import com.drp.domain.inventory.AssetStatus
+import com.drp.domain.inventory.AssetType
+import com.drp.domain.inventory.Location
 import com.drp.domain.invitation.Invitation
 import com.drp.domain.token.SingleUseToken
 import java.time.Instant
@@ -154,4 +161,158 @@ interface CategoryRepository {
     fun seed(names: List<String>, at: Instant)
 
     fun countCurrent(): Long
+
+    fun save(category: Category): Category
+
+    fun findById(categoryId: UUID): Category?
+
+    /**
+     * La categoria **vigente** que se llame asi, comparando sin distinguir
+     * mayusculas ni acentos.
+     *
+     * Normaliza con la misma funcion que el indice unico --`immutable_unaccent`,
+     * ver `V1__extensions.sql`--, y no con un `lowercase()` de Kotlin: dos formas
+     * distintas de normalizar significan que el caso de uso deja pasar nombres
+     * que la base de datos rechaza despues con un 500.
+     */
+    fun findLiveByName(name: String): Category?
+
+    fun list(includeRetired: Boolean, pagination: Pagination): Page<Category>
+}
+
+interface ArticleRepository {
+    fun save(article: Article): Article
+
+    fun findById(articleId: UUID): Article?
+
+    /** Unico en el hogar entre los vigentes, comparado sin mayusculas ni acentos. */
+    fun findLiveByName(name: String): Article?
+
+    /** El codigo de barras tambien es unico entre los vigentes, si se informa. */
+    fun findLiveByBarcode(barcode: String): Article?
+
+    fun list(filter: ArticleFilter, pagination: Pagination): Page<Article>
+
+    /**
+     * Cuantas existencias vivas le quedan.
+     *
+     * Sostiene las dos reglas que dependen de ello: la `unit` deja de ser
+     * modificable en cuanto hay cantidad contada en ella, y el articulo no se
+     * puede retirar mientras quede algo.
+     */
+    fun countLiveStockItems(articleId: UUID): Long
+}
+
+data class ArticleFilter(
+    val query: String? = null,
+    val categoryId: UUID? = null,
+    val barcode: String? = null,
+    val includeRetired: Boolean = false,
+)
+
+interface LocationRepository {
+    fun save(location: Location): Location
+
+    fun findById(locationId: UUID): Location?
+
+    /**
+     * Unico **entre hermanas**, no en todo el hogar: dos «Estanteria 2» pueden
+     * convivir en garajes distintos, pero no en el mismo. `parentLocationId` a
+     * nulo compara entre las raices, que es lo que cubre el `NULLS NOT DISTINCT`
+     * del indice.
+     */
+    fun findByNameAmongSiblings(name: String, parentLocationId: UUID?): Location?
+
+    /** Con [parentLocationId] a nulo y [onlyChildren] a false devuelve el hogar entero. */
+    fun list(parentLocationId: UUID?, onlyChildren: Boolean, pagination: Pagination): Page<Location>
+
+    fun countChildren(locationId: UUID): Long
+
+    fun countAssetsIn(locationId: UUID): Long
+
+    /**
+     * La cadena de ancestros de [locationId], del padre hacia la raiz.
+     *
+     * Es lo que sostiene la comprobacion anti-ciclo, que **no** es expresable como
+     * `CHECK`: una restriccion solo ve la fila que se inserta, y la pregunta aqui
+     * es por el camino entero hasta la raiz.
+     */
+    fun ancestorsOf(locationId: UUID): List<UUID>
+
+    /** Borrado **real**: una ubicacion vacia no deja historial que preservar. */
+    fun delete(locationId: UUID)
+}
+
+interface AssetRepository {
+    fun save(asset: Asset): Asset
+
+    fun findById(assetId: UUID): Asset?
+
+    fun list(filter: AssetFilter, pagination: Pagination): Page<Asset>
+
+    /**
+     * La existencia **viva** de [articleId] en esa ubicacion, si la hay.
+     *
+     * Es la consulta sobre la que descansa `RegisterConsumableIntake`, y su
+     * criterio es exactamente el del indice `assets_live_stock_item_unique`:
+     * mismo articulo, misma ubicacion --comparando nulos como iguales, de ahi el
+     * `NULLS NOT DISTINCT`-- y `status <> 'DECOMMISSIONED'`. Cualquier
+     * discrepancia con ese indice convierte una entrada normal en un 500.
+     */
+    fun findLiveStockItem(articleId: UUID, location: AssetLocation?): Asset?
+
+    /** Los assets que tienen a este como ubicacion. Impide darlo de baja con cosas dentro. */
+    fun countChildren(assetId: UUID): Long
+
+    /** La cadena de assets contenedores, del padre hacia arriba. Sostiene el anti-ciclo. */
+    fun ancestorsOf(assetId: UUID): List<UUID>
+
+    /** Cuantos assets vivos hay en esa ubicacion. Es lo que se compara con la capacidad declarada. */
+    fun countLiveIn(location: AssetLocation): Long
+
+    /** `ACTIVE` u `OVERDUE`: un vencido sigue ocupando el asset igual que uno al dia. */
+    fun hasOpenLoan(assetId: UUID): Boolean
+}
+
+data class AssetFilter(
+    val locationId: UUID? = null,
+    val parentAssetId: UUID? = null,
+    val ownerId: UUID? = null,
+    val status: AssetStatus? = null,
+    val type: AssetType? = null,
+    val articleId: UUID? = null,
+    val categoryId: UUID? = null,
+    /** Los huerfanos de una baja de usuario, que es la pregunta que deja abierta `DeactivateUser`. */
+    val withoutOwner: Boolean = false,
+)
+
+/**
+ * Lo unico que el Hito 2 necesita saber de un fichero: si se puede adjuntar.
+ *
+ * No hay entidad JPA de `files` ni la va a haber hasta el Hito 3, que es de quien
+ * son los ficheros (ADR-005). Mapear la tabla entera ahora seria adelantar
+ * trabajo de otro hito para responder una pregunta de si o no.
+ */
+interface StoredFileRepository {
+    /** Vivo, ya subido del todo y --por RLS-- de este hogar. */
+    fun existsUsable(fileId: UUID): Boolean
+}
+
+/**
+ * Serializa los cambios de jerarquia dentro de un hogar.
+ *
+ * Existe por un agujero que ni la base de datos ni la comprobacion anti-ciclo
+ * pueden cerrar por si solas: **dos peticiones simultaneas**. Colgar A de B y B
+ * de A a la vez pasa las dos comprobaciones --ninguna transaccion ve el cambio de
+ * la otra-- y deja un ciclo que despues nadie puede deshacer, porque recorrer la
+ * jerarquia no termina nunca.
+ *
+ * Un `SELECT ... FOR UPDATE` sobre las dos filas implicadas cerraria el ciclo de
+ * dos nodos y no el de tres. Con un cerrojo por hogar se cierran todos, y el
+ * precio es nulo en la practica: reorganizar la casa no es una operacion
+ * concurrida.
+ */
+interface HierarchyLock {
+    /** Se toma dentro de la transaccion y se suelta sola al cerrarla. */
+    fun acquire()
 }

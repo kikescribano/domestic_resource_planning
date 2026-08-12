@@ -54,6 +54,20 @@ class ApiExceptionHandler {
             .body(ErrorResponse(VALIDATION_ERROR, "El cuerpo o los parámetros no se pueden interpretar"))
 
     /**
+     * Lo que rechazan los `PATCH`, que leen el cuerpo como arbol JSON en crudo
+     * para poder distinguir «no menciones este campo» de «ponlo a nulo».
+     *
+     * Esa lectura no pasa por Bean Validation, asi que un enumerado inventado o
+     * un identificador mal formado llegan como `IllegalArgumentException`. Sin
+     * este manejador acabarian en el `catch` general y responderian `500`, que
+     * es mentir sobre de quien es la culpa: el cuerpo esta mal, no el servidor.
+     */
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun onMalformedValue(failure: IllegalArgumentException): ResponseEntity<ErrorResponse> =
+        ResponseEntity.badRequest()
+            .body(ErrorResponse(VALIDATION_ERROR, "El cuerpo no cumple el contrato"))
+
+    /**
      * Credenciales. `401` y no `403`: no se ha podido establecer quien eres.
      *
      * El cuerpo lleva codigo solo cuando el contrato lo declara --el caso del

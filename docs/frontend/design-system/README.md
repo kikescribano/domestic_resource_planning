@@ -19,18 +19,35 @@ visual:
   [`frontend/src/index.css`](../../../frontend/src/index.css), y los ratios de
   contraste medidos, en [`accessibility/`](../accessibility/README.md).
 
+Escrito al arrancar el Hito 2, que es cuando las primitivas se pusieron a prueba
+contra algo más que un formulario:
+
+- [`components/`](components/README.md) — anatomía, variantes, estados,
+  comportamiento y accesibilidad de los seis componentes que existen:
+  [botón](components/button.md), [campo](components/field.md),
+  [aviso](components/notice.md),
+  [distintivo de estado](components/status-badge.md),
+  [indicador de carga](components/spinner.md) y
+  [tarjeta de acceso](components/card.md).
+- [`patterns/`](patterns/README.md) — cómo se componen: [formulario](patterns/form.md),
+  [listado](patterns/listing.md), [jerarquía navegable](patterns/hierarchy.md),
+  [feedback](patterns/feedback.md) y [navegación](patterns/navigation.md).
+
 Previsto, y sin contenido todavía:
 
-- `components/`: anatomía, variantes, estados, comportamiento y accesibilidad.
-- `patterns/`: formularios, tablas, navegación, feedback y composición.
 - `content/`: terminología, voz, tono, etiquetas y mensajes.
 - `assets/`: iconos, logotipos y recursos con sus fuentes editables.
 
-> Los primeros componentes reales —botón, campo, aviso, distintivo de estado y el
-> shell responsive— ya existen en
-> [`frontend/src/ui/primitives.tsx`](../../../frontend/src/ui/primitives.tsx), pero
-> todavía no tienen ficha aquí: se escriben cuando el Hito 2 los ponga a prueba
-> contra listados largos, que es donde se sabrá si su anatomía aguanta.
+> **Lo que estas fichas dicen y lo que no.** Describen lo que
+> [`frontend/src/ui/primitives.tsx`](../../../frontend/src/ui/primitives.tsx)
+> hace hoy, no lo que convendría que hiciera: lo que el Hito 2 necesita y
+> todavía no está va en un apartado propio de «Lo que falta», marcado como
+> previsto. Dos de los cinco patrones —listado y jerarquía— **están previstos
+> enteros**, porque describen pantallas que aún no existen. Los componentes que el
+> hito va a pedir y no hay —`Select`, `Combobox`, `Skeleton`, `Toast`, `Dialog`,
+> `EmptyState` y `Pagination`— están listados en
+> [`components/`](components/README.md) sin ficha propia, para que no se escriba
+> antes de tiempo.
 
 ## Ficha mínima de un componente
 

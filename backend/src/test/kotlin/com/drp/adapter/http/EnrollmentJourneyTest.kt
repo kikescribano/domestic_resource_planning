@@ -1,5 +1,7 @@
 package com.drp.adapter.http
 
+import com.drp.application.event.IdempotentEventHandler
+import com.drp.domain.event.DomainEvent
 import com.drp.test.DrpMailpit
 import com.drp.test.SpringIntegrationTest
 import io.kotest.matchers.longs.shouldBeLessThan
@@ -12,14 +14,17 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.boot.test.web.client.exchange
+import org.springframework.context.annotation.Bean
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.system.measureTimeMillis
 
 /**
@@ -43,10 +48,32 @@ class EnrollmentJourneyTest : SpringIntegrationTest() {
 
     @Autowired private lateinit var http: TestRestTemplate
 
+    @Autowired private lateinit var households: HouseholdCreatedRecorder
+
     private val mailpit = DrpMailpit.instance
 
     @BeforeEach
-    fun emptyMailbox() = mailpit.clear()
+    fun emptyMailbox() {
+        mailpit.clear()
+        households.received.clear()
+    }
+
+    /**
+     * Hace de modulo suscrito, que es lo unico que puede comprobar que el evento
+     * sale de verdad: sin nadie escuchando, `HouseholdCreated` se publicaria en el
+     * vacio y la prueba pasaria igual.
+     */
+    @TestConfiguration
+    class Subscriber {
+        @Bean fun householdCreatedRecorder() = HouseholdCreatedRecorder()
+    }
+
+    class HouseholdCreatedRecorder : IdempotentEventHandler("HouseholdCreatedRecorder") {
+        val received = CopyOnWriteArrayList<DomainEvent>()
+        override fun handle(event: DomainEvent) {
+            received += event
+        }
+    }
 
     @Test
     @DisplayName("alta, correo, verificacion y sesion: el recorrido entero sin tocar la base de datos")
@@ -90,6 +117,13 @@ class EnrollmentJourneyTest : SpringIntegrationTest() {
         val users = http.getJson("/api/v1/users", accessToken)
         users.statusCode.shouldBe(HttpStatus.OK)
         users.body.shouldContain(email)
+
+        // 8. Y el hogar se anuncia al resto de la aplicacion **aqui**, al
+        //    verificar, que es cuando pasa a ser utilizable. No al insertar la
+        //    fila: un modulo activo no deberia sembrar datos para un hogar que
+        //    quiza no llegue a existir de verdad.
+        val announced = households.received.single { it.type == "HouseholdCreated" }
+        announced.aggregateId.shouldBe(announced.householdId.toString())
     }
 
     @Test
