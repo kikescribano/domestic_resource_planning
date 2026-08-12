@@ -897,7 +897,11 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Asset" }
         "409":
-          description: Conflicto de ubicación u otra regla de negocio
+          description: >
+            La ubicación indicada no sirve como contenedor
+            (ASSET_LOCATION_CONFLICT): solo un DURABLE puede alojar otros
+            assets, porque una estantería contiene cosas y un paquete de harina
+            no.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -938,7 +942,8 @@ paths:
               schema: { $ref: "#/components/schemas/Asset" }
         "409":
           description: >
-            Conflicto de ubicación, cantidad no positiva
+            La ubicación no sirve como contenedor
+            (ASSET_LOCATION_CONFLICT), cantidad no positiva
             (INTAKE_QUANTITY_NOT_POSITIVE) o artículo duplicado
             (ARTICLE_DUPLICATE)
           content:
@@ -990,8 +995,9 @@ paths:
               schema: { $ref: "#/components/schemas/Asset" }
         "409":
           description: >
-            Conflicto de ubicación, ciclo en la jerarquía, cantidad sobre un
-            asset DURABLE (ASSET_QUANTITY_NOT_APPLICABLE), cantidad negativa
+            La ubicación no sirve como contenedor (ASSET_LOCATION_CONFLICT),
+            ciclo en la jerarquía (LOCATION_CYCLE), cantidad sobre un asset
+            DURABLE (ASSET_QUANTITY_NOT_APPLICABLE), cantidad negativa
             (ASSET_QUANTITY_NEGATIVE) o mover una existencia a una ubicación
             que ya tiene otra viva del mismo artículo
             (EXISTENCE_ALREADY_IN_LOCATION), que se resuelve con
@@ -1754,7 +1760,7 @@ components:
       required: [page, size, total]
       description: >
         Metadatos de paginación, comunes a todas las colecciones. Son las mismas
-        en las diez sin excepción por tamaño esperado: una sola forma que
+        en las once sin excepción por tamaño esperado: una sola forma que
         aprender en el cliente, y ninguna migración el día que una lista que se
         creía pequeña deje de serlo.
       properties:
@@ -2248,8 +2254,41 @@ components:
                 - $ref: "#/components/schemas/MeasurementUnit"
               nullable: true
               description: Resuelta desde el artículo; solo presente si el asset lo tiene.
+            warnings:
+              type: array
+              description: >
+                Advertencias de la operación que acaba de tener éxito. Vacío en
+                el caso normal. NO son errores: la operación se hizo, la
+                respuesta es 200 o 201, y el asset devuelto es el estado real.
+                Existe porque hay una regla que advierte sin bloquear -- superar
+                la capacidad declarada de una ubicación (ver readme.md 4.1.2) --
+                y sin este campo no habría por dónde contarlo: el sistema no
+                sabe cuánto ocupa cada cosa, así que bloquear con datos
+                incompletos impediría guardar algo que sí cabe.
+              items: { $ref: "#/components/schemas/Warning" }
             createdAt: { type: string, format: date-time }
         - $ref: "#/components/schemas/Authorship"
+
+    Warning:
+      type: object
+      description: >
+        Un aviso que acompaña a una operación con éxito. El cliente decide qué
+        hacer por el code, igual que con los errores, y por el mismo motivo:
+        distinguir por el texto obliga a leer castellano.
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - LOCATION_CAPACITY_EXCEEDED
+          description: >
+            LOCATION_CAPACITY_EXCEEDED -- la ubicación declara una capacidad en
+            unidades y, contando este asset, se supera. Solo se comprueba con
+            capacidad de tipo UNITS: con peso o volumen no hay nada que contar
+            hasta que el asset lleve esos datos, que es del módulo Warehouse.
+        message:
+          type: string
+          description: Explicación para una persona, en el idioma de la instalación.
 
     LocationType:
       type: string
@@ -2498,8 +2537,11 @@ components:
         - $ref: "#/components/schemas/Authorship"
 
     # --- Colecciones paginadas -------------------------------------------
-    # Una por tipo, porque OpenAPI 3.0 no tiene genericos. Todas comparten
-    # PageMeta, asi que el cliente generado ve la misma forma en las diez.
+    # Nueve esquemas para once endpoints paginados: los dos listados de hijos
+    # --de un asset y de una ubicacion-- reutilizan el de su tipo, porque
+    # devuelven lo mismo acotado de otra forma. Uno por tipo y no uno generico
+    # porque OpenAPI 3.0 no tiene genericos. Todos comparten PageMeta, asi que
+    # el cliente generado ve la misma forma en las once.
 
     ArticlePage:
       allOf:

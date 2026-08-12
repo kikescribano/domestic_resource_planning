@@ -31,9 +31,11 @@ esquemas.
 ## Convenciones ya fijadas
 
 - **Versionado** en la ruta del servidor (`/api/v1`).
-- **Paginación uniforme** en las diez colecciones: envoltura
+- **Paginación uniforme** en las once colecciones: envoltura
   `{ items, page, size, total }` con parámetros `page` (desde 0) y `size`. Sin
-  excepción por tamaño esperado.
+  excepción por tamaño esperado. Son once endpoints y nueve esquemas `*Page`:
+  los dos listados de hijos —de un asset y de una ubicación— reutilizan el de su
+  tipo.
 - **Errores en dos familias.** Los de forma responden `400` con el código
   `VALIDATION_ERROR`; los de regla de negocio, `409` con su código concreto. Los
   41 códigos están **enumerados en el esquema**, no descritos en prosa.

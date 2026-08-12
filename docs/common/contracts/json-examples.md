@@ -38,6 +38,27 @@ El contrato completo, con todos los recursos, parámetros y esquemas de error, s
 ```
 > `categoryId` es lo que se escribe; `category` es su nombre resuelto para lectura. Mismo patrón que `name` y `unit` con el artículo: se guarda una vez y se resuelve al leer.
 
+**`POST /api/v1/assets`** — la misma alta, cuando la ubicación se queda corta (`201 Created`)
+```json
+{
+  "id": "7c44f8b1-...-000000000004",
+  "name": "Caja de tornillos",
+  "type": "DURABLE",
+  "categoryId": "c1a70de5-...-00000000000c",
+  "category": "Herramientas",
+  "location": { "type": "LOCATION", "id": "a5b3c7d1-...-000000000010" },
+  "status": "AVAILABLE",
+  "warnings": [
+    {
+      "code": "LOCATION_CAPACITY_EXCEEDED",
+      "message": "La ubicación declara un máximo de 20 unidades y ya contiene 21"
+    }
+  ],
+  "createdAt": "2026-08-12T09:00:00Z"
+}
+```
+> **El asset se ha creado**: es un `201`, no un `409`. Superar la capacidad declarada de una ubicación **advierte pero no bloquea** (ver 4.1.2), porque el sistema no sabe cuánto ocupa cada cosa —el asset no lleva peso ni volumen— y bloquear con datos incompletos impediría guardar algo que sí cabe. El aviso solo se calcula con capacidad de tipo `UNITS`, que es lo único que se puede contar con certeza. `warnings` va vacío en el caso normal, y aparece igual en `PATCH /assets/{id}` al mover un asset a una ubicación llena.
+
 **`POST /api/v1/documents`** — adjuntar el manual a un **artículo**, no a una unidad
 ```json
 {
