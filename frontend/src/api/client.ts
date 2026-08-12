@@ -280,12 +280,42 @@ interface RequestOptions {
   method?: string
   body?: unknown
   accessToken?: string | null
+  /**
+   * Interno. Lo pone a `false` lo que no debe disparar una renovación: la propia
+   * renovación —o se llamaría a sí misma— y el cierre de sesión, que ya viene de
+   * alguien que se va.
+   */
+  renewable?: boolean
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, accessToken } = options
+  const { method = 'GET', body, accessToken, renewable = true } = options
 
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await send(path, method, body, accessToken)
+
+  // La renovación se intenta **solo** ante el 401 que significa «tu token ya no
+  // vale», que el backend marca con el código `UNAUTHORIZED`. Los demás 401 son
+  // credenciales rechazadas —`CURRENT_PASSWORD_INVALID` al cambiar la contraseña,
+  // sin ir más lejos— y renovar ahí no arregla nada: gastaría un refresh token
+  // por una errata y, si esa renovación fallase, echaría de la aplicación a
+  // alguien que solo se equivocó tecleando.
+  if (response.status === 401 && accessToken && renewable) {
+    const rejection = await toApiError(response)
+    if (rejection.code !== 'UNAUTHORIZED') throw rejection
+
+    const renewed = await renewSession()
+    // Sin renovación no hay segundo intento: `renewSession` ya ha avisado de que
+    // la sesión se perdió, y repetir la petición solo daría el mismo 401.
+    if (!renewed) throw rejection
+
+    return readResponse<T>(await send(path, method, body, renewed))
+  }
+
+  return readResponse<T>(response)
+}
+
+function send(path: string, method: string, body: unknown, accessToken?: string | null) {
+  return fetch(`${BASE_URL}${path}`, {
     method,
     headers: {
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
@@ -293,7 +323,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
+}
 
+async function readResponse<T>(response: Response): Promise<T> {
   if (response.status === 204 || response.status === 202) {
     return undefined as T
   }
@@ -303,6 +335,74 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   return (await response.json()) as T
+}
+
+// --- Renovación de la sesión -------------------------------------------------
+
+/**
+ * Lo que el cliente HTTP necesita de la sesión para poder renovarla.
+ *
+ * Es un puente y no un `import` porque la dependencia va al revés: los
+ * componentes hablan con este módulo, no este módulo con React. El
+ * `SessionProvider` se registra al montar y se descuelga al desmontar.
+ */
+export interface SessionRenewal {
+  /** El refresh token vivo, o el que quedó guardado de una visita anterior. */
+  currentRefreshToken: () => string | null
+  /** Hay par nuevo: la sesión se actualiza y el refresh anterior ya no vale. */
+  onRenewed: (tokens: TokenPair) => void
+  /** No se ha podido renovar: la sesión se acabó y hay que decirlo. */
+  onSessionLost: () => void
+}
+
+let renewal: SessionRenewal | null = null
+let inFlight: Promise<string | null> | null = null
+
+export function connectSessionRenewal(next: SessionRenewal | null): void {
+  renewal = next
+  inFlight = null
+}
+
+/**
+ * Renueva el par de tokens, **una sola vez** aunque se pida a la vez desde
+ * varias peticiones.
+ *
+ * Compartir el intento no es una optimización: el backend **rota** los refresh
+ * tokens, así que usar uno invalida el anterior. Con una renovación por petición,
+ * cinco consultas caducando juntas —lo normal al volver a una pestaña abierta—
+ * lanzarían cinco renovaciones, la primera invalidaría el token que usan las
+ * otras cuatro, y esas cuatro cerrarían la sesión de alguien que la tenía
+ * perfectamente viva.
+ */
+function renewSession(): Promise<string | null> {
+  if (inFlight) return inFlight
+
+  const attempt = (async (): Promise<string | null> => {
+    const bridge = renewal
+    const refreshToken = bridge?.currentRefreshToken() ?? null
+    if (!bridge || !refreshToken) {
+      bridge?.onSessionLost()
+      return null
+    }
+
+    try {
+      const tokens = await api.refresh(refreshToken)
+      bridge.onRenewed(tokens)
+      return tokens.accessToken
+    } catch {
+      // Caducado, revocado o ya rotado: da igual cuál de los tres, porque el
+      // desenlace es el mismo y distinguirlos no cambiaría nada de lo que se
+      // puede hacer a continuación.
+      bridge.onSessionLost()
+      return null
+    }
+  })()
+
+  inFlight = attempt
+  void attempt.finally(() => {
+    if (inFlight === attempt) inFlight = null
+  })
+  return attempt
 }
 
 async function toApiError(response: Response): Promise<ApiError> {
@@ -354,10 +454,17 @@ export const api = {
     request<TokenPair>('/auth/login', { method: 'POST', body: { email, password } }),
 
   refresh: (refreshToken: string) =>
-    request<TokenPair>('/auth/refresh', { method: 'POST', body: { refreshToken } }),
+    request<TokenPair>('/auth/refresh', { method: 'POST', body: { refreshToken }, renewable: false }),
 
   logout: (refreshToken: string, accessToken: string) =>
-    request<void>('/auth/logout', { method: 'POST', body: { refreshToken }, accessToken }),
+    request<void>('/auth/logout', {
+      method: 'POST',
+      body: { refreshToken },
+      accessToken,
+      // Cerrar sesión con el access token ya caducado es normal --se cierra al
+      // volver tras un rato-- y renovarlo para poder cerrarlo no tiene sentido.
+      renewable: false,
+    }),
 
   // --- Contraseñas ----------------------------------------------------------
   requestPasswordReset: (email: string) =>

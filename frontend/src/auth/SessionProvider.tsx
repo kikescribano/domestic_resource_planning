@@ -1,6 +1,15 @@
-import { createContext, use, useCallback, useMemo, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  use,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 
-import { api, type TokenPair, type UserRole } from '../api/client'
+import { api, connectSessionRenewal, type TokenPair, type UserRole } from '../api/client'
 
 /**
  * La sesión del navegador.
@@ -34,6 +43,15 @@ interface SessionContextValue {
   session: Session | null
   isAuthenticated: boolean
   isAdmin: boolean
+  /**
+   * Cierto mientras se intenta reanudar con el token guardado, al cargar la
+   * página. Existe para que las rutas protegidas **esperen** en vez de mandar a
+   * la pantalla de entrar: sin él, recargar echaría a todo el mundo durante el
+   * instante que tarda la renovación, y esa redirección ya no se deshace.
+   */
+  isResuming: boolean
+  /** La sesión se perdió sola, no la cerró nadie. Lo lee la pantalla de entrar. */
+  sessionExpired: boolean
   signIn: (tokens: TokenPair) => void
   signOut: () => Promise<void>
 }
@@ -73,12 +91,18 @@ function readClaims(accessToken: string): SessionClaims | null {
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
+  const [sessionExpired, setSessionExpired] = useState(false)
+  // Se arranca reanudando siempre que haya algo guardado que probar. Decidirlo
+  // en el estado inicial y no en un efecto evita el parpadeo de un primer render
+  // «sin sesión» que ya habría redirigido.
+  const [isResuming, setIsResuming] = useState(() => storedRefreshToken() !== null)
 
   const signIn = useCallback((tokens: TokenPair) => {
     const claims = readClaims(tokens.accessToken)
     if (!claims) return
     localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken)
     setSession({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, claims })
+    setSessionExpired(false)
   }, [])
 
   const signOut = useCallback(async () => {
@@ -93,15 +117,84 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [session])
 
+  /**
+   * El puente con el cliente HTTP, que es quien detecta el `401` y necesita
+   * poder renovar sin conocer React.
+   *
+   * El refresh token se lee de una `ref` y no del estado a propósito: el puente
+   * se registra una sola vez, y leer del estado lo dejaría capturado en el valor
+   * que hubiera al montar. Con eso, la segunda renovación de la sesión usaría el
+   * token que la primera ya invalidó.
+   */
+  const live = useRef<Session | null>(session)
+  live.current = session
+
+  useEffect(() => {
+    connectSessionRenewal({
+      currentRefreshToken: () => live.current?.refreshToken ?? storedRefreshToken(),
+      onRenewed: signIn,
+      onSessionLost: () => {
+        // Solo se anuncia como caducada si de verdad había sesión: si no la
+        // había, quien llegue a la pantalla de entrar no ha perdido nada y no
+        // hay nada que explicarle.
+        if (live.current !== null) setSessionExpired(true)
+        forgetStoredRefreshToken()
+        setSession(null)
+      },
+    })
+    return () => connectSessionRenewal(null)
+  }, [signIn])
+
+  /**
+   * Reanudar al cargar la página, con lo que quedó guardado.
+   *
+   * Sin esto, el refresh token se escribía en `localStorage` y **no se leía
+   * nunca**: recargar la pestaña echaba de la aplicación aunque la sesión
+   * siguiera viva en el servidor.
+   */
+  useEffect(() => {
+    if (!isResuming) return
+
+    let cancelled = false
+    const stored = storedRefreshToken()
+    if (!stored) {
+      setIsResuming(false)
+      return
+    }
+
+    api
+      .refresh(stored)
+      .then((tokens) => {
+        if (!cancelled) signIn(tokens)
+      })
+      .catch(() => {
+        // Reanudar y fallar no es «te ha caducado la sesión»: es que lo guardado
+        // ya no servía, y quien abre la aplicación no estaba haciendo nada que
+        // se le haya interrumpido. Se limpia en silencio.
+        if (!cancelled) forgetStoredRefreshToken()
+      })
+      .finally(() => {
+        if (!cancelled) setIsResuming(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+    // Solo al montar: reanudar es una vez por carga de página.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const value = useMemo<SessionContextValue>(
     () => ({
       session,
       isAuthenticated: session !== null,
       isAdmin: session?.claims.role === 'HOUSEHOLD_ADMIN',
+      isResuming,
+      sessionExpired,
       signIn,
       signOut,
     }),
-    [session, signIn, signOut],
+    [session, isResuming, sessionExpired, signIn, signOut],
   )
 
   return <SessionContext value={value}>{children}</SessionContext>

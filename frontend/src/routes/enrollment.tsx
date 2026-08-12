@@ -263,7 +263,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<Error | null>(null)
-  const { signIn } = useSession()
+  const { signIn, sessionExpired } = useSession()
   const navigate = useNavigate()
 
   const needsVerification = error instanceof ApiError && error.code === 'EMAIL_NOT_VERIFIED'
@@ -285,6 +285,14 @@ export function LoginPage() {
   return (
     <AuthCard title="Entrar">
       <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
+        {/* Solo cuando la sesión se cayó sola. Quien llega aquí por su pie no ha
+            perdido nada y no necesita que se lo cuenten. El aviso desaparece en
+            cuanto hay error de credenciales, para no apilar dos mensajes. */}
+        {sessionExpired && !error && (
+          <Notice tone="warning">
+            Tu sesión ha caducado por inactividad. Vuelve a entrar y seguirás donde estabas.
+          </Notice>
+        )}
         {error && (
           <Notice tone={needsVerification ? 'warning' : 'danger'}>
             {messageFor(error)}

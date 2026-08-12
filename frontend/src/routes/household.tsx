@@ -24,7 +24,19 @@ const NAVIGATION = [
 ]
 
 export function RequireSession() {
-  const { isAuthenticated } = useSession()
+  const { isAuthenticated, isResuming } = useSession()
+
+  // Mientras se reanuda **no** se decide nada. Redirigir aquí sería irreversible:
+  // para cuando la renovación termina, la navegación ya ocurrió y el usuario está
+  // mirando la pantalla de entrar con una sesión perfectamente válida.
+  if (isResuming) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center px-gutter">
+        <Spinner label="Recuperando tu sesión" />
+      </div>
+    )
+  }
+
   if (!isAuthenticated) return <Navigate to="/entrar" replace />
   return <HouseholdShell />
 }
