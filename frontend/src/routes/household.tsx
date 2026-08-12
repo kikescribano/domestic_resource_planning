@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { NavLink, Navigate, Outlet, useNavigate } from 'react-router'
+import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router'
 
 import { ApiError, api, type UserRole } from '../api/client'
 import { useAuthenticatedSession, useSession } from '../auth/SessionProvider'
@@ -99,9 +99,11 @@ export function HomePage() {
   return (
     <>
       <PageHeading title="Tu hogar" />
-      <Notice tone="info" title="El inventario llega en el próximo hito">
-        Por ahora puedes gestionar quién entra en el hogar y tu propia cuenta. Los
-        assets, las ubicaciones y el catálogo son el Hito 2.
+      <Notice tone="info" title="Por dónde empezar">
+        Crea primero las <Link to="/ubicaciones" className="underline">ubicaciones</Link> —la vivienda y
+        lo que hay dentro— y el <Link to="/catalogo" className="underline">catálogo</Link> de lo que
+        sueles tener en casa. Con eso, dar de alta algo en el{' '}
+        <Link to="/inventario" className="underline">inventario</Link> es elegir de una lista.
       </Notice>
       <dl className="mt-6 grid gap-4 sm:grid-cols-2">
         <div className="rounded-lg border border-border-subtle bg-surface-raised p-4">
