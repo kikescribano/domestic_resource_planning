@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Ejecución de la Fase 1 |
-| Última revisión | 2026-08-10 |
+| Última revisión | 2026-08-12 |
 
 > El estado de **las fases** vive en la sección 8 del
 > [`README principal`](../../../README.md), y solo allí. Este documento baja al
@@ -127,12 +127,43 @@ ADR-009.
 > se parece a la causa. Se fija con `systemProperty("api.version", ...)` en
 > `backend/build.gradle.kts`.
 
-### Hito 2 — Catálogo, ubicaciones y assets · Pendiente
+### Hito 2 — Catálogo, ubicaciones y assets · **Completado (2026-08-12)**
 
-- Categorías, artículos y ubicaciones con su CRUD completo; assets con sus dos naturalezas; entrada de consumible, movimiento, fusión, ajuste y baja.
-- Las validaciones que la base de datos no puede garantizar van en el caso de uso: anti-ciclo de las dos jerarquías, que la ubicación destino sea `DURABLE`, y que el aviso de capacidad **advierta sin bloquear**.
-- Event bus: puerto propio sobre `ApplicationEventPublisher`, con handlers idempotentes desde el principio.
-- Frontend: árbol de ubicaciones, ficha de asset y las operaciones de existencias.
+- [x] **Las 23 operaciones del contrato** que caen en este hito, con sus casos de uso: cuatro de categorías, cinco de artículos, seis de ubicaciones y ocho de assets. Son más casos de uso que endpoints, porque `MoveAsset` y `AdjustAssetQuantity` no tienen ruta propia: los dos entran por `PATCH /assets/{id}`, que despacha según lo que traiga el cuerpo.
+- [x] **Las dos naturalezas**, con la entrada que suma sobre la existencia, la fusión, el ajuste absoluto y la baja lógica que da por perdido lo que quedaba.
+- [x] **Las tres validaciones que la base de datos no puede garantizar**: anti-ciclo de las dos jerarquías —con el mismo helper, probado hasta el ciclo de tres nodos—, que la ubicación destino sea `DURABLE`, y el aviso de capacidad, que **advierte sin bloquear**.
+- [x] **Event bus**: puerto propio sobre `ApplicationEventPublisher`, con la clase base que resuelve las tres garantías —entrega tras el commit, aislamiento del fallo e idempotencia por `eventId`—. Publica los siete eventos del catálogo que tocan a este hito y el `HouseholdCreated` que el Hito 1 dejó esperando.
+- [x] **Frontend**: catálogo, árbol de ubicaciones, ficha de asset y las cinco operaciones de existencias, sobre las primitivas del Hito 1 y con dos nuevas, `SelectField` y `EmptyState`.
+- [x] **Las fichas del sistema de diseño** que el Hito 1 aplazó «hasta que un listado largo pusiera a prueba su anatomía»: las seis primitivas reales y seis patrones, con los que describen pantallas que aún no existen marcados como previstos.
+
+> **Cuatro decisiones que la definición no preveía y que hubo que tomar al
+> implementar.** Están razonadas en [`decisions.md`](decisions.md):
+>
+> - **El aviso de capacidad no tenía por dónde salir.** El esquema `Asset` no
+>   llevaba ningún campo de aviso y las respuestas son un `Asset` pelado. Se
+>   añade un array `warnings` al contrato: un `201` **con** advertencia, que no
+>   es lo mismo que un `409`.
+> - **El puerto del bus solo publica.** El boceto de la Fase 0 dibujaba también
+>   un `subscribe`, que no se implementa: sobre `ApplicationEventPublisher` la
+>   suscripción es declarativa, y un registro propio en paralelo daría dos
+>   mecanismos para lo mismo.
+> - **El sobre del evento lleva `householdId`**, un campo más que el boceto. Un
+>   handler corre `AFTER_COMMIT`, cuando ya no queda contexto de inquilino del
+>   que deducirlo.
+> - **Las fotos por fichero responden 404 hasta el Hito 3.** `photoUrl` funciona
+>   desde ya —es una columna de texto—; `photoFileId` se resuelve contra `files`,
+>   que no puede tener filas todavía.
+>
+> **Y tres cosas que solo se vieron ejecutando**, no leyendo: `Patch.Absent` como
+> `Patch<Nothing>` generaba un puente cuyo retorno se casteaba a `Void` y
+> reventaba en tiempo de ejecución compilando sin una queja; Hibernate se
+> construye su propio `ObjectMapper` sin el módulo de Kotlin, así que escribía
+> los `jsonb` y **no sabía leerlos**; y una propiedad calculada del dominio se
+> estaba serializando como una clave más dentro de una columna `jsonb` y en la
+> respuesta de la API, donde el contrato no la declara. Esa última la caza una
+> prueba que le pregunta a PostgreSQL qué claves hay de verdad: las de recorrido
+> no podían, porque escriben y leen con el mismo código y se equivocan igual en
+> los dos sentidos.
 
 ### Hito 3 — Ficheros y documentos · Pendiente
 
@@ -164,5 +195,6 @@ No son olvidos: están anotados con motivo en
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-12 | **Hito 2 completado.** Las 23 operaciones de catálogo, ubicaciones y assets; las dos naturalezas con entrada, fusión, ajuste y baja; las tres validaciones que la base de datos no puede garantizar; el event bus con handlers idempotentes y los ocho eventos; y el cliente web de las cuatro pantallas. Se anotan las cuatro decisiones que hubo que tomar al implementar y las tres cosas que solo se vieron ejecutando. |
 | 2026-08-11 | **Hito 1 completado.** Esquema completo, RLS con `FORCE`, `TenantContext`, Argon2id y JWT, las 16 operaciones del enrolamiento, limitador de frecuencia y los flujos de frontend sobre un sistema de diseño con las ocho dimensiones cerradas. Se anotan las tres decisiones que hubo que tomar al implementar y que la definición no preveía. |
 | 2026-08-10 | Se crea al arrancar la Fase 1, con el detalle de los hitos trasladado desde la sección 8.2 del README. Hito 0 completado. |
