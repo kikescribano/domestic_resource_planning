@@ -12,6 +12,7 @@ import com.drp.application.port.PasswordResetTokenRepository
 import com.drp.application.port.RefreshTokenRepository
 import com.drp.application.port.TenantResolver
 import com.drp.application.tenant.TenantContext
+import com.drp.domain.catalog.Category
 import com.drp.domain.household.Household
 import com.drp.domain.household.HouseholdMember
 import com.drp.domain.household.MemberRole
@@ -20,6 +21,7 @@ import com.drp.domain.identity.Identity
 import com.drp.domain.invitation.Invitation
 import com.drp.domain.token.SingleUseToken
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.time.Instant
@@ -377,4 +379,56 @@ class CategoryRepositoryAdapter(
     }
 
     override fun countCurrent(): Long = categories.count()
+
+    /**
+     * El `household_id` lo pone el contexto, nunca el objeto de dominio --que por
+     * eso no lo lleva-- ni un parametro. Al modificar se conserva el que ya tenia
+     * la fila, que es el mismo: la politica no habria dejado leerla si no.
+     */
+    override fun save(category: Category): Category {
+        val householdId = requireNotNull(tenantContext.currentHousehold()) {
+            "Guardar una categoria exige contexto de inquilino"
+        }
+
+        return categories.save(
+            CategoryEntity(
+                id = category.id,
+                householdId = householdId,
+                name = category.name,
+                notes = category.notes,
+                createdAt = category.createdAt,
+                updatedAt = category.updatedAt,
+                retiredAt = category.retiredAt,
+                createdBy = category.createdBy,
+                updatedBy = category.updatedBy,
+            ),
+        ).toDomain()
+    }
+
+    override fun findById(categoryId: UUID): Category? =
+        categories.findById(categoryId).orElse(null)?.toDomain()
+
+    override fun findLiveByName(name: String): Category? =
+        categories.findLiveByNormalizedName(name)?.toDomain()
+
+    override fun list(includeRetired: Boolean, pagination: Pagination): Page<Category> {
+        val request = PageRequest.of(pagination.page, pagination.size, Sort.by("name"))
+        val found = if (includeRetired) {
+            categories.findAll(request)
+        } else {
+            categories.findAllByRetiredAtIsNull(request)
+        }
+        return Page(found.content.map { it.toDomain() }, pagination.page, pagination.size, found.totalElements)
+    }
 }
+
+internal fun CategoryEntity.toDomain() = Category(
+    id = id,
+    name = name,
+    notes = notes,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    retiredAt = retiredAt,
+    createdBy = createdBy,
+    updatedBy = updatedBy,
+)

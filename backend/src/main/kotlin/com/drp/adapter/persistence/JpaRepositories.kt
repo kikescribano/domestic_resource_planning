@@ -126,4 +126,28 @@ interface RefreshTokenJpaRepository : JpaRepository<RefreshTokenEntity, UUID> {
     )
 }
 
-interface CategoryJpaRepository : JpaRepository<CategoryEntity, UUID>
+interface CategoryJpaRepository : JpaRepository<CategoryEntity, UUID> {
+
+    /**
+     * Normaliza con `immutable_unaccent`, que es **la misma funcion que usa el
+     * indice unico** `categories_name_unique_live`. De ahi que sea una consulta
+     * nativa y no JPQL: JPQL no sabe llamar a una funcion del esquema, y
+     * comparar aqui con `lower()` a secas dejaria pasar «Bricolaje» frente a
+     * «bricolage» --que el indice si rechaza-- y convertiria un 409 limpio en un
+     * 500 por violacion de restriccion.
+     *
+     * Sin `WHERE household_id`, como el resto: lo pone la politica de RLS.
+     */
+    @Query(
+        value = """
+            SELECT * FROM categories
+            WHERE lower(immutable_unaccent(name)) = lower(immutable_unaccent(:name))
+              AND retired_at IS NULL
+            LIMIT 1
+        """,
+        nativeQuery = true,
+    )
+    fun findLiveByNormalizedName(@Param("name") name: String): CategoryEntity?
+
+    fun findAllByRetiredAtIsNull(pageable: Pageable): org.springframework.data.domain.Page<CategoryEntity>
+}

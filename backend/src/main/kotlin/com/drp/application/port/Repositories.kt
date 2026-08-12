@@ -1,5 +1,6 @@
 package com.drp.application.port
 
+import com.drp.domain.catalog.Category
 import com.drp.domain.household.Household
 import com.drp.domain.household.HouseholdMember
 import com.drp.domain.identity.EmailAddress
@@ -154,4 +155,21 @@ interface CategoryRepository {
     fun seed(names: List<String>, at: Instant)
 
     fun countCurrent(): Long
+
+    fun save(category: Category): Category
+
+    fun findById(categoryId: UUID): Category?
+
+    /**
+     * La categoria **vigente** que se llame asi, comparando sin distinguir
+     * mayusculas ni acentos.
+     *
+     * Normaliza con la misma funcion que el indice unico --`immutable_unaccent`,
+     * ver `V1__extensions.sql`--, y no con un `lowercase()` de Kotlin: dos formas
+     * distintas de normalizar significan que el caso de uso deja pasar nombres
+     * que la base de datos rechaza despues con un 500.
+     */
+    fun findLiveByName(name: String): Category?
+
+    fun list(includeRetired: Boolean, pagination: Pagination): Page<Category>
 }

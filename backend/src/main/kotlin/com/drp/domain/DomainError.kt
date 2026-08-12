@@ -8,16 +8,35 @@ package com.drp.domain
  * contrato, no un caso que el frontend deba adivinar, asi que este enumerado
  * existe para que anadir uno obligue a tocar tambien el contrato.
  *
- * Solo estan los que el Hito 1 puede producir. Los del catalogo, los ficheros y
- * los prestamos entran con sus hitos.
+ * Estan los del Hito 1 --enrolamiento-- y los del Hito 2 --catalogo, ubicaciones
+ * y assets--. Los de ficheros y prestamos entran con los suyos.
  */
 enum class ErrorCode {
     ALREADY_MEMBER,
+    ARTICLE_DUPLICATE,
+    ARTICLE_HAS_EXISTENCES,
+    ARTICLE_UNIT_IMMUTABLE,
+    ASSET_HAS_ACTIVE_LOAN,
+    ASSET_HAS_CHILDREN,
+    ASSET_LOCATION_CONFLICT,
+    ASSET_QUANTITY_NEGATIVE,
+    ASSET_QUANTITY_NOT_APPLICABLE,
+    CATEGORY_DUPLICATE,
     CURRENT_PASSWORD_INVALID,
     EMAIL_NOT_VERIFIED,
+    EXISTENCE_ALREADY_IN_LOCATION,
     IDENTITY_ALREADY_MEMBER,
+    INTAKE_QUANTITY_NOT_POSITIVE,
     INVITATION_ALREADY_PENDING,
     INVITATION_TOKEN_INVALID,
+    LOCATION_CYCLE,
+    LOCATION_DUPLICATE,
+    LOCATION_HAS_ASSETS,
+    LOCATION_HAS_CHILDREN,
+    MERGE_ARTICLE_MISMATCH,
+    MERGE_ASSET_DEACTIVATED,
+    MERGE_NOT_CONSUMABLE,
+    MERGE_SAME_ASSET,
     RESET_TOKEN_INVALID,
     USER_LAST_ADMIN,
     VERIFICATION_TOKEN_INVALID,

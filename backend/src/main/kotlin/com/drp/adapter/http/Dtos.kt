@@ -3,6 +3,7 @@ package com.drp.adapter.http
 import com.drp.application.TokenPair
 import com.drp.application.port.Page
 import com.drp.application.usecase.HouseholdUser
+import com.drp.domain.catalog.Category
 import com.drp.domain.household.MemberRole
 import com.drp.domain.invitation.Invitation
 import jakarta.validation.Valid
@@ -145,6 +146,33 @@ data class UserResponse(
             deactivatedAt = user.member.deactivatedAt,
             createdBy = user.member.createdBy,
             updatedBy = user.member.updatedBy,
+        )
+    }
+}
+
+data class CategoryInput(
+    @field:NotBlank @field:Size(max = 120) val name: String,
+    val notes: String? = null,
+)
+
+data class CategoryResponse(
+    val id: UUID,
+    val name: String,
+    val notes: String?,
+    val createdAt: Instant,
+    val retiredAt: Instant?,
+    val createdBy: UUID?,
+    val updatedBy: UUID?,
+) {
+    companion object {
+        fun of(category: Category) = CategoryResponse(
+            id = category.id,
+            name = category.name,
+            notes = category.notes,
+            createdAt = category.createdAt,
+            retiredAt = category.retiredAt,
+            createdBy = category.createdBy,
+            updatedBy = category.updatedBy,
         )
     }
 }
