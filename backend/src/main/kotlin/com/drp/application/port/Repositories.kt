@@ -6,6 +6,10 @@ import com.drp.domain.household.Household
 import com.drp.domain.household.HouseholdMember
 import com.drp.domain.identity.EmailAddress
 import com.drp.domain.identity.Identity
+import com.drp.domain.inventory.Asset
+import com.drp.domain.inventory.AssetLocation
+import com.drp.domain.inventory.AssetStatus
+import com.drp.domain.inventory.AssetType
 import com.drp.domain.inventory.Location
 import com.drp.domain.invitation.Invitation
 import com.drp.domain.token.SingleUseToken
@@ -238,6 +242,49 @@ interface LocationRepository {
     /** Borrado **real**: una ubicacion vacia no deja historial que preservar. */
     fun delete(locationId: UUID)
 }
+
+interface AssetRepository {
+    fun save(asset: Asset): Asset
+
+    fun findById(assetId: UUID): Asset?
+
+    fun list(filter: AssetFilter, pagination: Pagination): Page<Asset>
+
+    /**
+     * La existencia **viva** de [articleId] en esa ubicacion, si la hay.
+     *
+     * Es la consulta sobre la que descansa `RegisterConsumableIntake`, y su
+     * criterio es exactamente el del indice `assets_live_stock_item_unique`:
+     * mismo articulo, misma ubicacion --comparando nulos como iguales, de ahi el
+     * `NULLS NOT DISTINCT`-- y `status <> 'DECOMMISSIONED'`. Cualquier
+     * discrepancia con ese indice convierte una entrada normal en un 500.
+     */
+    fun findLiveStockItem(articleId: UUID, location: AssetLocation?): Asset?
+
+    /** Los assets que tienen a este como ubicacion. Impide darlo de baja con cosas dentro. */
+    fun countChildren(assetId: UUID): Long
+
+    /** La cadena de assets contenedores, del padre hacia arriba. Sostiene el anti-ciclo. */
+    fun ancestorsOf(assetId: UUID): List<UUID>
+
+    /** Cuantos assets vivos hay en esa ubicacion. Es lo que se compara con la capacidad declarada. */
+    fun countLiveIn(location: AssetLocation): Long
+
+    /** `ACTIVE` u `OVERDUE`: un vencido sigue ocupando el asset igual que uno al dia. */
+    fun hasOpenLoan(assetId: UUID): Boolean
+}
+
+data class AssetFilter(
+    val locationId: UUID? = null,
+    val parentAssetId: UUID? = null,
+    val ownerId: UUID? = null,
+    val status: AssetStatus? = null,
+    val type: AssetType? = null,
+    val articleId: UUID? = null,
+    val categoryId: UUID? = null,
+    /** Los huerfanos de una baja de usuario, que es la pregunta que deja abierta `DeactivateUser`. */
+    val withoutOwner: Boolean = false,
+)
 
 /**
  * Lo unico que el Hito 2 necesita saber de un fichero: si se puede adjuntar.

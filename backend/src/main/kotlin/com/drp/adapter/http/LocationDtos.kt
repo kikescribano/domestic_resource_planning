@@ -140,6 +140,9 @@ class JsonPatch(private val body: JsonNode) {
 
     private fun node(field: String): JsonNode? = body.get(field)?.takeUnless { it.isNull }
 
+    /** Para los campos con estructura propia, que cada recurso interpreta a su manera. */
+    fun rawNode(field: String): JsonNode? = node(field)
+
     fun text(field: String): Patch<String?> =
         if (!has(field)) Patch.Absent else Patch.Set(node(field)?.asText())
 
@@ -155,6 +158,17 @@ class JsonPatch(private val body: JsonNode) {
 
     fun decimal(field: String): Patch<BigDecimal?> =
         if (!has(field)) Patch.Absent else Patch.Set(node(field)?.decimalValue())
+
+    /** Para los numeros que se pueden cambiar pero no vaciar, como la cantidad de una existencia. */
+    fun requiredDecimal(field: String): Patch<BigDecimal> =
+        if (!has(field)) {
+            Patch.Absent
+        } else {
+            Patch.Set(
+                node(field)?.decimalValue()
+                    ?: throw IllegalArgumentException("El campo $field no admite nulo"),
+            )
+        }
 
     inline fun <reified E : Enum<E>> enum(field: String): Patch<E> =
         if (!has(field)) Patch.Absent else Patch.Set(enumValueOf(rawText(field)))

@@ -2,6 +2,8 @@ package com.drp.adapter.persistence
 
 import com.drp.application.port.ArticleFilter
 import com.drp.application.port.ArticleRepository
+import com.drp.application.port.AssetFilter
+import com.drp.application.port.AssetRepository
 import com.drp.application.port.CategoryRepository
 import com.drp.application.port.EmailVerificationTokenRepository
 import com.drp.application.port.HierarchyLock
@@ -24,6 +26,8 @@ import com.drp.domain.household.HouseholdMember
 import com.drp.domain.household.MemberRole
 import com.drp.domain.identity.EmailAddress
 import com.drp.domain.identity.Identity
+import com.drp.domain.inventory.Asset
+import com.drp.domain.inventory.AssetLocation
 import com.drp.domain.inventory.Location
 import com.drp.domain.invitation.Invitation
 import com.drp.domain.token.SingleUseToken
@@ -436,6 +440,94 @@ internal fun CategoryEntity.toDomain() = Category(
     createdAt = createdAt,
     updatedAt = updatedAt,
     retiredAt = retiredAt,
+    createdBy = createdBy,
+    updatedBy = updatedBy,
+)
+
+@Repository
+class AssetRepositoryAdapter(
+    private val assets: AssetJpaRepository,
+    private val tenantContext: TenantContext,
+) : AssetRepository {
+
+    override fun save(asset: Asset): Asset {
+        val householdId = requireNotNull(tenantContext.currentHousehold()) {
+            "Guardar un asset exige contexto de inquilino"
+        }
+
+        return assets.save(
+            AssetEntity(
+                id = asset.id,
+                householdId = householdId,
+                articleId = asset.articleId,
+                categoryId = asset.categoryId,
+                name = asset.name,
+                type = asset.type,
+                ownerId = asset.ownerId,
+                locationAssetId = asset.location?.assetId,
+                locationId = asset.location?.locationId,
+                quantity = asset.quantity,
+                status = asset.status,
+                serialNumber = asset.serialNumber,
+                acquiredOn = asset.acquiredOn,
+                photoUrl = asset.photoUrl,
+                photoFileId = asset.photoFileId,
+                notes = asset.notes,
+                createdAt = asset.createdAt,
+                updatedAt = asset.updatedAt,
+                createdBy = asset.createdBy,
+                updatedBy = asset.updatedBy,
+            ),
+        ).toDomain()
+    }
+
+    override fun findById(assetId: UUID): Asset? = assets.findById(assetId).orElse(null)?.toDomain()
+
+    override fun findLiveStockItem(articleId: UUID, location: AssetLocation?): Asset? =
+        assets.findLiveStockItem(articleId, location?.assetId, location?.locationId)?.toDomain()
+
+    override fun countChildren(assetId: UUID): Long = assets.countLiveChildren(assetId)
+
+    override fun ancestorsOf(assetId: UUID): List<UUID> = assets.ancestorIdsOf(assetId)
+
+    override fun countLiveIn(location: AssetLocation): Long =
+        assets.countLiveIn(location.assetId, location.locationId)
+
+    override fun hasOpenLoan(assetId: UUID): Boolean = assets.countOpenLoans(assetId) > 0
+
+    override fun list(filter: AssetFilter, pagination: Pagination): Page<Asset> {
+        val found = assets.search(
+            locationId = filter.locationId,
+            parentAssetId = filter.parentAssetId,
+            ownerId = filter.ownerId,
+            withoutOwner = filter.withoutOwner,
+            status = filter.status?.name,
+            type = filter.type?.name,
+            articleId = filter.articleId,
+            categoryId = filter.categoryId,
+            pageable = PageRequest.of(pagination.page, pagination.size),
+        )
+        return Page(found.content.map { it.toDomain() }, pagination.page, pagination.size, found.totalElements)
+    }
+}
+
+internal fun AssetEntity.toDomain() = Asset(
+    id = id,
+    type = type,
+    articleId = articleId,
+    name = name,
+    categoryId = categoryId,
+    ownerId = ownerId,
+    location = AssetLocation.from(locationAssetId, locationId),
+    status = status,
+    quantity = quantity,
+    serialNumber = serialNumber,
+    acquiredOn = acquiredOn,
+    photoUrl = photoUrl,
+    photoFileId = photoFileId,
+    notes = notes,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
     createdBy = createdBy,
     updatedBy = updatedBy,
 )

@@ -1,0 +1,670 @@
+package com.drp.adapter.http
+
+import com.drp.test.SpringIntegrationTest
+import com.drp.test.TestHousehold
+import com.drp.test.deleteJson
+import com.drp.test.extract
+import com.drp.test.getJson
+import com.drp.test.patchJson
+import com.drp.test.postJson
+import com.drp.test.registerHousehold
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.web.client.TestRestTemplate
+import org.springframework.http.HttpStatus
+
+/**
+ * Las ocho operaciones de assets, con sus dos naturalezas.
+ *
+ * Es la pieza mas acoplada del hito: la entrada, la fusion y el ajuste dependen
+ * del **mismo** indice unico parcial de existencias, asi que probarlas por
+ * separado no diria si encajan. De ahi que el recorrido principal las encadene.
+ */
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AssetJourneyTest : SpringIntegrationTest() {
+
+    @Autowired private lateinit var http: TestRestTemplate
+
+    // ----------------------------------------------------------------------
+    // DURABLE
+    // ----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("alta de un duradero, composicion, movimiento y baja")
+    fun `el recorrido de un asset durable`() {
+        val home = http.registerHousehold()
+        val room = home.createLocation("""{"name":"Trastero","type":"ROOM"}""")
+
+        val shelf = home.createAsset(
+            """{"name":"Estantería de trastero","type":"DURABLE","categoryId":"${home.category("Mobiliario")}",
+                "location":{"type":"LOCATION","id":"$room"}}""",
+        )
+
+        // Un DURABLE si puede alojar a otros: eso es la composicion.
+        val box = home.createAsset(
+            """{"name":"Caja de herramientas","type":"DURABLE","categoryId":"${home.category("Herramientas")}",
+                "location":{"type":"ASSET","id":"$shelf"}}""",
+        )
+
+        val children = http.getJson("/api/v1/assets/$shelf/children", home.accessToken)
+        children.statusCode.shouldBe(HttpStatus.OK)
+        children.body!!.shouldContain("Caja de herramientas")
+
+        // No se da de baja algo que tiene cosas dentro.
+        val blocked = http.deleteJson("/api/v1/assets/$shelf", home.accessToken)
+        blocked.statusCode.shouldBe(HttpStatus.CONFLICT)
+        blocked.body!!.shouldContain("ASSET_HAS_CHILDREN")
+
+        // Sacar la caja de la estanteria y ponerla en el suelo del trastero.
+        val moved = http.patchJson(
+            "/api/v1/assets/$box",
+            """{"location":{"type":"LOCATION","id":"$room"}}""",
+            home.accessToken,
+        )
+        moved.statusCode.shouldBe(HttpStatus.OK)
+        moved.body!!.shouldContain("\"type\":\"LOCATION\"")
+
+        // Y ahora si.
+        http.deleteJson("/api/v1/assets/$shelf", home.accessToken).statusCode.shouldBe(HttpStatus.NO_CONTENT)
+
+        // La baja es logica: fuera del listado por defecto, dentro pidiendo el estado.
+        http.getJson("/api/v1/assets", home.accessToken).body!!.shouldNotContain("Estantería")
+        http.getJson("/api/v1/assets?status=DECOMMISSIONED", home.accessToken)
+            .body!!.shouldContain("Estantería")
+    }
+
+    @Test
+    @DisplayName("un consumible no se da de alta por POST /assets: su alta es una entrada")
+    fun `el alta de consumible no pasa por aqui`() {
+        val home = http.registerHousehold()
+
+        val rejected = http.postJson(
+            "/api/v1/assets",
+            """{"name":"Arroz","type":"CONSUMABLE","categoryId":"${home.category("Alimentación")}"}""",
+            home.accessToken,
+        )
+
+        rejected.statusCode.shouldBe(HttpStatus.BAD_REQUEST)
+    }
+
+    @Test
+    @DisplayName("sin articleId, el nombre y la categoria son obligatorios")
+    fun `un asset sin articulo tiene que informar nombre y categoria`() {
+        val home = http.registerHousehold()
+
+        http.postJson("/api/v1/assets", """{"type":"DURABLE"}""", home.accessToken)
+            .statusCode.shouldBe(HttpStatus.BAD_REQUEST)
+    }
+
+    @Test
+    @DisplayName("con articulo, el nombre y la categoria se resuelven desde el y no se guardan por duplicado")
+    fun `lo heredado del articulo se resuelve al leer`() {
+        val home = http.registerHousehold()
+        val article = home.createArticle(
+            """{"name":"Taladro GSB 13","categoryId":"${home.category("Herramientas")}","unit":"UNIT",
+                "brand":"Bosch"}""",
+        )
+
+        val asset = home.createAsset("""{"type":"DURABLE","articleId":"$article"}""")
+
+        val read = http.getJson("/api/v1/assets/$asset", home.accessToken)
+        read.body!!.shouldContain("Taladro GSB 13")
+        read.body!!.shouldContain("\"category\":\"Herramientas\"")
+
+        // Y renombrar el articulo cambia lo que se lee del asset, porque no hay
+        // copia: hay resolucion.
+        http.patchJson("/api/v1/articles/$article", """{"name":"Taladro Bosch GSB 13"}""", home.accessToken)
+        http.getJson("/api/v1/assets/$asset", home.accessToken).body!!.shouldContain("Taladro Bosch GSB 13")
+    }
+
+    // ----------------------------------------------------------------------
+    // CONSUMABLE: entrada, ajuste y fusion
+    // ----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("dar entrada dos veces del mismo articulo en la misma ubicacion deja UNA existencia con la suma")
+    fun `la entrada suma sobre la existencia`() {
+        val home = http.registerHousehold()
+        val pantry = home.createLocation("""{"name":"Despensa","type":"ROOM"}""")
+        val sugar = home.createArticle(
+            """{"name":"Azúcar","categoryId":"${home.category("Alimentación")}","unit":"GRAM"}""",
+        )
+
+        val first = http.postJson(
+            "/api/v1/assets/intake",
+            """{"articleId":"$sugar","ownerId":"${home.memberId}","quantity":300,
+                "location":{"type":"LOCATION","id":"$pantry"}}""",
+            home.accessToken,
+        )
+        // La primera crea: 201 y AssetCreated.
+        first.statusCode.shouldBe(HttpStatus.CREATED)
+        val stockItem = first.body!!.extract("id")
+
+        val second = http.postJson(
+            "/api/v1/assets/intake",
+            """{"articleId":"$sugar","ownerId":"${home.memberId}","quantity":1000,
+                "location":{"type":"LOCATION","id":"$pantry"}}""",
+            home.accessToken,
+        )
+        // La segunda suma: 200 y AssetQuantityChanged.
+        second.statusCode.shouldBe(HttpStatus.OK)
+        second.body!!.extract("id").shouldBe(stockItem)
+        second.body!!.shouldContain("\"quantity\":1300")
+
+        // Y sigue habiendo una sola fila, no dos «Azúcar» en la despensa.
+        http.getJson("/api/v1/assets?articleId=$sugar", home.accessToken).body!!.shouldContain("\"total\":1")
+    }
+
+    @Test
+    @DisplayName("el mismo articulo en dos ubicaciones son dos existencias distintas")
+    fun `dos ubicaciones son dos existencias`() {
+        val home = http.registerHousehold()
+        val pantry = home.createLocation("""{"name":"Despensa","type":"ROOM"}""")
+        val garage = home.createLocation("""{"name":"Trastero","type":"ROOM"}""")
+        val sugar = home.createArticle(
+            """{"name":"Azúcar","categoryId":"${home.category("Alimentación")}","unit":"GRAM"}""",
+        )
+
+        home.intake(sugar, pantry, 300)
+        home.intake(sugar, garage, 500)
+
+        http.getJson("/api/v1/assets?articleId=$sugar", home.accessToken).body!!.shouldContain("\"total\":2")
+    }
+
+    @Test
+    @DisplayName("la entrada crea el articulo en el mismo gesto si aun no existe")
+    fun `la entrada puede crear el articulo`() {
+        val home = http.registerHousehold()
+        val pantry = home.createLocation("""{"name":"Despensa","type":"ROOM"}""")
+
+        val created = http.postJson(
+            "/api/v1/assets/intake",
+            """{"article":{"name":"Lentejas","categoryId":"${home.category("Alimentación")}","unit":"GRAM"},
+                "ownerId":"${home.memberId}","quantity":500,
+                "location":{"type":"LOCATION","id":"$pantry"}}""",
+            home.accessToken,
+        )
+
+        created.statusCode.shouldBe(HttpStatus.CREATED)
+        created.body!!.shouldContain("Lentejas")
+        http.getJson("/api/v1/articles?q=lentejas", home.accessToken).body!!.shouldContain("\"total\":1")
+    }
+
+    @Test
+    @DisplayName("una entrada de cero o negativa se rechaza")
+    fun `la entrada tiene que ser positiva`() {
+        val home = http.registerHousehold()
+        val sugar = home.createArticle(
+            """{"name":"Sal","categoryId":"${home.category("Alimentación")}","unit":"GRAM"}""",
+        )
+
+        http.postJson(
+            "/api/v1/assets/intake",
+            """{"articleId":"$sugar","ownerId":"${home.memberId}","quantity":0}""",
+            home.accessToken,
+        ).statusCode.shouldBe(HttpStatus.BAD_REQUEST)
+    }
+
+    @Test
+    @DisplayName("el ajuste es absoluto y sustituye, al reves que la entrada, que suma")
+    fun `el ajuste sustituye la cantidad`() {
+        val home = http.registerHousehold()
+        val pantry = home.createLocation("""{"name":"Despensa","type":"ROOM"}""")
+        val rice = home.createArticle(
+            """{"name":"Arroz","categoryId":"${home.category("Alimentación")}","unit":"GRAM"}""",
+        )
+        val stockItem = home.intake(rice, pantry, 1000)
+
+        val adjusted = http.patchJson("/api/v1/assets/$stockItem", """{"quantity":650}""", home.accessToken)
+
+        adjusted.statusCode.shouldBe(HttpStatus.OK)
+        adjusted.body!!.shouldContain("\"quantity\":650")
+    }
+
+    @Test
+    @DisplayName("una cantidad negativa se rechaza, y sobre un DURABLE no aplica en absoluto")
+    fun `los dos errores de cantidad`() {
+        val home = http.registerHousehold()
+        val pantry = home.createLocation("""{"name":"Despensa","type":"ROOM"}""")
+        val rice = home.createArticle(
+            """{"name":"Arroz","categoryId":"${home.category("Alimentación")}","unit":"GRAM"}""",
+        )
+        val stockItem = home.intake(rice, pantry, 1000)
+        val durable = home.createAsset(
+            """{"name":"Sofá","type":"DURABLE","categoryId":"${home.category("Mobiliario")}"}""",
+        )
+
+        val negative = http.patchJson("/api/v1/assets/$stockItem", """{"quantity":-5}""", home.accessToken)
+        negative.statusCode.shouldBe(HttpStatus.CONFLICT)
+        negative.body!!.shouldContain("ASSET_QUANTITY_NEGATIVE")
+
+        val notApplicable = http.patchJson("/api/v1/assets/$durable", """{"quantity":3}""", home.accessToken)
+        notApplicable.statusCode.shouldBe(HttpStatus.CONFLICT)
+        notApplicable.body!!.shouldContain("ASSET_QUANTITY_NOT_APPLICABLE")
+    }
+
+    @Test
+    @DisplayName("llegar a cero no da de baja: un consumible agotado sigue existiendo")
+    fun `cero no es baja`() {
+        val home = http.registerHousehold()
+        val pantry = home.createLocation("""{"name":"Despensa","type":"ROOM"}""")
+        val rice = home.createArticle(
+            """{"name":"Arroz","categoryId":"${home.category("Alimentación")}","unit":"GRAM"}""",
+        )
+        val stockItem = home.intake(rice, pantry, 1000)
+
+        http.patchJson("/api/v1/assets/$stockItem", """{"quantity":0}""", home.accessToken)
+
+        val read = http.getJson("/api/v1/assets/$stockItem", home.accessToken)
+        read.body!!.shouldContain("\"status\":\"AVAILABLE\"")
+        read.body!!.shouldContain("\"quantity\":0")
+    }
+
+    @Test
+    @DisplayName("mover una existencia a una ubicacion que ya tiene otra del mismo articulo manda a la fusion")
+    fun `mover no hace de fusion`() {
+        val home = http.registerHousehold()
+        val pantry = home.createLocation("""{"name":"Despensa","type":"ROOM"}""")
+        val garage = home.createLocation("""{"name":"Trastero","type":"ROOM"}""")
+        val sugar = home.createArticle(
+            """{"name":"Azúcar","categoryId":"${home.category("Alimentación")}","unit":"GRAM"}""",
+        )
+        home.intake(sugar, pantry, 300)
+        val inGarage = home.intake(sugar, garage, 500)
+
+        val rejected = http.patchJson(
+            "/api/v1/assets/$inGarage",
+            """{"location":{"type":"LOCATION","id":"$pantry"}}""",
+            home.accessToken,
+        )
+
+        rejected.statusCode.shouldBe(HttpStatus.CONFLICT)
+        rejected.body!!.shouldContain("EXISTENCE_ALREADY_IN_LOCATION")
+    }
+
+    @Test
+    @DisplayName("la fusion suma en el destino, deja el origen a cero y de baja, y libera su hueco")
+    fun `la fusion junta dos existencias`() {
+        val home = http.registerHousehold()
+        val pantry = home.createLocation("""{"name":"Despensa","type":"ROOM"}""")
+        val garage = home.createLocation("""{"name":"Trastero","type":"ROOM"}""")
+        val sugar = home.createArticle(
+            """{"name":"Azúcar","categoryId":"${home.category("Alimentación")}","unit":"GRAM"}""",
+        )
+        val inPantry = home.intake(sugar, pantry, 300)
+        val inGarage = home.intake(sugar, garage, 500)
+
+        val merged = http.postJson(
+            "/api/v1/assets/$inGarage/merge",
+            """{"targetAssetId":"$inPantry"}""",
+            home.accessToken,
+        )
+
+        merged.statusCode.shouldBe(HttpStatus.OK)
+        merged.body!!.extract("id").shouldBe(inPantry)
+        merged.body!!.shouldContain("\"quantity\":800")
+
+        // El destino conserva SU ubicacion, que es lo que la fusion decide.
+        merged.body!!.shouldContain("\"id\":\"$pantry\"")
+
+        val source = http.getJson("/api/v1/assets/$inGarage", home.accessToken)
+        source.body!!.shouldContain("\"status\":\"DECOMMISSIONED\"")
+        source.body!!.shouldContain("\"quantity\":0")
+
+        // Y el hueco del trastero queda libre: la exclusion de DECOMMISSIONED del
+        // indice es justo lo que permite volver a dar entrada ahi.
+        home.intake(sugar, garage, 250)
+    }
+
+    @Test
+    @DisplayName("la fusion rechaza los cuatro casos que no son fusion")
+    fun `los limites de la fusion`() {
+        val home = http.registerHousehold()
+        val pantry = home.createLocation("""{"name":"Despensa","type":"ROOM"}""")
+        val garage = home.createLocation("""{"name":"Trastero","type":"ROOM"}""")
+        val sugar = home.createArticle(
+            """{"name":"Azúcar","categoryId":"${home.category("Alimentación")}","unit":"GRAM"}""",
+        )
+        val salt = home.createArticle(
+            """{"name":"Sal","categoryId":"${home.category("Alimentación")}","unit":"GRAM"}""",
+        )
+        val sugarInPantry = home.intake(sugar, pantry, 300)
+        val saltInGarage = home.intake(salt, garage, 100)
+        val durable = home.createAsset(
+            """{"name":"Sofá","type":"DURABLE","categoryId":"${home.category("Mobiliario")}"}""",
+        )
+
+        // Consigo misma.
+        http.postJson(
+            "/api/v1/assets/$sugarInPantry/merge",
+            """{"targetAssetId":"$sugarInPantry"}""",
+            home.accessToken,
+        ).body!!.shouldContain("MERGE_SAME_ASSET")
+
+        // De articulos distintos.
+        http.postJson(
+            "/api/v1/assets/$saltInGarage/merge",
+            """{"targetAssetId":"$sugarInPantry"}""",
+            home.accessToken,
+        ).body!!.shouldContain("MERGE_ARTICLE_MISMATCH")
+
+        // Con un duradero de por medio.
+        http.postJson(
+            "/api/v1/assets/$durable/merge",
+            """{"targetAssetId":"$sugarInPantry"}""",
+            home.accessToken,
+        ).body!!.shouldContain("MERGE_NOT_CONSUMABLE")
+
+        // Con una ya dada de baja.
+        http.deleteJson("/api/v1/assets/$saltInGarage", home.accessToken)
+        http.postJson(
+            "/api/v1/assets/$saltInGarage/merge",
+            """{"targetAssetId":"$sugarInPantry"}""",
+            home.accessToken,
+        ).body!!.shouldContain("MERGE_ASSET_DEACTIVATED")
+    }
+
+    @Test
+    @DisplayName("dar de baja una existencia con cantidad la deja a cero: lo que quedaba se da por perdido")
+    fun `la baja de una existencia con resto la lleva a cero`() {
+        val home = http.registerHousehold()
+        val pantry = home.createLocation("""{"name":"Despensa","type":"ROOM"}""")
+        val rice = home.createArticle(
+            """{"name":"Arroz","categoryId":"${home.category("Alimentación")}","unit":"GRAM"}""",
+        )
+        val stockItem = home.intake(rice, pantry, 750)
+
+        http.deleteJson("/api/v1/assets/$stockItem", home.accessToken).statusCode.shouldBe(HttpStatus.NO_CONTENT)
+
+        val read = http.getJson("/api/v1/assets/$stockItem", home.accessToken)
+        read.body!!.shouldContain("\"status\":\"DECOMMISSIONED\"")
+        read.body!!.shouldContain("\"quantity\":0")
+    }
+
+    // ----------------------------------------------------------------------
+    // Las tres validaciones que la base de datos no puede garantizar
+    // ----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("un CONSUMABLE no puede alojar otros assets: solo un DURABLE contiene cosas")
+    fun `solo un durable hace de contenedor`() {
+        val home = http.registerHousehold()
+        val pantry = home.createLocation("""{"name":"Despensa","type":"ROOM"}""")
+        val flour = home.createArticle(
+            """{"name":"Harina","categoryId":"${home.category("Alimentación")}","unit":"GRAM"}""",
+        )
+        val flourStock = home.intake(flour, pantry, 1000)
+
+        val rejected = http.postJson(
+            "/api/v1/assets",
+            """{"name":"Cuchara","type":"DURABLE","categoryId":"${home.category("Herramientas")}",
+                "location":{"type":"ASSET","id":"$flourStock"}}""",
+            home.accessToken,
+        )
+
+        rejected.statusCode.shouldBe(HttpStatus.CONFLICT)
+        rejected.body!!.shouldContain("ASSET_LOCATION_CONFLICT")
+    }
+
+    @Test
+    @DisplayName("un asset no puede acabar dentro de si mismo, ni de su hijo, ni de su nieto")
+    fun `el anti-ciclo de la jerarquia de assets`() {
+        val home = http.registerHousehold()
+        val category = home.category("Mobiliario")
+        val a = home.createAsset("""{"name":"Armario","type":"DURABLE","categoryId":"$category"}""")
+        val b = home.createAsset(
+            """{"name":"Cajón","type":"DURABLE","categoryId":"$category","location":{"type":"ASSET","id":"$a"}}""",
+        )
+        val c = home.createAsset(
+            """{"name":"Caja","type":"DURABLE","categoryId":"$category","location":{"type":"ASSET","id":"$b"}}""",
+        )
+
+        // Dentro de si mismo.
+        http.patchJson("/api/v1/assets/$a", """{"location":{"type":"ASSET","id":"$a"}}""", home.accessToken)
+            .body!!.shouldContain("LOCATION_CYCLE")
+
+        // Dentro de su hijo.
+        http.patchJson("/api/v1/assets/$a", """{"location":{"type":"ASSET","id":"$b"}}""", home.accessToken)
+            .body!!.shouldContain("LOCATION_CYCLE")
+
+        // Dentro de su nieto: el que se escapa si solo se mira el hijo directo.
+        val attempt = http.patchJson(
+            "/api/v1/assets/$a",
+            """{"location":{"type":"ASSET","id":"$c"}}""",
+            home.accessToken,
+        )
+        attempt.statusCode.shouldBe(HttpStatus.CONFLICT)
+        attempt.body!!.shouldContain("LOCATION_CYCLE")
+
+        // Y la jerarquia sigue intacta.
+        http.getJson("/api/v1/assets/$a", home.accessToken).body!!.shouldContain("\"location\":null")
+    }
+
+    @Test
+    @DisplayName("superar la capacidad de una ubicacion ADVIERTE y deja pasar")
+    fun `el aviso de capacidad no bloquea`() {
+        val home = http.registerHousehold()
+        val category = home.category("Herramientas")
+        val shelf = home.createLocation(
+            """{"name":"Estante estrecho","type":"SHELF","capacity":{"type":"UNITS","max":2,"unit":"cosas"}}""",
+        )
+
+        home.createAsset("""{"name":"Martillo","type":"DURABLE","categoryId":"$category",
+            "location":{"type":"LOCATION","id":"$shelf"}}""")
+        val second = http.postJson(
+            "/api/v1/assets",
+            """{"name":"Destornillador","type":"DURABLE","categoryId":"$category",
+                "location":{"type":"LOCATION","id":"$shelf"}}""",
+            home.accessToken,
+        )
+        // Justo en el limite: cabe y no avisa.
+        second.statusCode.shouldBe(HttpStatus.CREATED)
+        second.body!!.shouldContain("\"warnings\":[]")
+
+        val third = http.postJson(
+            "/api/v1/assets",
+            """{"name":"Alicates","type":"DURABLE","categoryId":"$category",
+                "location":{"type":"LOCATION","id":"$shelf"}}""",
+            home.accessToken,
+        )
+
+        // Se pasa: se crea IGUAL --201, no 409-- y avisa.
+        third.statusCode.shouldBe(HttpStatus.CREATED)
+        third.body!!.shouldContain("LOCATION_CAPACITY_EXCEEDED")
+
+        // Y esta ahi de verdad, no es un aviso sobre algo que no se guardo.
+        http.getJson("/api/v1/assets?locationId=$shelf", home.accessToken).body!!.shouldContain("\"total\":3")
+    }
+
+    @Test
+    @DisplayName("con capacidad en peso no se avisa: no hay nada que contar hasta que el asset lleve peso")
+    fun `solo se avisa con capacidad en unidades`() {
+        val home = http.registerHousehold()
+        val shelf = home.createLocation(
+            """{"name":"Balda","type":"SHELF","capacity":{"type":"WEIGHT","max":1,"unit":"kg"}}""",
+        )
+
+        val created = http.postJson(
+            "/api/v1/assets",
+            """{"name":"Yunque","type":"DURABLE","categoryId":"${home.category("Herramientas")}",
+                "location":{"type":"LOCATION","id":"$shelf"}}""",
+            home.accessToken,
+        )
+
+        created.statusCode.shouldBe(HttpStatus.CREATED)
+        created.body!!.shouldContain("\"warnings\":[]")
+    }
+
+    @Test
+    @DisplayName("mover a una ubicacion llena tambien avisa, y tambien deja pasar")
+    fun `el aviso tambien salta al mover`() {
+        val home = http.registerHousehold()
+        val category = home.category("Herramientas")
+        val shelf = home.createLocation(
+            """{"name":"Estante","type":"SHELF","capacity":{"type":"UNITS","max":1,"unit":"cosas"}}""",
+        )
+        home.createAsset("""{"name":"Sierra","type":"DURABLE","categoryId":"$category",
+            "location":{"type":"LOCATION","id":"$shelf"}}""")
+        val loose = home.createAsset("""{"name":"Lima","type":"DURABLE","categoryId":"$category"}""")
+
+        val moved = http.patchJson(
+            "/api/v1/assets/$loose",
+            """{"location":{"type":"LOCATION","id":"$shelf"}}""",
+            home.accessToken,
+        )
+
+        moved.statusCode.shouldBe(HttpStatus.OK)
+        moved.body!!.shouldContain("LOCATION_CAPACITY_EXCEEDED")
+    }
+
+    // ----------------------------------------------------------------------
+    // Las dos reglas de articulo que necesitan existencias de verdad
+    // ----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("con existencias vivas, la unidad del articulo deja de admitirse")
+    fun `la unidad es inmutable con existencias`() {
+        val home = http.registerHousehold()
+        val pantry = home.createLocation("""{"name":"Despensa","type":"ROOM"}""")
+        val sugar = home.createArticle(
+            """{"name":"Azúcar","categoryId":"${home.category("Alimentación")}","unit":"GRAM"}""",
+        )
+        val stockItem = home.intake(sugar, pantry, 500)
+
+        val rejected = http.patchJson("/api/v1/articles/$sugar", """{"unit":"KILOGRAM"}""", home.accessToken)
+        rejected.statusCode.shouldBe(HttpStatus.CONFLICT)
+        rejected.body!!.shouldContain("ARTICLE_UNIT_IMMUTABLE")
+
+        // Dada de baja la existencia, vuelve a poder corregirse: una existencia
+        // DECOMMISSIONED no cuenta.
+        http.deleteJson("/api/v1/assets/$stockItem", home.accessToken)
+        http.patchJson("/api/v1/articles/$sugar", """{"unit":"KILOGRAM"}""", home.accessToken)
+            .statusCode.shouldBe(HttpStatus.OK)
+    }
+
+    @Test
+    @DisplayName("un articulo con existencias vivas no se retira")
+    fun `no se retira un articulo con existencias`() {
+        val home = http.registerHousehold()
+        val pantry = home.createLocation("""{"name":"Despensa","type":"ROOM"}""")
+        val sugar = home.createArticle(
+            """{"name":"Azúcar","categoryId":"${home.category("Alimentación")}","unit":"GRAM"}""",
+        )
+        val stockItem = home.intake(sugar, pantry, 500)
+
+        val rejected = http.deleteJson("/api/v1/articles/$sugar", home.accessToken)
+        rejected.statusCode.shouldBe(HttpStatus.CONFLICT)
+        rejected.body!!.shouldContain("ARTICLE_HAS_EXISTENCES")
+
+        http.deleteJson("/api/v1/assets/$stockItem", home.accessToken)
+        http.deleteJson("/api/v1/articles/$sugar", home.accessToken).statusCode.shouldBe(HttpStatus.NO_CONTENT)
+    }
+
+    @Test
+    @DisplayName("una ubicacion con assets dentro no se borra")
+    fun `no se borra una ubicacion ocupada`() {
+        val home = http.registerHousehold()
+        val room = home.createLocation("""{"name":"Salón","type":"ROOM"}""")
+        home.createAsset("""{"name":"Sofá","type":"DURABLE","categoryId":"${home.category("Mobiliario")}",
+            "location":{"type":"LOCATION","id":"$room"}}""")
+
+        val blocked = http.deleteJson("/api/v1/locations/$room", home.accessToken)
+
+        blocked.statusCode.shouldBe(HttpStatus.CONFLICT)
+        blocked.body!!.shouldContain("LOCATION_HAS_ASSETS")
+    }
+
+    // ----------------------------------------------------------------------
+    // Aislamiento
+    // ----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("ninguna de las ocho operaciones de assets cruza de hogar")
+    fun `los assets no cruzan de hogar`() {
+        val a = http.registerHousehold()
+        val b = http.registerHousehold()
+        val ofA = a.createAsset(
+            """{"name":"Bicicleta de A","type":"DURABLE","categoryId":"${a.category("Mobiliario")}"}""",
+        )
+
+        http.getJson("/api/v1/assets", b.accessToken).body!!.shouldNotContain("Bicicleta de A")
+        http.getJson("/api/v1/assets/$ofA", b.accessToken).statusCode.shouldBe(HttpStatus.NOT_FOUND)
+        http.getJson("/api/v1/assets/$ofA/children", b.accessToken).statusCode.shouldBe(HttpStatus.NOT_FOUND)
+        http.patchJson("/api/v1/assets/$ofA", """{"notes":"robada"}""", b.accessToken)
+            .statusCode.shouldBe(HttpStatus.NOT_FOUND)
+        http.deleteJson("/api/v1/assets/$ofA", b.accessToken).statusCode.shouldBe(HttpStatus.NOT_FOUND)
+        http.postJson("/api/v1/assets/$ofA/merge", """{"targetAssetId":"$ofA"}""", b.accessToken)
+            .statusCode.shouldBe(HttpStatus.CONFLICT) // MERGE_SAME_ASSET antes de mirar nada
+
+        // Meter algo propio dentro de un asset ajeno: la clave ajena lo
+        // aceptaria, porque no pasa por RLS. Lo impide resolver la referencia.
+        http.postJson(
+            "/api/v1/assets",
+            """{"name":"Intrusa","type":"DURABLE","categoryId":"${b.category("Mobiliario")}",
+                "location":{"type":"ASSET","id":"$ofA"}}""",
+            b.accessToken,
+        ).statusCode.shouldBe(HttpStatus.NOT_FOUND)
+
+        // Y sigue intacta en el suyo.
+        http.getJson("/api/v1/assets", a.accessToken).body!!.shouldContain("Bicicleta de A")
+    }
+
+    @Test
+    @DisplayName("no se pone a nombre de un usuario de otro hogar")
+    fun `el propietario tiene que ser del hogar`() {
+        val a = http.registerHousehold()
+        val b = http.registerHousehold()
+
+        http.postJson(
+            "/api/v1/assets",
+            """{"name":"Algo","type":"DURABLE","categoryId":"${b.category("Mobiliario")}","ownerId":"${a.memberId}"}""",
+            b.accessToken,
+        ).statusCode.shouldBe(HttpStatus.NOT_FOUND)
+    }
+
+    // ----------------------------------------------------------------------
+    // Utilidades
+    // ----------------------------------------------------------------------
+
+    private fun TestHousehold.createAsset(body: String): String {
+        val created = http.postJson("/api/v1/assets", body, accessToken)
+        created.statusCode.shouldBe(HttpStatus.CREATED)
+        return created.body!!.extract("id")
+    }
+
+    private fun TestHousehold.createLocation(body: String): String {
+        val created = http.postJson("/api/v1/locations", body, accessToken)
+        created.statusCode.shouldBe(HttpStatus.CREATED)
+        return created.body!!.extract("id")
+    }
+
+    private fun TestHousehold.createArticle(body: String): String {
+        val created = http.postJson("/api/v1/articles", body, accessToken)
+        created.statusCode.shouldBe(HttpStatus.CREATED)
+        return created.body!!.extract("id")
+    }
+
+    private fun TestHousehold.intake(articleId: String, locationId: String, quantity: Int): String {
+        val done = http.postJson(
+            "/api/v1/assets/intake",
+            """{"articleId":"$articleId","ownerId":"$memberId","quantity":$quantity,
+                "location":{"type":"LOCATION","id":"$locationId"}}""",
+            accessToken,
+        )
+        done.statusCode.value().shouldBe(if (done.statusCode == HttpStatus.CREATED) 201 else 200)
+        return done.body!!.extract("id")
+    }
+
+    /** Una de las cinco categorias que siembra el alta del hogar. */
+    private fun TestHousehold.category(name: String): String {
+        val body = http.getJson("/api/v1/categories", accessToken).body!!
+        val entry = Regex("\\{[^{}]*\"name\":\"$name\"[^{}]*\\}").find(body)
+            ?: error("No aparece la categoría sembrada «$name»:\n$body")
+        return entry.value.extract("id")
+    }
+}

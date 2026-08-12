@@ -2,6 +2,8 @@ package com.drp.adapter.persistence
 
 import com.drp.domain.catalog.MeasurementUnit
 import com.drp.domain.household.MemberRole
+import com.drp.domain.inventory.AssetStatus
+import com.drp.domain.inventory.AssetType
 import com.drp.domain.inventory.Capacity
 import com.drp.domain.inventory.EnvironmentalConditions
 import com.drp.domain.inventory.LocationType
@@ -14,6 +16,7 @@ import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
 import java.math.BigDecimal
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 /**
@@ -152,6 +155,36 @@ class ArticleEntity(
     var createdAt: Instant,
     var updatedAt: Instant,
     var retiredAt: Instant?,
+    var createdBy: UUID?,
+    var updatedBy: UUID?,
+)
+
+/**
+ * Las dos ubicaciones van como columnas separadas y anulables porque asi esta la
+ * tabla, con un `CHECK` que impide informar las dos. Hacia arriba se traducen a
+ * un `AssetLocation`, que no puede representar ese estado invalido.
+ */
+@Entity
+@Table(name = "assets")
+class AssetEntity(
+    @Id var id: UUID,
+    var householdId: UUID,
+    var articleId: UUID?,
+    var categoryId: UUID?,
+    var name: String?,
+    @Enumerated(EnumType.STRING) var type: AssetType,
+    var ownerId: UUID?,
+    var locationAssetId: UUID?,
+    var locationId: UUID?,
+    var quantity: BigDecimal?,
+    @Enumerated(EnumType.STRING) var status: AssetStatus,
+    var serialNumber: String?,
+    var acquiredOn: LocalDate?,
+    var photoUrl: String?,
+    var photoFileId: UUID?,
+    var notes: String?,
+    var createdAt: Instant,
+    var updatedAt: Instant,
     var createdBy: UUID?,
     var updatedBy: UUID?,
 )

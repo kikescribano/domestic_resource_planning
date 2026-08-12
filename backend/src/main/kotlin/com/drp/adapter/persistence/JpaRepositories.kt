@@ -152,6 +152,137 @@ interface CategoryJpaRepository : JpaRepository<CategoryEntity, UUID> {
     fun findAllByRetiredAtIsNull(pageable: Pageable): org.springframework.data.domain.Page<CategoryEntity>
 }
 
+interface AssetJpaRepository : JpaRepository<AssetEntity, UUID> {
+
+    /**
+     * La existencia viva de un articulo en una ubicacion.
+     *
+     * El `IS NOT DISTINCT FROM` no es una forma rebuscada de `=`: es lo que hace
+     * que dos nulos se consideren **iguales**, exactamente como el
+     * `NULLS NOT DISTINCT` del indice `assets_live_stock_item_unique`. Con un `=`
+     * normal, una existencia todavia sin ubicar nunca se encontraria a si misma,
+     * cada entrada crearia una fila nueva y el indice las rechazaria: 500 en vez
+     * de sumar.
+     *
+     * Y `status <> 'DECOMMISSIONED'` por el mismo motivo que el indice lo
+     * excluye: una existencia dada de baja no ocupa el hueco, asi que se puede
+     * volver a dar entrada de ese articulo en esa ubicacion.
+     */
+    @Query(
+        value = """
+            SELECT * FROM assets
+            WHERE type = 'CONSUMABLE'
+              AND status <> 'DECOMMISSIONED'
+              AND article_id = CAST(:articleId AS uuid)
+              AND location_asset_id IS NOT DISTINCT FROM CAST(:locationAssetId AS uuid)
+              AND location_id IS NOT DISTINCT FROM CAST(:locationId AS uuid)
+            LIMIT 1
+        """,
+        nativeQuery = true,
+    )
+    fun findLiveStockItem(
+        @Param("articleId") articleId: UUID,
+        @Param("locationAssetId") locationAssetId: UUID?,
+        @Param("locationId") locationId: UUID?,
+    ): AssetEntity?
+
+    @Query(
+        value = """
+            SELECT count(*) FROM assets
+            WHERE location_asset_id = CAST(:assetId AS uuid) AND status <> 'DECOMMISSIONED'
+        """,
+        nativeQuery = true,
+    )
+    fun countLiveChildren(@Param("assetId") assetId: UUID): Long
+
+    @Query(
+        value = """
+            SELECT count(*) FROM assets
+            WHERE status <> 'DECOMMISSIONED'
+              AND location_asset_id IS NOT DISTINCT FROM CAST(:locationAssetId AS uuid)
+              AND location_id IS NOT DISTINCT FROM CAST(:locationId AS uuid)
+        """,
+        nativeQuery = true,
+    )
+    fun countLiveIn(
+        @Param("locationAssetId") locationAssetId: UUID?,
+        @Param("locationId") locationId: UUID?,
+    ): Long
+
+    /** Igual que la de ubicaciones, y por lo mismo: bajo RLS y con tope de profundidad. */
+    @Query(
+        value = """
+            WITH RECURSIVE chain AS (
+                SELECT a.location_asset_id AS id, 1 AS depth
+                FROM assets a
+                WHERE a.id = CAST(:assetId AS uuid) AND a.location_asset_id IS NOT NULL
+                UNION ALL
+                SELECT a.location_asset_id, c.depth + 1
+                FROM assets a
+                JOIN chain c ON a.id = c.id
+                WHERE a.location_asset_id IS NOT NULL AND c.depth < 100
+            )
+            SELECT id FROM chain
+        """,
+        nativeQuery = true,
+    )
+    fun ancestorIdsOf(@Param("assetId") assetId: UUID): List<UUID>
+
+    @Query(
+        value = """
+            SELECT count(*) FROM loans
+            WHERE asset_id = CAST(:assetId AS uuid) AND status IN ('ACTIVE', 'OVERDUE')
+        """,
+        nativeQuery = true,
+    )
+    fun countOpenLoans(@Param("assetId") assetId: UUID): Long
+
+    /**
+     * El listado con sus ocho filtros. Excluye los `DECOMMISSIONED` **salvo que
+     * se pida ese estado**, que es la unica forma de ver el historial.
+     */
+    @Query(
+        value = """
+            SELECT * FROM assets
+            WHERE (CAST(:status AS text) IS NOT NULL OR status <> 'DECOMMISSIONED')
+              AND (CAST(:status AS text) IS NULL OR status = CAST(:status AS text))
+              AND (CAST(:locationId AS uuid) IS NULL OR location_id = CAST(:locationId AS uuid))
+              AND (CAST(:parentAssetId AS uuid) IS NULL OR location_asset_id = CAST(:parentAssetId AS uuid))
+              AND (CAST(:ownerId AS uuid) IS NULL OR owner_id = CAST(:ownerId AS uuid))
+              AND (NOT :withoutOwner OR owner_id IS NULL)
+              AND (CAST(:type AS text) IS NULL OR type = CAST(:type AS text))
+              AND (CAST(:articleId AS uuid) IS NULL OR article_id = CAST(:articleId AS uuid))
+              AND (CAST(:categoryId AS uuid) IS NULL OR category_id = CAST(:categoryId AS uuid))
+            ORDER BY created_at DESC
+        """,
+        countQuery = """
+            SELECT count(*) FROM assets
+            WHERE (CAST(:status AS text) IS NOT NULL OR status <> 'DECOMMISSIONED')
+              AND (CAST(:status AS text) IS NULL OR status = CAST(:status AS text))
+              AND (CAST(:locationId AS uuid) IS NULL OR location_id = CAST(:locationId AS uuid))
+              AND (CAST(:parentAssetId AS uuid) IS NULL OR location_asset_id = CAST(:parentAssetId AS uuid))
+              AND (CAST(:ownerId AS uuid) IS NULL OR owner_id = CAST(:ownerId AS uuid))
+              AND (NOT :withoutOwner OR owner_id IS NULL)
+              AND (CAST(:type AS text) IS NULL OR type = CAST(:type AS text))
+              AND (CAST(:articleId AS uuid) IS NULL OR article_id = CAST(:articleId AS uuid))
+              AND (CAST(:categoryId AS uuid) IS NULL OR category_id = CAST(:categoryId AS uuid))
+        """,
+        nativeQuery = true,
+    )
+    @Suppress("LongParameterList")
+    fun search(
+        @Param("locationId") locationId: UUID?,
+        @Param("parentAssetId") parentAssetId: UUID?,
+        @Param("ownerId") ownerId: UUID?,
+        @Param("withoutOwner") withoutOwner: Boolean,
+        @Param("status") status: String?,
+        @Param("type") type: String?,
+        @Param("articleId") articleId: UUID?,
+        @Param("categoryId") categoryId: UUID?,
+        pageable: Pageable,
+    ): org.springframework.data.domain.Page<AssetEntity>
+}
+
 interface ArticleJpaRepository : JpaRepository<ArticleEntity, UUID> {
 
     /** Mismo `immutable_unaccent` que el indice `articles_name_unique_live`. */
