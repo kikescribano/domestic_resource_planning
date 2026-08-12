@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type FormEvent } from 'react'
 import { NavLink, Navigate, Outlet, useNavigate } from 'react-router'
 
 import { ApiError, api, type UserRole } from '../api/client'
 import { useAuthenticatedSession, useSession } from '../auth/SessionProvider'
-import { Button, Field, Notice, Spinner, StatusBadge } from '../ui/primitives'
+import { Button, Field, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primitives'
 
 /**
  * Lo que vive detrás del login.
@@ -16,8 +16,11 @@ import { Button, Field, Notice, Spinner, StatusBadge } from '../ui/primitives'
 
 const NAVIGATION = [
   { to: '/', label: 'Hogar', end: true },
+  { to: '/inventario', label: 'Inventario', end: false },
+  { to: '/ubicaciones', label: 'Sitios', end: false },
+  { to: '/catalogo', label: 'Catálogo', end: false },
   { to: '/usuarios', label: 'Personas', end: false },
-  { to: '/cuenta', label: 'Tu cuenta', end: false },
+  { to: '/cuenta', label: 'Cuenta', end: false },
 ]
 
 export function RequireSession() {
@@ -88,15 +91,6 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
       ? 'font-medium text-accent-ink md:bg-accent-soft'
       : 'text-ink-muted md:hover:bg-surface-hover',
   ].join(' ')
-}
-
-function PageHeading({ title, action }: { title: string; action?: ReactNode }) {
-  return (
-    <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-title text-ink">{title}</h1>
-      {action}
-    </header>
-  )
 }
 
 export function HomePage() {

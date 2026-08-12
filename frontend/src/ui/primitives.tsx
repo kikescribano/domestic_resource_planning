@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
 import { useId } from 'react'
 
 /**
@@ -115,6 +115,64 @@ export function Field({ label, hint, error, id, className = '', ...props }: Fiel
   )
 }
 
+interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement> {
+  label: string
+  hint?: string
+  error?: string
+}
+
+/**
+ * Un desplegable con la misma anatomía que [Field].
+ *
+ * Existe porque el Hito 2 trae seis, y la versión a mano —un `<label>` que
+ * envuelve al `<select>` con la pista dentro— tiene un defecto que no se ve
+ * mirando la pantalla: **la pista pasa a formar parte del nombre accesible**, así
+ * que un lector de pantalla anuncia «Unidad, la fija el artículo, todas sus
+ * existencias se llevan en ella» cada vez que el foco entra en el campo. La
+ * pista va en `aria-describedby`, que es lo que se lee después y una sola vez.
+ */
+export function SelectField({ label, hint, error, id, children, className = '', ...props }: SelectFieldProps) {
+  const generatedId = useId()
+  const fieldId = id ?? generatedId
+  const hintId = `${fieldId}-hint`
+  const errorId = `${fieldId}-error`
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={fieldId} className="text-body-sm font-medium text-ink">
+        {label}
+      </label>
+
+      <select
+        {...props}
+        id={fieldId}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={[hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ') || undefined}
+        className={[
+          'min-h-touch rounded-md border bg-surface-raised px-3 py-2 text-body text-ink',
+          error ? 'border-danger' : 'border-border',
+          className,
+        ].join(' ')}
+      >
+        {children}
+      </select>
+
+      {hint && !error && (
+        <p id={hintId} className="text-caption text-ink-muted">
+          {hint}
+        </p>
+      )}
+
+      {error && (
+        <p id={errorId} className="flex items-start gap-1.5 text-caption text-danger">
+          <ErrorIcon />
+          <span>{error}</span>
+        </p>
+      )}
+    </div>
+  )
+}
+
 type NoticeTone = 'info' | 'success' | 'warning' | 'danger'
 
 const NOTICE_TONES: Record<NoticeTone, { box: string; icon: ReactNode }> = {
@@ -186,29 +244,81 @@ export function Spinner({ label }: { label: string }) {
 }
 
 /**
- * Un estado del dominio: color, etiqueta e icono. Los tres juntos, siempre.
+ * Un estado, con color **y etiqueta**: el color nunca va solo, porque quien no
+ * lo distingue se queda sin el dato.
  *
- * Aquí se usa para los roles y el estado de una invitación; en el Hito 2 lo
- * heredan los estados de asset, que es donde la regla se cobra de verdad.
+ * Sus tonos son de dos familias y conviene no mezclarlas. Los de *feedback*
+ * —`info`, `success`, `warning`, `danger`— dicen cómo fue una operación; los de
+ * *dominio* —`available`, `lent`, `overdue`, `decommissioned`, `out-of-stock`—
+ * dicen en qué estado está una cosa del hogar. Hasta el Hito 2 solo existían los
+ * primeros, así que un estado de asset se pedía prestando el tono de un aviso:
+ * los valores coincidían y por eso no se veía, pero era la frontera de
+ * `foundations/color.md` cruzada.
+ *
+ * No lleva icono, a diferencia de `Notice`. En una fila de listado se repite en
+ * cada línea, y quince iconos idénticos en columna son ruido, no información: la
+ * etiqueta ya dice lo que el color sugiere.
  */
-export function StatusBadge({ tone, children }: { tone: NoticeTone | 'neutral'; children: ReactNode }) {
-  const tones: Record<string, string> = {
-    info: 'bg-info-soft text-info',
-    success: 'bg-success-soft text-success',
-    warning: 'bg-warning-soft text-warning',
-    danger: 'bg-danger-soft text-danger',
-    neutral: 'bg-state-decommissioned-soft text-state-decommissioned',
-  }
+type StatusTone = NoticeTone | 'neutral' | 'available' | 'lent' | 'overdue' | 'decommissioned' | 'out-of-stock'
 
+const STATUS_TONES: Record<StatusTone, string> = {
+  info: 'bg-info-soft text-info',
+  success: 'bg-success-soft text-success',
+  warning: 'bg-warning-soft text-warning',
+  danger: 'bg-danger-soft text-danger',
+  neutral: 'bg-state-decommissioned-soft text-state-decommissioned',
+  available: 'bg-state-available-soft text-state-available',
+  lent: 'bg-state-lent-soft text-state-lent',
+  overdue: 'bg-state-overdue-soft text-state-overdue',
+  decommissioned: 'bg-state-decommissioned-soft text-state-decommissioned',
+  'out-of-stock': 'bg-state-out-of-stock-soft text-state-out-of-stock',
+}
+
+export function StatusBadge({ tone, children }: { tone: StatusTone; children: ReactNode }) {
   return (
     <span
       className={[
         'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-caption font-medium',
-        tones[tone],
+        STATUS_TONES[tone],
       ].join(' ')}
     >
       {children}
     </span>
+  )
+}
+
+/**
+ * La cabecera de una pantalla: un `h1` y, opcionalmente, su acción principal.
+ *
+ * Vive aquí y no en una ruta concreta porque el Hito 2 trae cuatro pantallas más
+ * que la necesitan, y tres copias del mismo `header` es como se acaba con tres
+ * tamaños de título distintos.
+ */
+export function PageHeading({ title, action }: { title: string; action?: ReactNode }) {
+  return (
+    // Sin la serif a propósito: esa entra solo en `AuthCard`, que es la pantalla
+    // de una sola columna. Aquí el `h1` compite con filas de listado y la serif
+    // a ese tamaño empieza a pesar.
+    <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <h1 className="text-title text-ink">{title}</h1>
+      {action}
+    </header>
+  )
+}
+
+/**
+ * Lo que se pinta cuando no hay nada que pintar.
+ *
+ * Una lista vacía sin explicación es indistinguible de una que no ha cargado o
+ * de un filtro que no encuentra nada, y las tres piden cosas distintas del
+ * usuario.
+ */
+export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
+  return (
+    <div className="rounded-lg border border-dashed border-border p-6 text-center">
+      <p className="text-body font-medium text-ink">{title}</p>
+      {children && <div className="mt-1 text-body-sm text-ink-muted">{children}</div>}
+    </div>
   )
 }
 
