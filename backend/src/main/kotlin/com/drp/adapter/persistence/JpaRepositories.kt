@@ -209,19 +209,24 @@ interface AssetJpaRepository : JpaRepository<AssetEntity, UUID> {
         @Param("locationId") locationId: UUID?,
     ): Long
 
-    /** Igual que la de ubicaciones, y por lo mismo: bajo RLS y con tope de profundidad. */
+    /**
+     * Igual que la de ubicaciones, y con el mismo motivo para no llevar tope de
+     * profundidad: un tope no protege del ciclo, lo **provoca** en cuanto la
+     * jerarquia es mas honda que el numero elegido. Ver `ancestorIdsOf` en
+     * [LocationJpaRepository].
+     */
     @Query(
         value = """
             WITH RECURSIVE chain AS (
-                SELECT a.location_asset_id AS id, 1 AS depth
+                SELECT a.location_asset_id AS id
                 FROM assets a
                 WHERE a.id = CAST(:assetId AS uuid) AND a.location_asset_id IS NOT NULL
                 UNION ALL
-                SELECT a.location_asset_id, c.depth + 1
+                SELECT a.location_asset_id
                 FROM assets a
                 JOIN chain c ON a.id = c.id
-                WHERE a.location_asset_id IS NOT NULL AND c.depth < 100
-            )
+                WHERE a.location_asset_id IS NOT NULL
+            ) CYCLE id SET is_cycle USING visited
             SELECT id FROM chain
         """,
         nativeQuery = true,
@@ -378,25 +383,39 @@ interface LocationJpaRepository : JpaRepository<LocationEntity, UUID> {
     ): LocationEntity?
 
     /**
-     * La cadena de ancestros, de padre a raiz, con un CTE recursivo.
+     * La cadena de ancestros, **entera**, de padre a raiz.
      *
-     * Corre **bajo RLS**, asi que el recorrido no puede salirse del hogar: una
-     * fila de otro es invisible y el camino se corta ahi. Y lleva tope de
-     * profundidad por si los datos ya estuvieran corrompidos con un ciclo --sin
-     * el, la consulta que sirve para detectarlos seria la que se cuelga.
+     * Corre bajo RLS, asi que el recorrido no puede salirse del hogar: una fila
+     * de otro es invisible y el camino se corta ahi.
+     *
+     * **Aqui hubo un tope de profundidad y era un agujero.** La primera version
+     * cortaba en `depth < 100` para no colgarse si los datos ya estuvieran
+     * corrompidos con un ciclo. El efecto real era el contrario del buscado: en
+     * una jerarquia de mas de 100 niveles la cadena volvia **truncada**, el
+     * ancestro que faltaba no aparecia en ella, y el anti-ciclo del caso de uso
+     * --que pregunta «¿esta este nodo entre mis ancestros?»-- respondia que no y
+     * **dejaba crear el ciclo**. Es decir: la proteccion contra un ciclo abria
+     * uno. Lo caza `HierarchyCycleSweepTest`, con 102 niveles.
+     *
+     * La clausula `CYCLE` de PostgreSQL 14+ resuelve las dos cosas a la vez y
+     * mejor: recuerda el camino recorrido y deja de descender en cuanto un nodo
+     * se repite, asi que **termina siempre** --tambien con datos ya ciclicos--
+     * sin necesidad de adivinar una profundidad maxima. La fila que cierra el
+     * ciclo se devuelve igual, que es lo que hace falta para que el caso de uso
+     * lo detecte en lugar de ignorarlo.
      */
     @Query(
         value = """
             WITH RECURSIVE chain AS (
-                SELECT l.parent_location_id AS id, 1 AS depth
+                SELECT l.parent_location_id AS id
                 FROM locations l
                 WHERE l.id = CAST(:locationId AS uuid) AND l.parent_location_id IS NOT NULL
                 UNION ALL
-                SELECT l.parent_location_id, c.depth + 1
+                SELECT l.parent_location_id
                 FROM locations l
                 JOIN chain c ON l.id = c.id
-                WHERE l.parent_location_id IS NOT NULL AND c.depth < 100
-            )
+                WHERE l.parent_location_id IS NOT NULL
+            ) CYCLE id SET is_cycle USING visited
             SELECT id FROM chain
         """,
         nativeQuery = true,

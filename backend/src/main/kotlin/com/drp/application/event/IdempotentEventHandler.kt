@@ -16,26 +16,40 @@ import java.util.UUID
  * **1. Corre despues del commit.** Con `@EventListener` a secas, el handler se
  * ejecuta dentro de la transaccion del core: una excepcion suya la marca
  * `rollbackOnly` y **deshace el alta del asset**, que es exactamente lo contrario
- * de lo que dice README 5.2.2. Y no basta con capturar la excepcion en quien
- * publica, porque para entonces la transaccion ya esta marcada y el commit falla
- * igual. La unica forma de que un modulo no pueda tumbar al core es que corra
- * cuando ya no hay nada que tumbar, y eso es `AFTER_COMMIT`.
+ * de lo que dice README 5.2.2. Con `AFTER_COMMIT` los datos del core ya estan
+ * escritos cuando el handler arranca.
  *
- * Consecuencia que conviene tener presente: aqui dentro **no hay transaccion ni
- * `app.household_id` fijado**. Un handler que toque la base de datos tiene que
- * abrir la suya y situarse en el hogar del evento, que por eso viaja en el sobre.
+ * **Y aqui hay que ser preciso, porque lo evidente es falso.** Medido con
+ * `EventBusSweepTest`, no supuesto: dentro del handler **la transaccion sigue
+ * activa** --`AFTER_COMMIT` se dispara antes de soltar los recursos, no
+ * despues-- y el hogar **sigue en el `TenantContext`**. De ahi salen dos
+ * consecuencias que un modulo tiene que conocer:
+ *
+ * - **Un handler que toque la base de datos debe abrir su transaccion con
+ *   `REQUIRES_NEW`.** Con la propagacion normal se une a la del core, que ya esta
+ *   cerrada y cuyo `SET LOCAL app.household_id` ya no vale: la consulta no
+ *   devuelve **ninguna fila** --medido-- porque la politica no ve hogar. Con
+ *   `REQUIRES_NEW` se abre una transaccion propia, el gestor vuelve a fijar el
+ *   hogar y todo funciona.
+ * - **Un handler `@Transactional` que se una a la del core y falle SI tumba al
+ *   core.** El interceptor la marca `rollbackOnly`, el commit revienta con
+ *   `UnexpectedRollbackException` y **las filas del core no sobreviven**
+ *   --medido--. El `AFTER_COMMIT` no protege de esto y el `catch` de mas abajo
+ *   tampoco, porque el fallo aparece al cerrar la transaccion, no al atender el
+ *   evento. Es la unica forma conocida de que un modulo se lleve por delante al
+ *   core, y la unica defensa es no unirse: `REQUIRES_NEW` siempre.
  *
  * **2. Se aisla.** Su excepcion no sale de aqui. Con un solo difusor, un handler
  * que propaga deja sin evento a los que van detras, asi que aislarse no es
  * cortesia con el core sino con los demas modulos.
  *
- * **3. Es idempotente.** La entrega es at-least-once, asi que se descarta lo ya
- * procesado por `eventId`. Hoy el bus es in-process y sincrono --una publicacion,
- * una entrega-- y el duplicado no llega a darse; la guarda esta puesta desde el
- * principio porque el candidato de evolucion que nombra README 5.2.2, el
- * Transactional Outbox, reentrega **el mismo `eventId`**, y entonces un handler
- * escrito sin ella empieza a duplicar trabajo en silencio. Escribirla despues
- * significaria repasar todos los handlers que existan para entonces.
+ * **3. Es idempotente.** La entrega es at-least-once, asi que se **reserva** el
+ * `eventId` antes de atenderlo y se descarta lo ya reservado. La reserva cubre
+ * dos casos que hoy si pueden darse --varios hilos publicando el mismo evento, y
+ * un handler que republique el suyo y se reentre-- ademas del que traera el
+ * Transactional Outbox que nombra README 5.2.2, que reentrega **el mismo
+ * `eventId`**. Escribir la guarda despues significaria repasar todos los
+ * handlers que existan para entonces.
  *
  * Lo recordado vive en memoria y no en una tabla, porque el bus tambien: un
  * reinicio no reentrega nada --pierde el evento, que es justo lo que el outbox
@@ -60,17 +74,23 @@ abstract class IdempotentEventHandler(private val handlerName: String) {
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     fun receive(event: DomainEvent) {
-        if (processed.alreadyDone(event.eventId)) {
+        // Se **reserva** el evento antes de atenderlo, no despues. La version
+        // anterior comprobaba primero y marcaba al terminar bien, y con eso la
+        // guarda no servia de nada en los dos casos en los que hace falta: ocho
+        // hilos con el mismo `eventId` pasaban los ocho la comprobacion antes de
+        // que ninguno marcara --medido: ocho ejecuciones-- y un handler que
+        // republicara su propio evento se llamaba a si mismo en cascada.
+        if (!processed.claim(event.eventId)) {
             log.debug("{} descarta {} {}: ya procesado", handlerName, event.type, event.eventId)
             return
         }
 
         try {
             handle(event)
-            // Se marca **al terminar bien**, no antes: si el handler falla, una
-            // reentrega posterior tiene que volver a intentarlo, no saltarselo.
-            processed.done(event.eventId)
         } catch (failure: Exception) {
+            // Se suelta la reserva: si el handler falla, una reentrega posterior
+            // tiene que volver a intentarlo, no saltarselo por haberlo reservado.
+            processed.release(event.eventId)
             log.error("{} fallo atendiendo {} {}", handlerName, event.type, event.eventId, failure)
         }
     }
@@ -94,11 +114,18 @@ private class ProcessedEvents(private val capacity: Int = 10_000) {
         },
     )
 
+    /**
+     * Reserva [eventId] y dice si la reserva es **nueva**.
+     *
+     * Comprobar y reservar tienen que ser un solo paso indivisible: separarlos
+     * deja una ventana entre el «no esta» y el «ya esta» por la que caben todas
+     * las entregas simultaneas que quepan.
+     */
     @Synchronized
-    fun alreadyDone(eventId: UUID): Boolean = eventId in seen
+    fun claim(eventId: UUID): Boolean = seen.add(eventId)
 
     @Synchronized
-    fun done(eventId: UUID) {
-        seen += eventId
+    fun release(eventId: UUID) {
+        seen -= eventId
     }
 }

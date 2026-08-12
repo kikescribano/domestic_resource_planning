@@ -13,13 +13,20 @@ import com.drp.domain.event.DomainEvent
  * para registrarse, mientras que lo declarativo mantiene la propiedad que la
  * seccion 5.2 pide de verdad: que el core no necesite saber que el modulo existe.
  *
- * Tres garantias que el adaptador cumple y de las que depende quien escuche:
+ * Tres garantias, **todas condicionadas a heredar de
+ * [com.drp.application.event.IdempotentEventHandler]**. Esa condicion no es
+ * burocracia: un modulo que se registre por su cuenta con un `@EventListener` a
+ * pelo se queda sin las tres, y ademas puede dejar sin evento a los demas. Los
+ * limites exactos, medidos y no supuestos, estan en esa clase.
  *
  * - **Entrega at-least-once.** Un handler puede recibir el mismo evento mas de
- *   una vez, asi que tiene que ser idempotente. No es una recomendacion: hay una
- *   clase base que lo resuelve, [com.drp.application.event.IdempotentEventHandler].
- * - **Un handler que falla no tumba al core.** La transaccion que origino el
- *   evento ya esta cerrada cuando el handler corre, y su excepcion no sale de el.
+ *   una vez, asi que tiene que ser idempotente. La clase base lo resuelve
+ *   reservando el `eventId` antes de atenderlo.
+ * - **Un handler que falla no tumba al core.** Los datos del core ya estan
+ *   escritos cuando el handler arranca, y su excepcion no sale de el. **Con una
+ *   excepcion conocida**: un handler que se una a la transaccion del core con
+ *   `@Transactional` y falle **si** la tumba. Por eso la regla para tocar la base
+ *   de datos desde un handler es `REQUIRES_NEW`, siempre.
  * - **Un handler que falla no deja sin evento a los demas.** Cada uno se aisla
  *   por su cuenta, que es la unica forma de conseguirlo con un solo difusor.
  */
