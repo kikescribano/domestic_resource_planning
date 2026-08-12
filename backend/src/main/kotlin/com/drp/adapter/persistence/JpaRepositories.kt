@@ -151,3 +151,57 @@ interface CategoryJpaRepository : JpaRepository<CategoryEntity, UUID> {
 
     fun findAllByRetiredAtIsNull(pageable: Pageable): org.springframework.data.domain.Page<CategoryEntity>
 }
+
+interface LocationJpaRepository : JpaRepository<LocationEntity, UUID> {
+
+    fun findAllByParentLocationId(
+        parentLocationId: UUID?,
+        pageable: Pageable,
+    ): org.springframework.data.domain.Page<LocationEntity>
+
+    fun countByParentLocationId(parentLocationId: UUID): Long
+
+    /** Mismo `immutable_unaccent` que el indice `locations_name_unique_among_siblings`. */
+    @Query(
+        value = """
+            SELECT * FROM locations
+            WHERE lower(immutable_unaccent(name)) = lower(immutable_unaccent(:name))
+              AND parent_location_id IS NOT DISTINCT FROM CAST(:parentLocationId AS uuid)
+            LIMIT 1
+        """,
+        nativeQuery = true,
+    )
+    fun findByNormalizedNameAmongSiblings(
+        @Param("name") name: String,
+        @Param("parentLocationId") parentLocationId: UUID?,
+    ): LocationEntity?
+
+    /**
+     * La cadena de ancestros, de padre a raiz, con un CTE recursivo.
+     *
+     * Corre **bajo RLS**, asi que el recorrido no puede salirse del hogar: una
+     * fila de otro es invisible y el camino se corta ahi. Y lleva tope de
+     * profundidad por si los datos ya estuvieran corrompidos con un ciclo --sin
+     * el, la consulta que sirve para detectarlos seria la que se cuelga.
+     */
+    @Query(
+        value = """
+            WITH RECURSIVE chain AS (
+                SELECT l.parent_location_id AS id, 1 AS depth
+                FROM locations l
+                WHERE l.id = CAST(:locationId AS uuid) AND l.parent_location_id IS NOT NULL
+                UNION ALL
+                SELECT l.parent_location_id, c.depth + 1
+                FROM locations l
+                JOIN chain c ON l.id = c.id
+                WHERE l.parent_location_id IS NOT NULL AND c.depth < 100
+            )
+            SELECT id FROM chain
+        """,
+        nativeQuery = true,
+    )
+    fun ancestorIdsOf(@Param("locationId") locationId: UUID): List<UUID>
+
+    @Query(value = "SELECT count(*) FROM assets WHERE location_id = CAST(:locationId AS uuid)", nativeQuery = true)
+    fun countAssetsIn(@Param("locationId") locationId: UUID): Long
+}

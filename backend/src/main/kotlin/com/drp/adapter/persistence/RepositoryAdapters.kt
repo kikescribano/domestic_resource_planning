@@ -2,14 +2,17 @@ package com.drp.adapter.persistence
 
 import com.drp.application.port.CategoryRepository
 import com.drp.application.port.EmailVerificationTokenRepository
+import com.drp.application.port.HierarchyLock
 import com.drp.application.port.HouseholdMemberRepository
 import com.drp.application.port.HouseholdRepository
 import com.drp.application.port.IdentityRepository
 import com.drp.application.port.InvitationRepository
+import com.drp.application.port.LocationRepository
 import com.drp.application.port.Page
 import com.drp.application.port.Pagination
 import com.drp.application.port.PasswordResetTokenRepository
 import com.drp.application.port.RefreshTokenRepository
+import com.drp.application.port.StoredFileRepository
 import com.drp.application.port.TenantResolver
 import com.drp.application.tenant.TenantContext
 import com.drp.domain.catalog.Category
@@ -18,6 +21,7 @@ import com.drp.domain.household.HouseholdMember
 import com.drp.domain.household.MemberRole
 import com.drp.domain.identity.EmailAddress
 import com.drp.domain.identity.Identity
+import com.drp.domain.inventory.Location
 import com.drp.domain.invitation.Invitation
 import com.drp.domain.token.SingleUseToken
 import org.springframework.data.domain.PageRequest
@@ -432,3 +436,129 @@ internal fun CategoryEntity.toDomain() = Category(
     createdBy = createdBy,
     updatedBy = updatedBy,
 )
+
+@Repository
+class LocationRepositoryAdapter(
+    private val locations: LocationJpaRepository,
+    private val tenantContext: TenantContext,
+) : LocationRepository {
+
+    override fun save(location: Location): Location {
+        val householdId = requireNotNull(tenantContext.currentHousehold()) {
+            "Guardar una ubicacion exige contexto de inquilino"
+        }
+
+        return locations.save(
+            LocationEntity(
+                id = location.id,
+                householdId = householdId,
+                name = location.name,
+                type = location.type,
+                parentLocationId = location.parentLocationId,
+                capacity = location.capacity,
+                environmentalConditions = location.environmentalConditions,
+                photoUrl = location.photoUrl,
+                photoFileId = location.photoFileId,
+                notes = location.notes,
+                createdAt = location.createdAt,
+                updatedAt = location.updatedAt,
+                createdBy = location.createdBy,
+                updatedBy = location.updatedBy,
+            ),
+        ).toDomain()
+    }
+
+    override fun findById(locationId: UUID): Location? =
+        locations.findById(locationId).orElse(null)?.toDomain()
+
+    override fun findByNameAmongSiblings(name: String, parentLocationId: UUID?): Location? =
+        locations.findByNormalizedNameAmongSiblings(name, parentLocationId)?.toDomain()
+
+    override fun list(parentLocationId: UUID?, onlyChildren: Boolean, pagination: Pagination): Page<Location> {
+        val request = PageRequest.of(pagination.page, pagination.size, Sort.by("name"))
+        val found = if (onlyChildren) {
+            locations.findAllByParentLocationId(parentLocationId, request)
+        } else {
+            locations.findAll(request)
+        }
+        return Page(found.content.map { it.toDomain() }, pagination.page, pagination.size, found.totalElements)
+    }
+
+    override fun countChildren(locationId: UUID): Long = locations.countByParentLocationId(locationId)
+
+    override fun countAssetsIn(locationId: UUID): Long = locations.countAssetsIn(locationId)
+
+    override fun ancestorsOf(locationId: UUID): List<UUID> = locations.ancestorIdsOf(locationId)
+
+    override fun delete(locationId: UUID) = locations.deleteById(locationId)
+}
+
+internal fun LocationEntity.toDomain() = Location(
+    id = id,
+    name = name,
+    type = type,
+    parentLocationId = parentLocationId,
+    capacity = capacity,
+    environmentalConditions = environmentalConditions,
+    photoUrl = photoUrl,
+    photoFileId = photoFileId,
+    notes = notes,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    createdBy = createdBy,
+    updatedBy = updatedBy,
+)
+
+/**
+ * Va por JDBC y sin entidad JPA a proposito: la pregunta es de si o no, y mapear
+ * `files` entera es trabajo del Hito 3. La consulta corre bajo RLS, asi que el
+ * fichero de otro hogar no aparece --y hoy no aparece ninguno, porque nada puede
+ * insertar en esa tabla todavia.
+ */
+@Repository
+class StoredFileRepositoryAdapter(private val jdbc: JdbcTemplate) : StoredFileRepository {
+
+    override fun existsUsable(fileId: UUID): Boolean =
+        jdbc.queryForObject(
+            """
+            SELECT count(*) FROM files
+            WHERE id = ? AND deleted_at IS NULL AND uploaded_at IS NOT NULL
+            """.trimIndent(),
+            Long::class.java,
+            fileId,
+        )!! > 0
+}
+
+/**
+ * El cerrojo de jerarquia, con un advisory lock de transaccion.
+ *
+ * Se elige `pg_advisory_xact_lock` y no un `SELECT ... FOR UPDATE` sobre las
+ * filas implicadas porque el bloqueo de filas cierra el ciclo de dos nodos y no
+ * el de tres: A→B, B→C y C→A a la vez bloquean parejas distintas y no coinciden
+ * en ninguna. Un cerrojo por hogar los cierra todos.
+ *
+ * Se libera solo al cerrar la transaccion --de ahi el `xact`--, asi que no hay
+ * forma de dejarselo puesto ni siquiera fallando a mitad.
+ *
+ * La clave se compone de un espacio de nombres fijo y del hash del hogar. Dos
+ * hogares distintos podrian colisionar en el mismo hash, y el efecto seria que
+ * uno espera al otro un instante: nunca un fallo de correccion.
+ */
+@Repository
+class AdvisoryHierarchyLock(
+    private val jdbc: JdbcTemplate,
+    private val tenantContext: TenantContext,
+) : HierarchyLock {
+
+    override fun acquire() {
+        val householdId = requireNotNull(tenantContext.currentHousehold()) {
+            "Tomar el cerrojo de jerarquia exige contexto de inquilino"
+        }
+
+        jdbc.queryForObject(
+            "SELECT pg_advisory_xact_lock(hashtext('drp.hierarchy'), hashtext(?))",
+            String::class.java,
+            householdId.toString(),
+        )
+    }
+}

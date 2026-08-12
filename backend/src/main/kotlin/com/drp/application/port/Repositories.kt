@@ -5,6 +5,7 @@ import com.drp.domain.household.Household
 import com.drp.domain.household.HouseholdMember
 import com.drp.domain.identity.EmailAddress
 import com.drp.domain.identity.Identity
+import com.drp.domain.inventory.Location
 import com.drp.domain.invitation.Invitation
 import com.drp.domain.token.SingleUseToken
 import java.time.Instant
@@ -172,4 +173,68 @@ interface CategoryRepository {
     fun findLiveByName(name: String): Category?
 
     fun list(includeRetired: Boolean, pagination: Pagination): Page<Category>
+}
+
+interface LocationRepository {
+    fun save(location: Location): Location
+
+    fun findById(locationId: UUID): Location?
+
+    /**
+     * Unico **entre hermanas**, no en todo el hogar: dos «Estanteria 2» pueden
+     * convivir en garajes distintos, pero no en el mismo. `parentLocationId` a
+     * nulo compara entre las raices, que es lo que cubre el `NULLS NOT DISTINCT`
+     * del indice.
+     */
+    fun findByNameAmongSiblings(name: String, parentLocationId: UUID?): Location?
+
+    /** Con [parentLocationId] a nulo y [onlyChildren] a false devuelve el hogar entero. */
+    fun list(parentLocationId: UUID?, onlyChildren: Boolean, pagination: Pagination): Page<Location>
+
+    fun countChildren(locationId: UUID): Long
+
+    fun countAssetsIn(locationId: UUID): Long
+
+    /**
+     * La cadena de ancestros de [locationId], del padre hacia la raiz.
+     *
+     * Es lo que sostiene la comprobacion anti-ciclo, que **no** es expresable como
+     * `CHECK`: una restriccion solo ve la fila que se inserta, y la pregunta aqui
+     * es por el camino entero hasta la raiz.
+     */
+    fun ancestorsOf(locationId: UUID): List<UUID>
+
+    /** Borrado **real**: una ubicacion vacia no deja historial que preservar. */
+    fun delete(locationId: UUID)
+}
+
+/**
+ * Lo unico que el Hito 2 necesita saber de un fichero: si se puede adjuntar.
+ *
+ * No hay entidad JPA de `files` ni la va a haber hasta el Hito 3, que es de quien
+ * son los ficheros (ADR-005). Mapear la tabla entera ahora seria adelantar
+ * trabajo de otro hito para responder una pregunta de si o no.
+ */
+interface StoredFileRepository {
+    /** Vivo, ya subido del todo y --por RLS-- de este hogar. */
+    fun existsUsable(fileId: UUID): Boolean
+}
+
+/**
+ * Serializa los cambios de jerarquia dentro de un hogar.
+ *
+ * Existe por un agujero que ni la base de datos ni la comprobacion anti-ciclo
+ * pueden cerrar por si solas: **dos peticiones simultaneas**. Colgar A de B y B
+ * de A a la vez pasa las dos comprobaciones --ninguna transaccion ve el cambio de
+ * la otra-- y deja un ciclo que despues nadie puede deshacer, porque recorrer la
+ * jerarquia no termina nunca.
+ *
+ * Un `SELECT ... FOR UPDATE` sobre las dos filas implicadas cerraria el ciclo de
+ * dos nodos y no el de tres. Con un cerrojo por hogar se cierran todos, y el
+ * precio es nulo en la practica: reorganizar la casa no es una operacion
+ * concurrida.
+ */
+interface HierarchyLock {
+    /** Se toma dentro de la transaccion y se suelta sola al cerrarla. */
+    fun acquire()
 }
