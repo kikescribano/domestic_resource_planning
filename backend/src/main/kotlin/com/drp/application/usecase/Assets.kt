@@ -331,10 +331,15 @@ class UpdateAsset(
 
     @Transactional
     fun handle(session: SessionClaims, assetId: UUID, patch: AssetPatch): AssetView {
+        // Antes de leer y en toda modificacion, por lo mismo que en
+        // `UpdateLocation`: `save` reescribe la fila entera, asi que un cambio de
+        // notas deshace en silencio un movimiento concurrente ya confirmado, y
+        // esa reescritura puede cerrar un ciclo sin pasar por la comprobacion.
+        hierarchyLock.acquire()
+
         val current = assets.findById(assetId) ?: throw ResourceNotFound("Asset no encontrado")
 
         val moves = patch.location is Patch.Set && patch.location.value != current.location
-        if (moves) hierarchyLock.acquire()
 
         val newLocation = patch.location.orKeep(current.location)
         if (moves && newLocation != null) {
@@ -512,12 +517,17 @@ class MergeStockItems(
 @Service
 class DecommissionAsset(
     private val assets: AssetRepository,
+    private val hierarchyLock: HierarchyLock,
     private val events: CoreEvents,
     private val clock: Clock,
 ) {
 
     @Transactional
     fun handle(session: SessionClaims, assetId: UUID) {
+        // Comprobar que no tiene nada dentro y darlo de baja son dos pasos, y
+        // entre ellos cabe un movimiento que meta algo.
+        hierarchyLock.acquire()
+
         val asset = assets.findById(assetId) ?: throw ResourceNotFound("Asset no encontrado")
         if (!asset.isLive) return
 

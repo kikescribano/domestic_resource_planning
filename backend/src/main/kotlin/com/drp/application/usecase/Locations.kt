@@ -152,15 +152,26 @@ class UpdateLocation(
 
     @Transactional
     fun handle(session: SessionClaims, locationId: UUID, patch: LocationPatch): Location {
+        // El cerrojo se toma **antes de leer** y en **toda** modificacion, no solo
+        // en las que mueven. Las dos condiciones costaron un fallo de CI cada una.
+        //
+        // Antes de leer, porque lo que hay que hacer indivisible es el ciclo
+        // entero de leer, comprobar y escribir: comprobar sobre un estado que
+        // otra transaccion ya cambio es exactamente el ciclo que se busca evitar.
+        //
+        // Y en toda modificacion porque `save` reescribe **la fila entera**,
+        // incluido `parent_location_id`. Un simple renombrado lo reescribe con el
+        // valor que leyo al empezar, asi que un movimiento confirmado con un 200
+        // en medio de esos dos instantes **se deshace en silencio** --y con tres
+        // peticiones a la vez, esa reescritura puede cerrar un ciclo que la
+        // comprobacion anti-ciclo nunca llego a ver, porque para ella no habia
+        // movimiento que comprobar.
+        hierarchyLock.acquire()
+
         val current = locations.findById(locationId) ?: throw ResourceNotFound("Ubicación no encontrada")
 
         val movesInHierarchy = patch.parentLocationId is Patch.Set &&
             patch.parentLocationId.value != current.parentLocationId
-
-        // El cerrojo se toma **antes** de leer los ancestros y solo si de verdad
-        // se mueve: con dos peticiones simultaneas, cada una comprobando sobre el
-        // estado que la otra aun no ha escrito, las dos pasan y queda un ciclo.
-        if (movesInHierarchy) hierarchyLock.acquire()
 
         val newParentId = patch.parentLocationId.orKeep(current.parentLocationId)
         if (movesInHierarchy && newParentId != null) {
@@ -197,10 +208,17 @@ class UpdateLocation(
  * articulo: una ubicacion vacia no deja historial que preservar.
  */
 @Service
-class DeleteLocation(private val locations: LocationRepository) {
+class DeleteLocation(
+    private val locations: LocationRepository,
+    private val hierarchyLock: HierarchyLock,
+) {
 
     @Transactional
     fun handle(locationId: UUID) {
+        // Tambien aqui: comprobar que no cuelga nada y borrar son dos pasos, y
+        // entre ellos cabe un movimiento que meta algo dentro.
+        hierarchyLock.acquire()
+
         locations.findById(locationId) ?: throw ResourceNotFound("Ubicación no encontrada")
 
         if (locations.countChildren(locationId) > 0) {
