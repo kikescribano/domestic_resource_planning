@@ -152,6 +152,76 @@ interface CategoryJpaRepository : JpaRepository<CategoryEntity, UUID> {
     fun findAllByRetiredAtIsNull(pageable: Pageable): org.springframework.data.domain.Page<CategoryEntity>
 }
 
+interface ArticleJpaRepository : JpaRepository<ArticleEntity, UUID> {
+
+    /** Mismo `immutable_unaccent` que el indice `articles_name_unique_live`. */
+    @Query(
+        value = """
+            SELECT * FROM articles
+            WHERE lower(immutable_unaccent(name)) = lower(immutable_unaccent(:name))
+              AND retired_at IS NULL
+            LIMIT 1
+        """,
+        nativeQuery = true,
+    )
+    fun findLiveByNormalizedName(@Param("name") name: String): ArticleEntity?
+
+    fun findFirstByBarcodeAndRetiredAtIsNull(barcode: String): ArticleEntity?
+
+    /**
+     * El listado con sus cuatro filtros, todos opcionales.
+     *
+     * El `q` compara normalizado igual que la unicidad --buscar «cafe» tiene que
+     * encontrar «Café»-- y por eso la consulta es nativa: JPQL no sabe llamar a
+     * `immutable_unaccent`.
+     */
+    @Query(
+        value = """
+            SELECT * FROM articles
+            WHERE (:includeRetired OR retired_at IS NULL)
+              AND (CAST(:categoryId AS uuid) IS NULL OR category_id = CAST(:categoryId AS uuid))
+              AND (CAST(:barcode AS text) IS NULL OR barcode = CAST(:barcode AS text))
+              AND (
+                CAST(:query AS text) IS NULL
+                OR lower(immutable_unaccent(name)) LIKE '%' || lower(immutable_unaccent(CAST(:query AS text))) || '%'
+              )
+            ORDER BY name
+        """,
+        countQuery = """
+            SELECT count(*) FROM articles
+            WHERE (:includeRetired OR retired_at IS NULL)
+              AND (CAST(:categoryId AS uuid) IS NULL OR category_id = CAST(:categoryId AS uuid))
+              AND (CAST(:barcode AS text) IS NULL OR barcode = CAST(:barcode AS text))
+              AND (
+                CAST(:query AS text) IS NULL
+                OR lower(immutable_unaccent(name)) LIKE '%' || lower(immutable_unaccent(CAST(:query AS text))) || '%'
+              )
+        """,
+        nativeQuery = true,
+    )
+    fun search(
+        @Param("query") query: String?,
+        @Param("categoryId") categoryId: UUID?,
+        @Param("barcode") barcode: String?,
+        @Param("includeRetired") includeRetired: Boolean,
+        pageable: Pageable,
+    ): org.springframework.data.domain.Page<ArticleEntity>
+
+    /**
+     * Las existencias vivas del articulo. `DECOMMISSIONED` no cuenta: una
+     * existencia dada de baja sigue apuntando al articulo --por eso la fila
+     * permanece-- pero no impide retirarlo.
+     */
+    @Query(
+        value = """
+            SELECT count(*) FROM assets
+            WHERE article_id = CAST(:articleId AS uuid) AND status <> 'DECOMMISSIONED'
+        """,
+        nativeQuery = true,
+    )
+    fun countLiveStockItems(@Param("articleId") articleId: UUID): Long
+}
+
 interface LocationJpaRepository : JpaRepository<LocationEntity, UUID> {
 
     fun findAllByParentLocationId(

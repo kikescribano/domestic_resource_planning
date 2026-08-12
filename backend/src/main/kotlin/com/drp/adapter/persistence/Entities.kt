@@ -1,5 +1,6 @@
 package com.drp.adapter.persistence
 
+import com.drp.domain.catalog.MeasurementUnit
 import com.drp.domain.household.MemberRole
 import com.drp.domain.inventory.Capacity
 import com.drp.domain.inventory.EnvironmentalConditions
@@ -11,6 +12,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.Table
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
+import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
 
@@ -124,6 +126,28 @@ class CategoryEntity(
     @Id var id: UUID,
     var householdId: UUID,
     var name: String,
+    var notes: String?,
+    var createdAt: Instant,
+    var updatedAt: Instant,
+    var retiredAt: Instant?,
+    var createdBy: UUID?,
+    var updatedBy: UUID?,
+)
+
+@Entity
+@Table(name = "articles")
+class ArticleEntity(
+    @Id var id: UUID,
+    var householdId: UUID,
+    var categoryId: UUID,
+    var name: String,
+    @Enumerated(EnumType.STRING) var unit: MeasurementUnit,
+    var brand: String?,
+    var model: String?,
+    var barcode: String?,
+    var packSize: BigDecimal?,
+    var photoUrl: String?,
+    var photoFileId: UUID?,
     var notes: String?,
     var createdAt: Instant,
     var updatedAt: Instant,

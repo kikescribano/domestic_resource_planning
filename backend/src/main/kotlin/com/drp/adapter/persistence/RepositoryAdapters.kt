@@ -1,5 +1,7 @@
 package com.drp.adapter.persistence
 
+import com.drp.application.port.ArticleFilter
+import com.drp.application.port.ArticleRepository
 import com.drp.application.port.CategoryRepository
 import com.drp.application.port.EmailVerificationTokenRepository
 import com.drp.application.port.HierarchyLock
@@ -15,6 +17,7 @@ import com.drp.application.port.RefreshTokenRepository
 import com.drp.application.port.StoredFileRepository
 import com.drp.application.port.TenantResolver
 import com.drp.application.tenant.TenantContext
+import com.drp.domain.catalog.Article
 import com.drp.domain.catalog.Category
 import com.drp.domain.household.Household
 import com.drp.domain.household.HouseholdMember
@@ -429,6 +432,82 @@ class CategoryRepositoryAdapter(
 internal fun CategoryEntity.toDomain() = Category(
     id = id,
     name = name,
+    notes = notes,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    retiredAt = retiredAt,
+    createdBy = createdBy,
+    updatedBy = updatedBy,
+)
+
+@Repository
+class ArticleRepositoryAdapter(
+    private val articles: ArticleJpaRepository,
+    private val tenantContext: TenantContext,
+) : ArticleRepository {
+
+    override fun save(article: Article): Article {
+        val householdId = requireNotNull(tenantContext.currentHousehold()) {
+            "Guardar un articulo exige contexto de inquilino"
+        }
+
+        return articles.save(
+            ArticleEntity(
+                id = article.id,
+                householdId = householdId,
+                categoryId = article.categoryId,
+                name = article.name,
+                unit = article.unit,
+                brand = article.brand,
+                model = article.model,
+                barcode = article.barcode,
+                packSize = article.packSize,
+                photoUrl = article.photoUrl,
+                photoFileId = article.photoFileId,
+                notes = article.notes,
+                createdAt = article.createdAt,
+                updatedAt = article.updatedAt,
+                retiredAt = article.retiredAt,
+                createdBy = article.createdBy,
+                updatedBy = article.updatedBy,
+            ),
+        ).toDomain()
+    }
+
+    override fun findById(articleId: UUID): Article? =
+        articles.findById(articleId).orElse(null)?.toDomain()
+
+    override fun findLiveByName(name: String): Article? =
+        articles.findLiveByNormalizedName(name)?.toDomain()
+
+    override fun findLiveByBarcode(barcode: String): Article? =
+        articles.findFirstByBarcodeAndRetiredAtIsNull(barcode)?.toDomain()
+
+    override fun list(filter: ArticleFilter, pagination: Pagination): Page<Article> {
+        val found = articles.search(
+            query = filter.query?.takeIf { it.isNotBlank() },
+            categoryId = filter.categoryId,
+            barcode = filter.barcode?.takeIf { it.isNotBlank() },
+            includeRetired = filter.includeRetired,
+            pageable = PageRequest.of(pagination.page, pagination.size),
+        )
+        return Page(found.content.map { it.toDomain() }, pagination.page, pagination.size, found.totalElements)
+    }
+
+    override fun countLiveStockItems(articleId: UUID): Long = articles.countLiveStockItems(articleId)
+}
+
+internal fun ArticleEntity.toDomain() = Article(
+    id = id,
+    name = name,
+    categoryId = categoryId,
+    unit = unit,
+    brand = brand,
+    model = model,
+    barcode = barcode,
+    packSize = packSize,
+    photoUrl = photoUrl,
+    photoFileId = photoFileId,
     notes = notes,
     createdAt = createdAt,
     updatedAt = updatedAt,

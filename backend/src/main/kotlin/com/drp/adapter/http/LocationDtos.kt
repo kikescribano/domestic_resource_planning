@@ -149,6 +149,10 @@ class JsonPatch(private val body: JsonNode) {
     fun uuid(field: String): Patch<UUID?> =
         if (!has(field)) Patch.Absent else Patch.Set(node(field)?.asText()?.let(UUID::fromString))
 
+    /** Para los campos que se pueden cambiar pero no vaciar, como la categoria de un articulo. */
+    fun requiredUuid(field: String): Patch<UUID> =
+        if (!has(field)) Patch.Absent else Patch.Set(UUID.fromString(rawText(field)))
+
     fun decimal(field: String): Patch<BigDecimal?> =
         if (!has(field)) Patch.Absent else Patch.Set(node(field)?.decimalValue())
 

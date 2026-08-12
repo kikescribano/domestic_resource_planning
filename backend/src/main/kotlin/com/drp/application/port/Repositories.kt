@@ -1,5 +1,6 @@
 package com.drp.application.port
 
+import com.drp.domain.catalog.Article
 import com.drp.domain.catalog.Category
 import com.drp.domain.household.Household
 import com.drp.domain.household.HouseholdMember
@@ -174,6 +175,36 @@ interface CategoryRepository {
 
     fun list(includeRetired: Boolean, pagination: Pagination): Page<Category>
 }
+
+interface ArticleRepository {
+    fun save(article: Article): Article
+
+    fun findById(articleId: UUID): Article?
+
+    /** Unico en el hogar entre los vigentes, comparado sin mayusculas ni acentos. */
+    fun findLiveByName(name: String): Article?
+
+    /** El codigo de barras tambien es unico entre los vigentes, si se informa. */
+    fun findLiveByBarcode(barcode: String): Article?
+
+    fun list(filter: ArticleFilter, pagination: Pagination): Page<Article>
+
+    /**
+     * Cuantas existencias vivas le quedan.
+     *
+     * Sostiene las dos reglas que dependen de ello: la `unit` deja de ser
+     * modificable en cuanto hay cantidad contada en ella, y el articulo no se
+     * puede retirar mientras quede algo.
+     */
+    fun countLiveStockItems(articleId: UUID): Long
+}
+
+data class ArticleFilter(
+    val query: String? = null,
+    val categoryId: UUID? = null,
+    val barcode: String? = null,
+    val includeRetired: Boolean = false,
+)
 
 interface LocationRepository {
     fun save(location: Location): Location
