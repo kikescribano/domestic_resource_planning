@@ -123,6 +123,10 @@ drp:
     # El lado largo de la miniatura. De sobra para una rejilla en un movil de
     # 375 px, y no cuenta en la cuota del hogar.
     thumbnail-pixels: 320
+    # 1 MB por avatar, el mismo tope que el CHECK de la columna. NO es una cuota
+    # acumulable: un avatar sustituye siempre al anterior, asi que no hay nada
+    # que sumar (README 4.1.1).
+    max-avatar-bytes: 1048576
 
   files:
     # De donde cuelgan las URL firmadas. En produccion es **otro dominio**, que

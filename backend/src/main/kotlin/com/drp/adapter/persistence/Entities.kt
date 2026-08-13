@@ -60,6 +60,14 @@ class IdentityEntity(
     var passwordHash: String,
     var emailVerifiedAt: Instant?,
     var lastLoginAt: Instant?,
+    // El avatar vive aqui y no en `files`: una identidad no pertenece a ningun
+    // hogar, asi que no tiene cuota a la que sumar ni politica de RLS detras
+    // (README 4.1.1). `avatar_url` queda para un enlace externo y hoy nadie lo
+    // rellena: el contrato solo ofrece subir un fichero.
+    var avatarUrl: String?,
+    var avatarStorageKey: String?,
+    var avatarContentType: String?,
+    var avatarSizeBytes: Long?,
     var createdAt: Instant,
     var updatedAt: Instant,
     var deactivatedAt: Instant?,

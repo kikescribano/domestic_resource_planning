@@ -51,6 +51,14 @@ object StorageKeys {
      */
     fun avatar(identityId: UUID): String = "$AVATAR/${shardOf(identityId)}/$identityId"
 
+    /**
+     * Un avatar se guarda **siempre en WebP**, porque lo que se guarda es la
+     * miniatura: se pinta a 40 px en una lista de personas y a poco mas en su
+     * ficha, asi que conservar la foto entera seria guardar cien veces lo que se
+     * usa.
+     */
+    const val AVATAR_CONTENT_TYPE = "image/webp"
+
     private fun shardOf(id: UUID) = id.toString().take(SHARD_LENGTH)
 
     private const val SHARD_LENGTH = 2

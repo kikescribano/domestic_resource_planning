@@ -132,6 +132,7 @@ class CreateHousehold(
                         // sesion, y el hogar no sirve para nada.
                         emailVerifiedAt = null,
                         lastLoginAt = null,
+                        avatar = null,
                         createdAt = now,
                         updatedAt = now,
                         deactivatedAt = null,

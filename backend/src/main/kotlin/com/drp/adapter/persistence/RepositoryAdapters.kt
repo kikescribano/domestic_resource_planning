@@ -32,6 +32,7 @@ import com.drp.domain.file.StoredFile
 import com.drp.domain.household.Household
 import com.drp.domain.household.HouseholdMember
 import com.drp.domain.household.MemberRole
+import com.drp.domain.identity.Avatar
 import com.drp.domain.identity.EmailAddress
 import com.drp.domain.identity.Identity
 import com.drp.domain.inventory.Asset
@@ -151,6 +152,10 @@ class IdentityRepositoryAdapter(
                 passwordHash = identity.passwordHash,
                 emailVerifiedAt = identity.emailVerifiedAt,
                 lastLoginAt = identity.lastLoginAt,
+                avatarUrl = null,
+                avatarStorageKey = identity.avatar?.storageKey,
+                avatarContentType = identity.avatar?.contentType,
+                avatarSizeBytes = identity.avatar?.sizeBytes,
                 createdAt = identity.createdAt,
                 updatedAt = identity.updatedAt,
                 deactivatedAt = identity.deactivatedAt,
@@ -174,6 +179,7 @@ internal fun IdentityEntity.toDomain() = Identity(
     passwordHash = passwordHash,
     emailVerifiedAt = emailVerifiedAt,
     lastLoginAt = lastLoginAt,
+    avatar = Avatar.from(avatarStorageKey, avatarContentType, avatarSizeBytes),
     createdAt = createdAt,
     updatedAt = updatedAt,
     deactivatedAt = deactivatedAt,

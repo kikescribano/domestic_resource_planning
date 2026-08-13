@@ -16,6 +16,7 @@ import com.drp.application.usecase.ReceivedFile
 import com.drp.application.usecase.UploadFile
 import com.drp.application.usecase.UploadSource
 import com.drp.domain.ResourceNotFound
+import com.drp.domain.ValidationFailure
 import com.drp.domain.file.DocumentType
 import com.drp.domain.file.StoredContentType
 import com.drp.domain.file.StoredFile
@@ -160,27 +161,6 @@ class FileController(
     private fun contentTypeOrReject(value: String): StoredContentType =
         StoredContentType.from(value) ?: throw IllegalArgumentException("Tipo de contenido no admitido: $value")
 
-    /**
-     * La peticion multipart, vista como fuente de bytes.
-     *
-     * `declaredBytes` no parsea nada: es la cabecera. `receive()` si, y por eso se
-     * invoca **despues** de la reserva.
-     */
-    private class MultipartUpload(private val request: MultipartHttpServletRequest) : UploadSource {
-
-        override val declaredBytes: Long get() = request.contentLengthLong
-
-        override fun receive(): ReceivedFile {
-            val part = request.getFile(FIELD)
-                ?: throw com.drp.domain.ValidationFailure(mapOf(FIELD to "no se ha enviado ningún fichero"))
-            return ReceivedFile(part.originalFilename ?: FIELD, part.inputStream)
-        }
-
-        companion object {
-            const val FIELD = "file"
-        }
-    }
-
     private companion object {
         const val ACCEL_REDIRECT = "X-Accel-Redirect"
         const val NOSNIFF = "nosniff"
@@ -285,5 +265,31 @@ class LocalSignedFileController(
             .header(X_CONTENT_TYPE_OPTIONS, "nosniff")
             .header(REFERRER_POLICY, "no-referrer")
             .body(InputStreamResource(content))
+    }
+}
+
+/**
+ * La peticion multipart, vista como fuente de bytes.
+ *
+ * `declaredBytes` **no parsea nada**: es la cabecera de la peticion. `receive()`
+ * si, y por eso se invoca despues de la reserva de cuota. Ese reparto en dos
+ * tiempos es lo que hace posible reservar antes de transmitir (5.8.3).
+ *
+ * La usan los dos sitios que reciben un fichero --la subida al hogar y el avatar
+ * de una identidad-- porque el camino es el mismo aunque lo que hagan despues no
+ * lo sea.
+ */
+internal class MultipartUpload(private val request: MultipartHttpServletRequest) : UploadSource {
+
+    override val declaredBytes: Long get() = request.contentLengthLong
+
+    override fun receive(): ReceivedFile {
+        val part = request.getFile(FIELD)
+            ?: throw ValidationFailure(mapOf(FIELD to "no se ha enviado ningún fichero"))
+        return ReceivedFile(part.originalFilename ?: FIELD, part.inputStream)
+    }
+
+    private companion object {
+        const val FIELD = "file"
     }
 }

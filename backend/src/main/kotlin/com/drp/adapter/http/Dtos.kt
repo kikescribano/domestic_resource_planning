@@ -131,16 +131,16 @@ data class UserResponse(
     val updatedBy: UUID?,
 ) {
     companion object {
-        fun of(user: HouseholdUser) = UserResponse(
+        fun of(user: HouseholdUser, avatarUrl: String?) = UserResponse(
             id = user.member.id,
             identityId = user.identity.id,
             name = user.identity.name,
             email = user.identity.email.value,
             phone = user.identity.phone,
             role = user.member.role,
-            // El avatar llega con el Hito 3, junto al resto de la entrega de
-            // ficheros: hasta entonces la columna existe y nadie la rellena.
-            avatarUrl = null,
+            // URL firmada, igual que una foto. Nula cuando la persona no ha
+            // subido ninguno, que es lo normal.
+            avatarUrl = avatarUrl,
             lastLoginAt = user.identity.lastLoginAt,
             emailVerifiedAt = user.identity.emailVerifiedAt,
             deactivatedAt = user.member.deactivatedAt,

@@ -33,12 +33,17 @@ data class TestHousehold(
      * de un fichero se troce por hogar.
      */
     val householdId: String,
+    /**
+     * La **identidad**, que no es la pertenencia. La ruta de un avatar se deriva
+     * de ella, porque una identidad no pertenece a ningun hogar.
+     */
+    val identityId: String,
 )
 
-/** El `householdId` que lleva dentro el access token. Solo lo usan las pruebas. */
-private fun String.householdIdClaim(): String {
+/** Los claims que lleva dentro el access token. Solo los usan las pruebas. */
+private fun String.claim(name: String): String {
     val payload = String(java.util.Base64.getUrlDecoder().decode(split(".")[1]))
-    return payload.extract("householdId")
+    return payload.extract(name)
 }
 
 /**
@@ -60,7 +65,7 @@ fun TestRestTemplate.registerHousehold(mailpit: DrpMailpit = DrpMailpit.instance
     val accessToken = session.extract("accessToken")
     val memberId = getJson("/api/v1/users", accessToken).body!!.extract("id")
 
-    return TestHousehold(accessToken, memberId, email, accessToken.householdIdClaim())
+    return TestHousehold(accessToken, memberId, email, accessToken.claim("householdId"), accessToken.claim("sub"))
 }
 
 /**
