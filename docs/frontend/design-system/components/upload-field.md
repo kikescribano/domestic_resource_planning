@@ -46,8 +46,8 @@ Tampoco cubre el documento que **vive fuera**: `DocumentInput` acepta `url` o
 
 ## Anatomía, variantes y estados
 
-Una columna, con la separación de un campo (`gap-1.5`), y cinco piezas de las
-que **solo la primera está siempre**:
+Una columna, con la separación de un campo (`gap-1.5`), y cinco piezas: **las
+tres primeras están siempre y las dos últimas aparecen con el fichero**.
 
 1. **El disparador** — un `<label>` con aspecto de botón secundario, de 44 px de
    alto (`min-h-touch`), con su icono y su texto («Elegir foto», «Añadir
@@ -104,9 +104,10 @@ aplicación colgada. Por eso hay un estado **Procesando** entre el 100 % y el
 `201`, con la barra indeterminada y su etiqueta.
 
 **Un fichero subido y no adjuntado no es basura que haya que recoger.** Ocupa
-cuota, no se puede adjuntar a nada mientras `uploadedAt` sea nulo, y el proceso
-diario lo retira a las 24 horas. Cancelar un formulario a medias deja como mucho
-una fila que se limpia sola: el componente **no** debe intentar borrarla en el
+cuota desde que se reserva y no se puede adjuntar mientras `uploadedAt` siga a
+nulo; el proceso diario retira las dos cosas —la subida que se quedó a medias y
+la que terminó y nunca se adjuntó, a las 24 h—. Cancelar un formulario deja como
+mucho una fila que se limpia sola: el componente **no** debe intentar borrarla en el
 `unmount` —no hay garantía de que ese código llegue a ejecutarse, y una petición
 de borrado en el camino de salida es exactamente lo que falla en el móvil que se
 bloquea—.
@@ -271,6 +272,14 @@ comprobaciones locales, las dos baratas y ninguna sustituta de la del servidor:
 Y por encima del 90 % de ocupación, el campo enseña cuánto queda **antes** de que
 nadie elija nada. Los valores llegan del mismo `GET /storage`, así que no cuesta
 una petición nueva por campo si la pantalla ya lo tiene.
+
+**El medidor de cuota no es un componente aparte**, y por eso no tiene ficha
+propia: es esta misma barra con dos cambios. Uno es semántico y no es menor —un
+nivel que no cambia solo no es una tarea en curso, así que su papel es `meter` y
+no `progressbar`—, y el otro es el color, que pasa a `warning` por encima del
+90 % y a `danger` al llegar al tope, siempre con la cifra escrita al lado, porque
+nada se dice solo con color. La pantalla de almacenamiento del hogar reutiliza la
+misma pieza con esa configuración.
 
 ### El `accept` es una comodidad, nunca una validación
 

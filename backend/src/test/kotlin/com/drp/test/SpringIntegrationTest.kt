@@ -2,6 +2,8 @@ package com.drp.test
 
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import java.nio.file.Files
+import java.nio.file.Path
 
 /**
  * Base de las pruebas que levantan la aplicacion entera contra PostgreSQL real.
@@ -39,6 +41,23 @@ abstract class SpringIntegrationTest {
             // propia prueba, con sus propios valores.
             registry.add("drp.rate-limit.per-ip") { 10_000 }
             registry.add("drp.rate-limit.per-email") { 10_000 }
+            registry.add("drp.rate-limit.per-identity-upload") { 10_000 }
+
+            // El volumen de ficheros, en un directorio efimero. Se comparte entre
+            // clases igual que el contenedor de PostgreSQL: crear uno por clase
+            // multiplicaria los arranques sin comprobar nada mas.
+            registry.add("drp.storage.root") { storageRoot.toString() }
         }
+
+        /**
+         * La raiz del volumen de ficheros durante las pruebas.
+         *
+         * Es publica porque hay comprobaciones que **no se pueden hacer por la
+         * API**: que el EXIF ha desaparecido se afirma mirando los bytes
+         * guardados, no la respuesta. Escribir y leer con el mismo codigo se
+         * equivoca igual en los dos sentidos.
+         */
+        @JvmStatic
+        val storageRoot: Path = Files.createTempDirectory("drp-files-test")
     }
 }

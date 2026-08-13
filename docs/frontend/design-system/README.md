@@ -23,7 +23,7 @@ Escrito al arrancar el Hito 2, que es cuando las primitivas se pusieron a prueba
 contra algo más que un formulario:
 
 - [`components/`](components/README.md) — anatomía, variantes, estados,
-  comportamiento y accesibilidad de los seis componentes que existen:
+  comportamiento y accesibilidad, con ficha propia para
   [botón](components/button.md), [campo](components/field.md),
   [aviso](components/notice.md),
   [distintivo de estado](components/status-badge.md),
@@ -33,6 +33,12 @@ contra algo más que un formulario:
   [listado](patterns/listing.md), [jerarquía navegable](patterns/hierarchy.md),
   [feedback](patterns/feedback.md) y [navegación](patterns/navigation.md).
 
+Escrito al arrancar el Hito 3, y **previsto de arriba abajo**, porque describe
+anatomías que todavía no existen: la [subida de fichero con
+progreso](components/upload-field.md), la [galería de
+ficheros](components/file-gallery.md) y el [avatar](components/avatar.md). Son la
+especificación de lo que el hito tiene que construir, no el resumen de nada.
+
 Previsto, y sin contenido todavía:
 
 - `content/`: terminología, voz, tono, etiquetas y mensajes.
@@ -40,14 +46,15 @@ Previsto, y sin contenido todavía:
 
 > **Lo que estas fichas dicen y lo que no.** Describen lo que
 > [`frontend/src/ui/primitives.tsx`](../../../frontend/src/ui/primitives.tsx)
-> hace hoy, no lo que convendría que hiciera: lo que el Hito 2 necesita y
+> hace hoy, no lo que convendría que hiciera: lo que el hito en curso necesita y
 > todavía no está va en un apartado propio de «Lo que falta», marcado como
 > previsto. Dos de los cinco patrones —listado y jerarquía— **están previstos
-> enteros**, porque describen pantallas que aún no existen. Los componentes que el
-> hito va a pedir y no hay —`Select`, `Combobox`, `Skeleton`, `Toast`, `Dialog`,
-> `EmptyState` y `Pagination`— están listados en
+> enteros**, porque describen pantallas que aún no existen, y las tres fichas del
+> Hito 3 también. Los componentes que hacen falta y no hay —`Combobox`,
+> `Skeleton`, `Toast`, `Dialog` y `Pagination`— están listados en
 > [`components/`](components/README.md) sin ficha propia, para que no se escriba
-> antes de tiempo.
+> antes de tiempo. El registro de ese documento dice cuáles de los nueve
+> componentes implementados tienen ficha y cuáles no.
 
 ## Ficha mínima de un componente
 

@@ -101,6 +101,13 @@ class ApiExceptionHandler {
         ResponseEntity.status(HttpStatus.UNAUTHORIZED)
             .body(ErrorResponse(failure.code?.name ?: UNAUTHORIZED, failure.message))
 
+    /** El limite de subidas por identidad, que se aplica ya dentro del controlador. */
+    @ExceptionHandler(RateLimited::class)
+    fun onRateLimited(failure: RateLimited): ResponseEntity<ErrorResponse> =
+        ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+            .header(org.springframework.http.HttpHeaders.RETRY_AFTER, failure.retryAfterSeconds.toString())
+            .body(ErrorResponse(RATE_LIMITED, failure.message ?: "Demasiadas peticiones"))
+
     @ExceptionHandler(AccessDeniedException::class)
     fun onAccessDenied(): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -142,5 +149,6 @@ class ApiExceptionHandler {
         const val UNAUTHORIZED = "UNAUTHORIZED"
         const val FORBIDDEN = "FORBIDDEN"
         const val NOT_FOUND = "NOT_FOUND"
+        const val RATE_LIMITED = "RATE_LIMITED"
     }
 }

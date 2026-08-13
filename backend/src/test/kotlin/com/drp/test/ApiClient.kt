@@ -27,7 +27,19 @@ data class TestHousehold(
     val accessToken: String,
     val memberId: String,
     val email: String,
+    /**
+     * Sale del propio token, que es el unico sitio donde esta: la API no lo
+     * devuelve nunca. Lo necesitan las pruebas que miran el disco, porque la ruta
+     * de un fichero se troce por hogar.
+     */
+    val householdId: String,
 )
+
+/** El `householdId` que lleva dentro el access token. Solo lo usan las pruebas. */
+private fun String.householdIdClaim(): String {
+    val payload = String(java.util.Base64.getUrlDecoder().decode(split(".")[1]))
+    return payload.extract("householdId")
+}
 
 /**
  * Da de alta un hogar y lo deja verificado, leyendo el enlace del **correo real**
@@ -48,7 +60,7 @@ fun TestRestTemplate.registerHousehold(mailpit: DrpMailpit = DrpMailpit.instance
     val accessToken = session.extract("accessToken")
     val memberId = getJson("/api/v1/users", accessToken).body!!.extract("id")
 
-    return TestHousehold(accessToken, memberId, email)
+    return TestHousehold(accessToken, memberId, email, accessToken.householdIdClaim())
 }
 
 fun TestRestTemplate.postJson(path: String, body: String, accessToken: String? = null): ResponseEntity<String> =
