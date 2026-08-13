@@ -2,15 +2,15 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Previsto |
+| Estado | Implementado |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
 | Última revisión | 2026-08-13 |
 
-> **Esta ficha describe algo que todavía no existe.** No hay ninguna rejilla, ni
-> ninguna miniatura, ni un solo `<img>` en el frontend. Es la **especificación**
-> de la anatomía que el Hito 3 tiene que construir; lo que queda por decidir está
-> dicho como tal en [Lo que falta](#lo-que-falta).
+> **Esta ficha se escribió antes que el componente**, como especificación, y el
+> Hito 3 lo construyó siguiéndola: vive en
+> [`files.tsx`](../../../../frontend/src/ui/files.tsx). Lo que sigue sin
+> construirse está en [Lo que falta](#lo-que-falta).
 
 ## Propósito y situaciones de uso
 

@@ -63,9 +63,9 @@ con sus siete puntos. No se reordena ni se recorta.
 | `AuthCard` | [`card.md`](card.md) | **Implementado** | [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) |
 | `PageHeading` | Sin ficha | **Implementado** en el Hito 2 | [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) |
 | `EmptyState` | Sin ficha | **Implementado** en el Hito 2 | [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) |
-| `UploadField` | [`upload-field.md`](upload-field.md) | **Previsto** (Hito 3) | — |
-| `FileGallery` | [`file-gallery.md`](file-gallery.md) | **Previsto** (Hito 3) | — |
-| `Avatar` | [`avatar.md`](avatar.md) | **Previsto** (Hito 3) | — |
+| `UploadField` | [`upload-field.md`](upload-field.md) | **Implementado** | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
+| `FileGallery` | [`file-gallery.md`](file-gallery.md) | **Implementado** | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
+| `Avatar` | [`avatar.md`](avatar.md) | **Implementado** | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
 
 **Nueve componentes implementados en un único fichero de 376 líneas, y solo seis
 con ficha**: `SelectField`, `PageHeading` y `EmptyState` entraron con el Hito 2 y
@@ -161,4 +161,5 @@ porque es donde se incumplen:
 | Fecha | Cambio | Autor |
 |---|---|---|
 | 2026-08-12 | Creación del directorio con las seis fichas de los componentes que existen, y el registro de los que el Hito 2 va a pedir. | Equipo DRP |
+| 2026-08-14 | Las tres anatomías del Hito 3 pasan de previstas a **implementadas**, en un fichero propio —`files.tsx`— y no en `primitives.tsx`: traen estado y una petición en curso, que es otra clase de complejidad. Se añade `QuotaMeter`, que la ficha de `UploadField` documentaba como variante y acabó siendo pieza aparte. | Equipo DRP |
 | 2026-08-13 | Se corrige el registro, que había quedado desfasado al cerrar el Hito 2: son **nueve** componentes en 376 líneas, no seis en 266, y `SelectField`, `PageHeading` y `EmptyState` están implementados sin ficha. Se dan de alta las tres anatomías del Hito 3 —`UploadField`, `FileGallery` y `Avatar`—, previstas y con ficha, y se anota la excepción de foco que trae la primera. | Equipo DRP |

@@ -2,17 +2,18 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Previsto |
+| Estado | Implementado |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
 | Última revisión | 2026-08-13 |
 
-> **Esta ficha describe algo que todavía no existe.** No hay ningún `UploadField`
-> en [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx), ni ningún
-> `<input type="file">` ni ningún `<img>` en todo el frontend. Es la
-> **especificación** de la anatomía que el Hito 3 tiene que construir, escrita
-> antes para que la implementación se pueda guiar por ella; lo que queda por
-> decidir está dicho como tal en [Lo que falta](#lo-que-falta), no disimulado.
+> **Esta ficha se escribió antes que el componente**, como especificación, y el
+> Hito 3 lo construyó siguiéndola: vive en
+> [`files.tsx`](../../../../frontend/src/ui/files.tsx) y no en
+> [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx), porque trae
+> estado propio y una petición en curso. Los siete estados están, el séptimo
+> incluido. Lo que sigue sin construirse está en
+> [Lo que falta](#lo-que-falta), no disimulado.
 
 ## Propósito y situaciones de uso
 

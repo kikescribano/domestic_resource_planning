@@ -2,17 +2,17 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Previsto |
+| Estado | Implementado |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
 | Última revisión | 2026-08-13 |
 
-> **Esta ficha describe algo que todavía no existe.** `User` ya trae `avatarUrl`
-> en [`client.ts`](../../../../frontend/src/api/client.ts) y **nadie lo pinta**:
-> la lista de personas de `UsersPage`, en
-> [`household.tsx`](../../../../frontend/src/routes/household.tsx), muestra
-> nombre, correo y rol. Es la **especificación** de la anatomía que el Hito 3
-> tiene que construir.
+> **Esta ficha se escribió antes que el componente**, como especificación, y el
+> Hito 3 lo construyó siguiéndola: vive en
+> [`files.tsx`](../../../../frontend/src/ui/files.tsx), y la pantalla de cuenta
+> —en [`household.tsx`](../../../../frontend/src/routes/household.tsx)— sube y
+> quita el propio. Lo que sigue sin construirse está en
+> [Lo que falta](#lo-que-falta).
 
 ## Propósito y situaciones de uso
 
