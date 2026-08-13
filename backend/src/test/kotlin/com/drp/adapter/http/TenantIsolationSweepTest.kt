@@ -6,9 +6,11 @@ import com.drp.test.deleteJson
 import com.drp.test.extract
 import com.drp.test.extractRaw
 import com.drp.test.getJson
+import com.drp.test.imageBytes
 import com.drp.test.patchJson
 import com.drp.test.postJson
 import com.drp.test.registerHousehold
+import com.drp.test.uploadFile
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.DisplayName
@@ -22,7 +24,8 @@ import org.springframework.http.ResponseEntity
 import java.util.UUID
 
 /**
- * El barrido de aislamiento de las **veintitres** operaciones del Hito 2.
+ * El barrido de aislamiento de las **treinta y cuatro** operaciones de los Hitos
+ * 2 y 3.
  *
  * No sustituye a las pruebas de recorrido de cada recurso: comprueba una sola
  * cosa --la de la ADR-002-- sobre todas ellas y de forma sistematica.
@@ -74,6 +77,8 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     private lateinit var durA: String
     private lateinit var stockA: String
     private lateinit var stockA2: String
+    private lateinit var fileA: String
+    private lateinit var docA: String
 
     /** Lo propio de B, con lo que se construyen los controles positivos. */
     private lateinit var catB: String
@@ -85,6 +90,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     private lateinit var durB: String
     private lateinit var durBWithArticle: String
     private lateinit var stockB: String
+    private lateinit var fileB: String
 
     /** El estado de A antes de que B lo intente, para comprobar que sigue igual. */
     private val snapshotOfA = mutableMapOf<String, String>()
@@ -125,6 +131,14 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         durBWithArticle = b.createAsset("""{"type":"DURABLE","articleId":"$artB2"}""")
         stockB = b.intake(artB, locB, 300)
 
+        // Los ficheros del Hito 3. Antes de el, `files` no podia tener ninguna
+        // fila y todo identificador de fichero daba 404 por vacio; ahora hay uno
+        // de cada hogar, asi que las comprobaciones de `photoFileId` y de `fileId`
+        // pasan a tener control positivo de verdad.
+        fileA = a.uploadImage()
+        fileB = b.uploadImage()
+        docA = a.attachDocument(durA, a.uploadImage())
+
         listOf(
             "/api/v1/categories?includeRetired=true",
             "/api/v1/articles?includeRetired=true",
@@ -137,7 +151,13 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             "/api/v1/assets/$durA/children",
             "/api/v1/assets/$stockA",
             "/api/v1/assets/$stockA2",
+            "/api/v1/documents",
         ).forEach { snapshotOfA[it] = http.getJson(it, a.accessToken).body!! }
+
+        // Los ficheros no entran en el retrato: sus dos URL van firmadas y la
+        // caducidad cambia con cada lectura, asi que el cuerpo nunca es igual dos
+        // veces. Lo que hay que comprobar de ellos --que siguen ahi y que siguen
+        // siendo suyos-- lo miran las secciones de ruta y de listado.
     }
 
     // ------------------------------------------------------------------
@@ -145,7 +165,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("las catorce operaciones con identificador en la ruta responden 404 ante uno de otro hogar")
+    @DisplayName("las dieciocho operaciones con identificador en la ruta responden 404 ante uno de otro hogar")
     fun `barrido por identificador del recurso`() {
         val section = "ruta"
 
@@ -238,7 +258,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         bothWays("POST /articles categoryId", own = catB, foreign = catA, ok = CREATED) { id ->
             http.postJson(ARTICLES, """{"name":"Sonda${short()}","categoryId":"$id","unit":"UNIT"}""", b.accessToken)
         }
-        bothWays("POST /articles photoFileId", own = null, foreign = anyFile(), ok = CREATED) { id ->
+        bothWays("POST /articles photoFileId", own = b.uploadImage(), foreign = fileA, ok = CREATED) { id ->
             http.postJson(
                 ARTICLES,
                 """{"name":"Sonda${short()}","categoryId":"$catB","unit":"UNIT","photoFileId":"$id"}""",
@@ -251,7 +271,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         bothWays("PATCH /articles categoryId", own = catB2, foreign = catA, ok = OK) { id ->
             http.patchJson("$ARTICLES/${freshArticleB()}", """{"categoryId":"$id"}""", b.accessToken)
         }
-        bothWays("PATCH /articles photoFileId", own = null, foreign = anyFile(), ok = OK) { id ->
+        bothWays("PATCH /articles photoFileId", own = b.uploadImage(), foreign = fileA, ok = OK) { id ->
             http.patchJson("$ARTICLES/${freshArticleB()}", """{"photoFileId":"$id"}""", b.accessToken)
         }
 
@@ -263,7 +283,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
                 b.accessToken,
             )
         }
-        bothWays("POST /locations photoFileId", own = null, foreign = anyFile(), ok = CREATED) { id ->
+        bothWays("POST /locations photoFileId", own = b.uploadImage(), foreign = fileA, ok = CREATED) { id ->
             http.postJson(
                 LOCATIONS,
                 """{"name":"Sonda${short()}","type":"ROOM","photoFileId":"$id"}""",
@@ -275,7 +295,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         bothWays("PATCH /locations parentLocationId", own = locB2, foreign = locA, ok = OK) { id ->
             http.patchJson("$LOCATIONS/${freshLocationB()}", """{"parentLocationId":"$id"}""", b.accessToken)
         }
-        bothWays("PATCH /locations photoFileId", own = null, foreign = anyFile(), ok = OK) { id ->
+        bothWays("PATCH /locations photoFileId", own = b.uploadImage(), foreign = fileA, ok = OK) { id ->
             http.patchJson("$LOCATIONS/${freshLocationB()}", """{"photoFileId":"$id"}""", b.accessToken)
         }
 
@@ -309,7 +329,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
                 b.accessToken,
             )
         }
-        bothWays("POST /assets photoFileId", own = null, foreign = anyFile(), ok = CREATED) { id ->
+        bothWays("POST /assets photoFileId", own = b.uploadImage(), foreign = fileA, ok = CREATED) { id ->
             http.postJson(
                 ASSETS,
                 """{"name":"Sonda${short()}","type":"DURABLE","categoryId":"$catB","photoFileId":"$id"}""",
@@ -351,7 +371,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
                 b.accessToken,
             )
         }
-        bothWays("POST /assets/intake article.photoFileId", own = null, foreign = anyFile(), ok = INTAKE_OK) { id ->
+        bothWays("POST /assets/intake article.photoFileId", own = b.uploadImage(), foreign = fileA, ok = INTAKE_OK) { id ->
             http.postJson(
                 INTAKE,
                 """{"article":{"name":"Sonda${short()}","categoryId":"$catB","unit":"UNIT","photoFileId":"$id"},
@@ -380,7 +400,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         bothWays("PATCH /assets location ASSET", own = durB, foreign = durA, ok = OK) { id ->
             http.patchJson("$ASSETS/${freshDurableB()}", """{"location":{"type":"ASSET","id":"$id"}}""", b.accessToken)
         }
-        bothWays("PATCH /assets photoFileId", own = null, foreign = anyFile(), ok = OK) { id ->
+        bothWays("PATCH /assets photoFileId", own = b.uploadImage(), foreign = fileA, ok = OK) { id ->
             http.patchJson("$ASSETS/${freshDurableB()}", """{"photoFileId":"$id"}""", b.accessToken)
         }
 
@@ -453,6 +473,31 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         expectStatus("ref PATCH /assets con articulo y categoryId de A", HttpStatus.OK, patched)
         expectAbsent("ref el asset con articulo no guarda la categoria de A", catA, patched)
 
+        // --- POST /documents, con sus tres referencias. Es la operacion del Hito
+        // 3 con mas superficie: dos destinos posibles y un contenido, y las tres
+        // llegan del cliente.
+        bothWays("POST /documents assetId", own = freshDurableB(), foreign = durA, ok = CREATED) { id ->
+            http.postJson(
+                DOCUMENTS,
+                """{"assetId":"$id","type":"MANUAL","url":"https://ejemplo.test/${short()}"}""",
+                b.accessToken,
+            )
+        }
+        bothWays("POST /documents articleId", own = freshArticleB(), foreign = artA, ok = CREATED) { id ->
+            http.postJson(
+                DOCUMENTS,
+                """{"articleId":"$id","type":"MANUAL","url":"https://ejemplo.test/${short()}"}""",
+                b.accessToken,
+            )
+        }
+        bothWays("POST /documents fileId", own = b.uploadImage(), foreign = fileA, ok = CREATED) { id ->
+            http.postJson(
+                DOCUMENTS,
+                """{"assetId":"${freshDurableB()}","type":"INVOICE","fileId":"$id"}""",
+                b.accessToken,
+            )
+        }
+
         endOfSection("ref")
     }
 
@@ -461,7 +506,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("los cuatro listados no devuelven nada de otro hogar, ni filtrando por sus identificadores")
+    @DisplayName("los seis listados no devuelven nada de otro hogar, ni filtrando por sus identificadores")
     fun `barrido de listados`() {
         val section = "listado"
 
@@ -518,6 +563,26 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             stockA,
             http.getJson("$ASSETS?status=DECOMMISSIONED", b.accessToken),
         )
+
+        // Los dos listados del Hito 3. El de ficheros no tiene filtro por
+        // identificador --solo por adjuntado y por tipo-- asi que lo que se mide
+        // es que ninguno de los dos deje ver el fichero de A.
+        expectAbsent("$section GET /files", fileA, http.getJson(FILES, b.accessToken))
+        expectAbsent("$section GET /files?attached=false", fileA, http.getJson("$FILES?attached=false", b.accessToken))
+        expectAbsent("$section GET /files?attached=true", fileA, http.getJson("$FILES?attached=true", b.accessToken))
+        expectAbsent(
+            "$section GET /files?type=image/jpeg",
+            fileA,
+            http.getJson("$FILES?type=image/jpeg", b.accessToken),
+        )
+
+        expectAbsent("$section GET /documents", docA, http.getJson(DOCUMENTS, b.accessToken))
+        expectEmpty("$section GET /documents?assetId de A", http.getJson("$DOCUMENTS?assetId=$durA", b.accessToken))
+        expectEmpty("$section GET /documents?articleId de A", http.getJson("$DOCUMENTS?articleId=$artA", b.accessToken))
+
+        // Y el uso de almacenamiento es del hogar que pregunta: si contase lo de
+        // otro, seria un oraculo sobre cuanto tiene guardado el de al lado.
+        expectPresent("""$section GET /storage cuenta solo lo de B""", "usedBytes", http.getJson(STORAGE, b.accessToken))
 
         endOfSection(section)
     }
@@ -580,7 +645,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         println(
             """
 
-            ================ BARRIDO DE AISLAMIENTO DEL HITO 2 ================
+            ================ BARRIDO DE AISLAMIENTO DE LOS HITOS 2 Y 3 ================
             Comprobaciones ejecutadas: ${checks.size}
             Desviaciones: ${deviations.size}
 
@@ -601,7 +666,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     // ------------------------------------------------------------------
 
     /**
-     * Las catorce operaciones con identificador en la ruta, cada una como una
+     * Las dieciocho operaciones con identificador en la ruta, cada una como una
      * llamada que solo espera el identificador. Es lo que permite ejecutarlas dos
      * veces --con el de A y con uno inventado-- sin repetir el cuerpo.
      */
@@ -628,6 +693,13 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         "POST /assets/{id}/merge" to { id ->
             http.postJson("$ASSETS/$id/merge", """{"targetAssetId":"$stockB"}""", b.accessToken)
         },
+        // Las cuatro del Hito 3. La de contenido es la que mas importa: es la
+        // unica que devuelve BYTES, asi que un fallo aqui no filtra un nombre
+        // sino la factura entera.
+        "GET /files/{id}" to { id -> http.getJson("$FILES/$id", b.accessToken) },
+        "GET /files/{id}/content" to { id -> http.getJson("$FILES/$id/content", b.accessToken) },
+        "DELETE /files/{id}" to { id -> http.deleteJson("$FILES/$id", b.accessToken) },
+        "DELETE /documents/{id}" to { id -> http.deleteJson("$DOCUMENTS/$id", b.accessToken) },
     )
 
     /** El recurso de A que le toca a cada operacion, por su ruta. */
@@ -636,6 +708,8 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         operation.contains("/articles") -> artA
         operation.contains("/locations") -> locA
         operation.contains("/merge") -> stockA
+        operation.contains("/files") -> fileA
+        operation.contains("/documents") -> docA
         else -> durA
     }
 
@@ -645,10 +719,13 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
      * tiene que funcionar.
      *
      * Sin la segunda mitad, un cuerpo mal escrito daria 404 por su cuenta y la
-     * prueba pasaria sin haber comprobado el aislamiento. Con [own] a nulo se
-     * declara que no hay control posible, que hoy solo le pasa a `photoFileId`:
-     * la tabla `files` no puede tener filas hasta el Hito 3, asi que **cualquier**
-     * identificador de fichero da 404 y eso es lo correcto.
+     * prueba pasaria sin haber comprobado el aislamiento.
+     *
+     * Hasta el Hito 3, `photoFileId` era la unica referencia **sin control
+     * positivo posible**: la tabla `files` no podia tener filas, asi que
+     * cualquier identificador de fichero daba 404 y eso era lo correcto. Ahora
+     * los dos hogares tienen ficheros de verdad, y el par vuelve a medir lo que
+     * dice medir: el de A da 404 y el propio de B funciona.
      */
     private fun bothWays(
         name: String,
@@ -740,9 +817,17 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         b.createAsset("""{"name":"Sonda${short()}","type":"DURABLE","categoryId":"$catB"}""")
 
     /** Un identificador de fichero cualquiera: hoy ninguno existe, y esa es la regla. */
-    private fun anyFile() = UUID.randomUUID().toString()
-
     private fun short() = UUID.randomUUID().toString().take(8)
+
+    /** Una imagen de verdad subida por este hogar. Cada llamada sube una distinta. */
+    private fun TestHousehold.uploadImage(): String =
+        http.uploadFile(accessToken, imageBytes("png"), "sonda-${short()}.png", "image/png").body!!.extract("id")
+
+    private fun TestHousehold.attachDocument(assetId: String, fileId: String): String = http.postJson(
+        DOCUMENTS,
+        """{"assetId":"$assetId","type":"INVOICE","fileId":"$fileId"}""",
+        accessToken,
+    ).body!!.extract("id")
 
     private fun TestHousehold.createCategory(body: String) = created(CATEGORIES, body)
 
@@ -779,6 +864,9 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         const val LOCATIONS = "/api/v1/locations"
         const val ASSETS = "/api/v1/assets"
         const val INTAKE = "/api/v1/assets/intake"
+        const val FILES = "/api/v1/files"
+        const val DOCUMENTS = "/api/v1/documents"
+        const val STORAGE = "/api/v1/storage"
 
         val OK = setOf(HttpStatus.OK)
         val CREATED = setOf(HttpStatus.CREATED)
