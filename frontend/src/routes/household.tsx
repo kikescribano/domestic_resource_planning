@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router'
 
-import { ApiError, api, type UserRole } from '../api/client'
+import { ApiError, api, humanMessage, type UserRole } from '../api/client'
 import { useAuthenticatedSession, useSession } from '../auth/SessionProvider'
+import { Avatar } from '../ui/files'
 import { Button, Field, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primitives'
 
 /**
@@ -20,6 +21,7 @@ const NAVIGATION = [
   { to: '/ubicaciones', label: 'Sitios', end: false },
   { to: '/catalogo', label: 'Catálogo', end: false },
   { to: '/usuarios', label: 'Personas', end: false },
+  { to: '/almacenamiento', label: 'Archivo', end: false },
   { to: '/cuenta', label: 'Cuenta', end: false },
 ]
 
@@ -305,6 +307,8 @@ export function AccountPage() {
     <>
       <PageHeading title="Tu cuenta" />
 
+      <OwnAvatar accessToken={session.accessToken} />
+
       <form onSubmit={submit} className="flex max-w-form flex-col gap-4" noValidate>
         <h2 className="font-display text-title-sm text-ink">Cambiar la contraseña</h2>
         <p className="text-body-sm text-ink-muted">
@@ -360,5 +364,88 @@ export function AccountPage() {
         </Button>
       </section>
     </>
+  )
+}
+
+/**
+ * El avatar propio.
+ *
+ * Se parece a subir un fichero y es otra operación: `PUT /users/me/avatar`
+ * **sube y sustituye a la vez**, con lo que no hay `fileId` que guardar ni paso
+ * de adjuntar. Y responde `204` sin cuerpo, así que lo que hay que hacer después
+ * es volver a leer a la persona: el `avatarUrl` no llega en la respuesta.
+ *
+ * No consume la cuota de ningún hogar —una identidad no pertenece a uno— y por
+ * eso su tope es otro: 1 MB, y solo imagen.
+ */
+function OwnAvatar({ accessToken }: { accessToken: string }) {
+  const queryClient = useQueryClient()
+  const [problem, setProblem] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+
+  const me = useQuery({
+    queryKey: ['users'],
+    queryFn: () => api.listUsers(accessToken),
+  })
+
+  const mine = me.data?.items[0] ?? null
+
+  function refresh() {
+    setProblem(null)
+    void queryClient.invalidateQueries({ queryKey: ['users'] })
+  }
+
+  const remove = useMutation({
+    mutationFn: () => api.deleteOwnAvatar(accessToken),
+    onSuccess: refresh,
+    onError: (error) => setProblem(humanMessage(error)),
+  })
+
+  async function choose(file: File) {
+    setUploading(true)
+    try {
+      await api.setOwnAvatar(file, accessToken)
+      refresh()
+    } catch (error) {
+      setProblem(humanMessage(error))
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <section className="flex flex-col gap-3 border-b border-border-subtle pb-6">
+      <h2 className="font-display text-title-sm text-ink">Tu foto</h2>
+
+      <div className="flex items-center gap-4">
+        <Avatar name={mine?.name ?? ''} url={mine?.avatarUrl ?? null} size="lg" />
+
+        <div className="flex flex-col gap-1.5">
+          <label className="inline-flex min-h-touch w-fit cursor-pointer items-center justify-center rounded-md border border-border bg-surface-raised px-4 py-2 text-body font-medium text-ink transition-colors hover:bg-surface-hover focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
+            {uploading ? 'Subiendo…' : mine?.avatarUrl ? 'Cambiar la foto' : 'Elegir una foto'}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={uploading}
+              className="sr-only"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                event.target.value = ''
+                if (file) void choose(file)
+              }}
+            />
+          </label>
+          <p className="text-caption text-ink-muted">JPEG, PNG o WebP. Hasta 1 MB. Sustituye a la anterior.</p>
+        </div>
+
+        {mine?.avatarUrl && (
+          <Button variant="ghost" onClick={() => remove.mutate()} busy={remove.isPending}>
+            Quitarla
+          </Button>
+        )}
+      </div>
+
+      {problem && <Notice tone="danger">{problem}</Notice>}
+    </section>
   )
 }
