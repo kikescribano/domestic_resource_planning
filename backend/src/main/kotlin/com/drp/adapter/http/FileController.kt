@@ -1,20 +1,26 @@
 package com.drp.adapter.http
 
+import com.drp.application.port.DocumentFilter
 import com.drp.application.port.FileStorage
 import com.drp.application.port.Pagination
 import com.drp.application.port.SessionClaims
 import com.drp.application.port.StoredFileFilter
+import com.drp.application.usecase.AttachDocument
+import com.drp.application.usecase.DeleteDocument
 import com.drp.application.usecase.DeleteFile
 import com.drp.application.usecase.GetFile
 import com.drp.application.usecase.GetStorageUsage
+import com.drp.application.usecase.ListDocuments
 import com.drp.application.usecase.ListFiles
 import com.drp.application.usecase.ReceivedFile
 import com.drp.application.usecase.UploadFile
 import com.drp.application.usecase.UploadSource
 import com.drp.domain.ResourceNotFound
+import com.drp.domain.file.DocumentType
 import com.drp.domain.file.StoredContentType
 import com.drp.domain.file.StoredFile
 import jakarta.servlet.http.HttpServletRequest
+import jakarta.validation.Valid
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.core.io.InputStreamResource
@@ -28,6 +34,7 @@ import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -202,6 +209,38 @@ class StorageController(private val usage: GetStorageUsage) {
 
     @GetMapping
     fun get(): StorageUsageResponse = StorageUsageResponse.of(usage.handle())
+}
+
+@RestController
+@RequestMapping("/api/v1/documents")
+class DocumentController(
+    private val listDocuments: ListDocuments,
+    private val attachDocument: AttachDocument,
+    private val deleteDocument: DeleteDocument,
+) {
+
+    @GetMapping
+    fun list(
+        @RequestParam(required = false) assetId: UUID?,
+        @RequestParam(required = false) articleId: UUID?,
+        @RequestParam(required = false) type: DocumentType?,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "50") size: Int,
+    ): PageResponse<DocumentResponse> = PageResponse.of(
+        listDocuments.handle(DocumentFilter(assetId, articleId, type), Pagination(page, size)),
+        DocumentResponse::of,
+    )
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    fun attach(
+        @AuthenticationPrincipal session: SessionClaims,
+        @Valid @RequestBody input: DocumentInput,
+    ): DocumentResponse = DocumentResponse.of(attachDocument.handle(session, input.toCommand()))
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun delete(@PathVariable id: UUID) = deleteDocument.handle(id)
 }
 
 /**

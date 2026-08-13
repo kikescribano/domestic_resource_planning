@@ -1,8 +1,15 @@
 package com.drp.adapter.http
 
+import com.drp.application.usecase.DocumentCommand
 import com.drp.application.usecase.StorageUsage
+import com.drp.domain.file.Document
+import com.drp.domain.file.DocumentContent
+import com.drp.domain.file.DocumentType
 import com.drp.domain.file.StoredFile
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.Size
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 /**
@@ -38,6 +45,68 @@ data class StoredFileResponse(
             uploadedAt = file.uploadedAt,
             createdAt = file.createdAt,
             createdBy = file.createdBy,
+        )
+    }
+}
+
+/**
+ * Lo que llega al adjuntar un documento.
+ *
+ * Las dos exclusiones --destino y contenido-- **no se validan aqui** con
+ * anotaciones, y no es un descuido: Bean Validation responderia `400
+ * VALIDATION_ERROR` y el contrato declara `409` con codigo propio para las dos.
+ * Son reglas de negocio, no de forma, asi que las comprueba el caso de uso.
+ */
+data class DocumentInput(
+    val assetId: UUID? = null,
+    val articleId: UUID? = null,
+    @field:NotNull val type: DocumentType? = null,
+    val url: String? = null,
+    val fileId: UUID? = null,
+    @field:Size(max = 500) val description: String? = null,
+    val date: LocalDate? = null,
+    val validUntil: LocalDate? = null,
+) {
+    fun toCommand() = DocumentCommand(
+        assetId = assetId,
+        articleId = articleId,
+        type = type!!,
+        url = url,
+        fileId = fileId,
+        description = description,
+        date = date,
+        validUntil = validUntil,
+    )
+}
+
+data class DocumentResponse(
+    val id: UUID,
+    val assetId: UUID?,
+    val articleId: UUID?,
+    val type: DocumentType,
+    val url: String?,
+    val fileId: UUID?,
+    val description: String?,
+    val date: LocalDate?,
+    val validUntil: LocalDate?,
+    val createdAt: Instant,
+    val createdBy: UUID?,
+    val updatedBy: UUID?,
+) {
+    companion object {
+        fun of(document: Document) = DocumentResponse(
+            id = document.id,
+            assetId = document.target.assetId,
+            articleId = document.target.articleId,
+            type = document.type,
+            url = (document.content as? DocumentContent.ExternalLink)?.url,
+            fileId = document.fileId,
+            description = document.description,
+            date = document.date,
+            validUntil = document.validUntil,
+            createdAt = document.createdAt,
+            createdBy = document.createdBy,
+            updatedBy = document.updatedBy,
         )
     }
 }

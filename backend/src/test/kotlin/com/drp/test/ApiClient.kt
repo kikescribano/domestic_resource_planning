@@ -63,6 +63,21 @@ fun TestRestTemplate.registerHousehold(mailpit: DrpMailpit = DrpMailpit.instance
     return TestHousehold(accessToken, memberId, email, accessToken.householdIdClaim())
 }
 
+/**
+ * Una de las categorias que **siembra el alta del hogar**.
+ *
+ * Un `DURABLE` sin articulo necesita nombre y categoria propios, asi que casi
+ * toda prueba que cree un asset pasa por aqui. Los nombres de las categorias
+ * sembradas son **datos** y van en castellano, al contrario que los
+ * identificadores.
+ */
+fun TestRestTemplate.seededCategory(accessToken: String, name: String): String {
+    val body = getJson("/api/v1/categories", accessToken).body!!
+    val entry = Regex("\\{[^{}]*\"name\":\"$name\"[^{}]*\\}").find(body)
+        ?: error("No aparece la categoría sembrada «$name»:\n$body")
+    return entry.value.extract("id")
+}
+
 fun TestRestTemplate.postJson(path: String, body: String, accessToken: String? = null): ResponseEntity<String> =
     exchange(path, HttpMethod.POST, HttpEntity(body, jsonHeaders(accessToken)))
 
