@@ -58,6 +58,15 @@ abstract class SpringIntegrationTest {
          * equivoca igual en los dos sentidos.
          */
         @JvmStatic
-        val storageRoot: Path = Files.createTempDirectory("drp-files-test")
+        val storageRoot: Path = Files.createTempDirectory("drp-files-test").also { root ->
+            // `createTempDirectory` crea `rwx------`, y el contenedor de nginx de
+            // `NginxDeliveryTest` monta esta raiz para servir los ficheros: sin
+            // permiso de paso, su usuario no puede ni entrar. En Windows no
+            // aplica --el montaje ignora los permisos POSIX-- y por eso el fallo
+            // solo aparecia en la CI.
+            runCatching {
+                Files.setPosixFilePermissions(root, java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"))
+            }
+        }
     }
 }

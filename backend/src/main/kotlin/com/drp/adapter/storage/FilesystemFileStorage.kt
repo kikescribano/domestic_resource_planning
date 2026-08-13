@@ -11,6 +11,7 @@ import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.PosixFilePermissions
 import java.security.DigestOutputStream
 import java.security.MessageDigest
 
@@ -65,6 +66,7 @@ class FilesystemFileStorage(
     override fun write(key: String, source: InputStream): WrittenBytes {
         val destination = resolve(key)
         Files.createDirectories(destination.parent)
+        allowServerToRead(destination.parent, DIRECTORY_PERMISSIONS)
 
         val temporary = Files.createTempFile(staging, "write-", ".part")
         val digest = MessageDigest.getInstance(DIGEST)
@@ -74,11 +76,32 @@ class FilesystemFileStorage(
                 DigestOutputStream(out, digest).use { source.copyTo(it) }
             }
             Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING)
+            allowServerToRead(destination, FILE_PERMISSIONS)
             WrittenBytes(size, digest.digest().toHex())
         }.getOrElse { failure ->
             Files.deleteIfExists(temporary)
             throw failure
         }
+    }
+
+    /**
+     * Deja el fichero legible para **el servidor web**, que no corre como la
+     * aplicacion.
+     *
+     * No es cosmetica de permisos: quien entrega los bytes es nginx (5.8.4), y un
+     * fichero escrito solo para su dueno le da un `403` --con la firma correcta y
+     * la fila correcta--. Y `createTempFile` crea justo eso, `rw-------`, porque
+     * un temporal del sistema tiene que ser privado; al mover, el fichero
+     * definitivo hereda esos permisos.
+     *
+     * Se descubrio en la CI y no en local: en Docker Desktop sobre Windows el
+     * montaje ignora los permisos POSIX, asi que la prueba de nginx pasaba aqui y
+     * fallaba alli. En un despliegue de verdad habria fallado igual que en la CI.
+     *
+     * En un sistema sin POSIX no hay nada que hacer y no es un error: se ignora.
+     */
+    private fun allowServerToRead(path: Path, permissions: String) {
+        runCatching { Files.setPosixFilePermissions(path, PosixFilePermissions.fromString(permissions)) }
     }
 
     override fun openRead(key: String): InputStream? {
@@ -144,5 +167,13 @@ class FilesystemFileStorage(
 
         const val DIGEST = "SHA-256"
         const val BUFFER_BYTES = 16 * 1024
+
+        /**
+         * Legible por el servidor web, escribible solo por la aplicacion. El
+         * volumen va montado `noexec`, asi que el bit de ejecucion no aporta
+         * nada ni aqui ni en los directorios.
+         */
+        const val FILE_PERMISSIONS = "rw-r--r--"
+        const val DIRECTORY_PERMISSIONS = "rwxr-xr-x"
     }
 }
