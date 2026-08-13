@@ -365,7 +365,7 @@ class UpdateAsset(
         val newArticleId = resolveArticleId(current, patch)
         val newOwnerId = patch.ownerId.orKeep(current.ownerId)
         if (patch.ownerId is Patch.Set && newOwnerId != null) references.requireMember(newOwnerId)
-        if (patch.photoFileId is Patch.Set) references.requirePhoto(patch.photoFileId.value)
+        if (patch.photoFileId is Patch.Set) references.requirePhoto(patch.photoFileId.value, current.photoFileId)
 
         // El nombre y la categoria propios solo valen en un asset SIN articulo:
         // si lo tiene, se cambian en el articulo. Guardarlos aqui los duplicaria
@@ -590,7 +590,7 @@ class AssetReferenceResolver(
         // hereda la suya, asi que no hay nada que resolver.
         if (articleId == null) categoryId?.let { requireLiveCategory(categories, it) }
         ownerId?.let { requireMember(it) }
-        photos.requireUsable(photoFileId)
+        photos.requireAttachable(photoFileId)
     }
 
     fun requireLiveArticle(articleId: UUID) {
@@ -602,7 +602,7 @@ class AssetReferenceResolver(
         members.findById(memberId) ?: throw ResourceNotFound("Usuario no encontrado")
     }
 
-    fun requirePhoto(fileId: UUID?) = photos.requireUsable(fileId)
+    fun requirePhoto(fileId: UUID?, alreadyHeld: UUID? = null) = photos.requireAttachable(fileId, alreadyHeld)
 
     /**
      * La segunda validacion del hito: **solo un `DURABLE` puede alojar otros

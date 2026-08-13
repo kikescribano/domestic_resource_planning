@@ -4,6 +4,10 @@ import com.drp.domain.catalog.Article
 import com.drp.domain.catalog.Category
 import com.drp.domain.household.Household
 import com.drp.domain.household.HouseholdMember
+import com.drp.domain.file.Document
+import com.drp.domain.file.DocumentType
+import com.drp.domain.file.StoredContentType
+import com.drp.domain.file.StoredFile
 import com.drp.domain.identity.EmailAddress
 import com.drp.domain.identity.Identity
 import com.drp.domain.inventory.Asset
@@ -44,6 +48,22 @@ interface HouseholdRepository {
     fun save(household: Household): Household
 
     fun findCurrent(): Household?
+
+    /**
+     * Bloquea la fila del hogar hasta que cierre la transaccion (`SELECT ... FOR
+     * UPDATE`).
+     *
+     * Existe para la **reserva de cuota** (5.8.3), que es un lee-y-luego-escribe
+     * clasico: sumar lo que ya ocupa el hogar y decidir si cabe uno mas. Sin
+     * cerrojo, dos subidas simultaneas leen la misma suma, las dos deciden que
+     * caben y el gigabyte se pasa.
+     *
+     * **Se toma antes de leer, no entre la lectura y la escritura**, que es la
+     * unica posicion que sirve: tomarlo despues de sumar deja abierta justo la
+     * ventana que pretende cerrar. Mismo motivo y misma forma que
+     * [HierarchyLock].
+     */
+    fun lockCurrent()
 
     /** Borrado real, el unico del core: solo lo usa `PurgeUnverifiedHouseholds`. */
     fun deleteCurrent()
@@ -287,16 +307,79 @@ data class AssetFilter(
 )
 
 /**
- * Lo unico que el Hito 2 necesita saber de un fichero: si se puede adjuntar.
+ * Los metadatos de los ficheros del hogar. Los bytes no pasan por aqui: para eso
+ * esta [FileStorage].
  *
- * No hay entidad JPA de `files` ni la va a haber hasta el Hito 3, que es de quien
- * son los ficheros (ADR-005). Mapear la tabla entera ahora seria adelantar
- * trabajo de otro hito para responder una pregunta de si o no.
+ * Que las dos mitades vivan en puertos distintos no es ceremonia. La fila esta
+ * sujeta a RLS y el byte no, asi que **el aislamiento lo hereda el disco de la
+ * fila**: para construir una ruta hay que haber leido antes una fila que ya paso
+ * por la politica. Un atajo que derive rutas de algo que no salga de aqui
+ * desactiva esa herencia sin producir ningun error visible (ADR-005).
  */
 interface StoredFileRepository {
-    /** Vivo, ya subido del todo y --por RLS-- de este hogar. */
-    fun existsUsable(fileId: UUID): Boolean
+    fun save(file: StoredFile): StoredFile
+
+    /** En cualquiera de sus tres estados. Por RLS, solo si es de este hogar. */
+    fun findById(fileId: UUID): StoredFile?
+
+    /** Excluye los borrados y ordena por tamano **descendente** (ver `ListFiles` en 5.7). */
+    fun list(filter: StoredFileFilter, pagination: Pagination): Page<StoredFile>
+
+    /**
+     * Lo que ocupa el hogar: la suma de `sizeBytes` de sus ficheros vivos,
+     * **incluidas las reservas a medias**, que ya ocupan cuota aunque todavia no
+     * se puedan adjuntar. Las miniaturas no cuentan: las decide el sistema.
+     */
+    fun usedBytes(): Long
+
+    /**
+     * Si algo lo referencia: un documento, o la foto de un asset, un articulo o
+     * una ubicacion.
+     *
+     * Sostiene las dos reglas que la base de datos **no** puede garantizar
+     * enteras. El indice `documents_file_unique` impide que dos documentos
+     * compartan fichero, y ahi se acaba: que un documento y una foto lo compartan,
+     * o que dos assets compartan foto, no lo impide nadie mas que esto.
+     */
+    fun isAttached(fileId: UUID): Boolean
+
+    /**
+     * Lo que el proceso diario tiene que desenlazar del disco, en sus tres
+     * variantes (ver `PurgeUnusedFiles` en 5.7). Cada corte es una fecha distinta
+     * porque cada motivo tiene su plazo.
+     */
+    fun findPurgeable(
+        deletedBefore: Instant,
+        neverAttachedBefore: Instant,
+        reservedBefore: Instant,
+    ): List<StoredFile>
+
+    /** Borrado **real** de la fila. Solo el proceso diario, y siempre despues de los bytes. */
+    fun delete(fileId: UUID)
 }
+
+data class StoredFileFilter(
+    /** Con `false` devuelve los subidos y nunca adjuntados: lo que se puede borrar sin perder nada. */
+    val attached: Boolean? = null,
+    val contentType: StoredContentType? = null,
+)
+
+interface DocumentRepository {
+    fun save(document: Document): Document
+
+    fun findById(documentId: UUID): Document?
+
+    fun list(filter: DocumentFilter, pagination: Pagination): Page<Document>
+
+    /** Borrado **real**: no lo referencia ninguna otra entidad, asi que no hay historial que preservar. */
+    fun delete(documentId: UUID)
+}
+
+data class DocumentFilter(
+    val assetId: UUID? = null,
+    val articleId: UUID? = null,
+    val type: DocumentType? = null,
+)
 
 /**
  * Serializa los cambios de jerarquia dentro de un hogar.

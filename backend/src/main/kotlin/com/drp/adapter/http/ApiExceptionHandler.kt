@@ -1,6 +1,7 @@
 package com.drp.adapter.http
 
 import com.drp.domain.BusinessRuleViolation
+import com.drp.domain.ErrorCode
 import com.drp.domain.ResourceNotFound
 import com.drp.domain.ValidationFailure
 import com.drp.application.usecase.AuthenticationFailed
@@ -13,6 +14,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
+import org.springframework.web.multipart.MaxUploadSizeExceededException
 
 /**
  * La traduccion de errores a la forma unica del contrato.
@@ -28,10 +30,29 @@ class ApiExceptionHandler {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
+    /**
+     * `409` salvo los dos que el contrato saca de esa familia: el tamano y el
+     * tipo de un fichero tienen codigo de estado propio en HTTP --`413` y
+     * `415`-- y usarlos es lo que deja que un cliente generico reaccione sin
+     * leer el cuerpo.
+     *
+     * La correspondencia vive aqui y no en el enumerado del dominio porque es
+     * informacion de transporte: el dominio no sabe que existe HTTP.
+     */
     @ExceptionHandler(BusinessRuleViolation::class)
     fun onBusinessRule(failure: BusinessRuleViolation): ResponseEntity<ErrorResponse> =
-        ResponseEntity.status(HttpStatus.CONFLICT)
+        ResponseEntity.status(STATUS_BY_CODE[failure.code] ?: HttpStatus.CONFLICT)
             .body(ErrorResponse(failure.code.name, failure.message))
+
+    /**
+     * El tope duro de 25 MB, que **corta Tomcat antes de que el cuerpo llegue al
+     * caso de uso** (5.8.3, paso 1). Sin este manejador saldria como `500`, que
+     * es mentir sobre de quien es la culpa.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException::class)
+    fun onUploadTooLarge(): ResponseEntity<ErrorResponse> =
+        ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+            .body(ErrorResponse(ErrorCode.FILE_TOO_LARGE.name, "El fichero supera el tamaño máximo permitido"))
 
     @ExceptionHandler(ValidationFailure::class)
     fun onValidationFailure(failure: ValidationFailure): ResponseEntity<ErrorResponse> =
@@ -106,6 +127,12 @@ class ApiExceptionHandler {
     }
 
     private companion object {
+        /** Los dos codigos de negocio a los que el contrato asigna un estado que no es `409`. */
+        val STATUS_BY_CODE = mapOf(
+            ErrorCode.FILE_TOO_LARGE to HttpStatus.PAYLOAD_TOO_LARGE,
+            ErrorCode.FILE_TYPE_NOT_ALLOWED to HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+        )
+
         const val VALIDATION_ERROR = "VALIDATION_ERROR"
         const val INTERNAL_ERROR = "INTERNAL_ERROR"
 

@@ -128,7 +128,7 @@ class CreateArticle(
         requireLiveCategory(categories, command.categoryId)
         requireNameAvailable(articles, command.name, exceptId = null)
         command.barcode?.let { requireBarcodeAvailable(articles, it, exceptId = null) }
-        files.requireUsable(command.photoFileId)
+        files.requireAttachable(command.photoFileId)
 
         val now = clock.instant()
         return articles.save(
@@ -188,7 +188,9 @@ class UpdateArticle(
             requireBarcodeAvailable(articles, newBarcode, exceptId = articleId)
         }
 
-        if (patch.photoFileId is Patch.Set) files.requireUsable(patch.photoFileId.value)
+        if (patch.photoFileId is Patch.Set) {
+            files.requireAttachable(patch.photoFileId.value, alreadyHeld = current.photoFileId)
+        }
 
         val saved = articles.save(
             current.copy(
