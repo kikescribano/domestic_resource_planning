@@ -70,18 +70,52 @@ class ImageIoFileContentProcessor(
     }
 
     /**
-     * Decodifica **comprobando las dimensiones antes**.
+     * Decodifica **comprobando las dimensiones antes** y **exigiendo que la
+     * imagen entre entera**.
      *
      * El orden es todo el control: un PNG de 50 000 x 50 000 ocupa unos pocos
      * kilobytes comprimido --pasa de sobra el tope de 25 MB-- y son diez
      * gigabytes de pixeles al abrirlo. Reventaria la memoria al decodificar, no
      * al leer, asi que preguntar el tamano despues de `read()` llega tarde. El
      * lector de ImageIO responde `getWidth`/`getHeight` leyendo solo la cabecera.
+     *
+     * **Y no basta con que `read` no lance.** Un JPEG cortado por la mitad *no*
+     * da error en la JVM: el lector rellena lo que falta, devuelve una imagen del
+     * tamano que declaraba la cabecera y se limita a **avisar**. Sin escuchar esos
+     * avisos, un fichero roto entraba como bueno; PNG y WebP si lanzan, asi que el
+     * agujero era solo de JPEG y por eso no se veia.
+     *
+     * **Se escuchan los avisos de truncamiento, no todos**, y la diferencia esta
+     * medida en `ReaderWarningProbeTest`. Rechazar ante cualquier aviso parecia lo
+     * prudente y es peor que el agujero: un JPEG **legitimo** con bytes de relleno
+     * antes del EOI --lo que producen varias camaras y varios editores-- avisa
+     * «Corrupt JPEG data: N extraneous bytes before marker», se ve perfectamente
+     * en cualquier visor, y pasaria a rechazarse con un 415 incomprensible.
+     *
+     * Lo que si significa que la imagen no llego entera es «premature end» o
+     * «Truncated File», y aparece en las dos variantes del ataque: la cortada a
+     * secas y la cortada con un EOI pegado detras para disimular --que es lo que
+     * derrota a cualquier comprobacion de «¿termina en EOI?».
+     *
+     * Se compara por texto porque **estos mensajes no se traducen**: vienen tal
+     * cual de libjpeg. Medido en tres idiomas. Si algun dia cambiaran, lo que se
+     * pone rojo es la prueba de truncamiento, que es justo la alarma que se quiere.
      */
     private fun decode(input: InputStream): BufferedImage? {
         ImageIO.createImageInputStream(input).use { stream ->
             val reader = ImageIO.getImageReaders(stream).asSequence().firstOrNull() ?: return null
             reader.setInput(stream, true, true)
+
+            var incomplete = false
+            reader.addIIOReadWarningListener { _, warning ->
+                if (TRUNCATION_WARNINGS.any { warning.contains(it, ignoreCase = true) }) {
+                    incomplete = true
+                    log.debug("El lector avisa de un fichero incompleto, se rechaza: {}", warning)
+                } else {
+                    log.debug("Aviso benigno del lector, la imagen se acepta igual: {}", warning)
+                }
+            }
+
             try {
                 val pixels = reader.getWidth(0).toLong() * reader.getHeight(0).toLong()
                 if (pixels > maxImagePixels) {
@@ -90,7 +124,8 @@ class ImageIoFileContentProcessor(
                         "La imagen tiene demasiados píxeles para procesarse",
                     )
                 }
-                return reader.read(0)
+                val image = reader.read(0)
+                return if (incomplete) null else image
             } catch (failure: IOException) {
                 // Dice ser una imagen y no se deja decodificar: no lo es.
                 log.debug("Imagen no decodificable, se rechaza", failure)
@@ -203,5 +238,14 @@ class ImageIoFileContentProcessor(
 
         /** Como llama al modo con perdida el escritor de WebP. JPEG no declara tipos, y no pasa nada. */
         const val LOSSY = "Lossy"
+
+        /**
+         * Los dos avisos que significan «la imagen no llego entera».
+         *
+         * Cualquier otro --el de bytes de relleno, sin ir mas lejos-- describe un
+         * fichero valido con ruido, y rechazarlo seria rechazar fotos que
+         * cualquier visor abre.
+         */
+        val TRUNCATION_WARNINGS = listOf("premature end", "Truncated File")
     }
 }

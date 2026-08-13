@@ -7,6 +7,7 @@ import com.drp.test.extract
 import com.drp.test.extractRaw
 import com.drp.test.getJson
 import com.drp.test.imageBytes
+import com.drp.test.jpegWithBenignPadding
 import com.drp.test.jpegWithExif
 import com.drp.test.pdfBytes
 import com.drp.test.registerHousehold
@@ -208,6 +209,27 @@ class FileUploadJourneyTest : SpringIntegrationTest() {
         // Y el filtro por tipo distingue.
         http.getJson("/api/v1/files?type=application/pdf", household.accessToken)
             .body!!.extractRaw("total") shouldBe "0"
+    }
+
+    /**
+     * **Un JPEG legitimo con ruido no se rechaza**, aunque el lector avise.
+     *
+     * Es el reverso de la comprobacion de truncamiento, y es la que impide que
+     * esa se pase de ancha. Un JPEG con bytes de relleno antes del marcador de
+     * fin --lo que producen varias camaras y varios editores-- hace avisar al
+     * lector de la JVM exactamente igual que uno cortado. Rechazar ante cualquier
+     * aviso seria devolver un 415 incomprensible por una foto que cualquier visor
+     * abre sin pestanear, que es peor que el agujero que se pretendia cerrar.
+     */
+    @Test
+    fun `un JPEG con ruido benigno se acepta, aunque el lector avise`() {
+        val household = http.registerHousehold()
+
+        val response = http.uploadFile(household.accessToken, jpegWithBenignPadding(), "camara.jpg", "image/jpeg")
+
+        response.statusCode shouldBe HttpStatus.CREATED
+        response.body!!.extract("contentType") shouldBe "image/jpeg"
+        storedFiles("original", household).size shouldBe 1
     }
 
     /**

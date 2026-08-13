@@ -12,7 +12,13 @@ import com.drp.domain.file.StoredContentType
  * Y es solo **la mitad** de la comprobacion. Estas firmas dicen que el fichero
  * empieza como un JPEG, no que sea un JPEG: lo segundo solo lo demuestra
  * decodificarlo entero, que es lo que hace el paso siguiente. Un fichero con
- * cabecera valida y basura detras pasa por aqui y muere al recodificar.
+ * cabecera valida y contenido roto pasa por aqui y muere al recodificar.
+ *
+ * **Con una excepcion que conviene tener presente: el PDF no se decodifica.** No
+ * hay lector de PDF en el camino, asi que de un `application/pdf` esta firma es
+ * la unica comprobacion que se hace, y sus bytes se guardan tal cual. Lo que
+ * compensa eso no esta aqui sino en la entrega (5.8.4): nunca incrustado,
+ * siempre como adjunto, con `nosniff` y desde otro dominio.
  *
  * Lista blanca, nunca lista negra. Las firmas son las de los cuatro tipos
  * admitidos y no hay caso por defecto: lo que no reconoce, se rechaza.
