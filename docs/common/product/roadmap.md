@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Ejecución de la Fase 1 |
-| Última revisión | 2026-08-12 |
+| Última revisión | 2026-08-13 |
 
 > El estado de **las fases** vive en la sección 8 del
 > [`README principal`](../../../README.md), y solo allí. Este documento baja al
@@ -187,15 +187,45 @@ ADR-009.
 >   `REQUIRES_NEW`. Las que no se pueden arreglar quedan documentadas y escritas
 >   como pruebas que afirman el comportamiento **real** en lugar del deseado.
 
-### Hito 3 — Ficheros y documentos · Pendiente
+### Hito 3 — Ficheros y documentos · **Completado (2026-08-13)**
 
 La [ADR-005](../architecture/decisions/ADR-005-local-file-storage.md) entera. Es
-el hito con más infraestructura propia, y por eso va después de que el resto
-funcione.
+el hito con más infraestructura propia, y por eso fue después de que el resto
+funcionase.
 
-- Puerto `FileStorage` con adaptador de sistema de ficheros; controles OWASP; cuota de 1 GB por hogar validada **con la fila del hogar bloqueada**; miniaturas y purga.
-- **nginx entra en el `compose.yaml` en este hito**, con `X-Accel-Redirect`, dominio distinto al de la aplicación y URL firmada de vida corta. Hasta aquí no estaba, porque su configuración no era todavía nada real.
-- Frontend: subida con progreso, galería, adjuntar documento, avatar y consumo de cuota.
+- [x] **Las 11 operaciones del contrato** que caen en este hito: seis de ficheros, tres de documentos y dos de avatar. Con ellas la Fase 1 se queda a cuatro del total —las de préstamos, que son el Hito 4.
+- [x] **Puerto `FileStorage`** con adaptador de sistema de ficheros, y los controles de la File Upload Cheat Sheet: lista blanca **por contenido real**, renombrado en disco a partir del identificador, escritura a temporal con movimiento atómico y recodificación de imágenes que **borra el EXIF por construcción** —se decodifica a píxeles y se pinta en un lienzo nuevo, así que lo que no son píxeles no llega al escritor.
+- [x] **Cuota de 1 GB por hogar, reservada antes de transmitir**, con la fila del hogar bloqueada solo durante la reserva. Miniaturas de 320 px en WebP, fuera de la cuota, y el proceso diario `PurgeUnusedFiles` con sus tres criterios.
+- [x] **nginx en el `compose.yaml`**, con `X-Accel-Redirect`, dominio distinto al de la aplicación, URL firmada de vida corta y el log de acceso **sin cadena de consulta**.
+- [x] **Frontend**: subida con progreso, galería, adjuntar documento, avatar y consumo de cuota, sobre tres componentes nuevos escritos contra su ficha antes de existir.
+
+> **Cinco decisiones que la definición no preveía**, razonadas en
+> [`decisions.md`](decisions.md). Las dos que más condicionan lo demás:
+>
+> - **La firma va con MD5 con clave y no con el HMAC-SHA256 que dice 5.8.4.** Es
+>   lo único que nginx verifica de serie, y que lo verifique **sin preguntar a la
+>   aplicación** es el punto de la decisión. El secreto va al final del mensaje,
+>   que es la posición en la que la extensión de longitud no aplica.
+> - **La reserva de cuota no cambió el contrato.** Spring parsea el multipart
+>   antes de invocar al controlador, así que la reserva habría ocurrido con los
+>   25 MB ya en disco; con el multipart resuelto en diferido, el controlador ve la
+>   cabecera y todavía no el cuerpo.
+>
+> **La prueba de nginx levanta un nginx de verdad**, con la misma plantilla que
+> `compose.yaml` y no una copia, porque hay cuatro cosas que ningún simulacro
+> demuestra: que la firma que emite la aplicación es la que el proxy acepta, que
+> una caducidad manipulada da `403`, que `X-Accel-Redirect` entrega los bytes, y
+> que el log no lleva cadena de consulta —que es condición de la ADR-005 y no una
+> mejora. El resto de la suite corre sin proxy, que es como 5.8.4 describe el
+> entorno de desarrollo.
+>
+> **Un barrido de verificación encontró un agujero real**: un JPEG cortado por la
+> mitad entraba como bueno, porque el lector de la JVM no lanza ante un
+> truncamiento —rellena lo que falta y se limita a avisar—. PNG y WebP sí lanzan,
+> así que era solo de JPEG y por eso no se veía. **Su arreglo hubo que acotarlo**:
+> rechazar ante cualquier aviso habría rechazado fotos legítimas, porque un JPEG
+> con relleno benigno avisa igual. Medido antes de decidir, en los dos sentidos.
+> El segundo barrido murió por el límite de sesión antes de empezar.
 
 ### Hito 4 — Préstamos y cierre de fase · Pendiente
 
@@ -217,6 +247,7 @@ No son olvidos: están anotados con motivo en
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-13 | **Hito 3 completado.** Las 11 operaciones de ficheros, documentos y avatar; el puerto `FileStorage` con los controles de OWASP; la cuota reservada antes de transmitir; nginx con `X-Accel-Redirect` y URL firmada; el proceso diario de purga; y el cliente web con subida, galería y consumo de cuota. Se anotan las cinco decisiones que hubo que tomar al implementar y el agujero que encontró el barrido. |
 | 2026-08-12 | **Hito 2 completado.** Las 23 operaciones de catálogo, ubicaciones y assets; las dos naturalezas con entrada, fusión, ajuste y baja; las tres validaciones que la base de datos no puede garantizar; el event bus con handlers idempotentes y los ocho eventos; y el cliente web de las cuatro pantallas. Se anotan las cuatro decisiones que hubo que tomar al implementar y las tres cosas que solo se vieron ejecutando. |
 | 2026-08-11 | **Hito 1 completado.** Esquema completo, RLS con `FORCE`, `TenantContext`, Argon2id y JWT, las 16 operaciones del enrolamiento, limitador de frecuencia y los flujos de frontend sobre un sistema de diseño con las ocho dimensiones cerradas. Se anotan las tres decisiones que hubo que tomar al implementar y que la definición no preveía. |
 | 2026-08-10 | Se crea al arrancar la Fase 1, con el detalle de los hitos trasladado desde la sección 8.2 del README. Hito 0 completado. |

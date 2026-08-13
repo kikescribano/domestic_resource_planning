@@ -123,6 +123,27 @@ class CoreEvents(
             mapOf("mergedIntoAssetId" to mergedIntoAssetId),
         )
 
+    /**
+     * **El unico evento de los ficheros**, y no lo publica un fichero sino un
+     * documento.
+     *
+     * Un fichero recien subido y todavia sin adjuntar no significa nada para
+     * nadie: lo que le interesa a otro modulo --el CMMS enlazando el manual en el
+     * plan de mantenimiento que genera-- es que se adjunto. Un `FileUploaded`
+     * obligaria a cada suscriptor a esperar un segundo evento para saber si
+     * aquello llego a servir para algo (ver 5.7).
+     *
+     * Lleva el `fileId` cuando el documento se subio aqui, y nulo cuando es un
+     * enlace externo: quien reaccione necesita saber por cual de los dos caminos
+     * llegar al contenido.
+     */
+    fun documentAttached(documentId: UUID, assetId: UUID?, articleId: UUID?, type: String, fileId: UUID?) =
+        publish(
+            "DocumentAttached",
+            documentId,
+            mapOf("assetId" to assetId, "articleId" to articleId, "documentType" to type, "fileId" to fileId),
+        )
+
     private fun publish(type: String, aggregateId: UUID, payload: Map<String, Any?>) {
         // Sin hogar no hay evento que valga: el handler corre despues del commit,
         // cuando ya no queda contexto del que deducirlo. Que esto salte es un

@@ -112,7 +112,7 @@ class CreateLocation(
         command.parentLocationId?.let { parentId ->
             locations.findById(parentId) ?: throw ResourceNotFound("Ubicación padre no encontrada")
         }
-        files.requireUsable(command.photoFileId)
+        files.requireAttachable(command.photoFileId)
 
         requireNameFreeAmongSiblings(locations, command.name, command.parentLocationId, exceptId = null)
 
@@ -184,7 +184,9 @@ class UpdateLocation(
             requireNameFreeAmongSiblings(locations, newName, newParentId, exceptId = locationId)
         }
 
-        if (patch.photoFileId is Patch.Set) files.requireUsable(patch.photoFileId.value)
+        if (patch.photoFileId is Patch.Set) {
+            files.requireAttachable(patch.photoFileId.value, alreadyHeld = current.photoFileId)
+        }
 
         return locations.save(
             current.copy(

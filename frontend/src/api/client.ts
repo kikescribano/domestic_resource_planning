@@ -23,8 +23,14 @@ export type ApiErrorCode =
   | 'ASSET_QUANTITY_NOT_APPLICABLE'
   | 'CATEGORY_DUPLICATE'
   | 'CURRENT_PASSWORD_INVALID'
+  | 'DOCUMENT_CONTENT_INVALID'
+  | 'DOCUMENT_TARGET_INVALID'
   | 'EMAIL_NOT_VERIFIED'
   | 'EXISTENCE_ALREADY_IN_LOCATION'
+  | 'FILE_ALREADY_ATTACHED'
+  | 'FILE_IN_USE'
+  | 'FILE_TOO_LARGE'
+  | 'FILE_TYPE_NOT_ALLOWED'
   | 'IDENTITY_ALREADY_MEMBER'
   | 'INTAKE_QUANTITY_NOT_POSITIVE'
   | 'INVITATION_ALREADY_PENDING'
@@ -39,6 +45,7 @@ export type ApiErrorCode =
   | 'MERGE_SAME_ASSET'
   | 'RATE_LIMITED'
   | 'RESET_TOKEN_INVALID'
+  | 'STORAGE_QUOTA_EXCEEDED'
   | 'USER_LAST_ADMIN'
   | 'VALIDATION_ERROR'
   | 'VERIFICATION_TOKEN_INVALID'
@@ -64,6 +71,12 @@ const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   ASSET_QUANTITY_NEGATIVE: 'La cantidad no puede ser negativa.',
   ASSET_QUANTITY_NOT_APPLICABLE: 'Este asset no lleva cantidad.',
   CATEGORY_DUPLICATE: 'Ya hay una categoría con ese nombre.',
+  DOCUMENT_CONTENT_INVALID: 'Un documento es un enlace o un fichero, no las dos cosas.',
+  DOCUMENT_TARGET_INVALID: 'Un documento cuelga de una cosa o de un artículo, no de las dos.',
+  FILE_ALREADY_ATTACHED: 'Ese fichero ya está adjunto en otro sitio. Sube otro.',
+  FILE_IN_USE: 'No se puede borrar: todavía cuelga de algo. Quítalo de ahí primero.',
+  FILE_TOO_LARGE: 'El fichero pesa demasiado. El máximo son 25 MB.',
+  FILE_TYPE_NOT_ALLOWED: 'Ese tipo de fichero no se admite. Solo JPEG, PNG, WebP y PDF.',
   EXISTENCE_ALREADY_IN_LOCATION: 'Ahí ya hay una existencia de este artículo. Únelas en lugar de moverla.',
   INTAKE_QUANTITY_NOT_POSITIVE: 'La cantidad que entra tiene que ser mayor que cero.',
   LOCATION_CYCLE: 'No se puede mover ahí: el destino está dentro de lo que quieres mover.',
@@ -77,6 +90,9 @@ const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   NOT_FOUND: 'Eso ya no está.',
   FORBIDDEN: 'No tienes permiso para hacer esto.',
   RATE_LIMITED: 'Demasiados intentos. Prueba de nuevo en un momento.',
+  // Es el único de los tres de subida que NO se arregla eligiendo otro fichero:
+  // hay que hacer sitio. De ahí que el texto diga qué hacer y no qué ha pasado.
+  STORAGE_QUOTA_EXCEEDED: 'No queda espacio en el hogar. Borra algún fichero para hacer sitio.',
 }
 
 /**
@@ -209,6 +225,9 @@ export interface Article {
   packSize: number | null
   notes: string | null
   retiredAt: string | null
+  photoUrl: string | null
+  photoThumbnailUrl: string | null
+  photoFileId: string | null
 }
 
 export interface Capacity {
@@ -224,6 +243,9 @@ export interface Location {
   parentLocationId: string | null
   capacity: Capacity | null
   notes: string | null
+  photoUrl: string | null
+  photoThumbnailUrl: string | null
+  photoFileId: string | null
 }
 
 /** La referencia polimórfica: los dos campos van juntos. */
@@ -252,6 +274,9 @@ export interface Asset {
   unit: MeasurementUnit | null
   serialNumber: string | null
   notes: string | null
+  photoUrl: string | null
+  photoThumbnailUrl: string | null
+  photoFileId: string | null
   warnings: ApiWarning[]
 }
 
@@ -263,6 +288,78 @@ export interface AssetFilters {
   type?: AssetType
   status?: AssetStatus
   withoutOwner?: boolean
+}
+
+// --- Ficheros y documentos (Hito 3) ------------------------------------------
+
+export type FileContentType = 'image/jpeg' | 'image/png' | 'image/webp' | 'application/pdf'
+
+/** Los cuatro que admite la lista blanca. Sirve para el `accept` del selector. */
+export const ALLOWED_FILE_TYPES: FileContentType[] = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+
+export interface StoredFile {
+  id: string
+  originalName: string
+  contentType: FileContentType
+  sizeBytes: number
+  checksum: string
+  /**
+   * URL **firmada de vida corta**, servida desde el dominio de ficheros. Caduca
+   * con el access token que la generó —unos quince minutos— y **no se guarda**:
+   * vale para pintar ahora, no para almacenar en el estado ni para compartir.
+   */
+  url: string
+  /** Nula en un PDF: solo las imágenes tienen miniatura. */
+  thumbnailUrl: string | null
+  /** Nulo mientras la subida está en curso. */
+  uploadedAt: string | null
+  createdAt: string
+  createdBy: string | null
+}
+
+export interface StorageUsage {
+  usedBytes: number
+  quotaBytes: number
+  maxFileBytes: number
+}
+
+export type DocumentType = 'INVOICE' | 'WARRANTY' | 'MANUAL' | 'OTHER'
+
+/** Son datos que lee una persona, así que van en castellano. */
+export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  INVOICE: 'Factura',
+  WARRANTY: 'Garantía',
+  MANUAL: 'Manual',
+  OTHER: 'Otro',
+}
+
+export interface StoredDocument {
+  id: string
+  assetId: string | null
+  articleId: string | null
+  type: DocumentType
+  /** Exactamente uno de los dos: el documento vive fuera o vive aquí. */
+  url: string | null
+  fileId: string | null
+  description: string | null
+  date: string | null
+  validUntil: string | null
+  createdAt: string
+}
+
+/** Cómo se escribe un tamaño para que lo lea una persona. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['kB', 'MB', 'GB']
+  let value = bytes / 1024
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  // Un decimal por debajo de 10 y ninguno por encima: «1,4 MB» dice algo y
+  // «847,3 kB» solo añade ruido.
+  return `${value.toLocaleString('es-ES', { maximumFractionDigits: value < 10 ? 1 : 0 })} ${units[unit]}`
 }
 
 function queryString(params: Record<string, string | number | boolean | undefined>): string {
@@ -403,6 +500,92 @@ function renewSession(): Promise<string | null> {
     if (inFlight === attempt) inFlight = null
   })
   return attempt
+}
+
+/**
+ * Sube un fichero **informando del progreso**.
+ *
+ * Va por `XMLHttpRequest` y no por `fetch`, y no es nostalgia: `fetch` no expone
+ * el progreso de **subida**. Sin él, una foto de 20 MB desde el móvil es una
+ * pantalla quieta durante medio minuto, que es indistinguible de una aplicación
+ * colgada.
+ *
+ * **Reintenta una vez tras renovar la sesión**, igual que `request`. Sin eso, una
+ * subida larga que empieza con el token a punto de caducar termina en un `401`
+ * después de haber transmitido los 20 MB, que es el peor momento posible para
+ * perderlos. Comparte el mismo intento de renovación que el resto del cliente, de
+ * modo que varias subidas a la vez no rotan el refresh token unas contra otras.
+ */
+export async function uploadFile(
+  file: File,
+  accessToken: string,
+  onProgress?: (fraction: number) => void,
+  options: { path?: string; method?: string } = {},
+): Promise<StoredFile> {
+  const { path = '/files', method = 'POST' } = options
+
+  try {
+    return await sendFile(file, accessToken, onProgress, path, method)
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 401 || error.code !== 'UNAUTHORIZED') throw error
+
+    const renewed = await renewSession()
+    if (!renewed) throw error
+    return sendFile(file, renewed, onProgress, path, method)
+  }
+}
+
+function sendFile(
+  file: File,
+  accessToken: string,
+  onProgress: ((fraction: number) => void) | undefined,
+  path: string,
+  method: string,
+): Promise<StoredFile> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest()
+    request.open(method, `${BASE_URL}${path}`)
+    request.setRequestHeader('Authorization', `Bearer ${accessToken}`)
+
+    // `lengthComputable` es falso si el navegador no sabe el total. Ahí no se
+    // inventa un porcentaje: quien pinta la barra decide qué hacer sin dato.
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) onProgress(event.loaded / event.total)
+    }
+
+    request.onload = () => {
+      if (request.status >= 200 && request.status < 300) {
+        // El avatar responde 204 sin cuerpo; la subida de fichero, 201 con él.
+        resolve(request.responseText ? (JSON.parse(request.responseText) as StoredFile) : (undefined as never))
+        return
+      }
+      reject(toXhrError(request))
+    }
+
+    // Un fallo de red y una cancelación no llevan cuerpo ni código: se
+    // distinguen del error del contrato porque no son `ApiError`.
+    request.onerror = () => reject(new Error('No se ha podido subir el fichero'))
+    request.onabort = () => reject(new Error('Subida cancelada'))
+
+    const body = new FormData()
+    body.append('file', file)
+    request.send(body)
+  })
+}
+
+function toXhrError(request: XMLHttpRequest): ApiError {
+  let body: ApiErrorBody | undefined
+  try {
+    body = JSON.parse(request.responseText) as ApiErrorBody
+  } catch {
+    body = undefined
+  }
+  return new ApiError(
+    request.status,
+    body?.code ?? 'INTERNAL_ERROR',
+    body?.message ?? 'No se ha podido subir el fichero',
+    body?.details,
+  )
 }
 
 async function toApiError(response: Response): Promise<ApiError> {
@@ -584,4 +767,34 @@ export const api = {
 
   decommissionAsset: (id: string, accessToken: string) =>
     request<void>(`/assets/${id}`, { method: 'DELETE', accessToken }),
+
+  // --- Ficheros y documentos ------------------------------------------------
+  /** Ordenado por tamaño **descendente**: cuando la cuota se agota, la pregunta es qué la ocupa. */
+  listFiles: (accessToken: string, filters: { attached?: boolean; type?: FileContentType } = {}) =>
+    request<Page<StoredFile>>(`/files${queryString({ ...filters, size: 200 })}`, { accessToken }),
+
+  getFile: (id: string, accessToken: string) => request<StoredFile>(`/files/${id}`, { accessToken }),
+
+  /** Solo sobre ficheros que no cuelgan de nada: primero se desadjunta. */
+  deleteFile: (id: string, accessToken: string) =>
+    request<void>(`/files/${id}`, { method: 'DELETE', accessToken }),
+
+  getStorageUsage: (accessToken: string) => request<StorageUsage>('/storage', { accessToken }),
+
+  listDocuments: (accessToken: string, filters: { assetId?: string; articleId?: string } = {}) =>
+    request<Page<StoredDocument>>(`/documents${queryString({ ...filters, size: 200 })}`, { accessToken }),
+
+  attachDocument: (body: Record<string, unknown>, accessToken: string) =>
+    request<StoredDocument>('/documents', { method: 'POST', body, accessToken }),
+
+  /** Si tenía fichero, la misma transacción lo marca: la cuota se libera en el acto. */
+  deleteDocument: (id: string, accessToken: string) =>
+    request<void>(`/documents/${id}`, { method: 'DELETE', accessToken }),
+
+  /** «me» es la **identidad**, no la pertenencia: el avatar es de la persona. */
+  setOwnAvatar: (file: File, accessToken: string, onProgress?: (fraction: number) => void) =>
+    uploadFile(file, accessToken, onProgress, { path: '/users/me/avatar', method: 'PUT' }),
+
+  deleteOwnAvatar: (accessToken: string) =>
+    request<void>('/users/me/avatar', { method: 'DELETE', accessToken }),
 }

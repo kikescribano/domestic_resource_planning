@@ -27,7 +27,24 @@ data class TestHousehold(
     val accessToken: String,
     val memberId: String,
     val email: String,
+    /**
+     * Sale del propio token, que es el unico sitio donde esta: la API no lo
+     * devuelve nunca. Lo necesitan las pruebas que miran el disco, porque la ruta
+     * de un fichero se troce por hogar.
+     */
+    val householdId: String,
+    /**
+     * La **identidad**, que no es la pertenencia. La ruta de un avatar se deriva
+     * de ella, porque una identidad no pertenece a ningun hogar.
+     */
+    val identityId: String,
 )
+
+/** Los claims que lleva dentro el access token. Solo los usan las pruebas. */
+private fun String.claim(name: String): String {
+    val payload = String(java.util.Base64.getUrlDecoder().decode(split(".")[1]))
+    return payload.extract(name)
+}
 
 /**
  * Da de alta un hogar y lo deja verificado, leyendo el enlace del **correo real**
@@ -48,7 +65,22 @@ fun TestRestTemplate.registerHousehold(mailpit: DrpMailpit = DrpMailpit.instance
     val accessToken = session.extract("accessToken")
     val memberId = getJson("/api/v1/users", accessToken).body!!.extract("id")
 
-    return TestHousehold(accessToken, memberId, email)
+    return TestHousehold(accessToken, memberId, email, accessToken.claim("householdId"), accessToken.claim("sub"))
+}
+
+/**
+ * Una de las categorias que **siembra el alta del hogar**.
+ *
+ * Un `DURABLE` sin articulo necesita nombre y categoria propios, asi que casi
+ * toda prueba que cree un asset pasa por aqui. Los nombres de las categorias
+ * sembradas son **datos** y van en castellano, al contrario que los
+ * identificadores.
+ */
+fun TestRestTemplate.seededCategory(accessToken: String, name: String): String {
+    val body = getJson("/api/v1/categories", accessToken).body!!
+    val entry = Regex("\\{[^{}]*\"name\":\"$name\"[^{}]*\\}").find(body)
+        ?: error("No aparece la categoría sembrada «$name»:\n$body")
+    return entry.value.extract("id")
 }
 
 fun TestRestTemplate.postJson(path: String, body: String, accessToken: String? = null): ResponseEntity<String> =

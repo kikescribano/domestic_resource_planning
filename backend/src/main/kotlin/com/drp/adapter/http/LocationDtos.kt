@@ -101,7 +101,7 @@ data class LocationResponse(
     val updatedBy: UUID?,
 ) {
     companion object {
-        fun of(location: Location) = LocationResponse(
+        fun of(location: Location, photoThumbnailUrl: String?) = LocationResponse(
             id = location.id,
             name = location.name,
             type = location.type,
@@ -109,9 +109,9 @@ data class LocationResponse(
             capacity = location.capacity?.let(CapacityResponse::of),
             environmentalConditions = location.environmentalConditions?.let(EnvironmentalConditionsResponse::of),
             photoUrl = location.photoUrl,
-            // La miniatura es una URL firmada sobre un fichero subido, y eso
-            // llega con el Hito 3. De un enlace externo no se genera ninguna.
-            photoThumbnailUrl = null,
+            // Firmada, y **solo** si la foto es un fichero subido: de un enlace
+            // externo no se genera ninguna miniatura.
+            photoThumbnailUrl = photoThumbnailUrl,
             photoFileId = location.photoFileId,
             notes = location.notes,
             createdAt = location.createdAt,

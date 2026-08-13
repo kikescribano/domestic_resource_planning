@@ -5,6 +5,8 @@ import com.drp.application.port.ArticleRepository
 import com.drp.application.port.AssetFilter
 import com.drp.application.port.AssetRepository
 import com.drp.application.port.CategoryRepository
+import com.drp.application.port.DocumentFilter
+import com.drp.application.port.DocumentRepository
 import com.drp.application.port.EmailVerificationTokenRepository
 import com.drp.application.port.HierarchyLock
 import com.drp.application.port.HouseholdMemberRepository
@@ -16,14 +18,21 @@ import com.drp.application.port.Page
 import com.drp.application.port.Pagination
 import com.drp.application.port.PasswordResetTokenRepository
 import com.drp.application.port.RefreshTokenRepository
+import com.drp.application.port.StoredFileFilter
 import com.drp.application.port.StoredFileRepository
 import com.drp.application.port.TenantResolver
 import com.drp.application.tenant.TenantContext
 import com.drp.domain.catalog.Article
 import com.drp.domain.catalog.Category
+import com.drp.domain.file.Document
+import com.drp.domain.file.DocumentContent
+import com.drp.domain.file.DocumentTarget
+import com.drp.domain.file.StoredContentType
+import com.drp.domain.file.StoredFile
 import com.drp.domain.household.Household
 import com.drp.domain.household.HouseholdMember
 import com.drp.domain.household.MemberRole
+import com.drp.domain.identity.Avatar
 import com.drp.domain.identity.EmailAddress
 import com.drp.domain.identity.Identity
 import com.drp.domain.inventory.Asset
@@ -49,6 +58,7 @@ import java.util.UUID
 @Repository
 class HouseholdRepositoryAdapter(
     private val households: HouseholdJpaRepository,
+    private val jdbc: JdbcTemplate,
 ) : HouseholdRepository {
 
     override fun save(household: Household): Household =
@@ -68,6 +78,21 @@ class HouseholdRepositoryAdapter(
      * visible en esta tabla, y si no hay contexto no deja ninguna.
      */
     override fun findCurrent(): Household? = households.findAll().firstOrNull()?.toDomain()
+
+    /**
+     * Va por SQL plano porque JPA no tiene forma de pedir un `FOR UPDATE` sin
+     * traerse la entidad, y aqui **no hace falta la fila**: hace falta el
+     * cerrojo. Sin `WHERE`, como todo lo demas: la politica deja visible
+     * exactamente la del hogar de la sesion.
+     *
+     * Sin contexto de inquilino no bloquea nada --cero filas visibles-- y eso
+     * seria un cerrojo que parece tomado y no lo esta, asi que se exige el
+     * contexto en lugar de dejarlo pasar en silencio.
+     */
+    override fun lockCurrent() {
+        val locked = jdbc.queryForList("SELECT id FROM households FOR UPDATE", UUID::class.java)
+        check(locked.isNotEmpty()) { "Bloquear el hogar exige contexto de inquilino" }
+    }
 
     override fun deleteCurrent() {
         households.deleteAll(households.findAll())
@@ -127,6 +152,10 @@ class IdentityRepositoryAdapter(
                 passwordHash = identity.passwordHash,
                 emailVerifiedAt = identity.emailVerifiedAt,
                 lastLoginAt = identity.lastLoginAt,
+                avatarUrl = null,
+                avatarStorageKey = identity.avatar?.storageKey,
+                avatarContentType = identity.avatar?.contentType,
+                avatarSizeBytes = identity.avatar?.sizeBytes,
                 createdAt = identity.createdAt,
                 updatedAt = identity.updatedAt,
                 deactivatedAt = identity.deactivatedAt,
@@ -150,6 +179,7 @@ internal fun IdentityEntity.toDomain() = Identity(
     passwordHash = passwordHash,
     emailVerifiedAt = emailVerifiedAt,
     lastLoginAt = lastLoginAt,
+    avatar = Avatar.from(avatarStorageKey, avatarContentType, avatarSizeBytes),
     createdAt = createdAt,
     updatedAt = updatedAt,
     deactivatedAt = deactivatedAt,
@@ -680,25 +710,156 @@ internal fun LocationEntity.toDomain() = Location(
     updatedBy = updatedBy,
 )
 
-/**
- * Va por JDBC y sin entidad JPA a proposito: la pregunta es de si o no, y mapear
- * `files` entera es trabajo del Hito 3. La consulta corre bajo RLS, asi que el
- * fichero de otro hogar no aparece --y hoy no aparece ninguno, porque nada puede
- * insertar en esa tabla todavia.
- */
 @Repository
-class StoredFileRepositoryAdapter(private val jdbc: JdbcTemplate) : StoredFileRepository {
+class StoredFileRepositoryAdapter(
+    private val files: StoredFileJpaRepository,
+    private val tenantContext: TenantContext,
+) : StoredFileRepository {
 
-    override fun existsUsable(fileId: UUID): Boolean =
-        jdbc.queryForObject(
-            """
-            SELECT count(*) FROM files
-            WHERE id = ? AND deleted_at IS NULL AND uploaded_at IS NOT NULL
-            """.trimIndent(),
-            Long::class.java,
-            fileId,
-        )!! > 0
+    override fun save(file: StoredFile): StoredFile {
+        val householdId = requireNotNull(tenantContext.currentHousehold()) {
+            "Guardar un fichero exige contexto de inquilino"
+        }
+
+        return files.save(
+            StoredFileEntity(
+                id = file.id,
+                householdId = householdId,
+                originalName = file.originalName,
+                contentType = file.contentType.value,
+                sizeBytes = file.sizeBytes,
+                checksum = file.checksum,
+                storageKey = file.storageKey,
+                createdAt = file.createdAt,
+                createdBy = file.createdBy,
+                uploadedAt = file.uploadedAt,
+                deletedAt = file.deletedAt,
+            ),
+        ).toDomain()
+    }
+
+    override fun findById(fileId: UUID): StoredFile? =
+        files.findById(fileId).orElse(null)?.toDomain()
+
+    override fun findAllUsable(fileIds: Collection<UUID>): List<StoredFile> =
+        files.findAllById(fileIds).map { it.toDomain() }.filter { it.isUsable }
+
+    override fun list(filter: StoredFileFilter, pagination: Pagination): Page<StoredFile> {
+        val found = files.search(
+            attached = filter.attached,
+            contentType = filter.contentType?.value,
+            pageable = PageRequest.of(pagination.page, pagination.size),
+        )
+        return Page(found.content.map { it.toDomain() }, pagination.page, pagination.size, found.totalElements)
+    }
+
+    override fun usedBytes(): Long = files.sumLiveBytes()
+
+    override fun isAttached(fileId: UUID): Boolean = files.countAttachments(fileId) > 0
+
+    override fun findPurgeable(
+        deletedBefore: Instant,
+        neverAttachedBefore: Instant,
+        reservedBefore: Instant,
+    ): List<StoredFile> =
+        files.findPurgeable(deletedBefore, neverAttachedBefore, reservedBefore).map { it.toDomain() }
+
+    override fun delete(fileId: UUID) {
+        files.deleteById(fileId)
+    }
 }
+
+/**
+ * El `contentType` guardado tiene un `CHECK` con la lista blanca detras, asi que
+ * un valor desconocido no deberia poder existir. El `error` esta igualmente:
+ * si algun dia existe, se entera quien lo lea y no el usuario mirando una ficha
+ * con un hueco.
+ */
+internal fun StoredFileEntity.toDomain() = StoredFile(
+    id = id,
+    originalName = originalName,
+    contentType = StoredContentType.from(contentType)
+        ?: error("Tipo de contenido no admitido en la fila $id: $contentType"),
+    sizeBytes = sizeBytes,
+    checksum = checksum,
+    storageKey = storageKey,
+    createdAt = createdAt,
+    createdBy = createdBy,
+    uploadedAt = uploadedAt,
+    deletedAt = deletedAt,
+)
+
+@Repository
+class DocumentRepositoryAdapter(
+    private val documents: DocumentJpaRepository,
+    private val tenantContext: TenantContext,
+) : DocumentRepository {
+
+    override fun save(document: Document): Document {
+        val householdId = requireNotNull(tenantContext.currentHousehold()) {
+            "Guardar un documento exige contexto de inquilino"
+        }
+
+        return documents.save(
+            DocumentEntity(
+                id = document.id,
+                householdId = householdId,
+                assetId = document.target.assetId,
+                articleId = document.target.articleId,
+                fileId = (document.content as? DocumentContent.StoredFileRef)?.fileId,
+                type = document.type,
+                url = (document.content as? DocumentContent.ExternalLink)?.url,
+                description = document.description,
+                date = document.date,
+                validUntil = document.validUntil,
+                createdAt = document.createdAt,
+                updatedAt = document.updatedAt,
+                createdBy = document.createdBy,
+                updatedBy = document.updatedBy,
+            ),
+        ).toDomain()
+    }
+
+    override fun findById(documentId: UUID): Document? =
+        documents.findById(documentId).orElse(null)?.toDomain()
+
+    override fun list(filter: DocumentFilter, pagination: Pagination): Page<Document> {
+        val found = documents.search(
+            assetId = filter.assetId,
+            articleId = filter.articleId,
+            type = filter.type?.name,
+            pageable = PageRequest.of(pagination.page, pagination.size),
+        )
+        return Page(found.content.map { it.toDomain() }, pagination.page, pagination.size, found.totalElements)
+    }
+
+    override fun delete(documentId: UUID) {
+        documents.deleteById(documentId)
+    }
+}
+
+/**
+ * Los dos `CHECK` de la tabla garantizan que hay exactamente un destino y
+ * exactamente un contenido, asi que las dos reconstrucciones no pueden dar nulo.
+ * Se comprueba igual: una fila escrita por otra via --una migracion, una
+ * restauracion a medias-- no puede pasar por buena y salir como un documento sin
+ * destino.
+ */
+internal fun DocumentEntity.toDomain() = Document(
+    id = id,
+    target = DocumentTarget.from(assetId, articleId)
+        ?: error("Documento $id sin destino unico: asset=$assetId articulo=$articleId"),
+    type = type,
+    content = DocumentContent.from(url, fileId)
+        ?: error("Documento $id sin contenido unico"),
+    description = description,
+    date = date,
+    validUntil = validUntil,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    createdBy = createdBy,
+    updatedBy = updatedBy,
+)
 
 /**
  * El cerrojo de jerarquia, con un advisory lock de transaccion.

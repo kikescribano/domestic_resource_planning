@@ -54,6 +54,22 @@ spring:
           timeout: 30000
           writetimeout: 30000
 
+  servlet:
+    multipart:
+      # El tope duro **antes de leer el cuerpo** (5.8.3, paso 1): una peticion
+      # mayor la corta Tomcat y no llega al caso de uso.
+      max-file-size: 25MB
+      # Algo mas que el fichero: el `Content-Length` incluye la envoltura del
+      # multipart --limites, cabeceras de parte-- y un fichero de exactamente
+      # 25 MB pasaria del tope por unos cientos de bytes que no son suyos.
+      max-request-size: 26MB
+      # **Esta linea es la que hace posible reservar la cuota antes de
+      # transmitir.** Sin ella, Spring parsea el multipart entero --y lo escribe
+      # en disco-- antes de invocar al controlador, de modo que la reserva
+      # ocurriria con los 25 MB ya recibidos y el bloqueo del hogar dejaria de
+      # servir para lo que esta.
+      resolve-lazily: true
+
 server:
   servlet:
     context-path: /
@@ -82,6 +98,54 @@ drp:
     # una persona concreta. Cinco correos en cinco minutos ya es mas de lo que
     # nadie necesita.
     per-email: 5
+    # Subidas por identidad y ventana. Holgado para quien esta inventariando la
+    # casa a fotos, y suficiente para que llenar el gigabyte a base de peticiones
+    # cueste horas en vez de minutos.
+    per-identity-upload: 60
+
+  storage:
+    # La raiz del **volumen separado** de ficheros (5.8.1). En un despliegue de
+    # verdad es un punto de montaje propio, con `noexec,nodev,nosuid` y fuera de
+    # cualquier arbol que sirva el servidor web. En local basta un directorio.
+    root: ${DRP_STORAGE_ROOT:./.data/files}
+    # 1 GB por hogar. NO es un CHECK: no es una propiedad de una fila sino una
+    # suma sobre las vivas, y se valida en el caso de uso con la fila del hogar
+    # bloqueada (ADR-005).
+    quota-bytes: 1073741824
+    # 25 MB por fichero. Esto SI esta ademas en la tabla, y el contenedor de
+    # servlets corta antes de llegar aqui.
+    max-file-bytes: 26214400
+    # El tope de pixeles, comprobado **antes** de decodificar. Un PNG de
+    # 50 000 x 50 000 ocupa unos kilobytes comprimido y son diez gigabytes
+    # abiertos: lo que hay que acotar no es el fichero sino la imagen.
+    # 50 megapixeles admiten cualquier camara de movil actual con holgura.
+    max-image-pixels: 50000000
+    # El lado largo de la miniatura. De sobra para una rejilla en un movil de
+    # 375 px, y no cuenta en la cuota del hogar.
+    thumbnail-pixels: 320
+    # 1 MB por avatar, el mismo tope que el CHECK de la columna. NO es una cuota
+    # acumulable: un avatar sustituye siempre al anterior, asi que no hay nada
+    # que sumar (README 4.1.1).
+    max-avatar-bytes: 1048576
+
+  files:
+    # De donde cuelgan las URL firmadas. En produccion es **otro dominio**, que
+    # es lo que impide que un fichero que se cuele pese a todo comparta origen
+    # con la sesion, el token y los datos del hogar. En local es la propia
+    # aplicacion, que las sirve ella misma.
+    base-url: ${DRP_FILES_BASE_URL:http://localhost:8080}
+    # Secreto de la firma. Igual que la clave del JWT: es un SECRETO DE
+    # DESPLIEGUE y lo comparten la aplicacion y nginx, que es quien la verifica.
+    link-secret: ${DRP_FILES_LINK_SECRET:desarrollo-local-no-usar-en-produccion}
+    # Con nginx delante, la descarga autorizada delega los bytes con
+    # X-Accel-Redirect. Sin el, el mismo endpoint los transmite (5.8.4).
+    #
+    # La misma propiedad apaga el `location` /f/** que la aplicacion atiende en
+    # desarrollo: dejarlo encendido con nginx delante seria una segunda puerta a
+    # los bytes en el dominio de la aplicacion, que es justo lo que la ADR-005
+    # separa.
+    accel-redirect: ${DRP_FILES_ACCEL_REDIRECT:false}
+    accel-prefix: /internal
 
   mail:
     # Remitente de los correos de enrolamiento (ADR-009).

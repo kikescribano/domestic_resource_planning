@@ -8,8 +8,13 @@ package com.drp.domain
  * contrato, no un caso que el frontend deba adivinar, asi que este enumerado
  * existe para que anadir uno obligue a tocar tambien el contrato.
  *
- * Estan los del Hito 1 --enrolamiento-- y los del Hito 2 --catalogo, ubicaciones
- * y assets--. Los de ficheros y prestamos entran con los suyos.
+ * Estan los del Hito 1 --enrolamiento--, los del Hito 2 --catalogo, ubicaciones
+ * y assets-- y los del Hito 3 --ficheros y documentos--. Los de prestamos entran
+ * con el suyo.
+ *
+ * Tres de los de ficheros **no responden `409`**: el contrato les asigna `413` y
+ * `415`, que es informacion de transporte y no de dominio. La correspondencia
+ * vive en el manejador de errores, que es quien sabe de HTTP.
  */
 enum class ErrorCode {
     ALREADY_MEMBER,
@@ -23,8 +28,14 @@ enum class ErrorCode {
     ASSET_QUANTITY_NOT_APPLICABLE,
     CATEGORY_DUPLICATE,
     CURRENT_PASSWORD_INVALID,
+    DOCUMENT_CONTENT_INVALID,
+    DOCUMENT_TARGET_INVALID,
     EMAIL_NOT_VERIFIED,
     EXISTENCE_ALREADY_IN_LOCATION,
+    FILE_ALREADY_ATTACHED,
+    FILE_IN_USE,
+    FILE_TOO_LARGE,
+    FILE_TYPE_NOT_ALLOWED,
     IDENTITY_ALREADY_MEMBER,
     INTAKE_QUANTITY_NOT_POSITIVE,
     INVITATION_ALREADY_PENDING,
@@ -38,6 +49,7 @@ enum class ErrorCode {
     MERGE_NOT_CONSUMABLE,
     MERGE_SAME_ASSET,
     RESET_TOKEN_INVALID,
+    STORAGE_QUOTA_EXCEEDED,
     USER_LAST_ADMIN,
     VERIFICATION_TOKEN_INVALID,
 }

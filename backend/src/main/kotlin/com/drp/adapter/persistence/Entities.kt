@@ -1,6 +1,7 @@
 package com.drp.adapter.persistence
 
 import com.drp.domain.catalog.MeasurementUnit
+import com.drp.domain.file.DocumentType
 import com.drp.domain.household.MemberRole
 import com.drp.domain.inventory.AssetStatus
 import com.drp.domain.inventory.AssetType
@@ -33,10 +34,10 @@ import java.util.UUID
  * Estas clases no salen de este paquete: los casos de uso hablan del dominio, y
  * la traduccion entre ambos vive en los adaptadores de al lado.
  *
- * Las cuatro tablas restantes del esquema --documents, files, loans y
- * loan_access_tokens-- existen en la base de datos desde la primera migracion
- * pero no tienen entidad todavia: llegan con sus hitos. `ddl-auto: validate`
- * solo comprueba lo que esta mapeado, asi que no estorban.
+ * Las dos tablas restantes del esquema --loans y loan_access_tokens-- existen en
+ * la base de datos desde la primera migracion pero no tienen entidad todavia:
+ * llegan con el Hito 4. `ddl-auto: validate` solo comprueba lo que esta mapeado,
+ * asi que no estorban.
  */
 
 @Entity
@@ -59,6 +60,14 @@ class IdentityEntity(
     var passwordHash: String,
     var emailVerifiedAt: Instant?,
     var lastLoginAt: Instant?,
+    // El avatar vive aqui y no en `files`: una identidad no pertenece a ningun
+    // hogar, asi que no tiene cuota a la que sumar ni politica de RLS detras
+    // (README 4.1.1). `avatar_url` queda para un enlace externo y hoy nadie lo
+    // rellena: el contrato solo ofrece subir un fichero.
+    var avatarUrl: String?,
+    var avatarStorageKey: String?,
+    var avatarContentType: String?,
+    var avatarSizeBytes: Long?,
     var createdAt: Instant,
     var updatedAt: Instant,
     var deactivatedAt: Instant?,
@@ -121,6 +130,59 @@ class RefreshTokenEntity(
     var tokenHash: String,
     var expiresAt: Instant,
     var revokedAt: Instant?,
+)
+
+/**
+ * Los metadatos de un binario que vive en disco.
+ *
+ * `contentType` va como `String` y no como enumerado, al reves que el resto:
+ * la columna ya tiene un `CHECK` con la lista blanca, y mapearla a un `enum`
+ * aqui haria que una fila con un valor que la aplicacion no conoce --escrita por
+ * una version futura, o por una migracion-- reventase al leerla en vez de
+ * poderse listar. La traduccion al enumerado del dominio ocurre un piso mas
+ * arriba, donde se puede decidir que hacer.
+ *
+ * No lleva `updatedAt` ni `updatedBy`: un fichero no se modifica (README 4.1.1).
+ */
+@Entity
+@Table(name = "files")
+class StoredFileEntity(
+    @Id var id: UUID,
+    var householdId: UUID,
+    var originalName: String,
+    var contentType: String,
+    var sizeBytes: Long,
+    var checksum: String,
+    var storageKey: String,
+    var createdAt: Instant,
+    var createdBy: UUID?,
+    var uploadedAt: Instant?,
+    var deletedAt: Instant?,
+)
+
+/**
+ * Las dos parejas excluyentes --destino y contenido-- van como columnas sueltas
+ * y anulables porque asi esta la tabla, con sendos `CHECK` que impiden informar
+ * las dos. Hacia arriba se traducen a `DocumentTarget` y `DocumentContent`, que
+ * no pueden representar ese estado invalido.
+ */
+@Entity
+@Table(name = "documents")
+class DocumentEntity(
+    @Id var id: UUID,
+    var householdId: UUID,
+    var assetId: UUID?,
+    var articleId: UUID?,
+    var fileId: UUID?,
+    @Enumerated(EnumType.STRING) var type: DocumentType,
+    var url: String?,
+    var description: String?,
+    var date: LocalDate?,
+    var validUntil: LocalDate?,
+    var createdAt: Instant,
+    var updatedAt: Instant,
+    var createdBy: UUID?,
+    var updatedBy: UUID?,
 )
 
 @Entity

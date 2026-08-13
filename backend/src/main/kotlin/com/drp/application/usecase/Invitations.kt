@@ -202,6 +202,7 @@ class AcceptInvitation(
                     // correo.
                     emailVerifiedAt = now,
                     lastLoginAt = null,
+                    avatar = null,
                     createdAt = now,
                     updatedAt = now,
                     deactivatedAt = null,

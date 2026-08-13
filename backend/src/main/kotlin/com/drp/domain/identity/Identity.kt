@@ -39,6 +39,7 @@ data class Identity(
     val passwordHash: String,
     val emailVerifiedAt: Instant?,
     val lastLoginAt: Instant?,
+    val avatar: Avatar?,
     val createdAt: Instant,
     val updatedAt: Instant,
     val deactivatedAt: Instant?,
@@ -53,4 +54,38 @@ data class Identity(
      * cuenta cerrada no se autentica en ningun hogar.
      */
     val canAuthenticate: Boolean get() = isVerified && isActive
+}
+
+/**
+ * La imagen que retrata a una persona. **No es un `StoredFile`** (README 4.1.1).
+ *
+ * Y no lo es por una razon que no es de comodidad: una `Identity` **no pertenece
+ * a ningun hogar**, asi que su avatar no se puede cargar a ninguna cuota ni
+ * proteger con Row-Level Security. De ahi las tres diferencias:
+ *
+ * - Vive en columnas de la propia `identities`, no en la tabla `files`.
+ * - Es **uno solo y siempre se sustituye**, asi que no acumula. Sin acumulacion
+ *   posible no hay nada que contar, y por eso su limite no es una cuota sino un
+ *   tamano maximo por fichero: 1 MB.
+ * - **Cerrar la cuenta lo borra.** Es la unica imagen que retrata a una persona,
+ *   y la baja de la identidad es el momento en que deja de haber motivo para
+ *   conservarla. Los ficheros del hogar no se van con ella: son del hogar.
+ *
+ * Va como objeto de valor y no como tres columnas sueltas porque «hay clave de
+ * almacenamiento pero no tipo» no es un estado que deba poder representarse.
+ */
+data class Avatar(
+    val storageKey: String,
+    val contentType: String,
+    val sizeBytes: Long,
+) {
+    companion object {
+        /** Reconstruye desde las columnas. Nulo si no hay avatar. */
+        fun from(storageKey: String?, contentType: String?, sizeBytes: Long?): Avatar? =
+            if (storageKey != null && contentType != null && sizeBytes != null) {
+                Avatar(storageKey, contentType, sizeBytes)
+            } else {
+                null
+            }
+    }
 }

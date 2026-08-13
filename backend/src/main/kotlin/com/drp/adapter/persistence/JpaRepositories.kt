@@ -126,6 +126,145 @@ interface RefreshTokenJpaRepository : JpaRepository<RefreshTokenEntity, UUID> {
     )
 }
 
+/**
+ * Los metadatos de los ficheros del hogar.
+ *
+ * Casi todo es consulta nativa por un motivo comun: **la pregunta de si un
+ * fichero esta adjunto cruza cuatro tablas** --documents y las tres que llevan
+ * foto-- y JPQL obligaria a mapear asociaciones que las entidades no tienen a
+ * proposito. Todas corren bajo RLS, asi que ninguna necesita `household_id` y
+ * ninguna puede ver un fichero de otro hogar.
+ */
+interface StoredFileJpaRepository : JpaRepository<StoredFileEntity, UUID> {
+
+    /**
+     * Lo que ocupa el hogar. `coalesce` porque un hogar sin ficheros suma nulo, no
+     * cero, y ese nulo llegaria como cero solo por casualidad del mapeo.
+     *
+     * Cuenta tambien las reservas a medias --`uploaded_at` nulo--: ocupan cuota
+     * desde el instante en que se insertan, que es justo lo que hace que la
+     * reserva sirva de algo.
+     */
+    @Query(value = "SELECT coalesce(sum(size_bytes), 0) FROM files WHERE deleted_at IS NULL", nativeQuery = true)
+    fun sumLiveBytes(): Long
+
+    @Query(
+        value = """
+            SELECT count(*) FROM files f
+            WHERE f.id = CAST(:fileId AS uuid)
+              AND ($ATTACHED_PREDICATE)
+        """,
+        nativeQuery = true,
+    )
+    fun countAttachments(@Param("fileId") fileId: UUID): Long
+
+    /**
+     * El listado, ordenado por tamano **descendente**: cuando la cuota se agota,
+     * la pregunta real es que la esta ocupando.
+     *
+     * El `ORDER BY` va escrito aqui y no en el `Pageable` porque no es una
+     * preferencia del cliente sino parte de lo que el contrato promete.
+     */
+    @Query(
+        value = """
+            SELECT * FROM files f
+            WHERE f.deleted_at IS NULL
+              AND (CAST(:contentType AS text) IS NULL OR f.content_type = CAST(:contentType AS text))
+              AND (
+                CAST(:attached AS boolean) IS NULL
+                OR CAST(:attached AS boolean) = ($ATTACHED_PREDICATE)
+              )
+            ORDER BY f.size_bytes DESC, f.created_at DESC
+        """,
+        countQuery = """
+            SELECT count(*) FROM files f
+            WHERE f.deleted_at IS NULL
+              AND (CAST(:contentType AS text) IS NULL OR f.content_type = CAST(:contentType AS text))
+              AND (
+                CAST(:attached AS boolean) IS NULL
+                OR CAST(:attached AS boolean) = ($ATTACHED_PREDICATE)
+              )
+        """,
+        nativeQuery = true,
+    )
+    fun search(
+        @Param("attached") attached: Boolean?,
+        @Param("contentType") contentType: String?,
+        pageable: Pageable,
+    ): org.springframework.data.domain.Page<StoredFileEntity>
+
+    /**
+     * Las tres cosas que sobran, en una sola pasada (`PurgeUnusedFiles`, 5.7).
+     *
+     * Cada motivo lleva su propio corte porque cada uno tiene su plazo: 24 h desde
+     * el borrado, 24 h desde una subida que nunca se adjunto, y una hora desde una
+     * reserva que nunca se completo --esas son las subidas cortadas a medias.
+     */
+    @Query(
+        value = """
+            SELECT * FROM files f
+            WHERE (f.deleted_at IS NOT NULL AND f.deleted_at < :deletedBefore)
+               OR (
+                    f.deleted_at IS NULL
+                    AND f.uploaded_at IS NOT NULL
+                    AND f.uploaded_at < :neverAttachedBefore
+                    AND NOT ($ATTACHED_PREDICATE)
+                  )
+               OR (f.deleted_at IS NULL AND f.uploaded_at IS NULL AND f.created_at < :reservedBefore)
+        """,
+        nativeQuery = true,
+    )
+    fun findPurgeable(
+        @Param("deletedBefore") deletedBefore: Instant,
+        @Param("neverAttachedBefore") neverAttachedBefore: Instant,
+        @Param("reservedBefore") reservedBefore: Instant,
+    ): List<StoredFileEntity>
+}
+
+/**
+ * Que algo referencie al fichero `f`.
+ *
+ * Vive en una constante porque aparece en tres consultas y **desincronizarlas
+ * seria un agujero silencioso**: si el listado y la purga no entienden lo mismo
+ * por «adjunto», el proceso diario acabaria borrando los bytes de un fichero que
+ * la aplicacion sigue mostrando.
+ *
+ * Las cuatro tablas son las cuatro que pueden apuntar a un fichero: `documents`
+ * por `file_id`, y las tres que llevan foto por `photo_file_id`.
+ */
+private const val ATTACHED_PREDICATE = """
+    EXISTS (SELECT 1 FROM documents d WHERE d.file_id = f.id)
+    OR EXISTS (SELECT 1 FROM assets a WHERE a.photo_file_id = f.id)
+    OR EXISTS (SELECT 1 FROM articles ar WHERE ar.photo_file_id = f.id)
+    OR EXISTS (SELECT 1 FROM locations l WHERE l.photo_file_id = f.id)
+"""
+
+interface DocumentJpaRepository : JpaRepository<DocumentEntity, UUID> {
+
+    @Query(
+        value = """
+            SELECT * FROM documents
+            WHERE (CAST(:assetId AS uuid) IS NULL OR asset_id = CAST(:assetId AS uuid))
+              AND (CAST(:articleId AS uuid) IS NULL OR article_id = CAST(:articleId AS uuid))
+              AND (CAST(:type AS text) IS NULL OR type = CAST(:type AS text))
+            ORDER BY created_at DESC
+        """,
+        countQuery = """
+            SELECT count(*) FROM documents
+            WHERE (CAST(:assetId AS uuid) IS NULL OR asset_id = CAST(:assetId AS uuid))
+              AND (CAST(:articleId AS uuid) IS NULL OR article_id = CAST(:articleId AS uuid))
+              AND (CAST(:type AS text) IS NULL OR type = CAST(:type AS text))
+        """,
+        nativeQuery = true,
+    )
+    fun search(
+        @Param("assetId") assetId: UUID?,
+        @Param("articleId") articleId: UUID?,
+        @Param("type") type: String?,
+        pageable: Pageable,
+    ): org.springframework.data.domain.Page<DocumentEntity>
+}
+
 interface CategoryJpaRepository : JpaRepository<CategoryEntity, UUID> {
 
     /**

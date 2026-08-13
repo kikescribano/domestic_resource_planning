@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import {
+  DOCUMENT_TYPE_LABELS,
   UNIT_LABELS,
   api,
   humanMessage,
@@ -10,8 +11,10 @@ import {
   type Asset,
   type AssetStatus,
   type AssetType,
+  type DocumentType,
 } from '../api/client'
 import { useAuthenticatedSession } from '../auth/SessionProvider'
+import { FileGallery, UploadField, type GalleryItem } from '../ui/files'
 import {
   Button,
   EmptyState,
@@ -483,6 +486,8 @@ export function AssetDetailPage() {
       <PageHeading title={current.name} />
 
       <div className="flex flex-col gap-6">
+        <AssetPhoto asset={current} accessToken={accessToken} />
+
         <dl className="grid gap-3 sm:grid-cols-2">
           <Detail label="Estado">
             <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
@@ -521,6 +526,8 @@ export function AssetDetailPage() {
                 <MergeForm assetId={current.id} articleId={current.articleId} onMerge={merge.mutate} busy={merge.isPending} />
               </>
             )}
+
+            <AssetDocuments assetId={current.id} assetName={current.name} accessToken={accessToken} />
 
             <section className="flex flex-col gap-2 border-t border-border-subtle pt-4">
               <h2 className="text-body font-medium text-ink">Dar de baja</h2>
@@ -679,6 +686,184 @@ function MergeForm({
       <Button onClick={() => onMerge(targetId)} disabled={!targetId} busy={busy} busyLabel="Uniendo…">
         Unir
       </Button>
+    </section>
+  )
+}
+
+/**
+ * La foto del asset, y el hueco para ponerle una.
+ *
+ * Subir y adjuntar son **dos pasos**: primero `POST /files`, que devuelve el
+ * `fileId`, y después el `PATCH` con `photoFileId`. Aquí van seguidos porque no
+ * hay más formulario que rellenar, pero siguen siendo dos operaciones y el
+ * segundo puede fallar por su cuenta —si el fichero ya colgara de otro sitio.
+ */
+function AssetPhoto({ asset, accessToken }: { asset: Asset; accessToken: string }) {
+  const queryClient = useQueryClient()
+  const [problem, setProblem] = useState<string | null>(null)
+
+  const attach = useMutation({
+    mutationFn: (photoFileId: string | null) =>
+      api.updateAsset(asset.id, { photoFileId }, accessToken),
+    onSuccess: () => {
+      setProblem(null)
+      void queryClient.invalidateQueries({ queryKey: ['asset', asset.id] })
+      void queryClient.invalidateQueries({ queryKey: ['storage'] })
+    },
+    onError: (error) => setProblem(humanMessage(error)),
+  })
+
+  return (
+    <section className="flex flex-col gap-3">
+      {asset.photoThumbnailUrl ? (
+        <div className="flex items-center gap-3">
+          <img
+            src={asset.photoThumbnailUrl}
+            alt={`Foto de ${asset.name}`}
+            loading="lazy"
+            // Una miniatura que falla es una URL caducada, no una imagen rota:
+            // se vuelve a pedir la ficha, que trae una URL fresca.
+            onError={() => void queryClient.invalidateQueries({ queryKey: ['asset', asset.id] })}
+            className="size-24 rounded-md object-cover"
+          />
+          <Button variant="ghost" onClick={() => attach.mutate(null)} busy={attach.isPending}>
+            Quitar la foto
+          </Button>
+        </div>
+      ) : (
+        <UploadField
+          label="Añadir una foto"
+          accept="image"
+          accessToken={accessToken}
+          onUploaded={(file) => attach.mutate(file.id)}
+        />
+      )}
+
+      {problem && <Notice tone="danger">{problem}</Notice>}
+    </section>
+  )
+}
+
+/**
+ * Facturas, garantías y manuales de este asset.
+ *
+ * Admite las dos vías porque las dos son reales: la factura ya está en el correo
+ * y el manual en la web del fabricante —eso es un enlace—, pero la garantía que
+ * llegó en un sobre no tiene URL ninguna y hay que subirla.
+ */
+function AssetDocuments({
+  assetId,
+  assetName,
+  accessToken,
+}: {
+  assetId: string
+  assetName: string
+  accessToken: string
+}) {
+  const queryClient = useQueryClient()
+  const [type, setType] = useState<DocumentType>('INVOICE')
+  const [url, setUrl] = useState('')
+  const [problem, setProblem] = useState<string | null>(null)
+
+  const documents = useQuery({
+    queryKey: ['documents', assetId],
+    queryFn: () => api.listDocuments(accessToken, { assetId }),
+  })
+
+  const files = useQuery({
+    queryKey: ['files'],
+    queryFn: () => api.listFiles(accessToken),
+  })
+
+  function refresh() {
+    setProblem(null)
+    void queryClient.invalidateQueries({ queryKey: ['documents', assetId] })
+    void queryClient.invalidateQueries({ queryKey: ['files'] })
+    void queryClient.invalidateQueries({ queryKey: ['storage'] })
+  }
+
+  const attach = useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.attachDocument({ assetId, type, ...body }, accessToken),
+    onSuccess: () => {
+      setUrl('')
+      refresh()
+    },
+    onError: (error) => setProblem(humanMessage(error)),
+  })
+
+  const remove = useMutation({
+    mutationFn: (id: string) => api.deleteDocument(id, accessToken),
+    onSuccess: refresh,
+    onError: (error) => setProblem(humanMessage(error)),
+  })
+
+  // La miniatura de un documento sale de su fichero, que es otra colección: el
+  // documento solo lleva el `fileId`.
+  const thumbnails = new Map((files.data?.items ?? []).map((file) => [file.id, file]))
+
+  const items: GalleryItem[] = (documents.data?.items ?? []).map((document) => {
+    const file = document.fileId ? thumbnails.get(document.fileId) : undefined
+    return {
+      id: document.id,
+      thumbnailUrl: file?.thumbnailUrl ?? null,
+      name: file?.originalName ?? document.url ?? 'Documento',
+      caption: DOCUMENT_TYPE_LABELS[document.type],
+    }
+  })
+
+  return (
+    <section className="flex flex-col gap-3 border-t border-border-subtle pt-4">
+      <h2 className="text-body font-medium text-ink">Documentación</h2>
+
+      <FileGallery
+        label={`Documentos de ${assetName}`}
+        items={items}
+        onOpen={(item) => {
+          const document = documents.data?.items.find((candidate) => candidate.id === item.id)
+          if (!document) return
+          const target = document.url ?? `/api/v1/files/${document.fileId}/content`
+          window.open(target, '_blank', 'noopener')
+        }}
+        onRemove={(item) => remove.mutate(item.id)}
+        onStale={() => void queryClient.invalidateQueries({ queryKey: ['files'] })}
+        empty={<EmptyState title="Sin documentación todavía." />}
+      />
+
+      <SelectField label="Tipo" value={type} onChange={(event) => setType(event.target.value as DocumentType)}>
+        {Object.entries(DOCUMENT_TYPE_LABELS).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </SelectField>
+
+      <UploadField
+        label="Subir un documento"
+        accept="document"
+        accessToken={accessToken}
+        onUploaded={(file) => attach.mutate({ fileId: file.id })}
+      />
+
+      <form
+        className="flex flex-col gap-2"
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (url.trim()) attach.mutate({ url: url.trim() })
+        }}
+      >
+        <Field
+          label="…o un enlace a donde ya vive"
+          type="url"
+          value={url}
+          hint="La factura que está en el correo, el manual de la web del fabricante."
+          onChange={(event) => setUrl(event.target.value)}
+        />
+        <Button type="submit" disabled={!url.trim()} busy={attach.isPending}>
+          Adjuntar el enlace
+        </Button>
+      </form>
+
+      {problem && <Notice tone="danger">{problem}</Notice>}
     </section>
   )
 }

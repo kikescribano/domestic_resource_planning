@@ -106,6 +106,13 @@ class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/password-reset").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/password-reset/confirm").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/invitations/accept").permitAll()
+                    // La entrega de imagenes firmadas. **No lleva token a
+                    // proposito**: un `<img src>` no puede enviar la cabecera
+                    // `Authorization`, y de ahi toda la ADR-005. Lo que autoriza
+                    // es la firma de la URL, que cubre ruta y caducidad, y que en
+                    // un despliegue de verdad verifica nginx sin que esta ruta
+                    // llegue nunca a la aplicacion.
+                    .requestMatchers(HttpMethod.GET, "/f/**").permitAll()
                     .anyRequest().authenticated()
             }
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter::class.java)

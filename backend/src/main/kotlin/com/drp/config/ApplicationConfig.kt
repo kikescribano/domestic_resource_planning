@@ -1,6 +1,7 @@
 package com.drp.config
 
 import com.drp.application.SessionPolicy
+import com.drp.application.usecase.StoragePolicy
 import com.drp.domain.identity.PasswordPolicy
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
@@ -31,6 +32,16 @@ class ApplicationConfig {
             }
         return PasswordPolicy(commonPasswords)
     }
+
+    /**
+     * Los dos limites de almacenamiento, juntos porque quien pregunta los
+     * necesita a la vez: `GET /storage` avisa antes de que una subida falle.
+     */
+    @Bean
+    fun storagePolicy(
+        @Value("\${drp.storage.quota-bytes}") quotaBytes: Long,
+        @Value("\${drp.storage.max-file-bytes}") maxFileBytes: Long,
+    ): StoragePolicy = StoragePolicy(quotaBytes, maxFileBytes)
 
     @Bean
     fun sessionPolicy(

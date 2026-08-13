@@ -1,5 +1,6 @@
 package com.drp.adapter.http
 
+import com.drp.application.port.Page
 import com.drp.application.port.Pagination
 import com.drp.application.port.SessionClaims
 import com.drp.application.usecase.CreateLocation
@@ -9,6 +10,7 @@ import com.drp.application.usecase.ListLocations
 import com.drp.application.usecase.LocationCommand
 import com.drp.application.usecase.LocationPatch
 import com.drp.application.usecase.UpdateLocation
+import com.drp.domain.inventory.Location
 import com.fasterxml.jackson.databind.JsonNode
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
@@ -33,6 +35,7 @@ class LocationController(
     private val createLocation: CreateLocation,
     private val updateLocation: UpdateLocation,
     private val deleteLocation: DeleteLocation,
+    private val photoUrls: PhotoUrls,
 ) {
 
     /**
@@ -44,13 +47,12 @@ class LocationController(
         @RequestParam(required = false) parentLocationId: UUID?,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "50") size: Int,
-    ): PageResponse<LocationResponse> = PageResponse.of(
-        listLocations.handle(parentLocationId, onlyChildren = parentLocationId != null, Pagination(page, size)),
-        LocationResponse::of,
-    )
+    ): PageResponse<LocationResponse> =
+        listLocations.handle(parentLocationId, onlyChildren = parentLocationId != null, Pagination(page, size))
+            .withThumbnails()
 
     @GetMapping("/{id}")
-    fun get(@PathVariable id: UUID): LocationResponse = LocationResponse.of(getLocation.handle(id))
+    fun get(@PathVariable id: UUID): LocationResponse = getLocation.handle(id).withThumbnail()
 
     /** Las hijas directas. Es lo que permite cargar el arbol por niveles. */
     @GetMapping("/{id}/children")
@@ -63,10 +65,7 @@ class LocationController(
         // otro hogar, en lugar de una lista vacia que no distingue "no tiene
         // hijas" de "no es tuya".
         getLocation.handle(id)
-        return PageResponse.of(
-            listLocations.handle(id, onlyChildren = true, Pagination(page, size)),
-            LocationResponse::of,
-        )
+        return listLocations.handle(id, onlyChildren = true, Pagination(page, size)).withThumbnails()
     }
 
     @PostMapping
@@ -74,21 +73,19 @@ class LocationController(
     fun create(
         @AuthenticationPrincipal session: SessionClaims,
         @Valid @RequestBody input: LocationInput,
-    ): LocationResponse = LocationResponse.of(
-        createLocation.handle(
-            session,
-            LocationCommand(
-                name = input.name,
-                type = input.type!!,
-                parentLocationId = input.parentLocationId,
-                capacity = input.capacity?.toDomain(),
-                environmentalConditions = input.environmentalConditions?.toDomain(),
-                photoUrl = input.photoUrl,
-                photoFileId = input.photoFileId,
-                notes = input.notes,
-            ),
+    ): LocationResponse = createLocation.handle(
+        session,
+        LocationCommand(
+            name = input.name,
+            type = input.type!!,
+            parentLocationId = input.parentLocationId,
+            capacity = input.capacity?.toDomain(),
+            environmentalConditions = input.environmentalConditions?.toDomain(),
+            photoUrl = input.photoUrl,
+            photoFileId = input.photoFileId,
+            notes = input.notes,
         ),
-    )
+    ).withThumbnail()
 
     /**
      * El cuerpo llega como arbol JSON y no como DTO: es la unica forma de
@@ -102,26 +99,35 @@ class LocationController(
         @RequestBody body: JsonNode,
     ): LocationResponse {
         val patch = JsonPatch(body)
-        return LocationResponse.of(
-            updateLocation.handle(
-                session,
-                id,
-                LocationPatch(
-                    name = patch.requiredText("name"),
-                    type = patch.enum("type"),
-                    parentLocationId = patch.uuid("parentLocationId"),
-                    capacity = patch.capacity(),
-                    environmentalConditions = patch.environmentalConditions(),
-                    photoUrl = patch.text("photoUrl"),
-                    photoFileId = patch.uuid("photoFileId"),
-                    notes = patch.text("notes"),
-                ),
+        return updateLocation.handle(
+            session,
+            id,
+            LocationPatch(
+                name = patch.requiredText("name"),
+                type = patch.enum("type"),
+                parentLocationId = patch.uuid("parentLocationId"),
+                capacity = patch.capacity(),
+                environmentalConditions = patch.environmentalConditions(),
+                photoUrl = patch.text("photoUrl"),
+                photoFileId = patch.uuid("photoFileId"),
+                notes = patch.text("notes"),
             ),
-        )
+        ).withThumbnail()
     }
 
     /** Borrado **real**: una ubicacion vacia no deja historial que preservar. */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@PathVariable id: UUID) = deleteLocation.handle(id)
+
+    /**
+     * La miniatura firmada de cada fila, resuelta **de una vez** para toda la
+     * pagina: cincuenta ubicaciones con foto no pueden ser cincuenta consultas.
+     */
+    private fun Page<Location>.withThumbnails(): PageResponse<LocationResponse> {
+        val photos = photoUrls.index(items.map { it.photoFileId })
+        return PageResponse.of(this) { LocationResponse.of(it, photos.thumbnail(it.photoFileId)) }
+    }
+
+    private fun Location.withThumbnail() = LocationResponse.of(this, photoUrls.thumbnail(photoFileId))
 }

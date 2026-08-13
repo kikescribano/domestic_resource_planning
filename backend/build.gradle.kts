@@ -44,6 +44,16 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
+    // WebP, que la JVM no sabe ni leer ni escribir (ADR-005). Hacen falta las
+    // dos direcciones: `image/webp` esta en la lista blanca de subida --asi que
+    // hay que decodificarlo para recodificarlo-- y la miniatura de 320 px se
+    // escribe en WebP.
+    //
+    // Se enchufa como plugin de ImageIO, de modo que el codigo de recodificacion
+    // es el mismo para los tres formatos de imagen y no hay un camino aparte.
+    // Trae los binarios nativos dentro del jar y los extrae al arrancar.
+    implementation("org.sejda.imageio:webp-imageio:0.1.6")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("io.kotest:kotest-assertions-core:5.9.1")

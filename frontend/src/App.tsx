@@ -16,6 +16,7 @@ import { AssetDetailPage, AssetsPage, IntakePage, NewAssetPage } from './routes/
 import { CatalogPage } from './routes/catalog'
 import { AccountPage, HomePage, RequireSession, UsersPage } from './routes/household'
 import { LocationsPage } from './routes/locations'
+import { StoragePage } from './routes/storage'
 
 /**
  * Las rutas del Hito 1.
@@ -81,6 +82,7 @@ export function App() {
               <Route path="/inventario/entrada" element={<IntakePage />} />
               <Route path="/inventario/:id" element={<AssetDetailPage />} />
               <Route path="/usuarios" element={<UsersPage />} />
+              <Route path="/almacenamiento" element={<StoragePage />} />
               <Route path="/cuenta" element={<AccountPage />} />
             </Route>
           </Routes>

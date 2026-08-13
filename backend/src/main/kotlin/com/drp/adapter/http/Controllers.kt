@@ -9,8 +9,10 @@ import com.drp.application.usecase.ChangeUserRole
 import com.drp.application.usecase.CreateHousehold
 import com.drp.application.usecase.CreateHouseholdCommand
 import com.drp.application.usecase.DeactivateUser
+import com.drp.application.usecase.DeleteIdentityAvatar
 import com.drp.application.usecase.InviteUser
 import com.drp.application.usecase.InviteUserCommand
+import com.drp.application.usecase.HouseholdUser
 import com.drp.application.usecase.ListInvitations
 import com.drp.application.usecase.ListUsers
 import com.drp.application.usecase.Login
@@ -21,6 +23,7 @@ import com.drp.application.usecase.ResendVerification
 import com.drp.application.usecase.ResetPassword
 import com.drp.application.usecase.RevokeInvitation
 import com.drp.application.usecase.RevokeSession
+import com.drp.application.usecase.SetIdentityAvatar
 import com.drp.application.usecase.VerifyEmail
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
@@ -31,11 +34,13 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.multipart.MultipartHttpServletRequest
 import java.util.UUID
 
 /**
@@ -169,6 +174,10 @@ class UserController(
     private val listUsers: ListUsers,
     private val changeUserRole: ChangeUserRole,
     private val deactivateUser: DeactivateUser,
+    private val setAvatar: SetIdentityAvatar,
+    private val deleteAvatar: DeleteIdentityAvatar,
+    private val urls: SignedFileUrls,
+    private val uploadLimiter: UploadRateLimiter,
 ) {
 
     @GetMapping
@@ -177,7 +186,7 @@ class UserController(
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "50") size: Int,
     ): PageResponse<UserResponse> =
-        PageResponse.of(listUsers.handle(includeDeactivated, Pagination(page, size)), UserResponse::of)
+        PageResponse.of(listUsers.handle(includeDeactivated, Pagination(page, size))) { it.withAvatar() }
 
     @PatchMapping("/{id}/roles")
     @PreAuthorize("hasRole('HOUSEHOLD_ADMIN')")
@@ -185,7 +194,7 @@ class UserController(
         @AuthenticationPrincipal session: SessionClaims,
         @PathVariable id: UUID,
         @Valid @RequestBody input: RoleInput,
-    ): UserResponse = UserResponse.of(changeUserRole.handle(session, id, input.role))
+    ): UserResponse = changeUserRole.handle(session, id, input.role).withAvatar()
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('HOUSEHOLD_ADMIN')")
@@ -194,4 +203,36 @@ class UserController(
         @AuthenticationPrincipal session: SessionClaims,
         @PathVariable id: UUID,
     ) = deactivateUser.handle(session, id)
+
+    /**
+     * «me» resuelve a la **identidad** del token, no a la pertenencia: el avatar
+     * es de la persona y sobrevive a cualquier hogar. Por eso no suma al gigabyte
+     * de ningun hogar ni tiene politica de RLS detras (README 4.1.1).
+     *
+     * Recibe el multipart en diferido igual que la subida de un fichero, aunque
+     * aqui no haya cuota que reservar: es el mismo camino y una excepcion
+     * invitaria a copiarla mal.
+     */
+    @PutMapping("/me/avatar")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun setOwnAvatar(
+        @AuthenticationPrincipal session: SessionClaims,
+        request: MultipartHttpServletRequest,
+    ) {
+        uploadLimiter.consume(session.identityId)
+        setAvatar.handle(session, MultipartUpload(request))
+    }
+
+    @DeleteMapping("/me/avatar")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun deleteOwnAvatar(@AuthenticationPrincipal session: SessionClaims) =
+        deleteAvatar.handle(session.identityId)
+
+    /**
+     * El avatar se firma como cualquier otra imagen, y **no hace falta ninguna
+     * consulta mas**: la identidad ya viene resuelta desde el caso de uso, con
+     * su clave de almacenamiento dentro.
+     */
+    private fun HouseholdUser.withAvatar() =
+        UserResponse.of(this, identity.avatar?.let { urls.original(it.storageKey) })
 }

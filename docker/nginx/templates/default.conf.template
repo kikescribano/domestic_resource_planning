@@ -1,0 +1,120 @@
+# Entrega de ficheros (README 5.8.4, ADR-005).
+#
+# Dos servidores porque son dos dominios: la aplicacion y los ficheros. Que los
+# ficheros se sirvan desde otro origen es lo que impide que uno que se cuele pese
+# a todos los controles comparta origen con la sesion, el token y los datos del
+# hogar. En local se distinguen por puerto; en produccion, por nombre.
+#
+# La imagen oficial de nginx sustituye ${VARIABLE} en las plantillas de
+# /etc/nginx/templates y escribe el resultado en /etc/nginx/conf.d. Solo toca los
+# nombres que existen como variable de entorno, asi que $uri, $arg_s y compania
+# llegan intactos.
+
+# El formato de log de los ficheros. La diferencia con el de serie es una y es la
+# razon de que exista: registra $uri --la ruta ya normalizada-- y **no $request**,
+# que incluye la cadena de consulta.
+#
+# Sin esto, cada linea del log llevaria la firma completa de una URL todavia
+# valida, y con la retencion habitual de un log el propio registro pasaria a ser
+# un almacen de credenciales vivas que nadie vigila. Es condicion de la ADR-005,
+# no una mejora.
+log_format drp_files '$remote_addr [$time_local] "$request_method $uri" $status $body_bytes_sent';
+
+# ---------------------------------------------------------------------------
+# La aplicacion
+# ---------------------------------------------------------------------------
+server {
+    listen 80 default_server;
+    server_name _;
+
+    # 25 MB por fichero mas la envoltura del multipart. Sin esto nginx corta la
+    # subida con un 413 propio antes de que la aplicacion vea nada, y el cuerpo
+    # del error no seria el del contrato.
+    client_max_body_size 26m;
+
+    # La ruta interna a la que apunta X-Accel-Redirect. `internal` significa que
+    # solo se alcanza desde una redireccion interna: pedirla desde fuera da 404.
+    # Es lo que permite que la aplicacion autorice **en cada peticion** y aun asi
+    # no transmita ella los bytes.
+    location /internal/ {
+        internal;
+        alias /srv/drp/files/;
+    }
+
+    location / {
+        proxy_pass http://${DRP_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Una subida de 25 MB por una conexion mala tarda; el tiempo de espera de
+        # serie --60 s-- la cortaria a mitad.
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_request_buffering off;
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Los ficheros
+# ---------------------------------------------------------------------------
+server {
+    listen 81;
+    server_name _;
+
+    access_log /var/log/nginx/files.log drp_files;
+
+    # Las tres que no son opcionales, mas la de Referer para que la firma no
+    # viaje en la cabecera de ninguna navegacion posterior. `always` para que
+    # tambien salgan en las respuestas de error.
+    #
+    # **Se repiten dentro de cada `location`, y no es descuido.** nginx hereda las
+    # `add_header` del nivel de arriba **solo si el nivel de abajo no declara
+    # ninguna**: en cuanto un `location` anade una cabecera propia, pierde todas
+    # las heredadas. Declararlas solo aqui deja el `location` de los ficheros --el
+    # unico que entrega bytes-- sin `nosniff` ni CSP, sin que nada falle ni avise.
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Content-Security-Policy "default-src 'none'; sandbox" always;
+    add_header Referrer-Policy "no-referrer" always;
+
+    location /f/ {
+        # La firma va en `s` y la caducidad en `e`. `secure_link` deja en
+        # $secure_link: "" si la firma no cuadra, "0" si ha caducado, "1" si vale.
+        secure_link $arg_s,$arg_e;
+
+        # El mensaje que se firma, **exactamente el mismo que arma la aplicacion**
+        # en SignedFileUrls: caducidad, ruta, un espacio y el secreto.
+        #
+        # El secreto va AL FINAL, y esa posicion no es casual: md5(secreto+mensaje)
+        # admite extension de longitud y md5(mensaje+secreto) no. Es la debilidad
+        # real de MD5 en este uso, y asi no aplica.
+        secure_link_md5 "$secure_link_expires$uri ${DRP_FILES_LINK_SECRET}";
+
+        if ($secure_link = "") { return 403; }
+        if ($secure_link = "0") { return 410; }
+
+        alias /srv/drp/files/;
+
+        # Las tres heredadas, repetidas porque este `location` declara las suyas
+        # y con ello pierde las del servidor. Ver la nota de mas arriba.
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Content-Security-Policy "default-src 'none'; sandbox" always;
+        add_header Referrer-Policy "no-referrer" always;
+
+        # Siempre adjunto. NO impide que un <img> pinte la imagen: el navegador
+        # solo honra Content-Disposition en navegaciones y descargas, no en
+        # subrecursos. Es decir, se puede exigir siempre sin romper nada.
+        add_header Content-Disposition "attachment" always;
+
+        # Los ficheros son inmutables --cambiar una foto es subir otra-- y la URL
+        # caduca sola, asi que la cache del navegador puede quedarselos hasta
+        # entonces. `private` porque son de un hogar, no de la red.
+        add_header Cache-Control "private, max-age=900" always;
+    }
+
+    # Nada mas se sirve desde este dominio. Que no haya raiz ni listado es parte
+    # del aislamiento: aqui no vive la aplicacion.
+    location / {
+        return 404;
+    }
+}

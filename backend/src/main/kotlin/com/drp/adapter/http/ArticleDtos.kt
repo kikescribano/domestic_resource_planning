@@ -49,9 +49,10 @@ data class ArticleResponse(
     val updatedBy: UUID?,
 ) {
     companion object {
-        fun of(view: ArticleView) = of(view.article, view.categoryName)
+        fun of(view: ArticleView, photoThumbnailUrl: String?) =
+            of(view.article, view.categoryName, photoThumbnailUrl)
 
-        fun of(article: Article, categoryName: String?) = ArticleResponse(
+        fun of(article: Article, categoryName: String?, photoThumbnailUrl: String?) = ArticleResponse(
             id = article.id,
             name = article.name,
             categoryId = article.categoryId,
@@ -62,8 +63,7 @@ data class ArticleResponse(
             barcode = article.barcode,
             packSize = article.packSize,
             photoUrl = article.photoUrl,
-            // Miniatura firmada: Hito 3, con el resto de la entrega de ficheros.
-            photoThumbnailUrl = null,
+            photoThumbnailUrl = photoThumbnailUrl,
             photoFileId = article.photoFileId,
             notes = article.notes,
             createdAt = article.createdAt,

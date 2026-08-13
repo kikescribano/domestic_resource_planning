@@ -1,10 +1,12 @@
 package com.drp.adapter.http
 
 import com.drp.application.port.ArticleFilter
+import com.drp.application.port.Page
 import com.drp.application.port.Pagination
 import com.drp.application.port.SessionClaims
 import com.drp.application.usecase.ArticleCommand
 import com.drp.application.usecase.ArticlePatch
+import com.drp.application.usecase.ArticleView
 import com.drp.application.usecase.CreateArticle
 import com.drp.application.usecase.CreateCategory
 import com.drp.application.usecase.GetArticle
@@ -89,6 +91,7 @@ class ArticleController(
     private val createArticle: CreateArticle,
     private val updateArticle: UpdateArticle,
     private val retireArticle: RetireArticle,
+    private val photoUrls: PhotoUrls,
 ) {
 
     /** El `q` alimenta el autocompletado del alta de consumibles. */
@@ -100,20 +103,19 @@ class ArticleController(
         @RequestParam(defaultValue = "false") includeRetired: Boolean,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "50") size: Int,
-    ): PageResponse<ArticleResponse> = PageResponse.of(
-        listArticles.handle(ArticleFilter(q, categoryId, barcode, includeRetired), Pagination(page, size)),
-        ArticleResponse::of,
-    )
+    ): PageResponse<ArticleResponse> =
+        listArticles.handle(ArticleFilter(q, categoryId, barcode, includeRetired), Pagination(page, size))
+            .withThumbnails()
 
     @GetMapping("/{id}")
-    fun get(@PathVariable id: UUID): ArticleResponse = ArticleResponse.of(getArticle.handle(id))
+    fun get(@PathVariable id: UUID): ArticleResponse = getArticle.handle(id).withThumbnail()
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
         @AuthenticationPrincipal session: SessionClaims,
         @Valid @RequestBody input: ArticleInput,
-    ): ArticleResponse = ArticleResponse.of(createArticle.handle(session, input.toCommand()))
+    ): ArticleResponse = createArticle.handle(session, input.toCommand()).withThumbnail()
 
     @PatchMapping("/{id}")
     fun update(
@@ -122,25 +124,35 @@ class ArticleController(
         @RequestBody body: JsonNode,
     ): ArticleResponse {
         val patch = JsonPatch(body)
-        return ArticleResponse.of(
-            updateArticle.handle(
-                session,
-                id,
-                ArticlePatch(
-                    name = patch.requiredText("name"),
-                    categoryId = patch.requiredUuid("categoryId"),
-                    unit = patch.enum("unit"),
-                    brand = patch.text("brand"),
-                    model = patch.text("model"),
-                    barcode = patch.text("barcode"),
-                    packSize = patch.decimal("packSize"),
-                    photoUrl = patch.text("photoUrl"),
-                    photoFileId = patch.uuid("photoFileId"),
-                    notes = patch.text("notes"),
-                ),
+        return updateArticle.handle(
+            session,
+            id,
+            ArticlePatch(
+                name = patch.requiredText("name"),
+                categoryId = patch.requiredUuid("categoryId"),
+                unit = patch.enum("unit"),
+                brand = patch.text("brand"),
+                model = patch.text("model"),
+                barcode = patch.text("barcode"),
+                packSize = patch.decimal("packSize"),
+                photoUrl = patch.text("photoUrl"),
+                photoFileId = patch.uuid("photoFileId"),
+                notes = patch.text("notes"),
             ),
-        )
+        ).withThumbnail()
     }
+
+    /**
+     * La miniatura firmada de cada fila, resuelta **de una vez** para toda la
+     * pagina: un catalogo de cincuenta articulos con foto no puede ser cincuenta
+     * consultas.
+     */
+    private fun Page<ArticleView>.withThumbnails(): PageResponse<ArticleResponse> {
+        val photos = photoUrls.index(items.map { it.article.photoFileId })
+        return PageResponse.of(this) { ArticleResponse.of(it, photos.thumbnail(it.article.photoFileId)) }
+    }
+
+    private fun ArticleView.withThumbnail() = ArticleResponse.of(this, photoUrls.thumbnail(article.photoFileId))
 
     /** Retirada logica: la fila permanece porque las existencias de baja la referencian. */
     @DeleteMapping("/{id}")

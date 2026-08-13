@@ -98,7 +98,7 @@ data class AssetResponse(
     val updatedBy: UUID?,
 ) {
     companion object {
-        fun of(view: AssetView) = AssetResponse(
+        fun of(view: AssetView, photoThumbnailUrl: String?) = AssetResponse(
             id = view.asset.id,
             name = view.name,
             type = view.asset.type,
@@ -113,8 +113,7 @@ data class AssetResponse(
             serialNumber = view.asset.serialNumber,
             acquiredOn = view.asset.acquiredOn,
             photoUrl = view.asset.photoUrl,
-            // Miniatura firmada: Hito 3, con el resto de la entrega de ficheros.
-            photoThumbnailUrl = null,
+            photoThumbnailUrl = photoThumbnailUrl,
             photoFileId = view.asset.photoFileId,
             notes = view.asset.notes,
             warnings = view.warnings.map(WarningResponse::of),
