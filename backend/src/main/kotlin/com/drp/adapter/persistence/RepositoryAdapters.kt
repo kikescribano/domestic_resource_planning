@@ -735,6 +735,9 @@ class StoredFileRepositoryAdapter(
     override fun findById(fileId: UUID): StoredFile? =
         files.findById(fileId).orElse(null)?.toDomain()
 
+    override fun findAllUsable(fileIds: Collection<UUID>): List<StoredFile> =
+        files.findAllById(fileIds).map { it.toDomain() }.filter { it.isUsable }
+
     override fun list(filter: StoredFileFilter, pagination: Pagination): Page<StoredFile> {
         val found = files.search(
             attached = filter.attached,

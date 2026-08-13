@@ -322,6 +322,16 @@ interface StoredFileRepository {
     /** En cualquiera de sus tres estados. Por RLS, solo si es de este hogar. */
     fun findById(fileId: UUID): StoredFile?
 
+    /**
+     * Los que se pueden servir, de una vez.
+     *
+     * Existe para no lanzar una consulta por fila al pintar un listado con
+     * cincuenta miniaturas. Devuelve **solo los utilizables**: un borrado o una
+     * subida a medias sencillamente no aparecen, igual que no aparece el de otro
+     * hogar.
+     */
+    fun findAllUsable(fileIds: Collection<UUID>): List<StoredFile>
+
     /** Excluye los borrados y ordena por tamano **descendente** (ver `ListFiles` en 5.7). */
     fun list(filter: StoredFileFilter, pagination: Pagination): Page<StoredFile>
 

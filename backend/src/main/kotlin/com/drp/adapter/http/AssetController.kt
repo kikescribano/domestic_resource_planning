@@ -1,10 +1,12 @@
 package com.drp.adapter.http
 
 import com.drp.application.port.AssetFilter
+import com.drp.application.port.Page
 import com.drp.application.port.Pagination
 import com.drp.application.port.SessionClaims
 import com.drp.application.usecase.ArticleCommand
 import com.drp.application.usecase.AssetPatch
+import com.drp.application.usecase.AssetView
 import com.drp.application.usecase.CreateAsset
 import com.drp.application.usecase.CreateAssetCommand
 import com.drp.application.usecase.DecommissionAsset
@@ -43,6 +45,7 @@ class AssetController(
     private val updateAsset: UpdateAsset,
     private val mergeStockItems: MergeStockItems,
     private val decommissionAsset: DecommissionAsset,
+    private val photoUrls: PhotoUrls,
 ) {
 
     @GetMapping
@@ -58,16 +61,13 @@ class AssetController(
         @RequestParam(defaultValue = "false") withoutOwner: Boolean,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "50") size: Int,
-    ): PageResponse<AssetResponse> = PageResponse.of(
-        listAssets.handle(
-            AssetFilter(locationId, parentAssetId, ownerId, status, type, articleId, categoryId, withoutOwner),
-            Pagination(page, size),
-        ),
-        AssetResponse::of,
-    )
+    ): PageResponse<AssetResponse> = listAssets.handle(
+        AssetFilter(locationId, parentAssetId, ownerId, status, type, articleId, categoryId, withoutOwner),
+        Pagination(page, size),
+    ).withThumbnails()
 
     @GetMapping("/{id}")
-    fun get(@PathVariable id: UUID): AssetResponse = AssetResponse.of(getAsset.handle(id))
+    fun get(@PathVariable id: UUID): AssetResponse = getAsset.handle(id).withThumbnail()
 
     /** Lo que este asset contiene. Es la otra mitad del arbol, junto al de ubicaciones. */
     @GetMapping("/{id}/children")
@@ -79,10 +79,7 @@ class AssetController(
         // Se resuelve el padre primero: una lista vacia no distingue "no tiene
         // nada dentro" de "no es tuyo".
         getAsset.handle(id)
-        return PageResponse.of(
-            listAssets.handle(AssetFilter(parentAssetId = id), Pagination(page, size)),
-            AssetResponse::of,
-        )
+        return listAssets.handle(AssetFilter(parentAssetId = id), Pagination(page, size)).withThumbnails()
     }
 
     /** Solo `DURABLE`: un consumible entra por `/intake`, que suma sobre la existencia. */
@@ -91,10 +88,9 @@ class AssetController(
     fun create(
         @AuthenticationPrincipal session: SessionClaims,
         @Valid @RequestBody input: AssetInput,
-    ): AssetResponse = AssetResponse.of(
-        createAsset.handle(
-            session,
-            CreateAssetCommand(
+    ): AssetResponse = createAsset.handle(
+        session,
+        CreateAssetCommand(
                 name = input.name,
                 type = input.type!!,
                 categoryId = input.categoryId,
@@ -103,12 +99,11 @@ class AssetController(
                 location = input.location?.toDomain(),
                 serialNumber = input.serialNumber,
                 acquiredOn = input.acquiredOn,
-                photoUrl = input.photoUrl,
-                photoFileId = input.photoFileId,
-                notes = input.notes,
-            ),
+            photoUrl = input.photoUrl,
+            photoFileId = input.photoFileId,
+            notes = input.notes,
         ),
-    )
+    ).withThumbnail()
 
     /**
      * `201` si creo la primera existencia de ese articulo en esa ubicacion, y
@@ -147,7 +142,7 @@ class AssetController(
 
         return ResponseEntity
             .status(if (result.created) HttpStatus.CREATED else HttpStatus.OK)
-            .body(AssetResponse.of(result.view))
+            .body(result.view.withThumbnail())
     }
 
     /**
@@ -163,23 +158,21 @@ class AssetController(
         @RequestBody body: JsonNode,
     ): AssetResponse {
         val patch = JsonPatch(body)
-        return AssetResponse.of(
-            updateAsset.handle(
-                session,
-                id,
-                AssetPatch(
-                    name = patch.requiredText("name"),
-                    categoryId = patch.requiredUuid("categoryId"),
-                    articleId = patch.requiredUuid("articleId"),
-                    ownerId = patch.uuid("ownerId"),
-                    location = patch.assetLocation(),
-                    quantity = patch.requiredDecimal("quantity"),
-                    photoUrl = patch.text("photoUrl"),
-                    photoFileId = patch.uuid("photoFileId"),
-                    notes = patch.text("notes"),
-                ),
+        return updateAsset.handle(
+            session,
+            id,
+            AssetPatch(
+                name = patch.requiredText("name"),
+                categoryId = patch.requiredUuid("categoryId"),
+                articleId = patch.requiredUuid("articleId"),
+                ownerId = patch.uuid("ownerId"),
+                location = patch.assetLocation(),
+                quantity = patch.requiredDecimal("quantity"),
+                photoUrl = patch.text("photoUrl"),
+                photoFileId = patch.uuid("photoFileId"),
+                notes = patch.text("notes"),
             ),
-        )
+        ).withThumbnail()
     }
 
     /**
@@ -192,7 +185,7 @@ class AssetController(
         @AuthenticationPrincipal session: SessionClaims,
         @PathVariable id: UUID,
         @Valid @RequestBody input: AssetMergeInput,
-    ): AssetResponse = AssetResponse.of(mergeStockItems.handle(session, id, input.targetAssetId!!))
+    ): AssetResponse = mergeStockItems.handle(session, id, input.targetAssetId!!).withThumbnail()
 
     /** Baja **logica**: nada se borra, para no perder el historial. */
     @DeleteMapping("/{id}")
@@ -201,4 +194,17 @@ class AssetController(
         @AuthenticationPrincipal session: SessionClaims,
         @PathVariable id: UUID,
     ) = decommissionAsset.handle(session, id)
+
+    /**
+     * La miniatura firmada de cada fila, resuelta **de una vez** para toda la
+     * pagina. Es la pantalla donde mas importa: una rejilla de existencias en un
+     * movil son cincuenta fotos, y resolverlas de una en una serian cincuenta
+     * consultas.
+     */
+    private fun Page<AssetView>.withThumbnails(): PageResponse<AssetResponse> {
+        val photos = photoUrls.index(items.map { it.asset.photoFileId })
+        return PageResponse.of(this) { AssetResponse.of(it, photos.thumbnail(it.asset.photoFileId)) }
+    }
+
+    private fun AssetView.withThumbnail() = AssetResponse.of(this, photoUrls.thumbnail(asset.photoFileId))
 }

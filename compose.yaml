@@ -1,9 +1,11 @@
 # Entorno local de desarrollo.
 #
-# Reproduce el despliegue real en lo que condiciona el diseno. nginx llega con
-# el Hito 3, cuando su configuracion --X-Accel-Redirect, dominio separado y URL
-# firmada-- deja de ser un hueco y pasa a ser la entrega de ficheros que exige
-# la ADR-005.
+# Reproduce el despliegue real en lo que condiciona el diseno: PostgreSQL con su
+# reparto de usuarios, Mailpit para el correo saliente y **nginx para la entrega
+# de ficheros** --X-Accel-Redirect, dominio separado y URL firmada (ADR-005).
+#
+# Es para **ejecutar la aplicacion**, no para las pruebas: las de integracion usan
+# Testcontainers, que arranca lo suyo y lo destruye al terminar.
 
 services:
   postgres:
@@ -34,3 +36,40 @@ services:
     ports:
       - "1025:1025"  # SMTP, al que apunta el adaptador de EmailSender
       - "8025:8025"  # interfaz web y API, de donde el recorrido vertical lee el correo
+
+  # La entrega de ficheros, tal y como se despliega (ADR-005).
+  #
+  # **No hace falta para desarrollar ni para probar.** Sin el, la aplicacion sirve
+  # ella misma las imagenes firmadas y transmite los ficheros directamente, que es
+  # lo que 5.8.4 describe para desarrollo. Levantarlo sirve para trabajar sobre la
+  # entrega de verdad: la firma la verifica nginx, los bytes los entrega nginx y
+  # los ficheros salen por otro puerto --otro dominio en produccion.
+  #
+  # Para usarlo, la aplicacion tiene que arrancar sabiendolo:
+  #
+  #   DRP_FILES_ACCEL_REDIRECT=true \
+  #   DRP_FILES_BASE_URL=http://localhost:8091 \
+  #   DRP_STORAGE_ROOT=./.data/files \
+  #   ./gradlew bootRun
+  #
+  # y entonces la aplicacion se abre en http://localhost:8090, no en el 8080.
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8090:80"  # la aplicacion, por delante del proxy
+      - "8091:81"  # los ficheros: otro origen, y en produccion otro dominio
+    environment:
+      # El mismo secreto que firma la aplicacion. Si no coinciden, **todas** las
+      # imagenes dan 403 y ninguna otra cosa falla, que es un sintoma facil de
+      # atribuir a lo que no es.
+      DRP_FILES_LINK_SECRET: desarrollo-local-no-usar-en-produccion
+      # La aplicacion corre en la maquina, no en un contenedor.
+      DRP_UPSTREAM: host.docker.internal:8080
+    extra_hosts:
+      # Docker Desktop lo resuelve solo; en Linux hace falta decirlo.
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # El volumen de ficheros, **de solo lectura**: nginx entrega bytes y no
+      # escribe ninguno. Es el mismo directorio que usa `drp.storage.root`.
+      - ./.data/files:/srv/drp/files:ro
+      - ./docker/nginx/templates:/etc/nginx/templates:ro
