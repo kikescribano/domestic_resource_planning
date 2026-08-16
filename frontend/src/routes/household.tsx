@@ -20,6 +20,7 @@ const NAVIGATION = [
   { to: '/inventario', label: 'Inventario', end: false },
   { to: '/ubicaciones', label: 'Sitios', end: false },
   { to: '/catalogo', label: 'Catálogo', end: false },
+  { to: '/prestamos', label: 'Préstamos', end: false },
   { to: '/usuarios', label: 'Personas', end: false },
   { to: '/almacenamiento', label: 'Archivo', end: false },
   { to: '/cuenta', label: 'Cuenta', end: false },

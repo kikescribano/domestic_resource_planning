@@ -233,7 +233,7 @@ class StartLoan(
             // porque el dia que haya SMS no hace falta reemitir nada.
             party.email
                 ?.takeIf { it.isNotBlank() }
-                ?.let { emails.loan(EmailAddress.of(it), assetName.orEmpty(), role, issued.token) }
+                ?.let { emails.loan(EmailAddress.of(it), assetName.orEmpty(), role, loan.id, issued.token) }
         }
 
     private fun requireMember(memberId: UUID, field: String) {
@@ -440,7 +440,19 @@ class ConfirmReturn(
 
     private fun close(loanId: UUID, memberId: UUID?, usedTokenId: UUID?): Loan {
         val now = clock.instant()
-        val loan = loans.findById(loanId) ?: throw ResourceNotFound("Préstamo no encontrado")
+
+        // **Bloqueando la fila**, y solo aqui. El enlace del correo se abre desde
+        // dos sitios o se pulsa dos veces, y con una lectura corriente las dos
+        // peticiones ven `ACTIVE`, las dos pasan la comprobacion de abajo y las
+        // dos cierran: medido con cuatro devoluciones simultaneas del mismo
+        // token, cuatro `200` donde el contrato promete uno y tres `409`, con
+        // `LoanReturned` publicado cuatro veces y el `returnedAt` pisado.
+        //
+        // No sirve aqui el patron del alta --dejar que un indice unico rechace a
+        // la segunda-- porque no se inserta nada: es un `UPDATE` sobre una fila
+        // que ya existe. La segunda tiene que esperar a la primera para poder ver
+        // lo que hizo.
+        val loan = loans.findByIdForUpdate(loanId) ?: throw ResourceNotFound("Préstamo no encontrado")
 
         if (!loan.isOpen) {
             throw BusinessRuleViolation(ErrorCode.LOAN_ALREADY_RETURNED, "Ese préstamo ya estaba devuelto")

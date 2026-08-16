@@ -7,9 +7,12 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.util.UUID
 
 /**
- * Los cuatro correos del enrolamiento.
+ * Los cinco correos que salen del core: cuatro de enrolamiento y el del
+ * prestamo, que llega con el Hito 4 y es el unico que no invita a nadie a entrar
+ * en el hogar.
  *
  * Los enlaces apuntan al **frontend** y no a la API: quien recibe el correo abre
  * una pantalla, no un endpoint. La pantalla es la que llama despues al endpoint
@@ -106,7 +109,7 @@ class EnrollmentEmails(
      * ponerlo --queda mas humano-- y es justo lo que la pantalla de destino no
      * puede mostrar: el correo no debe filtrar lo que el token no alcanza.
      */
-    fun loan(to: EmailAddress, assetName: String, role: LoanRole, token: String) = when (role) {
+    fun loan(to: EmailAddress, assetName: String, role: LoanRole, loanId: UUID, token: String) = when (role) {
         LoanRole.BORROWER -> EmailMessage(
             to = to,
             subject = "Te han prestado: $assetName",
@@ -115,7 +118,7 @@ class EnrollmentEmails(
 
                 Aquí puedes consultar el préstamo y avisar de que lo has devuelto:
 
-                ${link("/prestamo", token)}
+                ${loanLink(loanId, token)}
 
                 Guarda el enlace: es la única forma de entrar, y no hace falta que
                 te crees ninguna cuenta.
@@ -131,13 +134,27 @@ class EnrollmentEmails(
                 Aquí puedes seguir el préstamo y confirmar la devolución cuando te
                 lo devuelvan:
 
-                ${link("/prestamo", token)}
+                ${loanLink(loanId, token)}
 
                 Guarda el enlace: es la única forma de entrar, y no hace falta que
                 te crees ninguna cuenta.
             """.trimIndent(),
         )
     }
+
+    /**
+     * El enlace del prestamo lleva **el identificador ademas del token**, al
+     * contrario que los otros cuatro.
+     *
+     * El token es un JWT y lleva el `loanId` dentro, asi que tecnicamente sobra.
+     * Se manda igual para que el frontend no tenga que descodificar una
+     * credencial para saber que pedir: interpretar un JWT en el cliente es
+     * empezar a confiar en su contenido sin verificar la firma, y de ahi a
+     * fiarse de un claim hay un paso. No filtra nada --quien recibe el correo es
+     * quien puede abrir ese prestamo-- y lo que autoriza sigue siendo el token.
+     */
+    private fun loanLink(loanId: UUID, token: String): String =
+        "$baseUrl/prestamo?id=$loanId&token=${URLEncoder.encode(token, StandardCharsets.UTF_8)}"
 
     private fun link(path: String, token: String): String =
         "$baseUrl$path?token=${URLEncoder.encode(token, StandardCharsets.UTF_8)}"

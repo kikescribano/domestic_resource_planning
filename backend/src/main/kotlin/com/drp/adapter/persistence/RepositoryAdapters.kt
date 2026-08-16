@@ -946,6 +946,9 @@ class LoanRepositoryAdapter(
     override fun findById(loanId: UUID): Loan? =
         loans.findById(loanId).orElse(null)?.toDomain()
 
+    override fun findByIdForUpdate(loanId: UUID): Loan? =
+        loans.findByIdForUpdate(loanId)?.toDomain()
+
     override fun list(filter: LoanFilter, pagination: Pagination): Page<Loan> {
         val found = loans.search(
             status = filter.status?.name,

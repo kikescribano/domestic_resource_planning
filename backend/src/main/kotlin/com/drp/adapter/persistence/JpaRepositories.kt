@@ -568,6 +568,23 @@ interface LocationJpaRepository : JpaRepository<LocationEntity, UUID> {
 interface LoanJpaRepository : JpaRepository<LoanEntity, UUID> {
 
     /**
+     * El prestamo con su fila bloqueada, para la devolucion.
+     *
+     * El `FOR UPDATE` va escrito en la consulta y no con `@Lock` porque en una
+     * consulta nativa Spring Data ignora la anotacion, y un cerrojo que se cree
+     * tomado y no lo este es peor que no tenerlo.
+     *
+     * Sin `household_id` en el `WHERE`, como todas las de este fichero: lo pone
+     * la politica. Y con ella puesta el cerrojo es tambien del hogar, porque una
+     * fila que la politica no deja ver tampoco se puede bloquear.
+     */
+    @Query(
+        value = "SELECT * FROM loans WHERE id = CAST(:id AS uuid) FOR UPDATE",
+        nativeQuery = true,
+    )
+    fun findByIdForUpdate(@Param("id") id: UUID): LoanEntity?
+
+    /**
      * El listado con sus tres filtros. `open` agrupa `ACTIVE` y `OVERDUE`, que es
      * la pregunta habitual --que hay fuera de casa-- y por eso no se resuelve
      * pidiendo dos veces con `status`.

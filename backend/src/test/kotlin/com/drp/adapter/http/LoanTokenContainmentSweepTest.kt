@@ -3,7 +3,6 @@ package com.drp.adapter.http
 import com.drp.test.DrpPostgres
 import com.drp.test.SpringIntegrationTest
 import com.drp.test.extract
-import com.drp.test.getJson
 import com.drp.test.postJson
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
@@ -12,6 +11,7 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -159,8 +159,8 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
                 // Un 200 aqui significaria una de dos cosas, las dos graves: o el
                 // token alcanzo algo que no es su prestamo, o alcanzo su prestamo
                 // por una ruta que el filtro no compara igual que el despachador.
-                response.leaksNothingOf(loan, other)
                 (response.status == 200).shouldBe(false)
+                response.leaksNothing(loan.assetId, loan.memberId, other.assetId)
             }
         }
     }
@@ -228,7 +228,7 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
 
             withClue("$method $target -> ${response.statusLine}\n${response.body}") {
                 (response.status == 200).shouldBe(false)
-                response.leaksNothingOf(loan, null)
+                response.leaksNothing(loan.assetId, loan.memberId)
             }
         }
     }
@@ -247,28 +247,50 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
         val loan = http.lendToStranger()
         val own = "/api/v1/loans/${loan.loanId}"
 
-        val attempts = listOf(
+        // Con la cabecera puesta, pero pidiendo **otra** ruta: si moviera lo que
+        // el filtro compara, el token pasaria a alcanzar lo que diga la cabecera.
+        val elsewhere = listOf(
             Triple("GET", "/api/v1/assets", listOf("X-Original-URL: $own")),
             Triple("GET", "/api/v1/assets", listOf("X-Rewrite-URL: $own")),
             Triple("GET", "/api/v1/assets", listOf("X-Forwarded-Prefix: $own")),
             Triple("GET", "/api/v1/assets", listOf("X-Forwarded-Path: $own")),
             Triple("GET", "/api/v1/loans", listOf("X-Original-URL: $own", "X-Rewrite-URL: $own")),
-            // Y al reves: un prefijo que, de aplicarse, recortaria la ruta propia
-            // hasta dejarla irreconocible para el filtro. Comprobar los dos
-            // sentidos es lo que descarta que la cabecera haga algo.
-            Triple("GET", own, listOf("X-Forwarded-Prefix: /api/v1")),
-            Triple("GET", own, listOf("X-Forwarded-Host: intruso.example")),
             // El override de metodo: si `HiddenHttpMethodFilter` estuviera
             // activo, esto convertiria el POST permitido en otra cosa.
             Triple("POST", "/api/v1/loans", listOf("X-HTTP-Method-Override: GET")),
         )
 
-        attempts.forEach { (method, target, headers) ->
+        elsewhere.forEach { (method, target, headers) ->
             val response = raw(method, target, loan.token, headers)
 
             withClue("$method $target ${headers.joinToString()} -> ${response.statusLine}\n${response.body}") {
                 (response.status == 200).shouldBe(false)
-                response.leaksNothingOf(loan, null)
+                response.leaksNothing(loan.assetId, loan.memberId)
+            }
+        }
+
+        // Y el sentido contrario, que es el que de verdad demuestra que la
+        // cabecera **no hace nada**: un prefijo que, de aplicarse, dejaria la
+        // ruta propia irreconocible para el filtro y daria 401. Sigue dando 200 y
+        // con la misma proyeccion acotada, asi que no se aplica.
+        //
+        // Comprobar solo el sentido de arriba no bastaba: un 401 alli tambien
+        // sale cuando la cabecera se ignora, que es justo lo que hay que
+        // distinguir.
+        val ownPath = listOf(
+            listOf("X-Forwarded-Prefix: /api/v1"),
+            listOf("X-Forwarded-Prefix: /api/v1/loans/${loan.loanId}"),
+            listOf("X-Forwarded-Host: intruso.example"),
+        )
+
+        ownPath.forEach { headers ->
+            val response = raw("GET", own, loan.token, headers)
+
+            withClue("${headers.joinToString()} -> ${response.statusLine}\n${response.body}") {
+                response.status.shouldBe(200)
+                response.body.extract("id").shouldBe(loan.loanId)
+                response.body.externalKeys().shouldBe(EXTERNAL_FIELDS)
+                response.leaksNothing(loan.assetId, loan.memberId)
             }
         }
     }
@@ -322,7 +344,7 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
 
             withClue("$what -> ${response.statusLine}\n${response.body}") {
                 response.status.shouldBe(401)
-                response.leaksNothingOf(loan, null)
+                response.leaksNothing(loan.assetId, loan.memberId)
             }
         }
     }
@@ -397,7 +419,7 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
                 val response = raw("GET", "/api/v1/loans/$target", token)
                 withClue("$what sobre $target -> ${response.statusLine}\n${response.body}") {
                     response.status.shouldBe(401)
-                    response.leaksNothingOf(loan, other)
+                    response.leaksNothing(loan.assetId, other.assetId, loan.memberId)
                 }
             }
         }
@@ -427,7 +449,7 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
         withClue("${response.statusLine}\n${response.body}") {
             // 404 y no 200: el prestamo ajeno sigue sin existir para esta sesion.
             response.status.shouldBe(404)
-            response.leaksNothingOf(alien, null)
+            response.leaksNothing(alien.assetId, alien.memberId)
         }
     }
 
@@ -448,16 +470,19 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
     @DisplayName("las dos respuestas y el 409 llevan exactamente los campos previstos y nada del hogar")
     fun `la proyeccion acotada no se ensancha por ninguna de las dos salidas`() {
         val loan = http.lendToStranger()
+        // El hogar sale del propio access token, que es el unico sitio donde
+        // esta: la API no lo devuelve nunca. Aqui hace de secreto a vigilar.
+        val householdId = loan.accessToken.claimOf("householdId")
 
         val read = raw("GET", "/api/v1/loans/${loan.loanId}", loan.token)
         read.status.shouldBe(200)
         read.body.externalKeys().shouldBe(EXTERNAL_FIELDS)
-        read.leaksNothingOf(loan, null)
+        read.leaksNothing(loan.assetId, loan.memberId, householdId)
 
         val returned = raw("POST", "/api/v1/loans/${loan.loanId}/return", loan.token)
         returned.status.shouldBe(200)
         returned.body.externalKeys().shouldBe(EXTERNAL_FIELDS)
-        returned.leaksNothingOf(loan, null)
+        returned.leaksNothing(loan.assetId, loan.memberId, householdId)
         // Y la cabecera: un `Location` con el asset dentro seria una fuga que el
         // cuerpo no delata.
         withClue(returned.headerBlock) {
@@ -469,8 +494,12 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
         val conflict = raw("POST", "/api/v1/loans/${loan.loanId}/return", loan.token)
         conflict.status.shouldBe(409)
         conflict.body.extract("code").shouldBe("LOAN_ALREADY_RETURNED")
-        conflict.body.externalKeys().shouldBe(setOf("code", "message"))
-        conflict.leaksNothingOf(loan, null)
+        // Los tres campos de `ErrorResponse` y ninguno mas. `details` sale a nulo
+        // --solo lo rellena el 400 de validacion-- y esa forma es la del contrato
+        // para cualquier error, no una filtracion.
+        conflict.body.externalKeys().shouldBe(setOf("code", "message", "details"))
+        conflict.body.shouldContain("\"details\":null")
+        conflict.leaksNothing(loan.assetId, loan.memberId, householdId)
 
         // Leer despues de devolver sigue valiendo --el GET es idempotente-- y no
         // se ensancha.
@@ -478,13 +507,14 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
         reread.status.shouldBe(200)
         reread.body.extract("status").shouldBe("RETURNED")
         reread.body.externalKeys().shouldBe(EXTERNAL_FIELDS)
-        reread.leaksNothingOf(loan, null)
+        reread.leaksNothing(loan.assetId, loan.memberId, householdId)
 
         // Y el 401, que es lo que responde el token fuera de su alcance: tampoco
-        // dice de que hogar ni de que asset se trata.
+        // dice de que hogar se trata. El asset va en la ruta pedida, asi que no
+        // entra en la lista: lo que no puede volver es lo que no se pregunto.
         val denied = raw("GET", "/api/v1/assets/${loan.assetId}", loan.token)
         denied.status.shouldBe(401)
-        denied.leaksNothingOf(loan, null)
+        denied.leaksNothing(loan.memberId, householdId)
     }
 
     /**
@@ -589,11 +619,24 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
          *
          * Se mira el intercambio entero y no solo el cuerpo porque una fuga por
          * `Location`, por `ETag` o por un mensaje de error no aparece en el JSON.
+         *
+         * Los secretos se pasan uno a uno y **nunca se incluye lo que iba en la
+         * ruta pedida**: el cuerpo de error por defecto de Spring Boot lleva
+         * dentro el `path`, asi que un identificador que el propio cliente
+         * escribio vuelve en la respuesta sin que eso sea una fuga de nada. Lo
+         * que no puede volver es lo que el cliente no sabia.
          */
-        fun leaksNothingOf(loan: LentToStranger, other: LentToStranger?) {
+        fun leaksNothing(vararg secrets: String) {
             val whole = "$headerBlock\n$body"
-            listOfNotNull(loan.assetId, loan.memberId, other?.assetId, other?.loanId)
-                .forEach { secret -> withClue("se escapa $secret") { whole.shouldNotContain(secret) } }
+
+            secrets.forEach { secret -> withClue("se escapa $secret") { whole.shouldNotContain(secret) } }
+
+            // Y los nombres de campo de la proyeccion completa. Que aparezca uno
+            // solo significa que se sirvio un `LoanResponse` donde tocaba un
+            // `ExternalLoanResponse`, aunque el valor concreto no delatase nada.
+            FULL_PROJECTION_MARKERS.forEach { marker ->
+                withClue("sale un campo de la proyeccion completa: $marker") { whole.shouldNotContain(marker) }
+            }
         }
     }
 
@@ -675,8 +718,26 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
 
         /** Los siete campos de `ExternalLoanResponse`, y ninguno mas. */
         val EXTERNAL_FIELDS = setOf("id", "assetName", "role", "status", "startedAt", "dueAt", "returnedAt")
+
+        /**
+         * Campos que solo existen en `LoanResponse`. Uno solo de estos en una
+         * respuesta al token acotado significa que se sirvio la proyeccion
+         * completa.
+         */
+        val FULL_PROJECTION_MARKERS = listOf(
+            "\"lender\"",
+            "\"borrower\"",
+            "\"assetId\"",
+            "\"notes\"",
+            "\"createdBy\"",
+            "\"updatedBy\"",
+        )
     }
 }
+
+/** Un claim del access token, leido del propio token porque la API no lo devuelve. */
+private fun String.claimOf(name: String): String =
+    String(Base64.getUrlDecoder().decode(split(".")[1])).extract(name)
 
 /**
  * Las claves del JSON plano de la respuesta.

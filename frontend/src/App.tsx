@@ -15,6 +15,7 @@ import {
 import { AssetDetailPage, AssetsPage, IntakePage, NewAssetPage } from './routes/assets'
 import { CatalogPage } from './routes/catalog'
 import { AccountPage, HomePage, RequireSession, UsersPage } from './routes/household'
+import { ExternalLoanPage, LoansPage } from './routes/loans'
 import { LocationsPage } from './routes/locations'
 import { StoragePage } from './routes/storage'
 
@@ -70,6 +71,11 @@ export function App() {
             <Route path="/recuperar" element={<ForgotPasswordPage />} />
             <Route path="/restablecer-contrasena" element={<ResetPasswordPage />} />
             <Route path="/aceptar-invitacion" element={<AcceptInvitationPage />} />
+            {/* La vista externa de un préstamo. Va aquí arriba, FUERA de
+                `RequireSession`, y es la única pantalla del producto que se ve
+                sin cuenta: la abre quien recibió el enlace por correo y su
+                credencial es el token de la URL. */}
+            <Route path="/prestamo" element={<ExternalLoanPage />} />
 
             <Route element={<RequireSession />}>
               <Route path="/" element={<HomePage />} />
@@ -81,6 +87,7 @@ export function App() {
               <Route path="/inventario/nuevo" element={<NewAssetPage />} />
               <Route path="/inventario/entrada" element={<IntakePage />} />
               <Route path="/inventario/:id" element={<AssetDetailPage />} />
+              <Route path="/prestamos" element={<LoansPage />} />
               <Route path="/usuarios" element={<UsersPage />} />
               <Route path="/almacenamiento" element={<StoragePage />} />
               <Route path="/cuenta" element={<AccountPage />} />

@@ -437,6 +437,29 @@ interface LoanRepository {
 
     fun findById(loanId: UUID): Loan?
 
+    /**
+     * El mismo prestamo, con **la fila bloqueada hasta el fin de la transaccion**.
+     *
+     * Lo pide la devolucion y solo ella. `ConfirmReturn` lee el prestamo,
+     * comprueba que sigue abierto y escribe, y entre la lectura y la escritura
+     * cabe otra transaccion haciendo exactamente lo mismo: las dos ven `ACTIVE`,
+     * las dos pasan la comprobacion y las dos cierran. Medido, cuatro
+     * devoluciones simultaneas con el mismo token daban **cuatro `200`** donde el
+     * contrato promete un `200` y tres `409`, con el evento `LoanReturned`
+     * publicado cuatro veces.
+     *
+     * Aqui no vale el patron del indice unico que defiende el alta --no hay
+     * ninguna fila nueva que colisione, es un `UPDATE` sobre la que ya esta-- asi
+     * que la unica forma de que la segunda vea lo que hizo la primera es esperar
+     * a que termine. Con `READ COMMITTED`, quien encuentra la fila tomada se
+     * bloquea y al desbloquearse **relee el estado ya escrito**, que es
+     * justamente lo que hace fallar su comprobacion.
+     *
+     * No se usa en las lecturas: bloquear para leer serializaria el listado del
+     * hogar sin ganar nada.
+     */
+    fun findByIdForUpdate(loanId: UUID): Loan?
+
     fun list(filter: LoanFilter, pagination: Pagination): Page<Loan>
 
     /**
