@@ -564,3 +564,86 @@ interface LocationJpaRepository : JpaRepository<LocationEntity, UUID> {
     @Query(value = "SELECT count(*) FROM assets WHERE location_id = CAST(:locationId AS uuid)", nativeQuery = true)
     fun countAssetsIn(@Param("locationId") locationId: UUID): Long
 }
+
+interface LoanJpaRepository : JpaRepository<LoanEntity, UUID> {
+
+    /**
+     * El listado con sus tres filtros. `open` agrupa `ACTIVE` y `OVERDUE`, que es
+     * la pregunta habitual --que hay fuera de casa-- y por eso no se resuelve
+     * pidiendo dos veces con `status`.
+     */
+    @Query(
+        value = """
+            SELECT * FROM loans
+            WHERE (CAST(:status AS text) IS NULL OR status = CAST(:status AS text))
+              AND (CAST(:assetId AS uuid) IS NULL OR asset_id = CAST(:assetId AS uuid))
+              AND (NOT :open OR status IN ('ACTIVE', 'OVERDUE'))
+            ORDER BY started_at DESC
+        """,
+        countQuery = """
+            SELECT count(*) FROM loans
+            WHERE (CAST(:status AS text) IS NULL OR status = CAST(:status AS text))
+              AND (CAST(:assetId AS uuid) IS NULL OR asset_id = CAST(:assetId AS uuid))
+              AND (NOT :open OR status IN ('ACTIVE', 'OVERDUE'))
+        """,
+        nativeQuery = true,
+    )
+    fun search(
+        @Param("status") status: String?,
+        @Param("assetId") assetId: UUID?,
+        @Param("open") open: Boolean,
+        pageable: Pageable,
+    ): org.springframework.data.domain.Page<LoanEntity>
+
+    /**
+     * Los candidatos a vencer.
+     *
+     * Las dos condiciones que la definicion subraya estan aqui y no en el codigo
+     * que llama: **solo `ACTIVE`** --marcar de nuevo un `OVERDUE` volveria a
+     * publicar su evento en cada pasada-- y **`due_at IS NOT NULL`**, porque un
+     * prestamo sin plazo no vence nunca. Juntas son lo que hace la pasada
+     * idempotente.
+     */
+    @Query(
+        value = """
+            SELECT * FROM loans
+            WHERE status = 'ACTIVE'
+              AND due_at IS NOT NULL
+              AND due_at < :now
+            ORDER BY due_at
+        """,
+        nativeQuery = true,
+    )
+    fun findOverdue(@Param("now") now: Instant): List<LoanEntity>
+
+    /**
+     * El nombre efectivo del asset prestado: el suyo, o el de su articulo cuando
+     * no tiene propio (README 4.1.1). Es el unico dato del asset que ve un token
+     * acotado, asi que se resuelve aqui en vez de arrastrar el asset entero.
+     */
+    @Query(
+        value = """
+            SELECT coalesce(a.name, ar.name)
+            FROM assets a
+            LEFT JOIN articles ar ON ar.id = a.article_id
+            WHERE a.id = CAST(:assetId AS uuid)
+        """,
+        nativeQuery = true,
+    )
+    fun assetNameOf(@Param("assetId") assetId: UUID): String?
+}
+
+/**
+ * Los tokens acotados.
+ *
+ * Su tabla **no tiene politica de RLS** --no lleva `household_id`, cuelga del
+ * prestamo-- asi que aqui la nota general de arriba no aplica: estas consultas
+ * no las filtra PostgreSQL. Lo que las acota es su forma, que resuelve siempre
+ * por un secreto que hay que traer. No hay ni un metodo con el que recorrer
+ * tokens ajenos, y anadirlo seria abrir un agujero que ninguna politica cerraria
+ * por detras.
+ */
+interface LoanAccessTokenJpaRepository : JpaRepository<LoanAccessTokenEntity, UUID> {
+
+    fun findByTokenHash(tokenHash: String): LoanAccessTokenEntity?
+}

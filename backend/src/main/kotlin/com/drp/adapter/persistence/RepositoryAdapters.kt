@@ -13,6 +13,9 @@ import com.drp.application.port.HouseholdMemberRepository
 import com.drp.application.port.HouseholdRepository
 import com.drp.application.port.IdentityRepository
 import com.drp.application.port.InvitationRepository
+import com.drp.application.port.LoanAccessTokenRepository
+import com.drp.application.port.LoanFilter
+import com.drp.application.port.LoanRepository
 import com.drp.application.port.LocationRepository
 import com.drp.application.port.Page
 import com.drp.application.port.Pagination
@@ -39,6 +42,9 @@ import com.drp.domain.inventory.Asset
 import com.drp.domain.inventory.AssetLocation
 import com.drp.domain.inventory.Location
 import com.drp.domain.invitation.Invitation
+import com.drp.domain.loan.Loan
+import com.drp.domain.loan.LoanAccessToken
+import com.drp.domain.loan.LoanParticipant
 import com.drp.domain.token.SingleUseToken
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
@@ -132,6 +138,13 @@ class SqlTenantResolver(private val jdbc: JdbcTemplate) : TenantResolver {
     override fun householdOfInvitationToken(tokenHash: String): UUID? =
         jdbc.query(
             "SELECT find_household_for_invitation_token(?)",
+            { rows, _ -> rows.getObject(1, UUID::class.java) },
+            tokenHash,
+        ).firstOrNull()
+
+    override fun householdOfLoanToken(tokenHash: String): UUID? =
+        jdbc.query(
+            "SELECT find_household_for_loan_token(?)",
             { rows, _ -> rows.getObject(1, UUID::class.java) },
             tokenHash,
         ).firstOrNull()
@@ -893,4 +906,114 @@ class AdvisoryHierarchyLock(
             householdId.toString(),
         )
     }
+}
+
+@Repository
+class LoanRepositoryAdapter(
+    private val loans: LoanJpaRepository,
+    private val tenantContext: TenantContext,
+) : LoanRepository {
+
+    override fun save(loan: Loan): Loan {
+        // Del contexto y nunca del cliente, como en los demas adaptadores. Sin
+        // el, el `WITH CHECK` implicito de la politica rechazaria la insercion.
+        val householdId = requireNotNull(tenantContext.currentHousehold()) {
+            "Guardar un prestamo exige contexto de inquilino"
+        }
+
+        return loans.save(
+            LoanEntity(
+                id = loan.id,
+                householdId = householdId,
+                assetId = loan.assetId,
+                lenderMemberId = loan.lender.memberId,
+                lenderExternal = loan.lender.external,
+                borrowerMemberId = loan.borrower.memberId,
+                borrowerExternal = loan.borrower.external,
+                status = loan.status,
+                notes = loan.notes,
+                startedAt = loan.startedAt,
+                dueAt = loan.dueAt,
+                returnedAt = loan.returnedAt,
+                createdAt = loan.createdAt,
+                updatedAt = loan.updatedAt,
+                createdBy = loan.createdBy,
+                updatedBy = loan.updatedBy,
+            ),
+        ).toDomain()
+    }
+
+    override fun findById(loanId: UUID): Loan? =
+        loans.findById(loanId).orElse(null)?.toDomain()
+
+    override fun list(filter: LoanFilter, pagination: Pagination): Page<Loan> {
+        val found = loans.search(
+            status = filter.status?.name,
+            assetId = filter.assetId,
+            open = filter.open,
+            pageable = PageRequest.of(pagination.page, pagination.size),
+        )
+        return Page(
+            items = found.content.map { it.toDomain() },
+            page = pagination.page,
+            size = pagination.size,
+            total = found.totalElements,
+        )
+    }
+
+    override fun findOverdueCandidates(now: Instant): List<Loan> =
+        loans.findOverdue(now).map { it.toDomain() }
+
+    override fun assetNameOf(loan: Loan): String? = loans.assetNameOf(loan.assetId)
+
+    private fun LoanEntity.toDomain() = Loan(
+        id = id,
+        assetId = assetId,
+        // Las dos columnas excluyentes se juntan aqui en un tipo que no admite
+        // ni las dos ni ninguna. Que la tabla lo garantice con un CHECK es lo
+        // que permite que este `error` sea de verdad inalcanzable.
+        lender = LoanParticipant.from(lenderMemberId, lenderExternal)
+            ?: error("El prestamo $id no tiene prestador, y el CHECK de la tabla lo impide"),
+        borrower = LoanParticipant.from(borrowerMemberId, borrowerExternal)
+            ?: error("El prestamo $id no tiene receptor, y el CHECK de la tabla lo impide"),
+        status = status,
+        startedAt = startedAt,
+        dueAt = dueAt,
+        returnedAt = returnedAt,
+        notes = notes,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        createdBy = createdBy,
+        updatedBy = updatedBy,
+    )
+}
+
+@Repository
+class LoanAccessTokenRepositoryAdapter(
+    private val tokens: LoanAccessTokenJpaRepository,
+) : LoanAccessTokenRepository {
+
+    override fun save(token: LoanAccessToken): LoanAccessToken =
+        tokens.save(
+            LoanAccessTokenEntity(
+                id = token.id,
+                loanId = token.loanId,
+                tokenHash = token.tokenHash,
+                role = token.role,
+                expiresAt = token.expiresAt,
+                usedAt = token.usedAt,
+            ),
+        ).toDomain()
+
+    override fun findByTokenHash(tokenHash: String): LoanAccessToken? =
+        tokens.findByTokenHash(tokenHash)?.toDomain()
+
+    private fun LoanAccessTokenEntity.toDomain() = LoanAccessToken(
+        id = id,
+        loanId = loanId,
+        tokenHash = tokenHash,
+        role = role,
+        expiresAt = expiresAt,
+        usedAt = usedAt,
+    )
 }

@@ -16,6 +16,9 @@ import com.drp.domain.inventory.AssetStatus
 import com.drp.domain.inventory.AssetType
 import com.drp.domain.inventory.Location
 import com.drp.domain.invitation.Invitation
+import com.drp.domain.loan.Loan
+import com.drp.domain.loan.LoanAccessToken
+import com.drp.domain.loan.LoanStatus
 import com.drp.domain.token.SingleUseToken
 import java.time.Instant
 import java.util.UUID
@@ -93,6 +96,16 @@ interface TenantResolver {
 
     /** A que hogar corresponde un token de invitacion recibido por correo. */
     fun householdOfInvitationToken(tokenHash: String): UUID?
+
+    /**
+     * A que hogar corresponde un token acotado de prestamo.
+     *
+     * El cuarto momento sin hogar conocido, y el unico en el que quien pregunta
+     * **no tiene cuenta**: es una persona ajena que solo trae el enlace del
+     * correo. Se resuelve por el hash y no por el `loanId` que el JWT lleva
+     * firmado, para que la funcion no sea un oraculo prestamo-hogar (V6).
+     */
+    fun householdOfLoanToken(tokenHash: String): UUID?
 }
 
 interface HouseholdMemberRepository {
@@ -408,4 +421,56 @@ data class DocumentFilter(
 interface HierarchyLock {
     /** Se toma dentro de la transaccion y se suelta sola al cerrarla. */
     fun acquire()
+}
+
+interface LoanRepository {
+    /**
+     * Inserta o actualiza.
+     *
+     * Puede lanzar la violacion del indice unico parcial `loans_one_open_per_asset`
+     * si otra transaccion abrio un prestamo sobre el mismo asset entre la
+     * comprobacion y la escritura. **Es la unica defensa que no tiene carrera**,
+     * y quien llama tiene que traducirla al `409` del contrato en vez de dejar
+     * que salga un 500.
+     */
+    fun save(loan: Loan): Loan
+
+    fun findById(loanId: UUID): Loan?
+
+    fun list(filter: LoanFilter, pagination: Pagination): Page<Loan>
+
+    /**
+     * Los `ACTIVE` con `dueAt` ya pasada, para el proceso diario.
+     *
+     * Deja fuera los que no tienen fecha --un prestamo sin plazo no vence-- y los
+     * que ya estan `OVERDUE`, que es lo que hace la pasada idempotente: la
+     * segunda no encuentra nada que marcar.
+     */
+    fun findOverdueCandidates(now: Instant): List<Loan>
+
+    /** El nombre del asset prestado, resuelto para lectura. Vale tambien para la vista acotada. */
+    fun assetNameOf(loan: Loan): String?
+}
+
+data class LoanFilter(
+    val status: LoanStatus? = null,
+    val assetId: UUID? = null,
+    /** `ACTIVE` y `OVERDUE` juntos, que es la pregunta habitual: que hay fuera de casa. */
+    val open: Boolean = false,
+)
+
+/**
+ * Los tokens acotados de un prestamo.
+ *
+ * **Es el unico repositorio del core cuya tabla no tiene politica de RLS**, asi
+ * que el aislamiento no lo defiende PostgreSQL sino la forma de sus consultas:
+ * resuelve siempre por hash o por prestamo, nunca lista ni busca por nada que
+ * permita recorrer los tokens de otros. Es la misma disciplina que sigue el
+ * repositorio de `identities`, y por el mismo motivo.
+ */
+interface LoanAccessTokenRepository {
+    fun save(token: LoanAccessToken): LoanAccessToken
+
+    /** Sin contexto de inquilino: quien lo trae no pertenece a ningun hogar. */
+    fun findByTokenHash(tokenHash: String): LoanAccessToken?
 }
