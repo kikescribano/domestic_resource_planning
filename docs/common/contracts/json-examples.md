@@ -178,6 +178,7 @@ El contrato completo, con todos los recursos, parámetros y esquemas de error, s
 {
   "id": "1a2b3c4d-...-000000000004",
   "assetName": "Taladro",
+  "role": "BORROWER",
   "status": "ACTIVE",
   "startedAt": "2026-08-01T09:00:00Z",
   "dueAt": "2026-08-15T09:00:00Z"
@@ -186,6 +187,8 @@ El contrato completo, con todos los recursos, parámetros y esquemas de error, s
 > **Esta es la única operación de toda la API que devuelve dos formas distintas según quién pregunta**, y por eso el contrato declara las dos: `LoanView` es un `oneOf` de `Loan` —la completa— y `LoanExternalView` —esta—. Dejarlo solo en la prosa habría hecho que el cliente generado prometiera `lender` y `borrower` a una pantalla que nunca los recibe.
 >
 > Lo que la vista acotada **no** lleva es tan deliberado como lo que lleva: ni `assetId`, ni `lender`, ni `borrower`, ni `notes`, ni la autoría. La credencial da acceso a un préstamo, no al hogar que lo registró. `returnedAt` aparece en cuanto se confirma la devolución, para que quien la confirmó la vea hecha.
+>
+> El `role` sí sale, y es el único campo que la vista acotada tiene y la completa no. No es un dato del préstamo sino de **quién pregunta**, y hace falta porque la mitad del texto de la pantalla externa depende de él: quien prestó reclama que le devuelvan y quien recibió confirma que ha devuelto. No revela nada —quien tiene el token ya sabe en qué extremo está— y evita que el cliente tenga que descodificar el claim del JWT para pintar una frase.
 
 **`GET /api/v1/loans/{id}`** — response del mismo préstamo con **sesión del hogar**
 ```json

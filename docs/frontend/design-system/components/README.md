@@ -66,11 +66,18 @@ con sus siete puntos. No se reordena ni se recorta.
 | `UploadField` | [`upload-field.md`](upload-field.md) | **Implementado** | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
 | `FileGallery` | [`file-gallery.md`](file-gallery.md) | **Implementado** | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
 | `Avatar` | [`avatar.md`](avatar.md) | **Implementado** | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
+| `LoanExternalPage` | [`loan-external-page.md`](loan-external-page.md) | **Prevista** | Sin construir (Hito 4) |
 
 **Nueve componentes implementados en un único fichero de 376 líneas, y solo seis
 con ficha**: `SelectField`, `PageHeading` y `EmptyState` entraron con el Hito 2 y
 se quedaron sin la suya. Las tres del Hito 3 van al revés —ficha sin
 implementación—, y su primera línea lo dice.
+
+La del Hito 4 va igual, y es la más extrema de las cuatro: `LoanExternalPage` no
+es una primitiva sino **una pantalla entera sin sesión y sin shell**, la única
+superficie del producto que se ve sin cuenta. Su ficha argumenta por qué es
+componente y no patrón, y propone la única primitiva nueva que el hito necesita,
+`BlockingError`.
 
 Sigue sin haber un directorio por componente, ni una carpeta de historias, ni una
 galería: mientras quepan en un fichero que se lee de una sentada, partirlos

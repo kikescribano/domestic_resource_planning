@@ -2573,12 +2573,26 @@ components:
         No lleva assetId, ni lender, ni borrower, ni notes, ni autoria, y eso
         **no es una omision sino el alcance del token** -- su credencial da
         acceso a un prestamo, no al hogar que lo registro.
-      required: [id, assetName, status, startedAt]
+      required: [id, assetName, status, startedAt, role]
       # Cerrado a proposito, y no solo por higiene: es lo que impide que la
       # vista completa encaje tambien aqui y deje ambigua la rama de LoanView.
       additionalProperties: false
       properties:
         id: { type: string, format: uuid }
+        role:
+          type: string
+          enum: [LENDER, BORROWER]
+          description: >
+            En cual de los dos extremos esta quien pregunta, tomado del token y
+            no del cuerpo. La pantalla externa lo necesita porque **la mitad de
+            su texto depende de el**: quien presto reclama que le devuelvan y
+            quien recibio confirma que ha devuelto, con la misma anatomia.
+
+
+            No revela nada: quien tiene el token ya sabe si presto o recibio.
+            La alternativa era que el cliente descodificase el claim del propio
+            JWT, que obliga al frontend a interpretar una credencial en vez de
+            leer una respuesta.
         assetName:
           type: string
           description: El unico dato del asset que sale de casa. Un nombre, sin identificador ni foto
