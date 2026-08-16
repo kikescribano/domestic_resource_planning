@@ -2,6 +2,7 @@ package com.drp.application
 
 import com.drp.application.port.EmailMessage
 import com.drp.domain.identity.EmailAddress
+import com.drp.domain.loan.LoanRole
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.net.URLEncoder
@@ -91,6 +92,52 @@ class EnrollmentEmails(
             el enlace, tu contraseña sigue siendo la misma.
         """.trimIndent(),
     )
+
+    /**
+     * El enlace del prestamo, el **quinto** correo y el unico que no va de
+     * enrolamiento: no invita a nadie a entrar en el hogar.
+     *
+     * Es lo que hace util al token acotado, y de ahi que la tabla exija que un
+     * externo traiga nombre y al menos un canal. El texto cambia segun el
+     * extremo, porque no es lo mismo pedir que te devuelvan algo que avisar de
+     * que tienes algo prestado.
+     *
+     * **No dice de que hogar viene ni quien es la otra parte.** Seria natural
+     * ponerlo --queda mas humano-- y es justo lo que la pantalla de destino no
+     * puede mostrar: el correo no debe filtrar lo que el token no alcanza.
+     */
+    fun loan(to: EmailAddress, assetName: String, role: LoanRole, token: String) = when (role) {
+        LoanRole.BORROWER -> EmailMessage(
+            to = to,
+            subject = "Te han prestado: $assetName",
+            body = """
+                Te han prestado "$assetName" y lo han apuntado en DRP.
+
+                Aquí puedes consultar el préstamo y avisar de que lo has devuelto:
+
+                ${link("/prestamo", token)}
+
+                Guarda el enlace: es la única forma de entrar, y no hace falta que
+                te crees ninguna cuenta.
+            """.trimIndent(),
+        )
+
+        LoanRole.LENDER -> EmailMessage(
+            to = to,
+            subject = "Has prestado: $assetName",
+            body = """
+                Se ha apuntado en DRP que has prestado "$assetName".
+
+                Aquí puedes seguir el préstamo y confirmar la devolución cuando te
+                lo devuelvan:
+
+                ${link("/prestamo", token)}
+
+                Guarda el enlace: es la única forma de entrar, y no hace falta que
+                te crees ninguna cuenta.
+            """.trimIndent(),
+        )
+    }
 
     private fun link(path: String, token: String): String =
         "$baseUrl$path?token=${URLEncoder.encode(token, StandardCharsets.UTF_8)}"

@@ -157,7 +157,19 @@ data class ExternalParty(
     val email: String?,
     val phone: String?,
 ) {
-    val isContactable: Boolean get() = !email.isNullOrBlank() || !phone.isNullOrBlank()
+    /**
+     * Va como **funcion y no como propiedad calculada**, y el nombre evita
+     * empezar por `is`, por la misma razon que `Capacity.countsUnits()`: esta
+     * clase se serializa a la columna `jsonb`, y Jackson trata un
+     * `val isContactable` como un campo mas.
+     *
+     * No es teorico. La primera version lo escribio como propiedad y la prueba
+     * que le pregunta a PostgreSQL que claves hay de verdad encontro una
+     * `isContactable` guardada en la tabla: un valor **derivado y congelado**
+     * dentro del dato del que se deriva, que a la primera correccion de correo
+     * pasaria a mentir.
+     */
+    fun hasContactChannel(): Boolean = !email.isNullOrBlank() || !phone.isNullOrBlank()
 }
 
 /**

@@ -2,11 +2,15 @@ package com.drp.adapter.security
 
 import com.drp.application.port.AccessTokenIssuer
 import com.drp.application.port.IssuedAccessToken
+import com.drp.application.port.IssuedLoanToken
 import com.drp.application.port.IssuedSecret
+import com.drp.application.port.LoanTokenClaims
+import com.drp.application.port.LoanTokenIssuer
 import com.drp.application.port.PasswordHasher
 import com.drp.application.port.SecretGenerator
 import com.drp.application.port.SessionClaims
 import com.drp.domain.household.MemberRole
+import com.drp.domain.loan.LoanRole
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.crypto.MACSigner
@@ -19,6 +23,7 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Clock
 import java.time.Duration
+import java.time.Instant
 import java.util.Base64
 import java.util.Date
 import java.util.UUID
@@ -122,6 +127,78 @@ class JwtAccessTokenIssuer(
         const val HOUSEHOLD_ID = "householdId"
         const val ROLE = "role"
         const val SESSION_ID = "sid"
+    }
+}
+
+/**
+ * El token acotado de un externo: JWT firmado **sin `sub`**.
+ *
+ * Comparte la clave de firma con el access token a proposito. Son dos
+ * credenciales del mismo emisor y separarlas anadiria un segundo secreto de
+ * despliegue que gestionar, sin ganar nada: lo que impide que uno se haga pasar
+ * por el otro no es la clave sino la forma del cuerpo --este no tiene `sub`,
+ * `memberId` ni `householdId`, y aquel no tiene `loanId`-- y que cada verificador
+ * exija los claims que le tocan y rechace lo demas.
+ *
+ * A diferencia del access token, este **si es revocable**, y no por si mismo: lo
+ * es porque su hash queda en `loan_access_tokens`. De ahi que [issue] devuelva
+ * las dos cosas.
+ */
+@Component
+class JwtLoanTokenIssuer(
+    private val properties: SecurityProperties,
+    private val secrets: SecretGenerator,
+    private val clock: Clock,
+) : LoanTokenIssuer {
+
+    private val signer = MACSigner(properties.jwtSecretBytes())
+    private val verifier = MACVerifier(properties.jwtSecretBytes())
+
+    override fun issue(claims: LoanTokenClaims, expiresAt: Instant): IssuedLoanToken {
+        val claimSet = JWTClaimsSet.Builder()
+            // Sin subject: quien lo trae no es un usuario. Lo que hay es un
+            // prestamo y un extremo.
+            .claim(LOAN_ID, claims.loanId.toString())
+            .claim(ROLE, claims.role.name)
+            .issueTime(Date.from(clock.instant()))
+            .expirationTime(Date.from(expiresAt))
+            .build()
+
+        val jwt = SignedJWT(JWSHeader(JWSAlgorithm.HS256), claimSet).apply { sign(signer) }.serialize()
+
+        return IssuedLoanToken(token = jwt, tokenHash = hash(jwt))
+    }
+
+    override fun verify(token: String): LoanTokenClaims? = runCatching {
+        val jwt = SignedJWT.parse(token)
+        if (!jwt.verify(verifier)) return null
+
+        val claims = jwt.jwtClaimsSet
+        val expiry = claims.expirationTime ?: return null
+        if (!expiry.toInstant().isAfter(clock.instant())) return null
+
+        // Un access token valido **no** puede colarse por aqui: lleva `sub` y no
+        // lleva `loanId`, asi que se rechaza por las dos. Comprobar las dos cosas
+        // y no solo la que falta es lo que mantiene la separacion aunque manana
+        // alguien anada un claim a la otra credencial.
+        if (claims.subject != null) return null
+
+        LoanTokenClaims(
+            loanId = UUID.fromString(claims.getStringClaim(LOAN_ID)),
+            role = LoanRole.valueOf(claims.getStringClaim(ROLE)),
+        )
+    }.getOrNull()
+
+    /**
+     * El mismo SHA-256 que los demas secretos, para que la tabla guarde lo mismo
+     * que las otras tres de tokens y una comparacion no dependa del algoritmo con
+     * que se escribio la fila.
+     */
+    override fun hash(token: String): String = secrets.hash(token)
+
+    private companion object {
+        const val LOAN_ID = "loanId"
+        const val ROLE = "role"
     }
 }
 

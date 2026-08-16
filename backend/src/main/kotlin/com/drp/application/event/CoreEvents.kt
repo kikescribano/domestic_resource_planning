@@ -6,6 +6,7 @@ import com.drp.domain.event.DomainEvent
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 import java.time.Clock
+import java.time.Instant
 import java.util.UUID
 
 /**
@@ -142,6 +143,43 @@ class CoreEvents(
             "DocumentAttached",
             documentId,
             mapOf("assetId" to assetId, "articleId" to articleId, "documentType" to type, "fileId" to fileId),
+        )
+
+    /**
+     * Empieza un prestamo. Lleva el asset porque quien reaccione va a querer
+     * saber que salio de casa, no solo que hubo un prestamo.
+     *
+     * Los dos extremos viajan como `MEMBER` o `EXTERNAL` sin el contacto dentro:
+     * el correo y el telefono de una persona ajena al hogar no tienen por que
+     * repartirse a todo el que escuche el bus.
+     */
+    fun loanStarted(loanId: UUID, assetId: UUID, lender: String, borrower: String, dueAt: Instant?) =
+        publish(
+            "LoanStarted",
+            loanId,
+            mapOf("assetId" to assetId, "lender" to lender, "borrower" to borrower, "dueAt" to dueAt),
+        )
+
+    /** Se confirma la devolucion, venga del hogar o del token acotado del externo. */
+    fun loanReturned(loanId: UUID, assetId: UUID, returnedAt: Instant) =
+        publish(
+            "LoanReturned",
+            loanId,
+            mapOf("assetId" to assetId, "returnedAt" to returnedAt),
+        )
+
+    /**
+     * Vence un prestamo, y **no lo provoca ninguna accion del usuario**: lo marca
+     * el proceso diario. Es el evento del que colgaran los recordatorios
+     * automaticos que la gestion avanzada de prestamos (4.2) necesitara, y la
+     * razon de que el estado se persista en lugar de derivarse al leer -- un
+     * valor calculado no tiene momento en el que ocurrir.
+     */
+    fun loanOverdue(loanId: UUID, assetId: UUID, dueAt: Instant) =
+        publish(
+            "LoanOverdue",
+            loanId,
+            mapOf("assetId" to assetId, "dueAt" to dueAt),
         )
 
     private fun publish(type: String, aggregateId: UUID, payload: Map<String, Any?>) {
