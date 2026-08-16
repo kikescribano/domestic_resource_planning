@@ -3,8 +3,11 @@ package com.drp.adapter.http
 import com.drp.application.port.LoanFilter
 import com.drp.application.port.Pagination
 import com.drp.application.port.SessionClaims
+import com.drp.application.usecase.ConfirmReturn
 import com.drp.application.usecase.GetLoan
+import com.drp.application.usecase.GetLoanForExternal
 import com.drp.application.usecase.ListLoans
+import com.drp.application.usecase.LoanAccess
 import com.drp.application.usecase.StartLoan
 import com.drp.application.usecase.StartLoanCommand
 import com.drp.domain.loan.LoanStatus
@@ -26,6 +29,8 @@ import java.util.UUID
 class LoanController(
     private val startLoan: StartLoan,
     private val getLoan: GetLoan,
+    private val getLoanForExternal: GetLoanForExternal,
+    private val confirmReturn: ConfirmReturn,
     private val listLoans: ListLoans,
 ) {
 
@@ -64,9 +69,35 @@ class LoanController(
         listLoans.handle(LoanFilter(status = status, assetId = assetId, open = open), Pagination(page, size)),
     ) { LoanResponse.of(it) }
 
+    /**
+     * **La unica operacion de la API que devuelve dos formas distintas segun
+     * quien pregunta.**
+     *
+     * Lo que decide no es el recurso sino la credencial, y se despacha por el
+     * tipo del principal en lugar de por un `if` sobre un rol: con sesion del
+     * hogar llega un `SessionClaims` y con token acotado un [LoanAccess], asi
+     * que la rama equivocada **no compila** en lugar de fallar en produccion.
+     *
+     * Y en la rama externa el identificador viene de la credencial, no de la
+     * ruta: el `id` del camino ya lo comprobo el filtro contra el del token, y
+     * usarlo aqui otra vez seria darle una segunda oportunidad de no coincidir.
+     */
     @GetMapping("/{id}")
     fun get(
-        @AuthenticationPrincipal session: SessionClaims,
+        @AuthenticationPrincipal principal: Any,
         @PathVariable id: UUID,
-    ): LoanResponse = LoanResponse.of(getLoan.handle(id))
+    ): Any = when (principal) {
+        is LoanAccess -> ExternalLoanResponse.of(getLoanForExternal.handle(principal))
+        else -> LoanResponse.of(getLoan.handle(id))
+    }
+
+    @PostMapping("/{id}/return")
+    fun confirmReturn(
+        @AuthenticationPrincipal principal: Any,
+        @PathVariable id: UUID,
+    ): Any = when (principal) {
+        is LoanAccess -> ExternalLoanResponse.of(confirmReturn.handle(principal))
+        is SessionClaims -> LoanResponse.of(confirmReturn.handle(principal, id))
+        else -> throw IllegalStateException("Principal no reconocido: ${principal::class.simpleName}")
+    }
 }

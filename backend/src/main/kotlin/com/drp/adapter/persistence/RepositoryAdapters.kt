@@ -1008,6 +1008,9 @@ class LoanAccessTokenRepositoryAdapter(
     override fun findByTokenHash(tokenHash: String): LoanAccessToken? =
         tokens.findByTokenHash(tokenHash)?.toDomain()
 
+    override fun findById(tokenId: UUID): LoanAccessToken? =
+        tokens.findById(tokenId).orElse(null)?.toDomain()
+
     private fun LoanAccessTokenEntity.toDomain() = LoanAccessToken(
         id = id,
         loanId = loanId,

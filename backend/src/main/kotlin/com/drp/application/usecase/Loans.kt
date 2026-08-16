@@ -14,6 +14,8 @@ import com.drp.application.port.LoanTokenIssuer
 import com.drp.application.port.Page
 import com.drp.application.port.Pagination
 import com.drp.application.port.SessionClaims
+import com.drp.application.port.TenantResolver
+import com.drp.application.tenant.TenantContext
 import com.drp.domain.BusinessRuleViolation
 import com.drp.domain.ErrorCode
 import com.drp.domain.ResourceNotFound
@@ -295,6 +297,185 @@ private fun LoanParticipantCommand.resolve(field: String): LoanParticipant {
 
 /** Como viaja un extremo en el payload del evento: sin el contacto del externo dentro. */
 private fun LoanParticipant.describe(): String = if (memberId != null) "MEMBER" else "EXTERNAL"
+
+/**
+ * Quien ha llegado con un token acotado, y a que prestamo.
+ *
+ * Es lo que sustituye a `SessionClaims` en las dos operaciones que ese token
+ * alcanza. **No lleva `memberId` ni `identityId`** porque no hay persona
+ * detras: hay un prestamo y un extremo.
+ */
+data class LoanAccess(
+    val loanId: UUID,
+    val role: LoanRole,
+    val tokenId: UUID,
+    val householdId: UUID,
+)
+
+/**
+ * Resuelve un token acotado: firma, hogar y fila.
+ *
+ * Las tres cosas en este orden y no en otro, porque cada una necesita la
+ * anterior:
+ *
+ * 1. **La firma y la caducidad del JWT**, que se comprueban sin tocar la base de
+ *    datos. Lo manipulado o caducado muere aqui, sin consultar nada.
+ * 2. **El hogar**, con la funcion acotada de la V6. Es imprescindible antes de
+ *    leer nada: `loans` tiene politica de RLS y quien pregunta no tiene sesion.
+ * 3. **La fila**, ya dentro del contexto. Es lo que hace el token **revocable**:
+ *    borrar la fila lo invalida aunque la firma siga siendo correcta.
+ *
+ * Cualquier fallo devuelve nulo sin distinguir cual: decir si el token existio,
+ * si caduco o si el prestamo es de otro hogar diria a quien prueba tokens por
+ * donde va bien encaminado.
+ */
+@Service
+class AuthenticateLoanToken(
+    private val loanTokens: LoanTokenIssuer,
+    private val tokens: LoanAccessTokenRepository,
+    private val tenantResolver: TenantResolver,
+    private val tenantContext: TenantContext,
+    private val transactions: TransactionTemplate,
+    private val clock: Clock,
+) {
+
+    fun authenticate(rawToken: String): LoanAccess? {
+        val claims = loanTokens.verify(rawToken) ?: return null
+        val tokenHash = loanTokens.hash(rawToken)
+
+        val householdId = tenantResolver.householdOfLoanToken(tokenHash) ?: return null
+
+        return tenantContext.runAs(householdId) {
+            transactions.execute {
+                val stored = tokens.findByTokenHash(tokenHash) ?: return@execute null
+                if (!stored.isReadableAt(clock.instant())) return@execute null
+
+                // El claim firmado y la fila tienen que decir lo mismo. Que no
+                // coincidan solo puede significar dos cosas --la clave de firma
+                // comprometida, o un fallo al emitir-- y ninguna merece dejar
+                // pasar la peticion.
+                if (stored.loanId != claims.loanId || stored.role != claims.role) return@execute null
+
+                LoanAccess(
+                    loanId = stored.loanId,
+                    role = stored.role,
+                    tokenId = stored.id,
+                    householdId = householdId,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * El prestamo visto por un externo.
+ *
+ * Recibe el [LoanAccess] entero y no un `loanId` suelto, y esa firma es la
+ * defensa: **no hay forma de invocarlo para un prestamo que no sea el del
+ * token**, porque el identificador sale de la credencial y no del parametro.
+ */
+@Service
+class GetLoanForExternal(
+    private val loans: LoanRepository,
+) {
+    @Transactional(readOnly = true)
+    fun handle(access: LoanAccess): ExternalLoanView {
+        val loan = loans.findById(access.loanId) ?: throw ResourceNotFound("Préstamo no encontrado")
+
+        return ExternalLoanView(
+            id = loan.id,
+            assetName = loans.assetNameOf(loan),
+            role = access.role,
+            status = loan.status,
+            startedAt = loan.startedAt,
+            dueAt = loan.dueAt,
+            returnedAt = loan.returnedAt,
+        )
+    }
+}
+
+/**
+ * Confirmar la devolucion, por cualquiera de los dos caminos.
+ *
+ * Lo puede hacer un usuario del hogar **o** el externo con su token acotado, y
+ * el efecto es el mismo: el prestamo pasa a `RETURNED` y el asset vuelve a
+ * `AVAILABLE`. Lo que cambia es la autoria --`updatedBy` solo existe cuando
+ * detras hay una pertenencia-- y lo que se devuelve, que sigue la proyeccion de
+ * la credencial.
+ *
+ * Un `OVERDUE` se devuelve igual que un `ACTIVE`: vencer no es un callejon sin
+ * salida sino el estado en el que mas falta hace poder cerrarlo.
+ */
+@Service
+class ConfirmReturn(
+    private val loans: LoanRepository,
+    private val tokens: LoanAccessTokenRepository,
+    private val assets: AssetRepository,
+    private val events: CoreEvents,
+    private val clock: Clock,
+) {
+
+    /** Desde el hogar. */
+    @Transactional
+    fun handle(session: SessionClaims, loanId: UUID): LoanView {
+        val returned = close(loanId, session.memberId, usedTokenId = null)
+        return LoanView(returned, loans.assetNameOf(returned))
+    }
+
+    /** Desde el enlace del correo, sin sesion. */
+    @Transactional
+    fun handle(access: LoanAccess): ExternalLoanView {
+        val returned = close(access.loanId, memberId = null, usedTokenId = access.tokenId)
+
+        return ExternalLoanView(
+            id = returned.id,
+            assetName = loans.assetNameOf(returned),
+            role = access.role,
+            status = returned.status,
+            startedAt = returned.startedAt,
+            dueAt = returned.dueAt,
+            returnedAt = returned.returnedAt,
+        )
+    }
+
+    private fun close(loanId: UUID, memberId: UUID?, usedTokenId: UUID?): Loan {
+        val now = clock.instant()
+        val loan = loans.findById(loanId) ?: throw ResourceNotFound("Préstamo no encontrado")
+
+        if (!loan.isOpen) {
+            throw BusinessRuleViolation(ErrorCode.LOAN_ALREADY_RETURNED, "Ese préstamo ya estaba devuelto")
+        }
+
+        val returned = loans.save(
+            loan.copy(
+                status = LoanStatus.RETURNED,
+                returnedAt = now,
+                updatedAt = now,
+                // Nulo cuando lo confirma un externo: no hay pertenencia a la que
+                // atribuirlo, y eso es exactamente lo que nulo significa.
+                updatedBy = memberId,
+            ),
+        )
+
+        // El asset se libera. Es la otra mitad de que prestarlo lo ocupase, y sin
+        // ella el hueco del indice unico quedaria libre pero el asset seguiria
+        // diciendo que esta fuera de casa.
+        assets.findById(loan.assetId)?.let {
+            assets.save(it.copy(status = AssetStatus.AVAILABLE, updatedAt = now, updatedBy = memberId))
+        }
+
+        // **Aqui y solo aqui se gasta el token.** Leer no lo consume: el GET es
+        // idempotente y quien acaba de confirmar recarga la pagina para verlo
+        // hecho. Lo que esta marca queda registrado es quien cerro el prestamo y
+        // con que credencial.
+        usedTokenId?.let { id ->
+            tokens.findById(id)?.let { tokens.save(it.copy(usedAt = now)) }
+        }
+
+        events.loanReturned(returned.id, returned.assetId, now)
+        return returned
+    }
+}
 
 @Service
 class GetLoan(

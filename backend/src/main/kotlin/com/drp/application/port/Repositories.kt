@@ -473,4 +473,10 @@ interface LoanAccessTokenRepository {
 
     /** Sin contexto de inquilino: quien lo trae no pertenece a ningun hogar. */
     fun findByTokenHash(tokenHash: String): LoanAccessToken?
+
+    /**
+     * Por identificador, y **solo para marcar el que acaba de usarse**: el
+     * identificador no llega del cliente sino de la credencial ya resuelta.
+     */
+    fun findById(tokenId: UUID): LoanAccessToken?
 }
