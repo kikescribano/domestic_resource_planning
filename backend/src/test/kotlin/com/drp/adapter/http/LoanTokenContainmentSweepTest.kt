@@ -83,6 +83,19 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
 
         ok.status.shouldBe(200)
         ok.body.extract("status").shouldBe("ACTIVE")
+
+        // La cadena de consulta no forma parte del `servletPath`, asi que escribir
+        // otra ruta ahi dentro no lleva a ningun sitio: la peticion sigue siendo
+        // la suya y la respuesta sigue siendo la acotada.
+        val withQuery = raw("GET", "/api/v1/loans/${loan.loanId}?x=/api/v1/assets&open=true", loan.token)
+        withQuery.status.shouldBe(200)
+        withQuery.body.extract("id").shouldBe(loan.loanId)
+        withQuery.body.externalKeys().shouldBe(EXTERNAL_FIELDS)
+        withQuery.leaksNothing(loan.assetId, loan.memberId)
+
+        // Y el manejador de errores de Spring Boot, que no es del contrato pero es
+        // una ruta mas de la aplicacion: el token tampoco es credencial ahi.
+        raw("GET", "/error", loan.token).status.shouldBe(401)
     }
 
     /**
@@ -152,16 +165,41 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
             "GET" to "/api/v1/loans",
         )
 
-        attempts.forEach { (method, target) ->
-            val response = raw(method, target, loan.token)
+        var reachable = 0
 
-            withClue("$method $target -> ${response.statusLine}\n${response.body}") {
-                // Un 200 aqui significaria una de dos cosas, las dos graves: o el
-                // token alcanzo algo que no es su prestamo, o alcanzo su prestamo
-                // por una ruta que el filtro no compara igual que el despachador.
-                (response.status == 200).shouldBe(false)
-                response.leaksNothing(loan.assetId, loan.memberId, other.assetId)
+        attempts.forEach { (method, target) ->
+            val denied = raw(method, target, loan.token)
+            // La MISMA ruta con la sesion del hogar. Es lo que distingue «el
+            // filtro lo paro» de «Tomcat lo rechazo antes de que nadie mirase el
+            // token»: sin esta segunda peticion, un barrido en el que todo diera
+            // 400 pasaria entero sin haber ejercitado el filtro ni una vez.
+            val withSession = raw(method, target, loan.accessToken)
+
+            println("SONDA| $method $target | token=${denied.status} sesion=${withSession.status}")
+            if (withSession.status >= 500 || denied.status >= 500) {
+                val flat = { it: String -> it.replace("\r", "").replace("\n", " ") }
+                println("SONDA5| $target | TOKEN>>${flat(denied.body)}<< SESION>>${flat(withSession.body)}<<")
             }
+            withClue("$method $target -> token ${denied.statusLine} | sesion ${withSession.statusLine}\n${denied.body}") {
+                // Un 200 con el token significaria una de dos cosas, las dos
+                // graves: o alcanzo algo que no es su prestamo, o alcanzo su
+                // prestamo por una ruta que el filtro no compara igual que el
+                // despachador.
+                (denied.status == 200).shouldBe(false)
+                denied.leaksNothing(loan.assetId, loan.memberId, other.assetId)
+
+                if (withSession.status == 200) {
+                    // La ruta existe y responde: aqui el 401 no es un accidente
+                    // del enrutado, es el filtro diciendo que ese token no es una
+                    // credencial en este sitio.
+                    reachable++
+                    denied.status.shouldBe(401)
+                }
+            }
+        }
+
+        withClue("ninguno de los ${attempts.size} intentos llegaba a una ruta viva: el barrido no probaria nada") {
+            (reachable >= 3).shouldBe(true)
         }
     }
 
@@ -184,12 +222,15 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
         val response = raw("GET", "/api/v1/loans/$encoded", loan.token)
 
         withClue("${response.statusLine}\n${response.body}") {
-            // O Tomcat lo trata como la ruta propia (200 con el prestamo del
-            // token), o lo rechaza. Lo que no puede es llevar a otra parte.
-            if (response.status == 200) {
-                response.body.extract("id").shouldBe(loan.loanId)
-                response.body.externalKeys().shouldBe(EXTERNAL_FIELDS)
-            }
+            // Medido: Tomcat decodifica el `servletPath`, asi que el filtro
+            // compara exactamente la misma cadena y esto **es** la ruta propia.
+            // Se afirma el 200 y no «cualquier cosa menos otro prestamo» a
+            // proposito: una condicion que solo comprueba algo cuando se cumple
+            // pasa igual de bien cuando no se cumple nunca.
+            response.status.shouldBe(200)
+            response.body.extract("id").shouldBe(loan.loanId)
+            response.body.externalKeys().shouldBe(EXTERNAL_FIELDS)
+            response.leaksNothing(loan.assetId, loan.memberId)
         }
     }
 

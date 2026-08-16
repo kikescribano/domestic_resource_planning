@@ -84,3 +84,45 @@ tasks.withType<Test> {
     // que aqui no tiene ningun efecto.
     systemProperty("api.version", "1.41")
 }
+
+/**
+ * La medicion de capacidad no es una prueba: no afirma nada y no puede romper la
+ * construccion porque la maquina vaya lenta ese dia. Queda fuera del `test` de
+ * siempre y se pide por su nombre.
+ *
+ * Va sobre `named("test")` y **no** sobre `withType<Test>`, que era la primera
+ * version y no funcionaba: `withType` alcanza tambien a la tarea de mas abajo, de
+ * modo que la exclusion y la inclusion de la misma etiqueta se anulaban y la
+ * medicion ejecutaba cero pruebas sin decir nada.
+ */
+tasks.named<Test>("test") {
+    useJUnitPlatform { excludeTags("capacity") }
+}
+
+/**
+ * La medicion que decide el VPS al cerrar la Fase 1 (ver
+ * `docs/backend/operations/capacity-measurements.md`).
+ *
+ * Es una tarea aparte y no un `test` mas por dos motivos: **tarda mucho**
+ * --siembra veinticinco hogares completos-- y **no afirma nada**, asi que
+ * mezclarla con la suite convertiria una medicion en una fuente de fallos
+ * intermitentes. Su salida se lee; no se compara con un umbral.
+ */
+tasks.register<Test>("capacityMeasurement") {
+    description = "Mide bytes por hogar y coste de CPU de las operaciones caras del core"
+    group = "verification"
+
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+
+    useJUnitPlatform { includeTags("capacity") }
+    systemProperty("api.version", "1.41")
+
+    // Sin cache: una medicion que se saltase por estar "al dia" no mediria nada.
+    outputs.upToDateWhen { false }
+
+    testLogging {
+        events("passed", "failed")
+        showStandardStreams = true
+    }
+}

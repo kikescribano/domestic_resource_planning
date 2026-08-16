@@ -67,6 +67,37 @@ jobs:
           path: backend/build/reports/tests/test
           if-no-files-found: ignore
 
+  # La medicion que decidio el VPS al cerrar la Fase 1
+  # (docs/backend/operations/capacity-measurements.md).
+  #
+  # Corre aqui y no en la maquina de nadie por un motivo concreto: **el runner es
+  # Linux con 2 vCPU**, que se parece mucho mas a un VPS-2 que un portatil con
+  # Docker Desktop. Los bytes son portables y se pueden medir en cualquier sitio;
+  # los milisegundos no, y medirlos en Windows daba una variacion del doble entre
+  # dos ejecuciones seguidas.
+  #
+  # No corta la integracion --`continue-on-error`-- porque no afirma nada: es un
+  # instrumento, y una medicion que rompe la construccion cuando el runner va
+  # cargado solo ensena a ignorarla. Lo que hace es dejar el numero registrado
+  # para que el dia que suba se vea cuando subio.
+  capacity:
+    name: Medicion de capacidad
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Medir bytes por hogar y coste de CPU
+        run: ./gradlew capacityMeasurement --no-daemon
+        working-directory: backend
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
