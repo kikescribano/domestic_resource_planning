@@ -175,11 +175,6 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
             // 400 pasaria entero sin haber ejercitado el filtro ni una vez.
             val withSession = raw(method, target, loan.accessToken)
 
-            println("SONDA| $method $target | token=${denied.status} sesion=${withSession.status}")
-            if (withSession.status >= 500 || denied.status >= 500) {
-                val flat = { it: String -> it.replace("\r", "").replace("\n", " ") }
-                println("SONDA5| $target | TOKEN>>${flat(denied.body)}<< SESION>>${flat(withSession.body)}<<")
-            }
             withClue("$method $target -> token ${denied.statusLine} | sesion ${withSession.statusLine}\n${denied.body}") {
                 // Un 200 con el token significaria una de dos cosas, las dos
                 // graves: o alcanzo algo que no es su prestamo, o alcanzo su
@@ -198,8 +193,78 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
             }
         }
 
+        // Medido: de los 29 rodeos, **dos** llegan a una ruta que responde 200 con
+        // sesion del hogar. Los otros veintisiete los corta Tomcat o el
+        // enrutado antes, asi que por si solos no dicen nada del filtro. El suelo
+        // esta aqui para que eso no pase inadvertido el dia que un cambio de
+        // enrutado deje el barrido entero en 400.
         withClue("ninguno de los ${attempts.size} intentos llegaba a una ruta viva: el barrido no probaria nada") {
-            (reachable >= 3).shouldBe(true)
+            (reachable >= 2).shouldBe(true)
+        }
+    }
+
+    /**
+     * El UUID en mayusculas, que es el rodeo que **de verdad** ejercita el filtro.
+     *
+     * Es el unico del barrido de arriba en el que la ruta esta viva --con sesion
+     * del hogar responde `200`, porque `@PathVariable UUID` no distingue
+     * mayusculas-- y el token acotado se queda fuera. Ahi el `401` no es un
+     * accidente del enrutado: es la comparacion de texto del filtro, que **si**
+     * distingue, porque el UUID del token se serializa siempre en minusculas.
+     *
+     * De modo que la asimetria existe y es hacia el lado seguro: rechaza de mas,
+     * nunca de menos. Escribirla aqui es lo que impide que manana alguien la
+     * "arregle" pasando los dos lados a minusculas sin darse cuenta de que eso
+     * ensancha el alcance de la credencial.
+     */
+    @Test
+    @DisplayName("el UUID en mayusculas: la ruta existe para el hogar y no para el token")
+    fun `la comparacion del identificador distingue mayusculas`() {
+        val loan = http.lendToStranger()
+        val shouted = "/api/v1/loans/${loan.loanId.uppercase()}"
+
+        withClue("con sesion del hogar la ruta tiene que estar viva, o esto no prueba nada") {
+            val withSession = raw("GET", shouted, loan.accessToken)
+            withSession.status.shouldBe(200)
+            withSession.body.extract("id").shouldBe(loan.loanId)
+        }
+
+        val denied = raw("GET", shouted, loan.token)
+        withClue("${denied.statusLine}\n${denied.body}") {
+            denied.status.shouldBe(401)
+            denied.leaksNothing(loan.assetId, loan.memberId)
+        }
+    }
+
+    /**
+     * La barra final, que es el unico sitio donde el filtro deja pasar un token
+     * acotado a algo que no es su `GET`.
+     *
+     * `withinScopeOf` hace `trimEnd('/')`, asi que para el filtro
+     * `/api/v1/loans/{id}/` **es** la ruta propia. Para Spring no lo es: desde la
+     * version 6 no hay correspondencia por barra final. Medido, el resultado es un
+     * `500 INTERNAL_ERROR` --con sesion del hogar tambien, asi que no es cosa de
+     * la credencial-- y lo que importa aqui es que ese 500 **no lleva nada del
+     * prestamo dentro**.
+     *
+     * Se deja el `trimEnd` como esta: hoy no concede nada, y estrechar el filtro
+     * taparia con un `401` un defecto de enrutado que sigue estando ahi para
+     * cualquier sesion. Lo que no puede cambiar sin que esto avise es que por esa
+     * ruta salgan datos.
+     */
+    @Test
+    @DisplayName("la barra final no sirve datos, aunque el filtro la acepte")
+    fun `la barra final no llega al prestamo`() {
+        val loan = http.lendToStranger()
+        val trailing = "/api/v1/loans/${loan.loanId}/"
+
+        val denied = raw("GET", trailing, loan.token)
+
+        withClue("${denied.statusLine}\n${denied.body}") {
+            (denied.status == 200).shouldBe(false)
+            denied.body.shouldNotContain("assetName")
+            denied.body.shouldNotContain("\"status\":\"ACTIVE\"")
+            denied.leaksNothing(loan.assetId, loan.memberId)
         }
     }
 

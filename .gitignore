@@ -17,6 +17,7 @@ frontend/dist/
 frontend/coverage/
 frontend/playwright-report/
 frontend/test-results/
+frontend/.playwright/
 frontend/.vite/
 
 # Cliente TypeScript generado desde openapi.yaml: se regenera, no se versiona
