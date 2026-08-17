@@ -89,9 +89,13 @@ class SecurityConfig {
             // ajeno pueda hacer enviar al navegador por su cuenta: el token va en
             // una cabecera que solo pone el propio cliente.
             .csrf { it.disable() }
+            // CORS habilitado en CorsConfig
+            .cors { }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests { requests ->
                 requests
+                    // Swagger UI y OpenAPI - documentacion interactiva (lectura solamente)
+                    .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs/**", "/openapi.yaml").permitAll()
                     // Los ocho endpoints sin autenticar del contrato. Cada uno
                     // lleva lo suyo --el login credenciales, la verificacion y la
                     // aceptacion un token de un solo uso recibido por correo--
