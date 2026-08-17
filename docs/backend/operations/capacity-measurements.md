@@ -31,7 +31,7 @@ Dos cosas se comportan muy distinto y se tratan distinto:
   misma medición de Argon2id dio **40 ms y 89 ms en dos ejecuciones seguidas** en
   el equipo de desarrollo, con Docker Desktop sobre Windows. Por eso la parte de
   CPU la ejecuta **la CI, en su runner de Linux con 2 vCPU**, que se parece mucho
-  más a un VPS-2 que un portátil.
+  más a un VPS-2 que un portátil, y **los números de abajo son los de allí**.
 
 ## Bytes por hogar
 
@@ -42,9 +42,9 @@ duraderos, 40 existencias, 15 documentos y 5 préstamos— y se mide
 | Hogares sembrados | Ocupado sobre el esquema vacío | «Por hogar», dividiendo |
 |---|---|---|
 | 1 | 1008 kiB | 1 032 192 B |
-| 5 | 1,2 MiB | 260 505 B |
-| 25 | 2,4 MiB | 100 597 B |
-| **Pendiente entre el primero y el último** | | **61 781 B** |
+| 5 | 1,3 MiB | 263 782 B |
+| 25 | 2,4 MiB | 99 942 B |
+| **Pendiente entre el primero y el último** | | **61 098 B** |
 
 **Los tres puntos son la parte importante de la medición, y con uno solo el
 número habría sido dieciséis veces mayor.** Con un hogar, el coste fijo del
@@ -61,32 +61,39 @@ quiera optimizar:
 
 | Tabla | Con 25 hogares |
 |---|---|
-| `assets` | 840 kiB |
-| `articles` | 520 kiB |
+| `assets` | 832 kiB |
+| `articles` | 512 kiB |
 | `locations` | 168 kiB |
 | `documents` | 168 kiB |
 
 ## Coste de CPU
 
-Medido en el equipo de desarrollo (12 núcleos, Docker Desktop sobre Windows),
-mediana y p95 de 100 repeticiones —10 en las de imagen, que cuestan órdenes de
-magnitud más—:
+Medido **en el runner de la CI**: Linux, **2 vCPU**, JVM con 512 MiB. Mediana y
+p95 de 100 repeticiones —10 en las de imagen, que cuestan órdenes de magnitud
+más—:
 
 | Operación | Mediana | p95 |
 |---|---|---|
-| Argon2id, un login | 40–89 ms | 58–105 ms |
-| Recodificar una foto de 12 MP | 575–828 ms | 639–892 ms |
-| Miniatura de 320 px | 68–107 ms | 73–133 ms |
+| Argon2id, un login | 78,3 ms | 100,7 ms |
+| Recodificar una foto de 12 MP | 775,9 ms | 845,6 ms |
+| Miniatura de 320 px | 88,0 ms | 90,2 ms |
 
-El rango de la primera columna **no es descuido**: son dos ejecuciones seguidas
-del mismo código en la misma máquina. Es la razón por la que estos números no
-deciden nada por sí solos y por la que la CI los vuelve a tomar en Linux.
+Estos son los números que cuentan, y por eso se toman ahí. Los mismos en el
+equipo de desarrollo —12 núcleos, Docker Desktop sobre Windows— dieron **40 ms y
+89 ms para Argon2id en dos ejecuciones seguidas**: un factor de dos entre dos
+pasadas del mismo código en la misma máquina. Un solo dato de esa serie habría
+servido para justificar cualquier conclusión.
+
+Conviene fijarse en que los bytes, en cambio, **coinciden entre las dos
+máquinas** —60 kB por hogar aquí, 61 kB allí—, que es exactamente lo que
+significa que sean portables.
 
 Lo que sí se puede leer de ellos, porque no depende de la máquina:
 
 - **Argon2id domina el login y nada más.** A 19 MiB y 2 iteraciones —el suelo de
-  OWASP— cada login cuesta entre 11 y 25 por segundo y núcleo. Para un producto
-  doméstico donde una persona entra una vez al día, sobra con enorme holgura.
+  OWASP— salen **13 logins por segundo y núcleo**, o sea unos 26 en un VPS-2. Para
+  un producto doméstico donde una persona entra una vez al día, sobra con enorme
+  holgura.
 - **La subida de una foto es la operación cara**, y por un orden de magnitud. Una
   foto de 12 MP cuesta cerca de un segundo de núcleo entre recodificar y hacer la
   miniatura. Es un pico y no una carga sostenida: se inventaría la casa una vez.
@@ -128,4 +135,4 @@ sin medir se habría elegido mirando al sitio equivocado.
 
 | Fecha | Cambio |
 |---|---|
-| 2026-08-17 | Se crea al cerrar la Fase 1, con la medición de los tres puntos, el coste de las tres operaciones caras y la elección de VPS-3 por disco y no por CPU. |
+| 2026-08-17 | Se crea al cerrar la Fase 1, con la medición de los tres puntos, el coste de las tres operaciones caras y la elección de VPS-3 por disco y no por CPU. Las cifras son las del runner de la CI —Linux, 2 vCPU—, tomadas en la primera ejecución del trabajo `capacity`; los bytes coincidieron con los del equipo de desarrollo y los milisegundos no, que es la razón de medirlos allí. |
