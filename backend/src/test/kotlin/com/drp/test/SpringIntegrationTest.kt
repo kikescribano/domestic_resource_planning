@@ -30,6 +30,25 @@ abstract class SpringIntegrationTest {
             registry.add("spring.flyway.user") { DrpPostgres.OWNER_USERNAME }
             registry.add("spring.flyway.password") { DrpPostgres.OWNER_PASSWORD }
 
+            // Pool pequeno, y no es una optimizacion: **es lo que impide que la
+            // suite se quede sin conexiones**.
+            //
+            // Spring cachea un contexto por combinacion de configuracion, y una
+            // clase de prueba con su propio `@TestConfiguration` --las que
+            // registran un modulo suscrito para comprobar eventos-- estrena
+            // contexto y con el un pool entero. Con el maximo por defecto de
+            // Hikari, cada una de esas clases reserva diez conexiones que no
+            // suelta mientras su contexto siga en cache, y PostgreSQL admite cien
+            // menos las reservadas al superusuario. Al anadir la del Hito 4 se
+            // paso del limite y fallaron **tres pruebas de otros hitos**, con un
+            // error que no se parece a la causa: "remaining connection slots are
+            // reserved for roles with the SUPERUSER attribute".
+            //
+            // Cinco basta de sobra: estas pruebas hablan por HTTP de una en una, y
+            // las unicas que abren varias a la vez --las de concurrencia-- usan
+            // dos o cuatro hilos.
+            registry.add("spring.datasource.hikari.maximum-pool-size") { 5 }
+
             // Mailpit, tambien en Testcontainers: el recorrido vertical lee de
             // el el enlace de verificacion sin ningun paso manual (ADR-009).
             val mailpit = DrpMailpit.instance

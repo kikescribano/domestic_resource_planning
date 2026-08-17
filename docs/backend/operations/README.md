@@ -11,6 +11,11 @@ Este directorio documentará cómo ejecutar y mantener el backend en cada entorn
   están. Trasladado desde las secciones 5.8.2 y 5.8.6 del
   [`README principal`](../../../README.md).
 
+- [`capacity-measurements.md`](capacity-measurements.md): lo que ocupa un hogar y
+  lo que cuestan las tres operaciones caras del core, **medido** y no estimado, y
+  la elección de VPS que sale de ello al cerrar la Fase 1. La conclusión es la
+  que no se esperaba: quien decide es el disco, no la CPU.
+
 ## Contenido previsto
 
 - Requisitos y arranque local reproducible.

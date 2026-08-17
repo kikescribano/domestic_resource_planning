@@ -7,6 +7,7 @@ import com.drp.test.forgetHousehold
 import com.drp.test.queryAll
 import com.drp.test.queryOne
 import com.drp.test.seedHousehold
+import com.drp.test.seedLoanWithToken
 import com.drp.test.useHousehold
 import com.drp.test.SeededHousehold
 import io.kotest.assertions.withClue
@@ -209,6 +210,7 @@ class RowLevelSecurityTest {
             listOf(
                 "find_household_for_active_member",
                 "find_household_for_invitation_token",
+                "find_household_for_loan_token",
                 "list_household_ids",
             ),
         )
@@ -242,6 +244,58 @@ class RowLevelSecurityTest {
         // Y lo que devuelven son identificadores, no acceso: leer el hogar sigue
         // exigiendo contexto.
         application.count("SELECT count(*) FROM households").shouldBe(0)
+    }
+
+    @Test
+    @DisplayName("el token acotado de un prestamo resuelve su hogar sin contexto previo")
+    fun `el token de prestamo resuelve el hogar y nada mas`() {
+        // El cuarto momento en el que todavia no se sabe cual es el hogar (V6).
+        // Tiene una vuelta que los otros tres no tienen: `loan_access_tokens` no
+        // lleva `household_id` --por eso es una de las cinco tablas sin
+        // politica-- asi que el identificador hay que ir a buscarlo al prestamo,
+        // que si esta protegido.
+        val tokenHash = "hash-de-prueba-${UUID.randomUUID()}"
+        owner.seedLoanWithToken(householdA, tokenHash)
+
+        application.useHousehold(null)
+
+        val resolved = application.queryOne(
+            "SELECT find_household_for_loan_token(?)",
+            tokenHash,
+        ) { it.getObject(1, UUID::class.java) }
+
+        resolved.shouldBe(householdA.householdId)
+
+        // Y lo de siempre: lo que devuelve es un identificador, no acceso. Sin
+        // fijar el contexto, el prestamo cuyo hogar acaba de resolver sigue sin
+        // verse. Si esto dejara de ser cierto, la funcion habria pasado de
+        // resolver el aislamiento a esquivarlo.
+        application.count("SELECT count(*) FROM loans").shouldBe(0)
+    }
+
+    @Test
+    @DisplayName("un hash que no existe resuelve a nulo, sin distinguir de uno ajeno")
+    fun `un hash desconocido no resuelve nada`() {
+        application.useHousehold(null)
+
+        application.queryOne(
+            "SELECT find_household_for_loan_token(?)",
+            "hash-que-nadie-emitio",
+        ) { it.getObject(1, UUID::class.java) }.shouldBe(null)
+    }
+
+    @Test
+    @DisplayName("con contexto de otro hogar, el prestamo ajeno sigue sin verse")
+    fun `resolver el hogar no abre la puerta al prestamo`() {
+        val tokenHash = "hash-ajeno-${UUID.randomUUID()}"
+        val loanId = owner.seedLoanWithToken(householdB, tokenHash)
+
+        // Alguien que tuviera el token de un prestamo del hogar B y una sesion
+        // legitima en el hogar A no puede combinarlos: la politica de `loans`
+        // sigue mirando el contexto, no el token.
+        application.useHousehold(householdA.householdId)
+
+        application.count("SELECT count(*) FROM loans WHERE id = ?", loanId).shouldBe(0)
     }
 
     @Test

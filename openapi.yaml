@@ -1558,12 +1558,12 @@ paths:
       responses:
         "200":
           description: >
-            Estado del préstamo. La vista completa (usuarios del hogar) incluye
-            todos los campos de Loan; con token acotado (loanToken) solo se
-            devuelven los campos visibles para ese rol (ver readme.md, 5.4.3).
+            Estado del préstamo, en la forma que corresponde a la credencial:
+            Loan con sesión del hogar y LoanExternalView con token acotado
+            (ver readme.md, 5.4.3).
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Loan" }
+              schema: { $ref: "#/components/schemas/LoanView" }
         "404": { $ref: "#/components/responses/NotFound" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -1584,10 +1584,13 @@ paths:
         - loanToken: []
       responses:
         "200":
-          description: Préstamo devuelto
+          description: >
+            Préstamo devuelto, en la forma que corresponde a la credencial.
+            Confirmar con token acotado devuelve la vista acotada: la
+            devolución no ensancha lo que ese token puede ver.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Loan" }
+              schema: { $ref: "#/components/schemas/LoanView" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
           description: El préstamo ya estaba devuelto (LOAN_ALREADY_RETURNED)
@@ -1623,7 +1626,25 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Token acotado de vida corta para prestador/receptor externos (claims -- loanId, role)
+      description: >
+        Credencial de un prestador o receptor **externo**, sin cuenta en DRP.
+        Es un JWT firmado **sin sub de usuario**, con claims loanId y role
+        (LENDER | BORROWER), que viaja como enlace por correo al iniciar el
+        prestamo.
+
+
+        Su alcance son exactamente dos operaciones -- GET /loans/{id} de ESE
+        prestamo y POST /loans/{id}/return -- y ninguna otra cosa del hogar.
+        Ni el listado, ni otro prestamo, ni los assets.
+
+
+        Vale a la vez la firma y la fila: su hash se guarda en
+        loan_access_tokens, y verificarlo exige firma valida **y** fila viva.
+        Las dos capas hacen cosas distintas y por eso estan las dos -- la firma
+        lo hace infalsificable y deja rechazar lo caducado sin tocar la base de
+        datos; la fila lo hace **revocable**, que un JWT por si solo no puede
+        ser, y aqui hace falta porque este token no es de vida corta: un
+        prestamo OVERDUE puede durar meses.
 
   parameters:
     AssetId:
@@ -2512,8 +2533,16 @@ components:
         notes: { type: string }
 
     Loan:
+      description: >
+        La vista completa, la que ve un usuario del hogar. Lo que un token
+        acotado recibe en su lugar es LoanExternalView, y los dos se declaran
+        juntos en LoanView.
       allOf:
         - type: object
+          # Estos siete siempre vienen en la vista completa, y decirlo aqui es
+          # lo que hace disjuntas las dos ramas de LoanView: un payload al que
+          # le falte lender o borrower no puede ser un Loan.
+          required: [id, assetId, assetName, lender, borrower, status, startedAt]
           properties:
             id: { type: string, format: uuid }
             assetId: { type: string, format: uuid }
@@ -2535,6 +2564,66 @@ components:
             returnedAt: { type: string, format: date-time, nullable: true }
             notes: { type: string, nullable: true }
         - $ref: "#/components/schemas/Authorship"
+
+    LoanExternalView:
+      type: object
+      description: >
+        Lo que ve quien llega con un token acotado: una persona ajena al hogar
+        que solo necesita saber que tiene, en que estado esta y para cuando.
+        No lleva assetId, ni lender, ni borrower, ni notes, ni autoria, y eso
+        **no es una omision sino el alcance del token** -- su credencial da
+        acceso a un prestamo, no al hogar que lo registro.
+      required: [id, assetName, status, startedAt, role]
+      # Cerrado a proposito, y no solo por higiene: es lo que impide que la
+      # vista completa encaje tambien aqui y deje ambigua la rama de LoanView.
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        role:
+          type: string
+          enum: [LENDER, BORROWER]
+          description: >
+            En cual de los dos extremos esta quien pregunta, tomado del token y
+            no del cuerpo. La pantalla externa lo necesita porque **la mitad de
+            su texto depende de el**: quien presto reclama que le devuelvan y
+            quien recibio confirma que ha devuelto, con la misma anatomia.
+
+
+            No revela nada: quien tiene el token ya sabe si presto o recibio.
+            La alternativa era que el cliente descodificase el claim del propio
+            JWT, que obliga al frontend a interpretar una credencial en vez de
+            leer una respuesta.
+        assetName:
+          type: string
+          description: El unico dato del asset que sale de casa. Un nombre, sin identificador ni foto
+        status:
+          type: string
+          enum: [ACTIVE, RETURNED, OVERDUE]
+        startedAt: { type: string, format: date-time }
+        dueAt: { type: string, format: date-time, nullable: true }
+        returnedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Informado tras confirmar la devolucion, para que quien la confirmo la vea hecha
+
+    LoanView:
+      description: >
+        Un prestamo visto por quien pregunta. **Es lo unico de toda la API que
+        devuelve dos formas distintas segun la credencial**: la completa con
+        sesion del hogar y la acotada con token de prestamo (ver readme.md,
+        5.4.1 y 5.4.3).
+
+
+        Se declara en vez de dejarlo en la prosa porque la ADR-007 hace del
+        contrato la fuente de los tipos del cliente, y un solo esquema
+        prometeria lender y borrower a una pantalla que nunca los recibe. Las
+        dos ramas son disjuntas --Loan exige siete campos que la acotada no
+        tiene, y la acotada no admite ninguno de mas-- asi que oneOf resuelve
+        siempre a una.
+      oneOf:
+        - $ref: "#/components/schemas/Loan"
+        - $ref: "#/components/schemas/LoanExternalView"
 
     # --- Colecciones paginadas -------------------------------------------
     # Nueve esquemas para once endpoints paginados: los dos listados de hijos

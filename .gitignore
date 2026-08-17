@@ -7,6 +7,9 @@ __pycache__/
 backend/build/
 backend/bin/
 backend/out/
+# Volcados del compilador de Kotlin cuando el daemon se cae. Son de la maquina,
+# no del proyecto, y se cuelan con un `git add -A` si no estan aqui.
+backend/.kotlin/
 
 # Node, Vite y Playwright
 node_modules/
@@ -14,6 +17,7 @@ frontend/dist/
 frontend/coverage/
 frontend/playwright-report/
 frontend/test-results/
+frontend/.playwright/
 frontend/.vite/
 
 # Cliente TypeScript generado desde openapi.yaml: se regenera, no se versiona

@@ -24,8 +24,8 @@ import org.springframework.http.ResponseEntity
 import java.util.UUID
 
 /**
- * El barrido de aislamiento de las **treinta y cuatro** operaciones de los Hitos
- * 2 y 3.
+ * El barrido de aislamiento de las **treinta y ocho** operaciones de los Hitos
+ * 2, 3 y 4.
  *
  * No sustituye a las pruebas de recorrido de cada recurso: comprueba una sola
  * cosa --la de la ADR-002-- sobre todas ellas y de forma sistematica.
@@ -79,6 +79,8 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     private lateinit var stockA2: String
     private lateinit var fileA: String
     private lateinit var docA: String
+    private lateinit var loanA: String
+    private lateinit var lentAssetA: String
 
     /** Lo propio de B, con lo que se construyen los controles positivos. */
     private lateinit var catB: String
@@ -91,6 +93,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     private lateinit var durBWithArticle: String
     private lateinit var stockB: String
     private lateinit var fileB: String
+    private lateinit var lendableB: String
 
     /** El estado de A antes de que B lo intente, para comprobar que sigue igual. */
     private val snapshotOfA = mutableMapOf<String, String>()
@@ -139,6 +142,15 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         fileB = b.uploadImage()
         docA = a.attachDocument(durA, a.uploadImage())
 
+        // Los prestamos del Hito 4. El de A queda ABIERTO a proposito: es el
+        // estado en el que un intento ajeno puede hacer dano de verdad --darlo
+        // por devuelto-- y no solo leerlo.
+        lentAssetA = a.createAsset("""{"name":"PrestadoDeA","type":"DURABLE","categoryId":"$catA"}""")
+        loanA = a.startLoan(lentAssetA)
+        // Y B necesita un DURABLE libre para su control positivo, porque el suyo
+        // de siempre lo usan otras secciones.
+        lendableB = b.createAsset("""{"name":"PrestableDeB","type":"DURABLE","categoryId":"$catB"}""")
+
         listOf(
             "/api/v1/categories?includeRetired=true",
             "/api/v1/articles?includeRetired=true",
@@ -152,6 +164,8 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             "/api/v1/assets/$stockA",
             "/api/v1/assets/$stockA2",
             "/api/v1/documents",
+            "/api/v1/loans",
+            "/api/v1/loans/$loanA",
         ).forEach { snapshotOfA[it] = http.getJson(it, a.accessToken).body!! }
 
         // Los ficheros no entran en el retrato: sus dos URL van firmadas y la
@@ -165,7 +179,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("las dieciocho operaciones con identificador en la ruta responden 404 ante uno de otro hogar")
+    @DisplayName("las veinte operaciones con identificador en la ruta responden 404 ante uno de otro hogar")
     fun `barrido por identificador del recurso`() {
         val section = "ruta"
 
@@ -498,6 +512,49 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             )
         }
 
+        // --- POST /loans, con sus tres referencias. Es la operacion del Hito 4
+        // con mas superficie, y las tres son de tipos distintos: un asset y dos
+        // pertenencias.
+        bothWays("POST /loans assetId", own = freshDurableB(), foreign = lentAssetA, ok = CREATED) { id ->
+            http.postJson(
+                LOANS,
+                """{"assetId":"$id","lender":{"userId":"${b.memberId}"},"borrower":{"userId":"${b.memberId}"}}""",
+                b.accessToken,
+            )
+        }
+        // Las dos pertenencias responden 400 y no 404: el que no existe no es el
+        // recurso de la ruta sino un campo del cuerpo, asi que el contrato lo
+        // trata como error de forma. Lo que importa para el aislamiento es que
+        // **no se acepte**, no cual de los dos codigos sale.
+        bothWays(
+            "POST /loans lender.userId",
+            own = b.memberId,
+            foreign = a.memberId,
+            ok = CREATED,
+            expectedForForeign = HttpStatus.BAD_REQUEST,
+        ) { id ->
+            http.postJson(
+                LOANS,
+                """{"assetId":"${freshDurableB()}","lender":{"userId":"$id"},
+                    "borrower":{"userId":"${b.memberId}"}}""",
+                b.accessToken,
+            )
+        }
+        bothWays(
+            "POST /loans borrower.userId",
+            own = b.memberId,
+            foreign = a.memberId,
+            ok = CREATED,
+            expectedForForeign = HttpStatus.BAD_REQUEST,
+        ) { id ->
+            http.postJson(
+                LOANS,
+                """{"assetId":"${freshDurableB()}","lender":{"userId":"${b.memberId}"},
+                    "borrower":{"userId":"$id"}}""",
+                b.accessToken,
+            )
+        }
+
         endOfSection("ref")
     }
 
@@ -583,6 +640,21 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         // Y el uso de almacenamiento es del hogar que pregunta: si contase lo de
         // otro, seria un oraculo sobre cuanto tiene guardado el de al lado.
         expectPresent("""$section GET /storage cuenta solo lo de B""", "usedBytes", http.getJson(STORAGE, b.accessToken))
+
+        // El listado del Hito 4. `assetId` es el filtro que mas tienta como
+        // oraculo: preguntar por el asset de A diria si esta prestado.
+        expectAbsent("$section GET /loans", loanA, http.getJson(LOANS, b.accessToken))
+        expectAbsent("$section GET /loans?open=true", loanA, http.getJson("$LOANS?open=true", b.accessToken))
+        expectEmpty("$section GET /loans?assetId de A", http.getJson("$LOANS?assetId=$lentAssetA", b.accessToken))
+        // Por ausencia de la fila de A y no exigiendo vacio, por el mismo motivo
+        // que el filtro por codigo de barras de mas arriba: B tiene prestamos
+        // ACTIVE propios --los abren los controles positivos de la seccion de
+        // referencias-- y exigir vacio confundiria eso con una fuga.
+        expectAbsent(
+            "$section GET /loans?status=ACTIVE",
+            loanA,
+            http.getJson("$LOANS?status=ACTIVE", b.accessToken),
+        )
 
         endOfSection(section)
     }
@@ -700,6 +772,12 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         "GET /files/{id}/content" to { id -> http.getJson("$FILES/$id/content", b.accessToken) },
         "DELETE /files/{id}" to { id -> http.deleteJson("$FILES/$id", b.accessToken) },
         "DELETE /documents/{id}" to { id -> http.deleteJson("$DOCUMENTS/$id", b.accessToken) },
+        // Las dos del Hito 4 con identificador en la ruta. Ojo con la de
+        // devolucion: es la unica operacion del barrido que ademas de leer
+        // **cierra** algo, asi que un fallo aqui no filtraria un dato ajeno sino
+        // que daria por devuelto el prestamo de otro hogar.
+        "GET /loans/{id}" to { id -> http.getJson("$LOANS/$id", b.accessToken) },
+        "POST /loans/{id}/return" to { id -> http.postJson("$LOANS/$id/return", "", b.accessToken) },
     )
 
     /** El recurso de A que le toca a cada operacion, por su ruta. */
@@ -710,6 +788,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         operation.contains("/merge") -> stockA
         operation.contains("/files") -> fileA
         operation.contains("/documents") -> docA
+        operation.contains("/loans") -> loanA
         else -> durA
     }
 
@@ -726,15 +805,23 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
      * cualquier identificador de fichero daba 404 y eso era lo correcto. Ahora
      * los dos hogares tienen ficheros de verdad, y el par vuelve a medir lo que
      * dice medir: el de A da 404 y el propio de B funciona.
+     *
+     * `expectedForForeign` existe por las dos pertenencias de un prestamo, que
+     * el contrato trata como **error de forma** y no como recurso ausente: lo
+     * que falta no es el recurso de la ruta sino un campo del cuerpo. Para el
+     * aislamiento da igual cual de los dos codigos salga --lo que se mide es que
+     * no se acepte-- pero fijarlo en la llamada evita que un cambio de codigo
+     * pase por bueno sin que nadie lo decida.
      */
     private fun bothWays(
         name: String,
         own: String?,
         foreign: String,
         ok: Set<HttpStatus>,
+        expectedForForeign: HttpStatus = HttpStatus.NOT_FOUND,
         send: (String) -> ResponseEntity<String>,
     ) {
-        expectStatus("ref $name con identificador de A", HttpStatus.NOT_FOUND, send(foreign))
+        expectStatus("ref $name con identificador de A", expectedForForeign, send(foreign))
 
         if (own == null) {
             log += "ref $name => sin control positivo posible (files llega con el Hito 3)"
@@ -845,6 +932,19 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         return response.body!!.extract("id")
     }
 
+    /** Un prestamo abierto del hogar, de si mismo a si mismo. */
+    private fun TestHousehold.startLoan(assetId: String): String {
+        val response = http.postJson(
+            LOANS,
+            """{"assetId":"$assetId","lender":{"userId":"$memberId"},"borrower":{"userId":"$memberId"}}""",
+            accessToken,
+        )
+        check(response.statusCode == HttpStatus.CREATED) {
+            "No se pudo preparar el prestamo: ${response.statusCode} ${response.body}"
+        }
+        return response.body!!.extract("id")
+    }
+
     private fun TestHousehold.intake(articleId: String, locationId: String, quantity: Int): String {
         val response = http.postJson(
             INTAKE,
@@ -867,6 +967,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         const val FILES = "/api/v1/files"
         const val DOCUMENTS = "/api/v1/documents"
         const val STORAGE = "/api/v1/storage"
+        const val LOANS = "/api/v1/loans"
 
         val OK = setOf(HttpStatus.OK)
         val CREATED = setOf(HttpStatus.CREATED)

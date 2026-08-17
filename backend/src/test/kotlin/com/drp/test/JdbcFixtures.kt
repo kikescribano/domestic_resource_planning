@@ -105,3 +105,54 @@ fun Connection.seedHousehold(name: String): SeededHousehold {
 
     return SeededHousehold(householdId, identityId, memberId, categoryId)
 }
+
+/**
+ * Siembra un asset duradero prestado y el token acotado de su receptor externo.
+ *
+ * Hace falta para comprobar la resolucion de inquilino por token (V6), que es el
+ * unico camino del core que empieza sin hogar **y** sin identidad: quien llega
+ * con ese token no tiene cuenta. Se siembra con la conexion del propietario por
+ * el mismo motivo que [seedHousehold] --preparar dos hogares exige saltarse las
+ * politicas-- y por eso no sirve para comprobar aislamiento, solo para montarlo.
+ *
+ * @return el identificador del prestamo.
+ */
+fun Connection.seedLoanWithToken(household: SeededHousehold, tokenHash: String): UUID {
+    val assetId = UUID.randomUUID()
+    val loanId = UUID.randomUUID()
+
+    execute(
+        """
+        INSERT INTO assets (id, household_id, category_id, name, type, owner_id, status, created_by)
+        VALUES (?, ?, ?, 'Taladro', 'DURABLE', ?, 'LENT', ?)
+        """.trimIndent(),
+        assetId,
+        household.householdId,
+        household.categoryId,
+        household.memberId,
+        household.memberId,
+    )
+    execute(
+        """
+        INSERT INTO loans (id, household_id, asset_id, lender_member_id, borrower_external, status, created_by)
+        VALUES (?, ?, ?, ?, ?::jsonb, 'ACTIVE', ?)
+        """.trimIndent(),
+        loanId,
+        household.householdId,
+        assetId,
+        household.memberId,
+        """{"name": "Vecino del 3.º", "email": "vecino@example.test"}""",
+        household.memberId,
+    )
+    execute(
+        """
+        INSERT INTO loan_access_tokens (id, loan_id, token_hash, role, expires_at)
+        VALUES (?, ?, ?, 'BORROWER', now() + interval '90 days')
+        """.trimIndent(),
+        UUID.randomUUID(),
+        loanId,
+        tokenHash,
+    )
+
+    return loanId
+}

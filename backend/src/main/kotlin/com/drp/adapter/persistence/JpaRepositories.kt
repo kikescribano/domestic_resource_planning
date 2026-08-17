@@ -564,3 +564,120 @@ interface LocationJpaRepository : JpaRepository<LocationEntity, UUID> {
     @Query(value = "SELECT count(*) FROM assets WHERE location_id = CAST(:locationId AS uuid)", nativeQuery = true)
     fun countAssetsIn(@Param("locationId") locationId: UUID): Long
 }
+
+interface LoanJpaRepository : JpaRepository<LoanEntity, UUID> {
+
+    /**
+     * El prestamo con su fila bloqueada, para la devolucion.
+     *
+     * El `FOR UPDATE` va escrito en la consulta y no con `@Lock` porque en una
+     * consulta nativa Spring Data ignora la anotacion, y un cerrojo que se cree
+     * tomado y no lo este es peor que no tenerlo.
+     *
+     * Sin `household_id` en el `WHERE`, como todas las de este fichero: lo pone
+     * la politica. Y con ella puesta el cerrojo es tambien del hogar, porque una
+     * fila que la politica no deja ver tampoco se puede bloquear.
+     */
+    @Query(
+        value = "SELECT * FROM loans WHERE id = CAST(:id AS uuid) FOR UPDATE",
+        nativeQuery = true,
+    )
+    fun findByIdForUpdate(@Param("id") id: UUID): LoanEntity?
+
+    /**
+     * El listado con sus tres filtros. `open` agrupa `ACTIVE` y `OVERDUE`, que es
+     * la pregunta habitual --que hay fuera de casa-- y por eso no se resuelve
+     * pidiendo dos veces con `status`.
+     */
+    @Query(
+        value = """
+            SELECT * FROM loans
+            WHERE (CAST(:status AS text) IS NULL OR status = CAST(:status AS text))
+              AND (CAST(:assetId AS uuid) IS NULL OR asset_id = CAST(:assetId AS uuid))
+              AND (NOT :open OR status IN ('ACTIVE', 'OVERDUE'))
+            ORDER BY started_at DESC
+        """,
+        countQuery = """
+            SELECT count(*) FROM loans
+            WHERE (CAST(:status AS text) IS NULL OR status = CAST(:status AS text))
+              AND (CAST(:assetId AS uuid) IS NULL OR asset_id = CAST(:assetId AS uuid))
+              AND (NOT :open OR status IN ('ACTIVE', 'OVERDUE'))
+        """,
+        nativeQuery = true,
+    )
+    fun search(
+        @Param("status") status: String?,
+        @Param("assetId") assetId: UUID?,
+        @Param("open") open: Boolean,
+        pageable: Pageable,
+    ): org.springframework.data.domain.Page<LoanEntity>
+
+    /**
+     * Los candidatos a vencer.
+     *
+     * Las dos condiciones que la definicion subraya estan aqui y no en el codigo
+     * que llama: **solo `ACTIVE`** --marcar de nuevo un `OVERDUE` volveria a
+     * publicar su evento en cada pasada-- y **`due_at IS NOT NULL`**, porque un
+     * prestamo sin plazo no vence nunca. Juntas son lo que hace la pasada
+     * idempotente **entre ejecuciones sucesivas**.
+     *
+     * El `FOR UPDATE` es lo que la hace idempotente **entre ejecuciones
+     * simultaneas**, y no estaba: medido con dos pasadas a la vez, `LoanOverdue`
+     * salia **dos veces** por el mismo prestamo. Las dos transacciones leian el
+     * mismo candidato `ACTIVE`, las dos lo marcaban y las dos publicaban; el
+     * `UPDATE` se serializaba pero el evento no.
+     *
+     * Con el cerrojo, la segunda espera al commit de la primera y PostgreSQL
+     * **reevalua el `WHERE` sobre la fila ya bloqueada**: como su `status` ya no
+     * es `ACTIVE`, deja de ser candidata y desaparece del resultado. Es decir, la
+     * condicion no hay que repetirla en el codigo --la vuelve a comprobar el
+     * motor-- y por eso este arreglo es una linea y no una comprobacion mas.
+     *
+     * No es un caso rebuscado: el proceso puede solaparse consigo mismo si una
+     * pasada se alarga, y de `LoanOverdue` colgaran los recordatorios (4.2), asi
+     * que duplicarlo son dos avisos a la misma persona por lo mismo.
+     */
+    @Query(
+        value = """
+            SELECT * FROM loans
+            WHERE status = 'ACTIVE'
+              AND due_at IS NOT NULL
+              AND due_at < :now
+            ORDER BY due_at
+            FOR UPDATE
+        """,
+        nativeQuery = true,
+    )
+    fun findOverdue(@Param("now") now: Instant): List<LoanEntity>
+
+    /**
+     * El nombre efectivo del asset prestado: el suyo, o el de su articulo cuando
+     * no tiene propio (README 4.1.1). Es el unico dato del asset que ve un token
+     * acotado, asi que se resuelve aqui en vez de arrastrar el asset entero.
+     */
+    @Query(
+        value = """
+            SELECT coalesce(a.name, ar.name)
+            FROM assets a
+            LEFT JOIN articles ar ON ar.id = a.article_id
+            WHERE a.id = CAST(:assetId AS uuid)
+        """,
+        nativeQuery = true,
+    )
+    fun assetNameOf(@Param("assetId") assetId: UUID): String?
+}
+
+/**
+ * Los tokens acotados.
+ *
+ * Su tabla **no tiene politica de RLS** --no lleva `household_id`, cuelga del
+ * prestamo-- asi que aqui la nota general de arriba no aplica: estas consultas
+ * no las filtra PostgreSQL. Lo que las acota es su forma, que resuelve siempre
+ * por un secreto que hay que traer. No hay ni un metodo con el que recorrer
+ * tokens ajenos, y anadirlo seria abrir un agujero que ninguna politica cerraria
+ * por detras.
+ */
+interface LoanAccessTokenJpaRepository : JpaRepository<LoanAccessTokenEntity, UUID> {
+
+    fun findByTokenHash(tokenHash: String): LoanAccessTokenEntity?
+}

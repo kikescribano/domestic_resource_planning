@@ -125,6 +125,16 @@ data class MailpitMessage(val subject: String, val body: String) {
         ?: error("El correo no lleva ningún enlace con token:\n$body")
 
     private companion object {
-        val TOKEN_IN_LINK = Regex("""[?&]token=([A-Za-z0-9_\-]+)""")
+        /**
+         * El punto entra en la clase por el token acotado de prestamo, que es el
+         * unico de los cinco que **no es un secreto opaco sino un JWT**: viaja
+         * como `cabecera.cuerpo.firma`, asi que sin el punto se extraia solo la
+         * cabecera y el enlace parecia no valer. Los otros cuatro son base64url
+         * sin puntos, de modo que ampliar la clase no los afecta.
+         *
+         * El enlace va siempre en una linea propia, asi que no hay punto final de
+         * frase que se pueda colar detras.
+         */
+        val TOKEN_IN_LINK = Regex("""[?&]token=([A-Za-z0-9_\-.]+)""")
     }
 }

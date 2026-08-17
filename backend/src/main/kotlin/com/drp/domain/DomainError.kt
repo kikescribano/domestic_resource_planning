@@ -9,8 +9,8 @@ package com.drp.domain
  * existe para que anadir uno obligue a tocar tambien el contrato.
  *
  * Estan los del Hito 1 --enrolamiento--, los del Hito 2 --catalogo, ubicaciones
- * y assets-- y los del Hito 3 --ficheros y documentos--. Los de prestamos entran
- * con el suyo.
+ * y assets--, los del Hito 3 --ficheros y documentos-- y los tres de prestamos
+ * del Hito 4, con los que la lista queda completa.
  *
  * Tres de los de ficheros **no responden `409`**: el contrato les asigna `413` y
  * `415`, que es informacion de transporte y no de dominio. La correspondencia
@@ -40,6 +40,9 @@ enum class ErrorCode {
     INTAKE_QUANTITY_NOT_POSITIVE,
     INVITATION_ALREADY_PENDING,
     INVITATION_TOKEN_INVALID,
+    LOAN_ALREADY_RETURNED,
+    LOAN_ASSET_ALREADY_LENT,
+    LOAN_ASSET_NOT_DURABLE,
     LOCATION_CYCLE,
     LOCATION_DUPLICATE,
     LOCATION_HAS_ASSETS,

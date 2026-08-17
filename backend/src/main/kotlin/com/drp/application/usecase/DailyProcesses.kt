@@ -1,14 +1,17 @@
 package com.drp.application.usecase
 
 import com.drp.application.StorageKeys
+import com.drp.application.event.CoreEvents
 import com.drp.application.port.FileStorage
 import com.drp.application.port.HouseholdMemberRepository
 import com.drp.application.port.HouseholdRepository
 import com.drp.application.port.IdentityRepository
+import com.drp.application.port.LoanRepository
 import com.drp.application.port.Pagination
 import com.drp.application.port.StoredFileRepository
 import com.drp.application.port.TenantResolver
 import com.drp.application.tenant.TenantContext
+import com.drp.domain.loan.LoanStatus
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -191,5 +194,81 @@ class PurgeUnusedFiles(
 
         /** Una subida cortada a medias. Una hora es de sobra para el fichero mas grande admitido. */
         val RESERVATION_GRACE: Duration = Duration.ofHours(1)
+    }
+}
+
+/**
+ * Marca los prestamos vencidos (`MarkOverdueLoans`, 4.1.5 y 5.7).
+ *
+ * **El unico cambio de estado del core que no lo provoca nadie.** Todo lo demas
+ * ocurre porque alguien pulsa algo; esto ocurre porque pasa el tiempo, y de ahi
+ * que haga falta un proceso que lo mire.
+ *
+ * Que el estado se persista en lugar de derivarse al leer es justo lo que
+ * permite publicar `LoanOverdue`: un valor calculado no tiene momento en el que
+ * ocurrir, y sin ese momento no hay evento del que colgar los recordatorios que
+ * la gestion avanzada de prestamos (4.2) necesitara.
+ *
+ * Es **el ejemplo que el CLAUDE.md pone** del proceso que no nace de una
+ * peticion: no hay token del que sacar el hogar, asi que recorre los hogares uno
+ * a uno fijando `app.household_id` en cada transaccion, igual que los otros dos y
+ * **nunca con `BYPASSRLS`**.
+ *
+ * Tres reglas, y las tres estan en la consulta y no aqui, para que no se puedan
+ * olvidar al llamar:
+ *
+ * - Solo `ACTIVE`. Un `OVERDUE` no se vuelve a marcar, que es lo que hace la
+ *   pasada **idempotente**: la segunda no encuentra nada y no publica nada.
+ * - Solo con `dueAt` informada. **Un prestamo sin plazo no vence nunca**: es un
+ *   prestamo sin fecha, no un plazo infinito.
+ * - Solo si la fecha ya paso.
+ *
+ * **El asset no se toca**: sigue `LENT`, porque vencer no es devolver. Es la
+ * regla que mas facil es incumplir aqui, y por eso hay una prueba que la mira.
+ *
+ * `updatedBy` queda a **nulo**, que en este esquema no es un hueco sino un dato:
+ * significa que el cambio lo hizo el sistema y no una persona. Este proceso es
+ * el caso que el contrato pone de ejemplo al documentar `Authorship`.
+ */
+@Service
+class MarkOverdueLoans(
+    private val tenantResolver: TenantResolver,
+    private val tenantContext: TenantContext,
+    private val transactions: TransactionTemplate,
+    private val loans: LoanRepository,
+    private val events: CoreEvents,
+    private val clock: Clock,
+) {
+
+    private val log = LoggerFactory.getLogger(javaClass)
+
+    fun run(): Int {
+        val now = clock.instant()
+        var marked = 0
+
+        for (householdId in tenantResolver.allHouseholdIds()) {
+            // Una transaccion por hogar y con su propio contexto, igual que los
+            // otros dos procesos: que uno falle no puede arrastrar a los demas.
+            //
+            // Y hace falta ademas por el evento: `CoreEvents` saca el hogar del
+            // contexto, asi que publicar fuera de `runAs` seria un error.
+            marked += tenantContext.runAs(householdId) {
+                transactions.execute { markHousehold(now) }
+            } ?: 0
+        }
+
+        if (marked > 0) log.info("Marcados {} préstamos como vencidos", marked)
+        return marked
+    }
+
+    private fun markHousehold(now: java.time.Instant): Int {
+        val overdue = loans.findOverdueCandidates(now)
+
+        for (loan in overdue) {
+            loans.save(loan.copy(status = LoanStatus.OVERDUE, updatedAt = now, updatedBy = null))
+            events.loanOverdue(loan.id, loan.assetId, loan.dueAt!!)
+        }
+
+        return overdue.size
     }
 }

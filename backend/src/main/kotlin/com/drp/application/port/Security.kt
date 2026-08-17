@@ -1,6 +1,8 @@
 package com.drp.application.port
 
 import com.drp.domain.household.MemberRole
+import com.drp.domain.loan.LoanRole
+import java.time.Instant
 import java.util.UUID
 
 /**
@@ -88,3 +90,37 @@ interface AccessTokenIssuer {
 }
 
 data class IssuedAccessToken(val token: String, val expiresInSeconds: Long)
+
+/**
+ * Lo que va dentro del token acotado de un externo.
+ *
+ * **No lleva `sub`**, y esa ausencia es la definicion de lo que es: no
+ * identifica a una persona, porque quien lo trae no tiene cuenta. Identifica un
+ * prestamo y un extremo, y su alcance son las dos operaciones de ese prestamo.
+ */
+data class LoanTokenClaims(val loanId: UUID, val role: LoanRole)
+
+/**
+ * Emite y verifica los tokens acotados de prestamo.
+ *
+ * Devuelve el JWT **y su hash** juntos, igual que [IssuedSecret], porque las dos
+ * capas son inseparables: el JWT viaja en el correo y el hash se guarda para
+ * poder revocarlo. Emitir uno sin guardar el otro daria una credencial que nadie
+ * puede cortar.
+ *
+ * [verify] comprueba **solo la firma y la caducidad**. Que la fila siga viva es
+ * una regla de negocio y se decide en el caso de uso, ya con el contexto de
+ * inquilino fijado, igual que la invitacion no comprueba su vigencia en la
+ * funcion que resuelve el hogar.
+ */
+interface LoanTokenIssuer {
+    fun issue(claims: LoanTokenClaims, expiresAt: Instant): IssuedLoanToken
+
+    /** Nulo si la firma no cuadra, ha caducado o el cuerpo no es lo que se espera. */
+    fun verify(token: String): LoanTokenClaims?
+
+    /** El hash con el que buscar la fila, para poder resolver un token que llega. */
+    fun hash(token: String): String
+}
+
+data class IssuedLoanToken(val token: String, val tokenHash: String)

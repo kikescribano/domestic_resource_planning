@@ -35,6 +35,9 @@ export type ApiErrorCode =
   | 'INTAKE_QUANTITY_NOT_POSITIVE'
   | 'INVITATION_ALREADY_PENDING'
   | 'INVITATION_TOKEN_INVALID'
+  | 'LOAN_ALREADY_RETURNED'
+  | 'LOAN_ASSET_ALREADY_LENT'
+  | 'LOAN_ASSET_NOT_DURABLE'
   | 'LOCATION_CYCLE'
   | 'LOCATION_DUPLICATE'
   | 'LOCATION_HAS_ASSETS'
@@ -79,6 +82,9 @@ const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   FILE_TYPE_NOT_ALLOWED: 'Ese tipo de fichero no se admite. Solo JPEG, PNG, WebP y PDF.',
   EXISTENCE_ALREADY_IN_LOCATION: 'Ahí ya hay una existencia de este artículo. Únelas en lugar de moverla.',
   INTAKE_QUANTITY_NOT_POSITIVE: 'La cantidad que entra tiene que ser mayor que cero.',
+  LOAN_ALREADY_RETURNED: 'Este préstamo ya estaba devuelto.',
+  LOAN_ASSET_ALREADY_LENT: 'Eso ya está prestado. Apunta la devolución antes de volver a prestarlo.',
+  LOAN_ASSET_NOT_DURABLE: 'Un consumible no se presta: descuenta la cantidad que has dado.',
   LOCATION_CYCLE: 'No se puede mover ahí: el destino está dentro de lo que quieres mover.',
   LOCATION_DUPLICATE: 'Ya hay algo con ese nombre en el mismo sitio.',
   LOCATION_HAS_ASSETS: 'No se puede borrar: todavía hay cosas guardadas ahí.',
@@ -345,6 +351,82 @@ export interface StoredDocument {
   date: string | null
   validUntil: string | null
   createdAt: string
+}
+
+// --- Préstamos (Hito 4) ------------------------------------------------------
+
+export type LoanStatus = 'ACTIVE' | 'RETURNED' | 'OVERDUE'
+export type LoanRole = 'LENDER' | 'BORROWER'
+
+/** Son datos que lee una persona, así que van en castellano. */
+export const LOAN_STATUS_LABELS: Record<LoanStatus, string> = {
+  ACTIVE: 'Prestado',
+  OVERDUE: 'Fuera de plazo',
+  RETURNED: 'Devuelto',
+}
+
+/** Nombre y al menos un canal: es por donde se le manda el enlace. */
+export interface ExternalParty {
+  name: string
+  email: string | null
+  phone: string | null
+}
+
+/** Exactamente uno de los dos, nunca los dos ni ninguno. */
+export interface LoanParticipant {
+  userId: string | null
+  external: ExternalParty | null
+}
+
+export interface Loan {
+  id: string
+  assetId: string
+  assetName: string | null
+  lender: LoanParticipant
+  borrower: LoanParticipant
+  status: LoanStatus
+  startedAt: string
+  dueAt: string | null
+  returnedAt: string | null
+  notes: string | null
+  createdBy: string | null
+  updatedBy: string | null
+}
+
+/**
+ * Lo que ve quien llega con el enlace del correo.
+ *
+ * **Es el único recurso de la API con dos formas**, y esta es la acotada: menos
+ * campos que [Loan] a propósito. Que sea un tipo distinto y no un `Partial<Loan>`
+ * es lo que impide que la pantalla externa lea un `lender` que nunca llega.
+ */
+export interface ExternalLoan {
+  id: string
+  assetName: string | null
+  role: LoanRole
+  status: LoanStatus
+  startedAt: string
+  dueAt: string | null
+  returnedAt: string | null
+}
+
+export interface LoanFilters {
+  status?: LoanStatus
+  assetId?: string
+  /** `ACTIVE` y `OVERDUE` juntos: qué hay fuera de casa. */
+  open?: boolean
+}
+
+/**
+ * Una fecha como la escribiría una persona.
+ *
+ * Es la primera del cliente: hasta el Hito 4 ninguna pantalla mostraba fechas.
+ * Sin hora, porque en un préstamo doméstico el día es toda la precisión que
+ * significa algo.
+ */
+export function formatDate(iso: string | null): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 /** Cómo se escribe un tamaño para que lo lea una persona. */
@@ -797,4 +879,31 @@ export const api = {
 
   deleteOwnAvatar: (accessToken: string) =>
     request<void>('/users/me/avatar', { method: 'DELETE', accessToken }),
+
+  // --- Préstamos ------------------------------------------------------------
+  listLoans: (accessToken: string, filters: LoanFilters = {}) =>
+    request<Page<Loan>>(`/loans${queryString({ ...filters, size: 200 })}`, { accessToken }),
+
+  getLoan: (id: string, accessToken: string) => request<Loan>(`/loans/${id}`, { accessToken }),
+
+  startLoan: (body: Record<string, unknown>, accessToken: string) =>
+    request<Loan>('/loans', { method: 'POST', body, accessToken }),
+
+  confirmReturn: (id: string, accessToken: string) =>
+    request<Loan>(`/loans/${id}/return`, { method: 'POST', accessToken }),
+
+  // --- Préstamos, con el token acotado del correo ---------------------------
+  // Las dos únicas llamadas de toda la API que **no van con la sesión**, y por
+  // eso llevan `renewable: false`: no hay refresh token que rotar ni sesión que
+  // recuperar. Un 401 aquí significa que el enlace ya no vale, y punto.
+
+  getLoanWithToken: (id: string, loanToken: string) =>
+    request<ExternalLoan>(`/loans/${id}`, { accessToken: loanToken, renewable: false }),
+
+  confirmReturnWithToken: (id: string, loanToken: string) =>
+    request<ExternalLoan>(`/loans/${id}/return`, {
+      method: 'POST',
+      accessToken: loanToken,
+      renewable: false,
+    }),
 }

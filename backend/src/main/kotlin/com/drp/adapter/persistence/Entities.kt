@@ -8,6 +8,9 @@ import com.drp.domain.inventory.AssetType
 import com.drp.domain.inventory.Capacity
 import com.drp.domain.inventory.EnvironmentalConditions
 import com.drp.domain.inventory.LocationType
+import com.drp.domain.loan.ExternalParty
+import com.drp.domain.loan.LoanRole
+import com.drp.domain.loan.LoanStatus
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
@@ -34,10 +37,8 @@ import java.util.UUID
  * Estas clases no salen de este paquete: los casos de uso hablan del dominio, y
  * la traduccion entre ambos vive en los adaptadores de al lado.
  *
- * Las dos tablas restantes del esquema --loans y loan_access_tokens-- existen en
- * la base de datos desde la primera migracion pero no tienen entidad todavia:
- * llegan con el Hito 4. `ddl-auto: validate` solo comprueba lo que esta mapeado,
- * asi que no estorban.
+ * Con las dos de prestamos, que llegan con el Hito 4, **el esquema queda mapeado
+ * entero**: quince tablas, quince entidades.
  */
 
 @Entity
@@ -279,4 +280,59 @@ class LocationEntity(
     var updatedAt: Instant,
     var createdBy: UUID?,
     var updatedBy: UUID?,
+)
+
+/**
+ * Cada extremo del prestamo va en **dos columnas excluyentes** --la pertenencia o
+ * el `jsonb` del externo-- porque asi esta la tabla, con sendos `CHECK` que
+ * impiden informar las dos y exigen una. Hacia arriba se traducen a un
+ * `LoanParticipant`, que no puede representar ninguno de los dos estados
+ * invalidos.
+ *
+ * Los dos `jsonb` se mapean con `@JdbcTypeCode(SqlTypes.JSON)` sobre el objeto de
+ * valor del dominio, igual que los de `locations` y con la misma contrapartida:
+ * renombrar un campo de [com.drp.domain.loan.ExternalParty] cambiaria en silencio
+ * las claves del JSON guardado. Aqui ademas rompe un `CHECK`, porque la tabla
+ * exige que el objeto tenga `name` y al menos uno de `email` o `phone`. De ahi
+ * que haya una prueba que le pregunte a PostgreSQL que claves hay de verdad.
+ */
+@Entity
+@Table(name = "loans")
+class LoanEntity(
+    @Id var id: UUID,
+    var householdId: UUID,
+    var assetId: UUID,
+    var lenderMemberId: UUID?,
+    @JdbcTypeCode(SqlTypes.JSON) var lenderExternal: ExternalParty?,
+    var borrowerMemberId: UUID?,
+    @JdbcTypeCode(SqlTypes.JSON) var borrowerExternal: ExternalParty?,
+    @Enumerated(EnumType.STRING) var status: LoanStatus,
+    var notes: String?,
+    var startedAt: Instant,
+    var dueAt: Instant?,
+    var returnedAt: Instant?,
+    var createdAt: Instant,
+    var updatedAt: Instant,
+    var createdBy: UUID?,
+    var updatedBy: UUID?,
+)
+
+/**
+ * El token acotado de un externo.
+ *
+ * **No lleva `householdId`**, y es la unica entidad del hito de la que eso se
+ * puede decir: cuelga del prestamo, igual que los tokens de correo cuelgan de la
+ * identidad. Por eso su tabla es una de las cinco sin politica de RLS, y por eso
+ * resolver el hogar a partir de un token exige la funcion de la V6 en lugar de
+ * una consulta normal.
+ */
+@Entity
+@Table(name = "loan_access_tokens")
+class LoanAccessTokenEntity(
+    @Id var id: UUID,
+    var loanId: UUID,
+    var tokenHash: String,
+    @Enumerated(EnumType.STRING) var role: LoanRole,
+    var expiresAt: Instant,
+    var usedAt: Instant?,
 )

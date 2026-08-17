@@ -67,6 +67,37 @@ jobs:
           path: backend/build/reports/tests/test
           if-no-files-found: ignore
 
+  # La medicion que decidio el VPS al cerrar la Fase 1
+  # (docs/backend/operations/capacity-measurements.md).
+  #
+  # Corre aqui y no en la maquina de nadie por un motivo concreto: **el runner es
+  # Linux con 2 vCPU**, que se parece mucho mas a un VPS-2 que un portatil con
+  # Docker Desktop. Los bytes son portables y se pueden medir en cualquier sitio;
+  # los milisegundos no, y medirlos en Windows daba una variacion del doble entre
+  # dos ejecuciones seguidas.
+  #
+  # No corta la integracion --`continue-on-error`-- porque no afirma nada: es un
+  # instrumento, y una medicion que rompe la construccion cuando el runner va
+  # cargado solo ensena a ignorarla. Lo que hace es dejar el numero registrado
+  # para que el dia que suba se vea cuando subio.
+  capacity:
+    name: Medicion de capacidad
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Medir bytes por hogar y coste de CPU
+        run: ./gradlew capacityMeasurement --no-daemon
+        working-directory: backend
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
@@ -90,3 +121,54 @@ jobs:
       - name: Probar
         run: npm test
         working-directory: frontend
+
+  # El recorrido vertical en un navegador de verdad, que es la condicion que la
+  # ADR-006 y la ADR-008 ponen y la que mantenia look-and-feel.md en Borrador.
+  #
+  # Es un trabajo aparte y no un paso mas del frontend porque necesita cosas que
+  # aquel no: PostgreSQL, Mailpit, el backend construido y un navegador. Mezclarlo
+  # haria que un fallo de tipos y un fallo de reflujo se parecieran en el informe.
+  e2e:
+    name: Recorrido vertical
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # La aplicacion de verdad contra su base de datos y su servidor de correo,
+      # no un doble: es lo que hace que esto sea un recorrido vertical y no una
+      # prueba de componente con mas pasos.
+      - name: Levantar PostgreSQL y Mailpit
+        run: docker compose up -d postgres mailpit
+
+      - name: Instalar dependencias
+        run: npm ci
+        working-directory: frontend
+
+      - name: Instalar el navegador
+        run: npx playwright install chromium --with-deps
+        working-directory: frontend
+
+      - name: Recorrido vertical y auditoria de accesibilidad
+        run: npm run test:e2e
+        working-directory: frontend
+
+      - name: Publicar el informe
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          if-no-files-found: ignore
