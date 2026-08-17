@@ -1,5 +1,25 @@
 name: CI
 
+# Las acciones van todas en su ultima version mayor, salvo una.
+#
+# El motivo del salto: el runner llevaba avisando de que Node 20 esta
+# descatalogado y estaba forzando esas acciones a ejecutarse sobre Node 24 --o
+# sea, ya corrian donde no declaraban--. El aviso estaba anotado desde el Hito 0
+# como algo que un dia tumbaria la CI sin haber tocado nada.
+#
+# **gradle/actions se queda deliberadamente en v5 y no sube a v6.** No es
+# descuido ni pereza: la v6 saca el cacheo a una libreria aparte,
+# `gradle-actions-caching`, que **ya no es codigo abierto**, y elimina el soporte
+# de configuration-cache a la espera de reimplementarlo alli. Eso no es una
+# version mas sino un cambio en la naturaleza de lo que se ejecuta en la
+# integracion, y merece decidirse a proposito. La v5 hace lo que hacia falta
+# --subir a Node 24-- y nada mas.
+#
+# El unico cambio rompedor que podria habernos afectado es el de
+# `actions/checkout` a partir de v5: cambia los valores por defecto de
+# `pull_request_target`. Este workflow dispara con `pull_request`, asi que no le
+# aplica.
+
 on:
   push:
     branches: [main]
@@ -15,9 +35,9 @@ jobs:
     name: Contrato y documentacion
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -43,14 +63,14 @@ jobs:
     name: Backend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
       # Las pruebas que tocan la base de datos levantan PostgreSQL con
       # Testcontainers y corren con un usuario sujeto a RLS (ADR-003 y ADR-008).
@@ -61,7 +81,7 @@ jobs:
 
       - name: Publicar el informe de pruebas
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-test-report
           path: backend/build/reports/tests/test
@@ -85,14 +105,14 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
       - name: Medir bytes por hogar y coste de CPU
         run: ./gradlew capacityMeasurement --no-daemon
@@ -102,9 +122,9 @@ jobs:
     name: Frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -132,16 +152,16 @@ jobs:
     name: Recorrido vertical
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -167,7 +187,7 @@ jobs:
 
       - name: Publicar el informe
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: frontend/playwright-report

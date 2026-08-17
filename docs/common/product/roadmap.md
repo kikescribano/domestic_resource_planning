@@ -71,10 +71,15 @@ midan solos.
 > de nacer en el repositorio. Arrancó sola con el primer push posterior a la
 > rama. Si un PR aparece sin comprobaciones, basta con empujar un commit.
 >
-> Queda pendiente algo menor: `actions/checkout`, `setup-java`,
-> `upload-artifact` y `setup-gradle` van en v4 y el runner ya avisa de que Node
-> 20 está descatalogado. Hoy es solo un aviso; el día que deje de serlo, la CI
-> se cae sin haber tocado nada.
+> Quedaba pendiente algo menor: `actions/checkout`, `setup-java`,
+> `upload-artifact` y `setup-gradle` iban en v4 y el runner ya avisaba de que
+> Node 20 estaba descatalogado. **Resuelto el 2026-08-17**, y el aviso había
+> pasado de teórico a real: el runner ya estaba forzando esas acciones a
+> ejecutarse sobre Node 24, o sea corriendo donde no declaraban. Todas suben a su
+> última versión mayor salvo `gradle/actions`, que se queda en v5 a propósito —la
+> v6 saca el cacheo a una librería que ya no es código abierto y elimina el
+> soporte de configuration-cache, y eso es un cambio de naturaleza y no una
+> versión más.
 
 ### Hito 1 — Aislamiento y enrolamiento · **Completado (2026-08-11)**
 
