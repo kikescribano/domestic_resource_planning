@@ -2,17 +2,26 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Lo primero: el código acaba de empezar
+## Lo primero: el core está implementado
 
-DRP está en la **Fase 1 (Core MVP)**, recién arrancada. El repositorio dejó de
-ser solo documentación: hay un monorepo con `backend/` (Kotlin, Gradle con Kotlin
-DSL) y `frontend/` (TypeScript, React sobre Vite), más `compose.yaml`, `scripts/`
-y `.github/workflows/`.
+**La Fase 1 (Core MVP) se cerró el 2026-08-17**, en cinco hitos y cinco pull
+requests. Lo que hay es un monorepo con `backend/` (Kotlin, Gradle con Kotlin DSL)
+y `frontend/` (TypeScript, React sobre Vite), más `compose.yaml`, `scripts/` y
+`.github/workflows/`, y dentro **el core entero**: las 54 operaciones del contrato,
+las 15 tablas con su RLS, los tres procesos diarios, el almacenamiento de ficheros
+con nginx delante y un cliente web para todos los flujos.
 
-Lo que hay es **andamiaje con una regla de dominio dentro**, no el core
-implementado. El alcance, los cinco hitos y el criterio de aceptación están en la
-sección 8.2 del README. No des por hecho que un caso de uso existe porque esté
-definido: casi ninguno lo está todavía.
+Así que la advertencia es la contraria a la que había aquí: **no supongas que algo
+no existe**. Antes de escribir un caso de uso, una tabla o una pantalla, busca si
+ya está —y si lo que quieres es cambiarlo, hay pruebas que lo fijan y documentos
+que lo explican.
+
+Lo siguiente es la **Fase 2 — Primer módulo funcional**, y su primer paso no es
+código: es elegir el módulo entre los de prioridad alta de la sección 4.2 del
+README, que es decisión de producto. La Fase 1 no tiene continuación pendiente; lo
+que se dejó abierto a propósito está listado al final de
+[`roadmap.md`](docs/common/product/roadmap.md), cada cosa con su motivo y su
+destinatario.
 
 La documentación está **en español de España**. Manténla así. El código sigue la
 misma frontera que la documentación: prosa y comentarios en castellano, todo
@@ -51,8 +60,10 @@ cambia el otro.
 
 ## Verificación
 
-Las cuatro comprobaciones que ejecuta [la CI](.github/workflows/ci.yml). Pásalas
-antes de entregar un cambio.
+[La CI](.github/workflows/ci.yml) tiene **cinco trabajos**: contrato y
+documentación, backend, frontend, recorrido vertical y medición de capacidad.
+Reprodúcelos en local antes de entregar un cambio; con tocar lo que tu cambio
+alcanza basta, salvo que estés cerrando algo.
 
 Validar el contrato de la API. Requiere `pip install pyyaml openapi-spec-validator`.
 Además de validar el esquema, exige `operationId` en todas las operaciones, que es
@@ -62,11 +73,20 @@ lo que la ADR-007 necesita para generar el cliente:
 python scripts/validate-openapi.py
 ```
 
-Comprobar que ningún enlace relativo está roto. Son unos 160 y se rompen con
+Comprobar que ningún enlace relativo está roto. Son cerca de 800 y se rompen con
 facilidad al renumerar secciones o al mover un fichero:
 
 ```bash
 python scripts/check-links.py
+```
+
+Comprobar el contraste de los tokens de color: lee los valores `oklch()` reales de
+`frontend/src/index.css` y mide los 36 pares **en los dos modos**, así que un
+retoque de paleta que baje de WCAG AA rompe la construcción en lugar de
+descubrirse en una auditoría:
+
+```bash
+python scripts/check-contrast.py
 ```
 
 Construir y probar el backend. Las pruebas que tocan la base de datos levantan
@@ -83,18 +103,38 @@ Comprobar tipos, construir y probar el frontend:
 cd frontend && npm run build && npm test
 ```
 
+Y el recorrido vertical en un navegador de verdad, que es lo único que comprueba
+que una persona llega: el enlace del correo, el teclado con su anillo de foco, la
+auditoría axe en los dos modos y el reflujo de 320 px a ultrawide. **Este sí
+necesita el `compose.yaml` arriba** —PostgreSQL y Mailpit—, porque ejecuta la
+aplicación y no un doble; el backend y Vite los arranca Playwright por su cuenta:
+
+```bash
+docker compose up -d postgres mailpit && cd frontend && npm run test:e2e
+```
+
+Dos avisos sobre este último, que cuestan un rato de diagnóstico si no se saben.
+Si mides colores aplicados, espera a que termine la transición: cambiar de tema
+abre 140 ms en los que cada color es una **mezcla de los dos modos**, y medir ahí
+da un contraste que no corresponde a ningún color del sistema. Y no audites una
+pantalla con el `Spinner` puesto: axe recorre cuatro elementos y pasa.
+
 ## Entorno local: para desarrollar, no para probar
 
-`compose.yaml` levanta PostgreSQL y Mailpit **para ejecutar la aplicación**, no
-para las pruebas: las de integración usan Testcontainers, que arranca su propio
-PostgreSQL efímero y lo destruye al terminar. Si solo vas a construir y probar,
-no hace falta levantar nada.
+`compose.yaml` levanta PostgreSQL, Mailpit y **nginx** —que llegó con el Hito 3,
+con `X-Accel-Redirect` y su URL firmada— para ejecutar la aplicación, no para las
+pruebas: las de integración usan Testcontainers, que arranca su propio PostgreSQL
+efímero y lo destruye al terminar. Si solo vas a construir y probar, no hace falta
+levantar nada.
 
 ```bash
 docker compose up -d
 ```
 
-nginx no está todavía; llega con el Hito 3, junto a la entrega de ficheros.
+La excepción es el recorrido vertical de más arriba, que ejecuta la aplicación de
+verdad y necesita **PostgreSQL y Mailpit**; nginx no, porque la entrega directa es
+lo que 5.8.4 describe para desarrollo. La prueba de nginx es del backend y levanta
+el suyo con la misma plantilla del `compose.yaml`.
 
 **Deja la máquina como la encontraste.** Lo que se arranca para comprobar algo
 se apaga en cuanto la comprobación está hecha:
@@ -163,9 +203,13 @@ La Fase 0 terminó sin decisiones de diseño abiertas. Están fijadas:
 - **Testing:** 60 % unitario de dominio, 25 % integración de casos de uso, 15 %
   contrato de adaptadores y E2E.
 
-Las cuatro ADR en [`docs/common/architecture/decisions/`](docs/common/architecture/decisions/README.md)
-recogen el porqué y las alternativas descartadas. Léelas antes de proponer un
-cambio estructural.
+Las **nueve ADR** en [`docs/common/architecture/decisions/`](docs/common/architecture/decisions/README.md)
+recogen el porqué y las alternativas descartadas: las cuatro de la Fase 0 —línea
+base, multi-tenancy, RLS y migraciones— más las cinco que llegaron con la Fase 1:
+ficheros locales, stack de frontend y sistema de diseño, el contrato como fuente de
+verdad, monorepo y cadena de construcción, y correo saliente. Léelas antes de
+proponer un cambio estructural, y recuerda que **una ADR aceptada no se
+reescribe**.
 
 ## Dos invariantes que condicionan todo el código futuro
 
@@ -271,26 +315,35 @@ incumplen sin querer:
 - La sección 11 del README explica qué tocar al avanzar el proyecto: léela antes de
   hacer una actualización amplia.
 
-## Cómo se ejecuta la Fase 1: un hito por sesión
+## Cómo se trabaja: un bloque grande por sesión
 
-La Fase 1 se entrega en **cinco hitos**, y el Hito 0 ya está cerrado. La forma de
-trabajar es explícita y conviene respetarla:
+Es la forma con la que se entregó la Fase 1 —cinco hitos, cinco sesiones, cinco
+pull requests— y **se conserva para la Fase 2**, con «módulo» donde antes decía
+«hito»:
 
-- **Un hito por sesión.** Arranca leyendo
-  [`docs/common/product/roadmap.md`](docs/common/product/roadmap.md), que es la
-  fuente del alcance, el criterio de aceptación y el estado. No mezcles hitos:
-  son bloques grandes y mezclarlos hace que ninguno se cierre del todo.
-- **Un pull request por hito**, y no se abre el siguiente hasta que el anterior
+- **Un bloque por sesión.** Arranca leyendo el documento de alcance de lo que vas a
+  hacer. Para la Fase 1 fue
+  [`docs/common/product/roadmap.md`](docs/common/product/roadmap.md), que ahora se
+  conserva como historia de cómo se hizo; la Fase 2 necesitará el suyo. No mezcles
+  bloques: son grandes y mezclarlos hace que ninguno se cierre del todo.
+- **Un pull request por bloque**, y no se abre el siguiente hasta que el anterior
   está fusionado. Al fusionar, sigue el procedimiento de alineación local de más
   arriba.
-- **Al cerrar un hito**, actualiza su estado en `roadmap.md` y añade la fila de
-  historial al README. El estado de las *fases* vive en la sección 8 del README;
-  el de los *hitos*, en `roadmap.md`. Cada dato en un solo sitio.
-- **Cada hito atraviesa las capas en vertical** —dominio, aplicación, adaptador,
+- **Al cerrar un bloque**, actualiza su estado donde viva y añade la fila de
+  historial al README. El estado de las *fases* vive en la sección 8 del README y
+  el detalle de sus partes, en el documento de la fase. Cada dato en un solo sitio.
+- **Cada bloque atraviesa las capas en vertical** —dominio, aplicación, adaptador,
   frontend y sus pruebas—, no una capa entera de cada vez.
+- **Cierra también los documentos que se auto-programaron.** La Fase 1 dejó seis
+  documentos del frontend diciendo «esto llega en el Hito 4» y hubo que volver a
+  por ellos después: si escribes «lo comprobará el bloque siguiente», eso es una
+  tarea del bloque siguiente y no se cierra sola.
 
 El criterio de validación estaba fijado desde la ADR-001: un **recorrido
 vertical** que atraviese frontend, API autenticada, aplicación, dominio y
 PostgreSQL, con pruebas en los tres niveles. Ese recorrido es también lo que
-valida en la práctica las decisiones de las ADR-002/003/004, y la ADR-005 lo
-amplía para que incluya subir una foto, verla adjunta y descargarla.
+valida en la práctica las decisiones de las ADR-002/003/004, la ADR-005 lo amplía
+para que incluya subir una foto, verla adjunta y descargarla, y la ADR-006 le añade
+lo que solo se puede medir en un navegador: foco, teclado, contraste aplicado y
+reflujo. Existe, se ejecuta en la CI y **es el sitio al que añadir el recorrido de
+un módulo nuevo** en lugar de empezar una suite paralela.
