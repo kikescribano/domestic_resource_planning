@@ -1,8 +1,8 @@
 # DRP · Domestic Resource Planning
 
 > **Estado del documento:** vivo — se actualiza a medida que el proyecto avanza.
-> **Última actualización:** 2026-08-13
-> **Fase actual:** Fase 1 (Core MVP) en curso; el alcance, los hitos y su estado viven en [`docs/common/product/roadmap.md`](docs/common/product/roadmap.md)
+> **Última actualización:** 2026-08-17
+> **Fase actual:** Fase 1 (Core MVP) **completada**; cómo se hizo, hito a hito, en [`docs/common/product/roadmap.md`](docs/common/product/roadmap.md). La Fase 2 arranca eligiendo el primer módulo entre los de prioridad alta de la sección 4.2
 
 ---
 
@@ -513,12 +513,21 @@ pie title Distribución de la batería de tests
 | Fase | Contenido | Estado |
 |---|---|---|
 | **Fase 0 — Definición** | Arquitectura, stack, alcance del core, estrategia de testing | 🟢 Completada |
-| **Fase 1 — Core MVP** | Gestión de recursos/assets, autenticación, API REST, event bus y cliente web completo del core | 🟡 En curso |
-| **Fase 2 — Primer módulo funcional** | Candidato a definir entre los de prioridad alta de la sección 4.2 | ⚪ Pendiente |
+| **Fase 1 — Core MVP** | Gestión de recursos/assets, autenticación, API REST, event bus y cliente web completo del core | 🟢 Completada |
+| **Fase 2 — Primer módulo funcional** | Candidato a definir entre los de prioridad alta de la sección 4.2 | 🟡 Siguiente |
 | **Fase 3 — Módulos adicionales** | Según backlog de la sección 4.2 | ⚪ Pendiente |
 
-> **La tarea de arranque de la Fase 1 ya está hecha:** el reparto a `docs/` de
-> las secciones 4.1.x, 5.4.3, 5.6, 5.7 y 5.8, aplazado deliberadamente durante
+> **La Fase 1 se cerró el 2026-08-17**, con los cinco hitos completados y las
+> **54 operaciones del contrato** implementadas. Los seis criterios de aceptación
+> que las ADR exigían están demostrados con pruebas que se ejecutan: recorrido
+> vertical en navegador real, aislamiento barrido sobre las 38 operaciones con
+> identificador, PostgreSQL real con usuario sujeto a RLS, arranque en limpio
+> desde las migraciones, ficheros con sus controles, y el correo leído de un
+> servidor de verdad. El **despliegue deja de estar abierto**: el VPS se elige con
+> [consumo medido](docs/backend/operations/capacity-measurements.md).
+>
+> **La tarea de arranque de la Fase 1 también está hecha:** el reparto a `docs/`
+> de las secciones 4.1.x, 5.4.3, 5.6, 5.7 y 5.8, aplazado deliberadamente durante
 > toda la Fase 0. Este documento pasó de 1821 a poco más de 600 líneas y conserva
 > la visión de conjunto; el mapa de dónde vive cada cosa está en la sección 9.1.
 
@@ -599,6 +608,7 @@ está organizado y en qué estado va— y el detalle vive por ámbito:
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-17 | **Fase 1 completada (Hito 4).** Préstamos con token acotado para externos, el vencimiento por proceso diario y el cliente web con la vista externa sin sesión: con ello el contrato queda en 54 de 54. Se cierra la fase con el recorrido vertical en navegador real, la auditoría axe y la **elección del VPS con consumo medido** —que resulta decidirla el disco y no la CPU—. El estado de la fase pasa a completada en la sección 8 y la fila del stack deja de decir «por decidir». |
 | 2026-08-05 | Creación inicial: objetivo, analogía ERP→DRP, alcance core/módulos, arquitectura, stack y estrategia de testing |
 | 2026-08-06 | Profundización del core mínimo: jerarquía de assets/ubicaciones con ubicación polimórfica, características de almacenaje, roles de usuario (incl. préstamos), contrato y catálogo inicial del event bus, y ampliación de la definición de la API REST |
 | 2026-08-06 | Validación de las decisiones de diseño abiertas (4.1.7): roles prestador/receptor abiertos a miembros del hogar o a externos, alcance mínimo de la gestión de préstamos en el core, y unificación del campo ubicación |

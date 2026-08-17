@@ -5,12 +5,17 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Ejecución de la Fase 1 |
-| Última revisión | 2026-08-13 |
+| Última revisión | 2026-08-17 |
 
 > El estado de **las fases** vive en la sección 8 del
 > [`README principal`](../../../README.md), y solo allí. Este documento baja al
 > detalle de la Fase 1: qué entra en cada hito, en qué estado va y cómo se
 > trabaja.
+
+> **La Fase 1 está completa (2026-08-17).** Los cinco hitos cerrados, las 54
+> operaciones del contrato implementadas y los seis criterios de aceptación
+> demostrados con pruebas que se ejecutan. Este documento se conserva como
+> historia de cómo se hizo; el plan de lo que viene es de la Fase 2.
 
 ## Alcance
 
@@ -254,15 +259,26 @@ El último, y el que cierra la Fase 1.
 > de esa pantalla depende de él. Es la segunda vez que escribir la ficha antes
 > que la pantalla paga.
 >
-> **Dos barridos de verificación al cerrar**, con instrucción de ejecutar y no de
-> leer, y el primero encontró **un agujero real de concurrencia**: `ConfirmReturn`
-> tenía forma de lee-y-luego-escribe, y cuatro devoluciones simultáneas del mismo
-> token cerraban el préstamo cuatro veces —`[200, 200, 200, 200]` donde el
-> contrato promete un `200` y tres `409`, con `LoanReturned` publicado cuatro
-> veces. No es rebuscado: el enlace del correo se abre en dos sitios o se pulsa
-> dos veces. Aquí no valía el patrón del alta —dejar que un índice único rechace
-> a la segunda— porque no se inserta nada: es un `UPDATE` sobre una fila que ya
-> existe. Se resuelve con `SELECT ... FOR UPDATE` **acotado a la devolución**.
+> **Tres barridos de verificación al cerrar**, con instrucción de ejecutar y no
+> de leer, y **dos encontraron el mismo tipo de agujero en sitios distintos**:
+>
+> - **`ConfirmReturn` tenía forma de lee-y-luego-escribe.** Cuatro devoluciones
+>   simultáneas del mismo token cerraban el préstamo cuatro veces —`[200, 200,
+>   200, 200]` donde el contrato promete un `200` y tres `409`, con `LoanReturned`
+>   publicado cuatro veces. No es rebuscado: el enlace del correo se abre en dos
+>   sitios o se pulsa dos veces. Aquí no valía el patrón del alta —dejar que un
+>   índice único rechace a la segunda— porque no se inserta nada: es un `UPDATE`
+>   sobre una fila que ya existe.
+> - **Y `MarkOverdueLoans` lo tenía también**, con una diferencia que lo hacía más
+>   difícil de ver: el `UPDATE` se serializaba, así que **el estado final era
+>   correcto** y solo el evento salía por duplicado. Sin un módulo suscrito
+>   escuchando, esa duplicación no se distingue de nada.
+>
+> Los dos se resuelven con `SELECT ... FOR UPDATE`, acotado en cada caso a la
+> operación que lo necesita, y los dos medidos en los dos sentidos: revertido el
+> arreglo, la prueba vuelve a fallar. **La lección que queda escrita no es el
+> arreglo sino dónde mirar**: cualquier caso de uso que lea, decida y escriba
+> sobre una fila que ya existe tiene esta forma, y el estado puede taparlo.
 >
 > **La medición del VPS dio la respuesta contraria a la esperada.** Por CPU
 > bastaría el VPS-2 y la base de datos cabe mil veces en cualquiera de los dos:
@@ -287,10 +303,33 @@ No son olvidos: están anotados con motivo en
 - **Análisis antivirus** de lo subido: es la defensa que toca añadir el día que un fichero pueda salir del hogar que lo subió.
 - **Cuatro atributos propuestos** —estado de conservación, condición en préstamo, etiquetas libres, e icono y color de categoría—, que no entran hasta que haya un caso de uso que los pida.
 
+Al cerrar la fase se les suman las dos que el Hito 3 dejó anotadas, y **se funden
+aquí en vez de resolverse con prisa**:
+
+- **«Cerrar la cuenta borra el avatar»** (4.1.1) no tiene dónde engancharse:
+  `DeactivateUser` da de baja la **pertenencia**, no la identidad, y el único
+  borrado real de identidades es el de los hogares sin verificar, donde no puede
+  haber avatar. No es una pregunta de avatares sino **la misma que la baja de un
+  hogar**, que ya estaba en esta lista: se anota junto a ella y se resolverá con
+  el caso de uso que las active a las dos.
+- **La conversión de HEIC** la asigna 5.8.3 al frontend, y el frontend no tiene
+  con qué: hoy la foto que hace un iPhone con los ajustes de fábrica se rechaza
+  con un `415` que enumera los tipos admitidos. Cerrarlo son dos caminos y
+  ninguno es un ajuste: meter un decodificador wasm de cerca de un megabyte en el
+  cliente para un formato que solo produce un fabricante, o decodificar en
+  servidor contradiciendo la sección que lo excluyó. **Es la carencia más visible
+  para el usuario más probable de una aplicación doméstica**, así que queda
+  escrita como tal y no como detalle.
+
+Ninguna de las dos bloquea el cierre de la Fase 1: las dos son huecos conocidos,
+con su motivo y su destinatario, que es exactamente lo que esta sección existe
+para sostener.
+
 ## Historial
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-17 | **Hito 4 completado, y con él la Fase 1.** Las 4 operaciones que faltaban —contrato al 54 de 54—, el token acotado de dos capas con su alcance comprobado en el filtro, la proyección por rol declarada en el contrato, el tercer proceso diario, la sexta migración, el cliente web con la vista externa sin sesión, el recorrido vertical con Playwright y axe, y la medición que elige el VPS. Se anotan las cinco decisiones tomadas al implementar y los dos agujeros de concurrencia que encontraron los barridos. |
 | 2026-08-13 | **Hito 3 completado.** Las 11 operaciones de ficheros, documentos y avatar; el puerto `FileStorage` con los controles de OWASP; la cuota reservada antes de transmitir; nginx con `X-Accel-Redirect` y URL firmada; el proceso diario de purga; y el cliente web con subida, galería y consumo de cuota. Se anotan las cinco decisiones que hubo que tomar al implementar y el agujero que encontró el barrido. |
 | 2026-08-12 | **Hito 2 completado.** Las 23 operaciones de catálogo, ubicaciones y assets; las dos naturalezas con entrada, fusión, ajuste y baja; las tres validaciones que la base de datos no puede garantizar; el event bus con handlers idempotentes y los ocho eventos; y el cliente web de las cuatro pantallas. Se anotan las cuatro decisiones que hubo que tomar al implementar y las tres cosas que solo se vieron ejecutando. |
 | 2026-08-11 | **Hito 1 completado.** Esquema completo, RLS con `FORCE`, `TenantContext`, Argon2id y JWT, las 16 operaciones del enrolamiento, limitador de frecuencia y los flujos de frontend sobre un sistema de diseño con las ocho dimensiones cerradas. Se anotan las tres decisiones que hubo que tomar al implementar y que la definición no preveía. |
