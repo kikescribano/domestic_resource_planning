@@ -75,6 +75,29 @@ function stockItem(overrides: Record<string, unknown> = {}) {
     quantity: 300,
     unit: 'GRAM',
     serialNumber: null,
+    acquiredOn: null,
+    notes: null,
+    warnings: [],
+    ...overrides,
+  }
+}
+
+/** Un duradero, que es el único que lleva número de serie y fecha de adquisición. */
+function durable(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'asset-2',
+    name: 'Taladro',
+    type: 'DURABLE',
+    categoryId: 'cat-2',
+    category: 'Herramientas',
+    articleId: null,
+    ownerId: null,
+    location: { type: 'LOCATION', id: 'loc-2' },
+    status: 'AVAILABLE',
+    quantity: null,
+    unit: null,
+    serialNumber: null,
+    acquiredOn: null,
     notes: null,
     warnings: [],
     ...overrides,
@@ -199,6 +222,90 @@ describe('árbol de ubicaciones', () => {
     await userEvent.click(within(despensa!).getByRole('button', { name: 'Borrar' }))
 
     expect(await screen.findByText('No se puede borrar: todavía hay cosas guardadas ahí.')).toBeInTheDocument()
+  })
+
+  it('la capacidad se declara al crear, con su medida', async () => {
+    const { calls } = await signInAndVisit('Sitios', {
+      'GET /api/v1/locations?size=200': LOCATIONS,
+      'POST /api/v1/locations': {
+        status: 201,
+        body: { id: 'loc-3', name: 'Estantería', type: 'SHELF', parentLocationId: 'loc-2', capacity: null, notes: null },
+      },
+    })
+
+    await userEvent.type(await screen.findByLabelText('Nombre'), 'Estantería')
+    await userEvent.selectOptions(screen.getByLabelText('Tipo'), 'SHELF')
+    await userEvent.selectOptions(screen.getByLabelText('Dentro de'), 'loc-2')
+
+    // Los dos campos de medida no existen hasta que se dice en qué se mide.
+    expect(screen.queryByLabelText('Máximo')).not.toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByLabelText('Capacidad (opcional)'), 'UNITS')
+    await userEvent.type(await screen.findByLabelText('Máximo'), '12')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Crear ubicación' }))
+
+    const created = calls.find((call) => call.method === 'POST' && call.url.endsWith('/locations'))
+    expect(created?.body).toMatchObject({
+      name: 'Estantería',
+      type: 'SHELF',
+      parentLocationId: 'loc-2',
+      // La unidad se propone sola al elegir el tipo, para que el campo no salga
+      // vacío obligando a inventar una palabra.
+      capacity: { type: 'UNITS', max: 12, unit: 'cajas' },
+    })
+  })
+
+  it('editar manda los cuatro campos, porque en un PATCH ausente conserva y nulo borra', async () => {
+    const { calls } = await signInAndVisit('Sitios', {
+      'GET /api/v1/locations?size=200': LOCATIONS,
+      'PATCH /api/v1/locations/loc-2': {
+        status: 200,
+        body: { id: 'loc-2', name: 'Despensa grande', type: 'ROOM', parentLocationId: 'loc-1', capacity: null, notes: null },
+      },
+    })
+
+    const tree = await screen.findByRole('tree', { name: 'Ubicaciones del hogar' })
+    const [, despensa] = within(tree).getAllByRole('treeitem')
+    await userEvent.click(within(despensa!).getByRole('button', { name: 'Editar' }))
+
+    const form = await screen.findByRole('heading', { name: 'Editar «Despensa»' })
+    // El foco se va al formulario: quien lo abrió con el teclado estaba en un
+    // botón del árbol, y el formulario aparece en otro sitio de la página.
+    expect(form).toHaveFocus()
+
+    const name = screen.getAllByLabelText('Nombre')[1]!
+    await userEvent.clear(name)
+    await userEvent.type(name, 'Despensa grande')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    const saved = calls.find((call) => call.method === 'PATCH' && call.url.endsWith('/locations/loc-2'))
+    expect(saved?.body).toEqual({
+      name: 'Despensa grande',
+      type: 'ROOM',
+      parentLocationId: 'loc-1',
+      capacity: null,
+    })
+  })
+
+  it('no se ofrece como destino ni ella misma ni lo que cuelga de ella', async () => {
+    await signInAndVisit('Sitios', {
+      'GET /api/v1/locations?size=200': LOCATIONS,
+    })
+
+    const tree = await screen.findByRole('tree', { name: 'Ubicaciones del hogar' })
+    const [casa] = within(tree).getAllByRole('treeitem')
+    // El primero: un `treeitem` con hijas los contiene dentro, así que ahí abajo
+    // hay más botones «Editar» que no son el suyo. En orden de DOM, la fila del
+    // nodo va antes que su lista de hijas.
+    await userEvent.click(within(casa!).getAllByRole('button', { name: 'Editar' })[0]!)
+
+    // Meter la casa dentro de su propia despensa es el ciclo que el servidor
+    // rechaza con LOCATION_CYCLE. Aquí ni se ofrece: la negativa del servidor es
+    // la red de seguridad, no el camino normal.
+    const parent = screen.getAllByLabelText('Dentro de')[1]!
+    expect(within(parent).getByRole('option', { name: 'Nada: es una vivienda' })).toBeInTheDocument()
+    expect(within(parent).queryByRole('option', { name: 'Casa del Pinar' })).not.toBeInTheDocument()
+    expect(within(parent).queryByRole('option', { name: 'Despensa' })).not.toBeInTheDocument()
   })
 })
 
@@ -369,5 +476,84 @@ describe('existencias', () => {
     expect(await screen.findByText('Agotado')).toBeInTheDocument()
     expect(screen.getByText('Disponible')).toBeInTheDocument()
     expect(screen.getByText('De baja')).toBeInTheDocument()
+  })
+})
+
+describe('identificación de un duradero', () => {
+  const DETAIL_ROUTES: Record<string, StubbedResponse> = {
+    'GET /api/v1/assets?size=200': { status: 200, body: { items: [durable()], page: 0, size: 200, total: 1 } },
+    'GET /api/v1/assets/asset-2': { status: 200, body: durable() },
+    'GET /api/v1/locations?size=200': LOCATIONS,
+    'GET /api/v1/documents?assetId=asset-2&size=200': {
+      status: 200,
+      body: { items: [], page: 0, size: 200, total: 0 },
+    },
+  }
+
+  it('el número de serie y la fecha se rellenan después del alta', async () => {
+    const { calls } = await signInAndVisit('Inventario', {
+      ...DETAIL_ROUTES,
+      'PATCH /api/v1/assets/asset-2': {
+        status: 200,
+        body: durable({ serialNumber: 'JU-88-2019-4471', acquiredOn: '2019-11-03' }),
+      },
+    })
+
+    await userEvent.click(await screen.findByRole('link', { name: /Taladro/ }))
+    await userEvent.type(await screen.findByLabelText('Número de serie'), 'JU-88-2019-4471')
+    await userEvent.type(screen.getByLabelText('Fecha de adquisición'), '2019-11-03')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    const saved = calls.find((call) => call.method === 'PATCH' && call.url.endsWith('/assets/asset-2'))
+    expect(saved?.body).toEqual({ serialNumber: 'JU-88-2019-4471', acquiredOn: '2019-11-03' })
+  })
+
+  it('vaciarlos manda null, que borra, y no cadena vacía', async () => {
+    const { calls } = await signInAndVisit('Inventario', {
+      ...DETAIL_ROUTES,
+      'GET /api/v1/assets/asset-2': {
+        status: 200,
+        body: durable({ serialNumber: 'MAL-COPIADO', acquiredOn: '2019-11-03' }),
+      },
+      'PATCH /api/v1/assets/asset-2': { status: 200, body: durable() },
+    })
+
+    await userEvent.click(await screen.findByRole('link', { name: /Taladro/ }))
+    await userEvent.clear(await screen.findByLabelText('Número de serie'))
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    const saved = calls.find((call) => call.method === 'PATCH' && call.url.endsWith('/assets/asset-2'))
+    expect(saved?.body).toMatchObject({ serialNumber: null })
+  })
+
+  it('la fecha se lee como día de calendario, no como instante UTC', async () => {
+    await signInAndVisit('Inventario', {
+      ...DETAIL_ROUTES,
+      'GET /api/v1/assets/asset-2': { status: 200, body: durable({ acquiredOn: '2019-11-03' }) },
+    })
+
+    await userEvent.click(await screen.findByRole('link', { name: /Taladro/ }))
+
+    // Con `new Date('2019-11-03')` esto sería el 2 de noviembre en cualquier huso
+    // al oeste de Greenwich: la cadena se interpreta como medianoche UTC.
+    expect(await screen.findByText('3 de noviembre de 2019')).toBeInTheDocument()
+  })
+
+  it('una existencia no ofrece identificación: no hay unidad física de la que hablar', async () => {
+    await signInAndVisit('Inventario', {
+      'GET /api/v1/assets?size=200': { status: 200, body: { items: [stockItem()], page: 0, size: 200, total: 1 } },
+      'GET /api/v1/assets/asset-1': { status: 200, body: stockItem() },
+      'GET /api/v1/locations?size=200': LOCATIONS,
+      'GET /api/v1/assets?articleId=art-1&size=200': {
+        status: 200,
+        body: { items: [stockItem()], page: 0, size: 200, total: 1 },
+      },
+    })
+
+    await userEvent.click(await screen.findByRole('link', { name: /Azúcar/ }))
+    await screen.findByRole('button', { name: 'Guardar cantidad' })
+
+    expect(screen.queryByLabelText('Número de serie')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Fecha de adquisición')).not.toBeInTheDocument()
   })
 })

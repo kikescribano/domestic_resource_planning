@@ -39,11 +39,19 @@ como **un solo `role="tree"`** con `aria-level` por nodo, compuesto en memoria a
 partir de `GET /locations` —la carga «de una vez» de las dos que describe este
 documento—, y la ubicación se elige con un `SelectField` plano.
 
+**Mover un nodo ya existe**, y con la primera de las tres reglas del selector
+cumplida: al editar una ubicación, ni ella misma ni sus descendientes aparecen
+como destino, así que el `LOCATION_CYCLE` del servidor vuelve a ser lo que tenía
+que ser —la red de seguridad y no el camino normal—. El formulario va **fuera del
+árbol**: dentro de un `treeitem` mezclaría dos formas de recorrer —las flechas y
+el tabulador— y a 375 px caería en una columna sangrada.
+
 De lo que este patrón describe, tres cosas siguen **previstas**: el árbol se pinta
 siempre desplegado, así que no hay plegado ni carga por niveles bajo demanda; el
 selector de destino es una lista plana y no un árbol, así que no dibuja la
-jerarquía al elegir; y **no hay migaja de pan** en la ficha de un asset, que es lo
-que necesitaría los antepasados de un nodo.
+jerarquía al elegir —dos armarios que se llamen igual en cuartos distintos siguen
+siendo indistinguibles ahí—; y **no hay migaja de pan** en la ficha de un asset,
+que es lo que necesitaría los antepasados de un nodo.
 
 **El backend está entero**: las seis operaciones de ubicaciones, con el anti-ciclo
 en el caso de uso y probado hasta el ciclo de tres nodos.
@@ -223,3 +231,4 @@ palabras.
 |---|---|---|
 | 2026-08-12 | Creación del documento. El patrón está previsto: el backend de ubicaciones existe y la interfaz no. | Equipo DRP |
 | 2026-08-17 | Corrección de estado al cerrar la Fase 1: el patrón está **implementado en su forma mínima** —un solo `role="tree"` con `aria-level`, cargado de una vez— y no previsto, como decía desde el Hito 2. Quedan previstos el plegado, la carga por niveles, el selector en forma de árbol y la migaja de pan. | Equipo DRP |
+| 2026-08-17 | **Mover un nodo ya existe**: editar una ubicación permite cambiar nombre, tipo, padre y capacidad, y el selector no ofrece ni el propio nodo ni sus descendientes —la primera de las tres reglas del selector, cumplida—. El formulario va fuera del árbol, y el porqué queda escrito. Siguen previstos el plegado, la carga por niveles, el selector en forma de árbol y la migaja de pan. | Equipo DRP |
