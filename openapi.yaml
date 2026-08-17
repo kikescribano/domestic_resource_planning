@@ -20,10 +20,10 @@ info:
   license:
     name: Ver LICENSE del repositorio
 servers:
-  - url: https://api.drp.example/api/v1
-    description: Entorno ilustrativo (el real se fija al elegir el VPS, al cerrar la Fase 1)
   - url: http://localhost:8080/api/v1
     description: Desarrollo local, levantado por compose.yaml
+  - url: https://api.drp.example/api/v1
+    description: Entorno ilustrativo (el real se fija al elegir el VPS, al cerrar la Fase 1)
 
 tags:
   - name: households

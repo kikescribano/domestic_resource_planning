@@ -154,3 +154,15 @@ drp:
     # al frontend, no a la API: quien recibe el correo abre una pantalla, no un
     # endpoint.
     base-url: http://localhost:5173
+
+springdoc:
+  api-docs:
+    # Usa el openapi.yaml del repositorio en lugar de generar uno desde anotaciones
+    enabled: true
+  swagger-ui:
+    enabled: true
+    # URL del openapi.yaml en el repositorio raiz
+    url: /openapi.yaml
+    # Nombre que aparece en la pestaña y en la cabecera
+    swagger-ui-standalone-presets: true
+    operations-sorter: method

@@ -40,6 +40,9 @@ dependencies {
     // Security y no hay que mantenerla a mano.
     implementation("org.springframework.security:spring-security-oauth2-jose")
 
+    // Swagger UI - documentacion interactiva de la API (README 5.4.2)
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5")
+
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
@@ -60,6 +63,18 @@ dependencies {
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+/**
+ * Copia el openapi.yaml de la raiz del repositorio al classpath, para que
+ * Swagger UI lo sirva (ver OpenApiController). No se versiona una copia en
+ * src/main/resources porque el contrato tiene una unica fuente de verdad
+ * (CLAUDE.md): esta tarea la reconstruye en cada build.
+ */
+tasks.named<ProcessResources>("processResources") {
+    from(rootDir.parentFile) {
+        include("openapi.yaml")
+    }
 }
 
 tasks.withType<Test> {
