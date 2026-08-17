@@ -242,15 +242,21 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
      *
      * `withinScopeOf` hace `trimEnd('/')`, asi que para el filtro
      * `/api/v1/loans/{id}/` **es** la ruta propia. Para Spring no lo es: desde la
-     * version 6 no hay correspondencia por barra final. Medido, el resultado es un
-     * `500 INTERNAL_ERROR` --con sesion del hogar tambien, asi que no es cosa de
-     * la credencial-- y lo que importa aqui es que ese 500 **no lleva nada del
-     * prestamo dentro**.
+     * version 6 no hay correspondencia por barra final, de modo que ahi no hay
+     * manejador.
      *
-     * Se deja el `trimEnd` como esta: hoy no concede nada, y estrechar el filtro
-     * taparia con un `401` un defecto de enrutado que sigue estando ahi para
-     * cualquier sesion. Lo que no puede cambiar sin que esto avise es que por esa
-     * ruta salgan datos.
+     * **Esta prueba ya ha sobrevivido a que ese desenlace cambiara**, que es para
+     * lo que se escribio asi. Cuando se midio por primera vez, una ruta sin
+     * manejador daba `500 INTERNAL_ERROR`; con el arreglo de rutas inexistentes
+     * da `404`, medido con las dos credenciales --token acotado y sesion del
+     * hogar-- asi que sigue sin ser cosa de la credencial. Lo que la prueba
+     * afirma no es el codigo sino **la propiedad de seguridad**: por esa ruta no
+     * sale un `200` ni un solo dato del prestamo. Pinar el codigo la habria roto
+     * al arreglar el enrutado, y arreglar el enrutado es justo lo que no debe
+     * requerir tocar una prueba de contencion.
+     *
+     * Se deja el `trimEnd` como esta: no concede nada, y estrechar el filtro
+     * cambiaria un `404` correcto por un `401` que diria menos verdad.
      */
     @Test
     @DisplayName("la barra final no sirve datos, aunque el filtro la acepte")
