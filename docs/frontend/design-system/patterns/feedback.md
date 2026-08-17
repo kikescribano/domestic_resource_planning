@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-12 |
+| Última revisión | 2026-08-17 |
 
 ## Propósito
 
@@ -38,11 +38,11 @@ Esa tercera es la que entra con el Hito 2 y la que más fácil es pintar mal.
 |---|---|
 | Aviso en el sitio donde ocurrió, con sus cuatro tonos | **Implementado** (`Notice`) |
 | Reparto entre error de campo y fallo de operación | **Implementado** en ocho formularios |
-| Traducción de código a lenguaje de casa | **Implementado a medias**: existe, no se comparte |
-| Advertencia sobre una operación con éxito | **Previsto**: no hay canal ni componente |
+| Traducción de código a lenguaje de casa | **Implementado** y compartido: `humanMessage` en [`client.ts`](../../../../frontend/src/api/client.ts), que usan todas las rutas |
+| Advertencia sobre una operación con éxito | **Implementado** en el Hito 2: el array `warnings` de la respuesta se pinta con un aviso por advertencia en [`assets.tsx`](../../../../frontend/src/routes/assets.tsx) |
 | Aviso efímero con deshacer | **Previsto**: no hay `Toast` |
-| Error bloqueante a pantalla completa | **Previsto**: no hay nada |
-| Sesión caducada | **Previsto**: no hay nada, y es un hueco real |
+| Error bloqueante a pantalla completa | **Previsto** como pieza del sistema. Hay un caso resuelto a mano —`BrokenLink`, en la pantalla externa de un préstamo— y tres sin resolver |
+| Sesión caducada | **Resuelto por otro camino**: la sesión se renueva con el refresh en vez de morir a los quince minutos, así que la pantalla de sesión caducada ya no es el remedio principal. Sigue haciendo falta para cuando el refresh también falla |
 
 ## Contenido
 
@@ -236,3 +236,4 @@ en un correo o en otras sesiones.
 | Fecha | Cambio | Autor |
 |---|---|---|
 | 2026-08-12 | Creación del documento con las tres respuestas de la API, el aviso de capacidad del Hito 2 y el reparto por código. | Equipo DRP |
+| 2026-08-17 | Corrección de estado al cerrar la Fase 1: el canal de advertencias y la traducción compartida de códigos están **implementados**, y la sesión caducada se resolvió por otro camino —renovación con el refresh—. El error bloqueante sigue previsto como pieza, con un caso resuelto a mano en la pantalla externa de un préstamo. | Equipo DRP |

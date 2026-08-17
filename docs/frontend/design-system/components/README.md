@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-13 |
+| Última revisión | 2026-08-17 |
 
 ## Propósito
 
@@ -66,18 +66,22 @@ con sus siete puntos. No se reordena ni se recorta.
 | `UploadField` | [`upload-field.md`](upload-field.md) | **Implementado** | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
 | `FileGallery` | [`file-gallery.md`](file-gallery.md) | **Implementado** | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
 | `Avatar` | [`avatar.md`](avatar.md) | **Implementado** | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
-| `LoanExternalPage` | [`loan-external-page.md`](loan-external-page.md) | **Prevista** | Sin construir (Hito 4) |
+| `QuotaMeter` | Sin ficha | **Implementado** en el Hito 3 | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
+| `LoanExternalPage` | [`loan-external-page.md`](loan-external-page.md) | **Implementado** como `ExternalLoanPage` | [`routes/loans.tsx`](../../../../frontend/src/routes/loans.tsx) |
 
-**Nueve componentes implementados en un único fichero de 376 líneas, y solo seis
-con ficha**: `SelectField`, `PageHeading` y `EmptyState` entraron con el Hito 2 y
-se quedaron sin la suya. Las tres del Hito 3 van al revés —ficha sin
-implementación—, y su primera línea lo dice.
+**Trece componentes reutilizables —nueve en `primitives.tsx` y cuatro en
+`files.tsx`— más una pantalla, y diez de las catorce filas tienen ficha**:
+`SelectField`, `PageHeading` y `EmptyState` entraron con el Hito 2 sin la suya, y
+`QuotaMeter` con el Hito 3, documentado como variante dentro de la ficha de
+`UploadField` y acabando en pieza aparte.
 
-La del Hito 4 va igual, y es la más extrema de las cuatro: `LoanExternalPage` no
-es una primitiva sino **una pantalla entera sin sesión y sin shell**, la única
-superficie del producto que se ve sin cuenta. Su ficha argumenta por qué es
-componente y no patrón, y propone la única primitiva nueva que el hito necesita,
-`BlockingError`.
+Porque `LoanExternalPage` no es una primitiva sino **una pantalla entera sin
+sesión y sin shell**, la única superficie del producto que se ve sin cuenta: por
+eso vive en su ruta y no en el sistema de diseño, y su ficha empieza argumentando
+por qué aun así es componente y no patrón. Es también la cuarta ficha escrita
+**antes** que su implementación, y la que mejor demuestra para qué sirve hacerlo:
+encontró un hueco del contrato cuando no había código, y dejó escrita una regla de
+anuncios que al cerrar la fase delató un defecto real.
 
 Sigue sin haber un directorio por componente, ni una carpeta de historias, ni una
 galería: mientras quepan en un fichero que se lee de una sentada, partirlos
@@ -87,10 +91,13 @@ decisión de dónde partir está más abajo.
 
 ## Lo que falta por construir
 
-Todos estos están **previstos**: ninguno tiene implementación hoy.
+Todos estos están **previstos**: ninguno tiene implementación hoy. **Con la Fase 1
+cerrada, ya no los pide ningún hito en curso**: quedan como lista de lo que el
+sistema de diseño no cubre, y cada uno se construirá cuando una pantalla lo
+necesite de verdad.
 
-Del Hito 2, que se cerró sin ellos. Los patrones que los usan sí están escritos y
-dicen en cada punto qué pieza falta: ver
+Los cinco del Hito 2, que se cerró sin ellos y siguen sin construirse. Los
+patrones que los usan sí están escritos y dicen en cada punto qué pieza falta: ver
 [`patterns/`](../patterns/README.md).
 
 | Componente previsto | Por qué se pide |
@@ -101,19 +108,17 @@ dicen en cada punto qué pieza falta: ver
 | `Dialog` y hoja inferior | La confirmación de baja y las operaciones de existencias, que en móvil son hoja y en escritorio diálogo |
 | `Pagination` | Las colecciones del contrato paginan todas igual; hoy no hay ningún control que lo pinte |
 
-Del Hito 3, que es lo que estas tres fichas nuevas especifican:
+Y uno del Hito 4, que tampoco se construyó:
 
 | Componente previsto | Por qué se pide |
 |---|---|
-| [`UploadField`](upload-field.md) | Subir con progreso **real** —`XMLHttpRequest`, porque `fetch` no lo da—, con la subida separada de adjuntar y los tres errores del contrato |
-| [`FileGallery`](file-gallery.md) | La rejilla de miniaturas de una entidad, con el marcador del PDF y la tolerancia a que una URL firmada caduque en pantalla |
-| [`Avatar`](avatar.md) | La cara de una persona, que se pinta en sitios donde no hay ninguna subida y cuya subida es otra operación distinta |
+| `BlockingError` | La vista entera de error, con ilustración y como mucho una salida. El Hito 4 resolvió a mano el más fácil de sus cuatro casos —el enlace roto, que no lleva acción— con `BrokenLink`, local a su ruta; los otros tres siguen esperándola. Está argumentado en [`loan-external-page.md`](loan-external-page.md) |
 
-Dos que el Hito 3 pide y **no** tienen ficha porque no son anatomía nueva: el
-medidor de cuota de `GET /storage`, que es la misma barra determinada de
-`UploadField` con otra semántica —`meter` en lugar de `progressbar`—, y la celda
-de fichero, que sale de `FileGallery` el día que la pantalla de almacenamiento
-del hogar la necesite. Los dos están anotados en la ficha que les corresponde.
+Lo del Hito 3 **sí se construyó**: `UploadField`, `FileGallery` y `Avatar` están
+en el registro de arriba, y con ellos el medidor de cuota, que su ficha
+documentaba como variante y acabó siendo pieza aparte. La celda de fichero sigue
+sin salir de `FileGallery`, y saldrá el día que la pantalla de almacenamiento del
+hogar la necesite.
 
 ## Reglas que ningún componente puede saltarse
 
@@ -144,10 +149,12 @@ porque es donde se incumplen:
   color y etiqueta, sin icono. El Hito 3 añade a la lista el icono de documento,
   el de persona y el de subir: cada hito que pasa hace más caro dibujarlos a mano
   y más raro no haber decidido.
-- **Dónde vive el segundo componente.** `primitives.tsx` va por 376 líneas y nueve
-  componentes, y las tres piezas del Hito 3 no son pequeñas. El criterio natural
-  —los primitivos por un lado, las piezas con estado propio y llamadas a la API
-  por otro— hay que fijarlo antes de escribirlas, no después.
+- ~~**Dónde vive el segundo componente.**~~ **Resuelto en el Hito 3**, y con el
+  criterio que se había propuesto: los primitivos siguen en `primitives.tsx` (376
+  líneas, nueve componentes) y las piezas con estado propio y peticiones en curso
+  fueron a `files.tsx` (441 líneas, cuatro). El Hito 4 confirmó el criterio por el
+  otro extremo: `ExternalLoanPage` no entró en ninguno de los dos, porque una
+  pantalla no es una pieza del sistema de diseño aunque tenga ficha.
 - **El foco de un control cuyo elemento enfocable está oculto.** La regla 2 dice
   que el foco no se declara en un componente, y `UploadField` no puede cumplirla:
   su elemento enfocable es un `<input type="file">` invisible, así que el anillo
@@ -170,3 +177,4 @@ porque es donde se incumplen:
 | 2026-08-12 | Creación del directorio con las seis fichas de los componentes que existen, y el registro de los que el Hito 2 va a pedir. | Equipo DRP |
 | 2026-08-14 | Las tres anatomías del Hito 3 pasan de previstas a **implementadas**, en un fichero propio —`files.tsx`— y no en `primitives.tsx`: traen estado y una petición en curso, que es otra clase de complejidad. Se añade `QuotaMeter`, que la ficha de `UploadField` documentaba como variante y acabó siendo pieza aparte. | Equipo DRP |
 | 2026-08-13 | Se corrige el registro, que había quedado desfasado al cerrar el Hito 2: son **nueve** componentes en 376 líneas, no seis en 266, y `SelectField`, `PageHeading` y `EmptyState` están implementados sin ficha. Se dan de alta las tres anatomías del Hito 3 —`UploadField`, `FileGallery` y `Avatar`—, previstas y con ficha, y se anota la excepción de foco que trae la primera. | Equipo DRP |
+| 2026-08-17 | Cierre documental de la Fase 1. `LoanExternalPage` pasa a **implementada** —vive en su ruta y no en el sistema de diseño, porque es una pantalla— y `QuotaMeter` entra en el registro, del que faltaba. Se corrige «lo que falta por construir», que seguía dando por no construidas las tres piezas del Hito 3 mientras el registro las daba por hechas: la lista queda en los cinco del Hito 2 más `BlockingError`, y deja de estar atada a un hito en curso porque ya no hay ninguno. | Equipo DRP |

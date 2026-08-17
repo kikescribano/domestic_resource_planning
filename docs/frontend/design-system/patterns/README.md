@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-12 |
+| Última revisión | 2026-08-17 |
 
 ## Propósito
 
@@ -15,14 +15,16 @@ jerarquía, enterarse de lo que ha pasado y llegar de una pantalla a otra.
 
 Un componente responde a «qué es esto y cómo se comporta». Un patrón responde a
 «en qué orden van las piezas, y por qué esta y no otra». La diferencia importa
-porque casi todo lo que el Hito 2 tiene que construir **no es un componente
-nuevo**: es una composición de los que ya hay, más cuatro o cinco que faltan.
+porque casi nada de lo que el Hito 2 tuvo que construir **era un componente
+nuevo**: era una composición de los que ya había, más cuatro o cinco que faltaban
+y en su mayoría siguen faltando.
 
 Estos documentos siguen la misma regla que las
 [fichas de componente](../components/README.md): **describen lo que hay, y
 marcan como previsto lo que no**. Un patrón entero en «previsto» es una respuesta
-correcta y frecuente aquí: dos de los cinco describen pantallas que todavía no
-existen, y decirlo es lo que evita que alguien las dé por hechas.
+correcta aquí: al nacer lo estaban dos de los cinco, y **hoy queda uno** —el
+listado paginado, que sigue sin existir porque ninguna pantalla del core lo pidió—.
+Decirlo es lo que evita que alguien lo dé por hecho.
 
 ## Alcance
 
@@ -49,10 +51,10 @@ existen, y decirlo es lo que evita que alguien las dé por hechas.
 | Patrón | Documento | Estado |
 |---|---|---|
 | Formulario | [`form.md`](form.md) | **Implementado** en su forma de una columna; la operación corta sobre una fila, prevista |
-| Feedback | [`feedback.md`](feedback.md) | **Implementado** el aviso en el sitio; el aviso efímero, el error bloqueante y el canal de advertencias, previstos |
+| Feedback | [`feedback.md`](feedback.md) | **Implementado** el aviso en el sitio y el canal de advertencias; el aviso efímero y el error bloqueante, previstos |
 | Navegación | [`navigation.md`](navigation.md) | **Implementado** el shell; el anuncio de ruta y el conmutador de tema, previstos |
 | Listado | [`listing.md`](listing.md) | **Previsto**: no hay ningún listado paginado |
-| Jerarquía navegable | [`hierarchy.md`](hierarchy.md) | **Previsto** en la interfaz; el backend de ubicaciones sí existe |
+| Jerarquía navegable | [`hierarchy.md`](hierarchy.md) | **Implementado** en el Hito 2: [`locations.tsx`](../../../../frontend/src/routes/locations.tsx) pinta un `role="tree"` con `aria-level` |
 
 ## La regla que comparten los cinco
 
@@ -95,7 +97,7 @@ escriba:
 ## Referencias
 
 - [`../README.md`](../README.md): el índice del sistema de diseño.
-- [`components/`](../components/README.md): las seis fichas de lo que existe y la
+- [`components/`](../components/README.md): las fichas de lo que existe y la
   lista de lo que falta.
 - [`foundations/`](../foundations/README.md) y [`tokens/`](../tokens/README.md)
 - [`look-and-feel.md`](../../product-design/look-and-feel.md): los cinco
@@ -108,3 +110,4 @@ escriba:
 | Fecha | Cambio | Autor |
 |---|---|---|
 | 2026-08-12 | Creación del directorio con los cinco patrones que el Hito 2 necesita: tres implementados a medias y dos previstos enteros. | Equipo DRP |
+| 2026-08-17 | Corrección de estado al cerrar la Fase 1, que el registro no había recibido desde su creación: la **jerarquía navegable está implementada** —árbol con `role="tree"` desde el Hito 2— y el **canal de advertencias** también, así que de los cinco patrones queda uno entero en previsto, el listado paginado. | Equipo DRP |
