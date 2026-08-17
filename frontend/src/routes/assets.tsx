@@ -6,6 +6,7 @@ import {
   DOCUMENT_TYPE_LABELS,
   UNIT_LABELS,
   api,
+  formatDay,
   humanMessage,
   type ApiWarning,
   type Asset,
@@ -183,7 +184,13 @@ export function NewAssetPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [failure, setFailure] = useState<string | null>(null)
-  const [draft, setDraft] = useState({ name: '', categoryId: '', locationId: '' })
+  const [draft, setDraft] = useState({
+    name: '',
+    categoryId: '',
+    locationId: '',
+    serialNumber: '',
+    acquiredOn: '',
+  })
 
   const categories = useQuery({
     queryKey: ['categories'],
@@ -202,6 +209,11 @@ export function NewAssetPage() {
           type: 'DURABLE',
           categoryId: draft.categoryId,
           ...(draft.locationId ? { location: { type: 'LOCATION', id: draft.locationId } } : {}),
+          // Vacío es ausente, no cadena vacía: son opcionales de verdad y el
+          // contrato no declara «sin número de serie» como un número de serie
+          // que es «».
+          ...(draft.serialNumber.trim() ? { serialNumber: draft.serialNumber.trim() } : {}),
+          ...(draft.acquiredOn ? { acquiredOn: draft.acquiredOn } : {}),
         },
         accessToken,
       ),
@@ -260,6 +272,20 @@ export function NewAssetPage() {
             </option>
           ))}
         </SelectField>
+
+        <Field
+          label="Número de serie (opcional)"
+          value={draft.serialNumber}
+          onChange={(event) => setDraft({ ...draft, serialNumber: event.target.value })}
+          hint="Se puede rellenar después: la etiqueta suele estar detrás del aparato."
+        />
+
+        <Field
+          label="Fecha de adquisición (opcional)"
+          type="date"
+          value={draft.acquiredOn}
+          onChange={(event) => setDraft({ ...draft, acquiredOn: event.target.value })}
+        />
 
         {failure && <Notice tone="danger">{failure}</Notice>}
 
@@ -456,6 +482,13 @@ export function AssetDetailPage() {
     onError: (error) => setFailure(humanMessage(error)),
   })
 
+  const identify = useMutation({
+    mutationFn: (patch: { serialNumber: string | null; acquiredOn: string | null }) =>
+      api.updateAsset(id, patch, accessToken),
+    onSuccess: refresh,
+    onError: (error) => setFailure(humanMessage(error)),
+  })
+
   const merge = useMutation({
     mutationFn: (targetAssetId: string) => api.mergeStockItems(id, targetAssetId, accessToken),
     onSuccess: (target) => {
@@ -497,6 +530,12 @@ export function AssetDetailPage() {
           </Detail>
           <Detail label="Categoría">{current.category ?? '—'}</Detail>
           {quantity && <Detail label="Cantidad">{quantity}</Detail>}
+          {current.type === 'DURABLE' && (
+            <>
+              <Detail label="Número de serie">{current.serialNumber ?? '—'}</Detail>
+              <Detail label="Adquirido">{formatDay(current.acquiredOn)}</Detail>
+            </>
+          )}
           {current.articleId && (
             // Lo heredado se señala: el nombre y la categoría de este asset son
             // los de su artículo, así que se corrigen allí y no aquí.
@@ -519,6 +558,15 @@ export function AssetDetailPage() {
               onMove={move.mutate}
               busy={move.isPending}
             />
+
+            {current.type === 'DURABLE' && (
+              <IdentificationForm
+                serialNumber={current.serialNumber}
+                acquiredOn={current.acquiredOn}
+                onSave={identify.mutate}
+                busy={identify.isPending}
+              />
+            )}
 
             {current.type === 'CONSUMABLE' && (
               <>
@@ -572,6 +620,61 @@ function Warnings({ warnings }: { warnings: ApiWarning[] }) {
         </Notice>
       ))}
     </>
+  )
+}
+
+/**
+ * El número de serie y la fecha de adquisición, que casi nunca se saben al dar
+ * de alta.
+ *
+ * Es la razón de que esto sea un formulario de la ficha y no solo dos campos del
+ * alta: la etiqueta con el número está pegada detrás del aparato, así que se
+ * apunta el día que alguien lo mueve —o el día que hay que reclamar la garantía,
+ * que es cuando de verdad hace falta.
+ *
+ * Vaciar un campo manda `null`, que **borra**, y no cadena vacía: un número de
+ * serie mal copiado se quita, y quedarse con `""` sería fingir que se conoce.
+ */
+function IdentificationForm({
+  serialNumber,
+  acquiredOn,
+  onSave,
+  busy,
+}: {
+  serialNumber: string | null
+  acquiredOn: string | null
+  onSave: (patch: { serialNumber: string | null; acquiredOn: string | null }) => void
+  busy: boolean
+}) {
+  const [draft, setDraft] = useState({ serialNumber: serialNumber ?? '', acquiredOn: acquiredOn ?? '' })
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    onSave({
+      serialNumber: draft.serialNumber.trim() || null,
+      acquiredOn: draft.acquiredOn || null,
+    })
+  }
+
+  return (
+    <form onSubmit={submit} className="flex max-w-form flex-col gap-2">
+      <h2 className="text-body font-medium text-ink">Identificación</h2>
+      <Field
+        label="Número de serie"
+        value={draft.serialNumber}
+        onChange={(event) => setDraft({ ...draft, serialNumber: event.target.value })}
+        hint="Lo que distingue dos unidades idénticas, y lo que pide un fabricante al reclamar una garantía."
+      />
+      <Field
+        label="Fecha de adquisición"
+        type="date"
+        value={draft.acquiredOn}
+        onChange={(event) => setDraft({ ...draft, acquiredOn: event.target.value })}
+      />
+      <Button type="submit" busy={busy} busyLabel="Guardando…">
+        Guardar
+      </Button>
+    </form>
   )
 }
 
