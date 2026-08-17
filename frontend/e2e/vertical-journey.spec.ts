@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 
 /**
  * El recorrido vertical de la Fase 1, en un navegador de verdad.
@@ -13,8 +13,16 @@ import { expect, test, type Page } from '@playwright/test'
  * cubren mejor las de recorrido del backend, que hablan con PostgreSQL real y
  * pueden mirar los bytes en disco. Lo que solo se puede comprobar aquí es que
  * **una persona llega**: que el enlace del correo abre una pantalla utilizable,
- * que el foco cae donde se dijo, que el contraste es el que se auditó y que a
- * 375 px no se rompe nada.
+ * que el foco cae donde se dijo, que el contraste es el que se auditó y que el
+ * reflujo aguanta en todo el rango declarado.
+ *
+ * Esas cuatro cosas son, exactamente, la condición que la [ADR-006] pone para
+ * que `look-and-feel.md` pase de `Borrador` a `Vigente`: **contraste, foco
+ * visible y navegación completa por teclado, a 375 px y en ultrawide**. Por eso
+ * el recorrido no solo hace clic: en los dos puntos donde una persona decide
+ * algo llega con el tabulador, comprueba el anillo de foco en cada parada y
+ * pulsa `Enter`. Un recorrido que solo hace clic deja sin medir la mitad del
+ * compromiso.
  *
  * Corre contra el `compose.yaml`, así que PostgreSQL y Mailpit tienen que estar
  * arriba. El correo se lee de Mailpit **como lo leería una persona**, igual que
@@ -23,6 +31,27 @@ import { expect, test, type Page } from '@playwright/test'
  */
 
 const MAILPIT = 'http://localhost:8025'
+
+/** El ancho por defecto del proyecto, al que se vuelve tras medir el reflujo. */
+const DESKTOP = { width: 1280, height: 720 }
+
+/**
+ * Los tres anchos en los que se mide el reflujo.
+ *
+ * 320 px es donde lo mide el criterio 1.4.10 y 375 es el suelo que declara el
+ * diseño: entre uno y otro caben 55 px en los que un `min-width` olvidado se
+ * nota o no se nota, así que hay que pasar por los dos. El techo va aparte
+ * porque su fallo es el contrario —la línea de texto que se estira sin freno—, y
+ * ese no lo delata ninguna medida del documento.
+ */
+const WIDTHS = [
+  { name: '320 px', size: { width: 320, height: 640 } },
+  { name: '375 px', size: { width: 375, height: 812 } },
+  { name: 'ultrawide', size: { width: 2560, height: 1080 } },
+]
+
+/** El tope de `--container-shell`, 96rem, que es lo que impide la línea infinita. */
+const SHELL_CAP = 1536
 
 test.describe('recorrido vertical', () => {
   test('de dar de alta un hogar a devolver un préstamo desde el correo', async ({ page, browser }) => {
@@ -62,8 +91,20 @@ test.describe('recorrido vertical', () => {
     // --- 3. Prestarlo a alguien de fuera ------------------------------------
     await navigateTo(page, 'Préstamos', '/prestamos')
     await checkAccessibility(page, 'préstamos del hogar')
+    await checkReflow(page, 'préstamos del hogar')
 
-    await page.getByRole('button', { name: 'Prestar algo' }).click()
+    // Con el teclado y desde el principio de la página, que es como llega quien
+    // no usa el ratón. La primera parada tiene que ser el salto al contenido: si
+    // deja de serlo, recorrer la aplicación con el tabulador pasa por los ocho
+    // enlaces de la navegación en cada pantalla.
+    const prestar = page.getByRole('button', { name: 'Prestar algo' })
+    await startKeyboardAtTop(page, prestar)
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('link', { name: 'Saltar al contenido' })).toBeFocused()
+    await expectFocusRing(page, 'el salto al contenido')
+
+    await tabTo(page, prestar, 'Prestar algo')
+    await page.keyboard.press('Enter')
     await page.getByLabel('Qué prestas').selectOption({ label: 'Taladro' })
     await page.getByLabel('A quién').selectOption({ label: 'Otra persona' })
     await page.getByLabel('Su nombre').fill('Vecino del 3.º')
@@ -88,20 +129,26 @@ test.describe('recorrido vertical', () => {
     await expect(stranger.getByRole('navigation')).toHaveCount(0)
 
     await checkAccessibility(stranger, 'vista externa')
+    await checkReflow(stranger, 'la pantalla externa')
 
-    // Y a 375 px, que es el suelo del rango de dispositivos.
-    await stranger.setViewportSize({ width: 375, height: 812 })
-    await expect(stranger.getByRole('button', { name: 'Ya lo he devuelto' })).toBeVisible()
-    // Nada de desplazamiento horizontal: es el fallo de reflujo más común y el
-    // único que se ve solo con un navegador de verdad midiendo el documento.
-    const overflows = await stranger.evaluate(
-      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
-    )
-    expect(overflows, 'la pantalla externa desborda a lo ancho en 375 px').toBe(false)
+    // --- 5. Devolver desde el enlace, con el teclado ------------------------
+    // Aquí el teclado no es un extra: esta pantalla tiene **una sola acción** y
+    // es terminal. Si no se llega a ella tabulando, para quien no usa el ratón
+    // el préstamo no se puede cerrar y no hay otro camino —ni menú, ni sesión,
+    // ni segunda pantalla— por el que rodearlo.
+    const confirmar = stranger.getByRole('button', { name: 'Ya lo he devuelto' })
+    await startKeyboardAtTop(stranger, confirmar)
+    await tabTo(stranger, confirmar, 'la confirmación de devolución')
+    await stranger.keyboard.press('Enter')
 
-    // --- 5. Devolver desde el enlace, y que el hogar lo vea -----------------
-    await stranger.getByRole('button', { name: 'Ya lo he devuelto' }).click()
     await expect(stranger.getByText(/ya está cerrado/)).toBeVisible()
+    // El cambio no mueve el foco —al desaparecer el botón la pantalla se queda sin
+    // paradas—, así que tiene que anunciarse. Y **una sola vez**: aquí había dos
+    // regiones vivas dando la misma noticia, que es lo que la ficha de la
+    // pantalla prohíbe expresamente. Contar es lo que impide que vuelvan.
+    const anuncios = stranger.getByRole('status')
+    await expect(anuncios, 'la devolución se anuncia dos veces').toHaveCount(1)
+    await expect(anuncios).toHaveText(/ya está cerrado/)
     await strangerContext.close()
 
     // El asset vuelve a casa: la vuelta entera cerrada, de la pantalla externa
@@ -153,21 +200,161 @@ async function linkFromEmail(recipient: string): Promise<string> {
 }
 
 /**
- * La auditoría automática de accesibilidad sobre la pantalla montada.
+ * La auditoría automática de accesibilidad sobre la pantalla montada, **en los
+ * dos modos**.
  *
  * Es la mitad que [`check-contrast.py`](../../scripts/check-contrast.py) no
  * puede hacer: aquel comprueba los **tokens** en abstracto y este los comprueba
  * ya aplicados, junto al resto de reglas —nombres accesibles, orden de
  * encabezados, roles— que solo existen sobre un DOM.
  *
+ * El modo oscuro se fija con `data-theme` y no con `emulateMedia`, que es
+ * justamente para lo que los tokens implementan las dos vías: la preferencia del
+ * sistema depende de la máquina que ejecuta la prueba y el atributo no depende
+ * de nada. Los 36 pares están medidos en los dos modos, pero medidos **en
+ * abstracto**; que un token no se aplique donde debía es un fallo que solo
+ * aparece aquí.
+ *
+ * **Dos esperas que no son ceremonia**, y las dos salieron de un falso positivo
+ * y de un falso negativo medidos aquí:
+ *
+ * - Con el spinner en pantalla, axe recorre cuatro elementos y pasa. Así pasó la
+ *   primera versión de esta prueba, y por eso la auditoría de una pantalla que
+ *   aún carga no dice nada de la pantalla.
+ * - Al cambiar de tema hay 140 ms de `transition-colors` en los que el color es
+ *   una **mezcla de los dos modos**, y esa mezcla no está en ningún diseño ni la
+ *   mide ningún script. Auditar ahí acusó al botón principal de dar 3,55:1 en
+ *   oscuro cuando sus tokens dan 6,77:1: el contraste real de un color que no
+ *   existe.
+ *
  * Acotado a A y AA, que es el objetivo normativo que fija la ADR-006.
  */
 async function checkAccessibility(page: Page, screen: string) {
-  const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-    .analyze()
+  await expect(page.locator('.animate-spin'), `«${screen}» todavía estaba cargando`).toHaveCount(0)
 
-  expect(results.violations, `Accesibilidad en «${screen}»: ${describe(results.violations)}`).toEqual([])
+  for (const mode of ['claro', 'oscuro']) {
+    if (mode === 'oscuro') {
+      await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+      await settleTransitions(page)
+    }
+
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze()
+
+    expect(
+      results.violations,
+      `Accesibilidad en «${screen}» (modo ${mode}): ${describe(results.violations)}`,
+    ).toEqual([])
+  }
+
+  // La pantalla se queda como estaba: lo que sigue al chequeo es el recorrido, y
+  // dejarlo en oscuro haría que una captura de fallo no se pareciera a nada de
+  // lo que el usuario vio.
+  await page.evaluate(() => document.documentElement.removeAttribute('data-theme'))
+  await settleTransitions(page)
+}
+
+/**
+ * Espera a que no quede ninguna transición a medio camino.
+ *
+ * Se filtra a `CSSTransition` a propósito: el `Spinner` gira con una animación
+ * **infinita**, así que esperar a que *todo* termine no terminaría nunca. Y se
+ * espera a la transición y no a un plazo fijo porque un plazo o sobra en la
+ * máquina rápida o se queda corto en la lenta, que es cómo se convierte una
+ * prueba de contraste en una prueba de la carga de la máquina.
+ */
+async function settleTransitions(page: Page) {
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .filter((animation) => animation instanceof CSSTransition)
+      .every((animation) => animation.playState === 'finished'),
+  )
+}
+
+/**
+ * El reflujo en los tres anchos del rango, sobre la pantalla montada.
+ *
+ * Mide dos cosas distintas y por eso no basta con una. Abajo, que **nada
+ * desborde a lo ancho**: es el fallo de reflujo más común y solo se ve con un
+ * navegador de verdad midiendo el documento. Arriba, que el contenido esté
+ * **acotado**: en ultrawide no desbordar es gratis —sobra sitio— y el fallo es
+ * el contrario, la línea de texto de dos mil píxeles que nadie puede seguir.
+ */
+async function checkReflow(page: Page, screen: string) {
+  const heading = page.getByRole('heading', { level: 1 }).first()
+
+  for (const { name, size } of WIDTHS) {
+    await page.setViewportSize(size)
+    await expect(heading, `«${screen}» a ${name}: el encabezado dejó de verse`).toBeVisible()
+
+    const overflows = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    )
+    expect(overflows, `«${screen}» desborda a lo ancho en ${name}`).toBe(false)
+  }
+
+  // El encabezado es un bloque, así que su caja mide lo que mide la columna de
+  // contenido: si él está acotado, lo está el texto que va debajo.
+  const width = (await heading.boundingBox())?.width ?? 0
+  expect(width, `«${screen}»: el contenido se estira sin tope en ultrawide`).toBeLessThanOrEqual(SHELL_CAP)
+
+  await page.setViewportSize(DESKTOP)
+  await expect(heading).toBeVisible()
+}
+
+/**
+ * Deja la pantalla como al abrirla, con el foco al principio del documento.
+ *
+ * Hace falta porque el recorrido llega hasta aquí haciendo clic, y el clic deja
+ * el tabulador continuando desde donde cayó: sin esto, la prueba no diría nada
+ * de las paradas anteriores, que son las que se rompen.
+ *
+ * **Recarga, y no `blur()`.** Fue lo primero que se probó y no vale: `blur()`
+ * quita el foco pero no mueve el *punto de partida de la navegación secuencial*,
+ * que el navegador mantiene donde estuvo el último elemento enfocado. El
+ * síntoma es exacto —el primer tabulador no llega al salto al contenido— y la
+ * causa no se parece: parecía que faltaba el salto y lo que fallaba era el
+ * punto de partida.
+ */
+async function startKeyboardAtTop(page: Page, anchor: Locator) {
+  await page.reload()
+  await expect(anchor, 'la pantalla no volvió a montarse tras recargar').toBeVisible()
+}
+
+/**
+ * Tabula hasta el destino, comprobando el anillo de foco en **cada** parada.
+ *
+ * Que se llegue no basta: lo que la ADR-006 exige es que en el camino se vea
+ * siempre dónde está uno. Y comprobarlo parada a parada es lo que convierte esto
+ * en una prueba de la regla —el `:focus-visible` de la capa base— y no de un
+ * componente concreto.
+ */
+async function tabTo(page: Page, target: Locator, label: string, limit = 40) {
+  for (let stop = 1; stop <= limit; stop++) {
+    await page.keyboard.press('Tab')
+    await expectFocusRing(page, `${label}, parada ${stop}`)
+
+    if (await target.evaluate((node) => node === document.activeElement)) return
+  }
+
+  throw new Error(`No se llegó a «${label}» con el tabulador en ${limit} paradas`)
+}
+
+/** El contorno de foco del elemento que lo tiene ahora, medido ya aplicado. */
+async function expectFocusRing(page: Page, where: string) {
+  const ring = await page.evaluate(() => {
+    const node = document.activeElement
+    if (!node || node === document.body) return null
+
+    const style = getComputedStyle(node)
+    return { style: style.outlineStyle, width: Number.parseFloat(style.outlineWidth) }
+  })
+
+  expect(ring, `${where}: el tabulador se salió de la página`).not.toBeNull()
+  expect(ring?.style, `${where}: el elemento enfocado no dibuja contorno`).not.toBe('none')
+  expect(ring?.width ?? 0, `${where}: contorno de foco de menos de 2 px`).toBeGreaterThanOrEqual(2)
 }
 
 function describe(violations: Array<{ id: string; help: string; nodes: unknown[] }>): string {

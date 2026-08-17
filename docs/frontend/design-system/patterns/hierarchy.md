@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-12 |
+| Última revisión | 2026-08-17 |
 
 ## Propósito
 
@@ -33,13 +33,20 @@ jerárquico**, y la jerarquía es lo que peor cabe en 375 px.
 
 ## Estado
 
-**Previsto por completo en el frontend.** No existe ningún árbol, ningún selector
-de ubicación y ninguna migaja de pan. Este documento describe una pantalla que
-todavía no está escrita.
+**Implementado en su forma mínima**, en
+[`locations.tsx`](../../../../frontend/src/routes/locations.tsx): el árbol se pinta
+como **un solo `role="tree"`** con `aria-level` por nodo, compuesto en memoria a
+partir de `GET /locations` —la carga «de una vez» de las dos que describe este
+documento—, y la ubicación se elige con un `SelectField` plano.
 
-**El backend sí existe**: las seis operaciones de ubicaciones están implementadas,
-con el anti-ciclo en el caso de uso. Así que lo que falta es exactamente la parte
-de la que trata este documento.
+De lo que este patrón describe, tres cosas siguen **previstas**: el árbol se pinta
+siempre desplegado, así que no hay plegado ni carga por niveles bajo demanda; el
+selector de destino es una lista plana y no un árbol, así que no dibuja la
+jerarquía al elegir; y **no hay migaja de pan** en la ficha de un asset, que es lo
+que necesitaría los antepasados de un nodo.
+
+**El backend está entero**: las seis operaciones de ubicaciones, con el anti-ciclo
+en el caso de uso y probado hasta el ciclo de tres nodos.
 
 ## Contenido
 
@@ -215,3 +222,4 @@ palabras.
 | Fecha | Cambio | Autor |
 |---|---|---|
 | 2026-08-12 | Creación del documento. El patrón está previsto: el backend de ubicaciones existe y la interfaz no. | Equipo DRP |
+| 2026-08-17 | Corrección de estado al cerrar la Fase 1: el patrón está **implementado en su forma mínima** —un solo `role="tree"` con `aria-level`, cargado de una vez— y no previsto, como decía desde el Hito 2. Quedan previstos el plegado, la carga por niveles, el selector en forma de árbol y la migaja de pan. | Equipo DRP |

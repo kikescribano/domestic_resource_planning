@@ -4,12 +4,13 @@ import { defineConfig, devices } from '@playwright/test'
  * El recorrido vertical en un navegador de verdad.
  *
  * Es la condición que la [ADR-006] y la [ADR-008] ponen al sistema de diseño y a
- * la cadena de pruebas, y la que mantiene `look-and-feel.md` en `Borrador` hasta
- * que se cumple. Lo que aporta sobre lo que ya había —el recorrido desde el
- * backend con Testcontainers— no es cobertura de la API sino **lo que solo
- * ocurre en un navegador**: que la pantalla externa se abra desde un enlace sin
- * sesión, que el foco y el contraste sean los que se dijeron, y que el reflujo a
- * 375 px funcione sobre el DOM real.
+ * la cadena de pruebas, y la que mantuvo `look-and-feel.md` en `Borrador` hasta
+ * cumplirse. Lo que aporta sobre lo que ya había —el recorrido desde el backend
+ * con Testcontainers— no es cobertura de la API sino **lo que solo ocurre en un
+ * navegador**: que la pantalla externa se abra desde un enlace sin sesión, que se
+ * llegue a cada acción con el teclado viendo el foco en cada parada, que el
+ * contraste sea el que se dijo también en oscuro, y que el reflujo aguante de 320
+ * px a ultrawide sobre el DOM real.
  *
  * Deliberadamente **una sola especificación y no una suite paralela**. Duplicar
  * aquí lo que ya comprueban las 45 pruebas de Vitest y las de recorrido del

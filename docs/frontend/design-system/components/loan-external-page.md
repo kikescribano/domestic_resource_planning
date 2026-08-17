@@ -2,16 +2,23 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Previsto |
+| Estado | Implementado |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-16 |
+| Última revisión | 2026-08-17 |
 
-> **Esta ficha se escribe antes que la pantalla**, como especificación de lo que
-> el Hito 4 tiene que construir. Hoy no existe nada de esto: ni la ruta, ni las
-> llamadas, ni los tipos. No describe código; lo describe por delante. Lo que
-> falta —que aquí es todo, y además cuatro piezas del sistema— está en
-> [Lo que falta](#lo-que-falta).
+> **Esta ficha se escribió antes que la pantalla**, como especificación de lo que
+> el Hito 4 tenía que construir, y **la pantalla ya existe**: vive en
+> [`routes/loans.tsx`](../../../../frontend/src/routes/loans.tsx) como
+> `ExternalLoanPage`. Lo que sigue describe el código de hoy; donde lo construido
+> se separó de lo especificado, se dice en [Estado de
+> implementación](#estado-de-implementación-y-enlace-al-componente-real) con el
+> motivo, y no se reescribe la especificación para que parezca que acertó.
+>
+> Escribirla por delante pagó dos veces: encontró un hueco del contrato —el papel
+> no viajaba en la vista acotada, y de él depende la mitad del texto— antes de que
+> hubiera código que arreglar, y dejó escrita la regla del anuncio único, que es
+> la que delató un defecto real al cerrar la fase.
 
 ## Propósito y situaciones de uso
 
@@ -576,71 +583,82 @@ Antiusos:
 | Tratar el `409` como un error | El préstamo se cerró desde casa: lo que quería hacer ya está hecho |
 | Un `Toast` al confirmar | No existe, y no hace falta: el cambio se ve en la propia pantalla |
 
-Evidencias de prueba: **ninguna todavía**. Lo que el Hito 4 tendrá que cubrir, y
-que conviene dejar dicho antes de escribirlo:
+Evidencias de prueba: las de componente están en
+[`loans.test.tsx`](../../../../frontend/src/routes/loans.test.tsx) y el recorrido
+de punta a punta en
+[`vertical-journey.spec.ts`](../../../../frontend/e2e/vertical-journey.spec.ts).
+Ese segundo es el que de verdad demuestra lo que ninguna prueba de componente
+puede: que el enlace del correo real de Mailpit abre esta pantalla **en un
+navegador sin sesión** —contexto nuevo, no la misma pestaña— y que desde ahí se
+cierra el préstamo.
 
-- Que con un token válido la pantalla pinta el nombre, el estado y las fechas, y
-  que **el `lender`, el `borrower` y las notas no aparecen en el DOM** aunque la
-  respuesta simulada los traiga. Es la aserción que protege la frontera.
-- Que el `401` y el `404` producen **el mismo texto**, comparado literalmente.
-- Que confirmar llama a `POST /loans/{id}/return` con la cabecera del token
-  acotado y **no** con la de sesión, con una sesión iniciada en el mismo almacén.
-- Que el `409` con `LOAN_ALREADY_RETURNED` acaba en la pantalla de devuelto y no
-  en un aviso de error.
-- Que tras confirmar el foco está en el mensaje y no en el `<body>`.
-- Que el préstamo devuelto no tiene ningún elemento enfocable.
-- Los dos papeles con los mismos datos, comprobando el texto del botón.
+Del recorrido salen además cuatro comprobaciones que esta pantalla es el único
+sitio donde tienen sentido, porque es la única sin shell y sin sesión:
 
-El recorrido de punta a punta con Playwright —abrir el enlace del correo real de
-Mailpit y confirmar desde ahí— es del cierre de fase, y es el que de verdad
-demuestra que el enlace del correo lleva a esta pantalla.
+- Que ni el nombre del externo ni el landmark de navegación existen en el DOM
+  entregado. Es la aserción que protege la frontera de los cinco datos.
+- Que se llega al botón **con el tabulador** y se confirma con `Enter`. Aquí no es
+  un extra: la pantalla tiene una sola acción y es terminal, así que sin teclado
+  no hay forma de cerrar el préstamo.
+- Que el anillo de foco se ve en **cada** parada del camino.
+- Que la devolución se anuncia **una sola vez** —la regla de más arriba, ahora con
+  una prueba que la cuenta— y que la pantalla no desborda a lo ancho a 320 ni a
+  375 px ni se estira sin tope en ultrawide.
 
 ## Estado de implementación y enlace al componente real
 
-**Previsto.** No existe nada: ni la ruta en
-[`App.tsx`](../../../../frontend/src/App.tsx), ni las llamadas en
-[`client.ts`](../../../../frontend/src/api/client.ts), ni el tipo
-`LoanExternalView`, ni el componente. Del dominio de préstamos, lo único que el
-frontend conoce hoy es el código de error `ASSET_HAS_ACTIVE_LOAN`, que llegó con
-el Hito 2 por el lado de la baja de un asset.
+**Implementado.** La pantalla es `ExternalLoanPage` en
+[`routes/loans.tsx`](../../../../frontend/src/routes/loans.tsx), con
+`ExternalLoanView` para el préstamo y `BrokenLink` para el enlace que no vale. La
+ruta `/prestamo` está en [`App.tsx`](../../../../frontend/src/App.tsx) **fuera de
+`RequireSession`**, que es la mitad del asunto, y las dos llamadas acotadas viven
+en [`client.ts`](../../../../frontend/src/api/client.ts).
 
-Su sitio natural es un fichero de ruta propio —`frontend/src/routes/loans.tsx`, o
-uno aparte para la pantalla externa—, y **no** dentro del shell: es la única vista
-del Hito 4 que vive fuera de `RequireSession`.
+De las piezas del sistema que esta ficha pedía prestadas, el Hito 4 resolvió seis:
+`role` viaja ya en `LoanExternalView`, `StatusBadge` admite los tonos de dominio,
+los tres estados del préstamo tienen tono y etiqueta, `client.ts` sabe llamar con
+una credencial que no es la de la sesión, los códigos `LOAN_*` están tipados con su
+mensaje en castellano y `formatDate` existe.
+
+### Dónde lo construido se separó de lo especificado
+
+Dos cosas, y las dos conviene que estén escritas aquí y no descubrirlas leyendo el
+código:
+
+- **El enlace roto no usa un error bloqueante, porque no se construyó.**
+  `BrokenLink` es `AuthCard` con una frase y ninguna salida: cumple la regla de no
+  delatar nada y de no ofrecer embudo, pero **sin ilustración y sin ser un
+  componente reutilizable**. La propuesta de `BlockingError` sigue en pie y sigue
+  abajo, con lo que cambia ahora que hay un caso resuelto a mano.
+- **Tras confirmar, el foco no se mueve: se anuncia.** La ficha especificaba lo
+  contrario —el foco al mensaje, con `tabIndex={-1}`— y lo construido deja que el
+  botón desaparezca y la pantalla se quede **sin ninguna parada de tabulador**,
+  que es el estado final que esta misma ficha declara correcto. Como el foco no se
+  mueve, la noticia va en la región viva, y ahí estaba el defecto: había **dos**
+  —el anuncio invisible y el `Notice`, que también es `role="status"`—, así que un
+  lector de pantalla leía el mismo cambio dos veces. Se quitó el invisible, que
+  decía menos, y el recorrido de punta a punta ahora **cuenta** las regiones para
+  que no vuelvan a ser dos. La regla de la que salió el hallazgo estaba escrita
+  aquí antes de que hubiera código: el foco se mueve o se anuncia, nunca las dos
+  cosas.
 
 ### Lo que falta
 
-Todo lo de la pantalla, y además cinco piezas del sistema que no son suyas:
-
-- **El papel no viaja en `LoanExternalView`.** Es el bloqueo de la mitad del texto
-  y está razonado más arriba: la propuesta es añadir `role` al esquema.
-- **`StatusBadge` no admite tonos de dominio.** Su tipo es `NoticeTone |
-  'neutral'`, así que hoy no hay forma de pedir `state-lent` ni `state-overdue`
-  aunque los tokens existan. Es el mismo hueco que su ficha arrastra desde el
-  Hito 1, y esta pantalla es donde deja de ser teórico.
-- **`RETURNED` no tiene tono ni etiqueta decididos.** Los cinco estados de dominio
-  son los del asset; los del préstamo son otros tres y solo dos se parecen.
 - **Sin iconos.** `lucide-react` sigue fuera de
   [`package.json`](../../../../frontend/package.json), así que `hand-helping`,
   `alarm-clock` y `check-circle` no existen y el estado se dice con color y
   etiqueta. Aquí eso duele más que en un listado: **el ámbar sin despertador al
   lado es la mitad del mensaje de un préstamo vencido**.
-- **No hay error bloqueante a pantalla completa**, que es lo que pide el estado
-  del enlace roto. La propuesta está abajo, y con ella la ilustración, que
-  tampoco existe: `assets/` sigue vacío.
-- **`client.ts` no sabe llamar con una credencial que no sea la de la sesión.**
-  `request()` toma el access token del módulo; hace falta poder pasar la cabecera
-  explícitamente, con `renewable: false`.
-- **Los códigos `LOAN_*` no están tipados.** `ApiErrorCode` enumera los del Hito 2
-  y los de ficheros; `LOAN_ALREADY_RETURNED`, `LOAN_ASSET_ALREADY_LENT` y
-  `LOAN_ASSET_NOT_DURABLE` están en el esquema `Error` de
-  [`openapi.yaml`](../../../../openapi.yaml) y no en el cliente, así que hoy
-  caerían en el mensaje genérico de `humanMessage`.
-- **No hay ninguna utilidad de formato de fecha en el frontend.** La única
-  aparición de `Intl` es la resolución del huso al dar de alta un hogar. Esta
-  pantalla estrena las fechas legibles, y detrás vienen todas las del Hito 4.
-- **No hay `<title>` por pantalla**, que es el hueco que `AuthCard` ya tiene
-  anotado y que aquí importa más que en ninguna otra parte.
+- **No hay error bloqueante a pantalla completa**, ni la ilustración que pide:
+  `assets/` sigue vacío.
+- **No hay `<title>` por pantalla.** Sigue siendo el `<title>DRP</title>` de
+  [`index.html`](../../../../frontend/index.html) para todo el producto, y esta
+  pestaña es la que puede quedarse abierta semanas: es el hueco que `AuthCard`
+  tiene anotado y donde más se nota.
+- **El fin de la carga no se anuncia.** La ficha pedía una frase en región viva al
+  pasar de «Abriendo el préstamo» a la pantalla montada, y no está: es el mismo
+  hueco del anuncio de ruta que [`navigation.md`](../patterns/navigation.md)
+  arrastra, y aquí no lo tapa nada porque no hay shell.
 - **No existe reabrir un préstamo.** El contrato tiene iniciar y devolver, y nada
   entre medias: una devolución confirmada por error solo se arregla iniciando otro
   préstamo. No es un problema de esta pantalla —es la razón por la que su acción
@@ -675,6 +693,16 @@ Por qué no vale una composición de lo que hay:
 Lo que **no** hace falta, y conviene decirlo para que no se construya de paso:
 ningún `Dialog` —argumentado más arriba—, ningún lienzo nuevo —`AuthCard` sirve—
 y ninguna variante de `Button`, `Notice` ni `Spinner`.
+
+**No se construyó, y el argumento cambia poco.** El Hito 4 resolvió este caso con
+`BrokenLink`, local a la ruta: `AuthCard`, una frase y ninguna salida. Lo que eso
+demuestra es que la parte difícil de `BlockingError` no era el enlace roto —el más
+fácil de los cuatro, porque no lleva acción— sino los otros tres, que sí la
+llevan. Así que la primitiva sigue pendiente con **tres sitios esperándola**
+—sesión caducada, hogar sin acceso y error del servidor— y uno ya resuelto que
+sirve de punto de partida en lugar de página en blanco. Lo que `BrokenLink` no
+resuelve y la primitiva sí tendría que resolver es la ilustración, la salida
+opcional y no estar copiado en cada ruta que lo necesite.
 
 ## Referencias
 
@@ -713,3 +741,4 @@ y ninguna variante de `Button`, `Notice` ni `Spinner`.
 | Fecha | Cambio | Autor |
 |---|---|---|
 | 2026-08-16 | Creación de la ficha al arrancar el Hito 4. La pantalla está **prevista**: no existe ni la ruta ni la llamada. Se documenta por qué la vista externa es componente y no patrón, la regla de que el enlace roto no delate nada, la ausencia de diálogo de confirmación y el papel que falta en la vista acotada. Se propone una primitiva nueva, `BlockingError`. | Equipo DRP |
+| 2026-08-17 | La pantalla existe: pasa a **Implementado** y la ficha describe el código. Se anotan las dos separaciones entre lo especificado y lo construido —el enlace roto sin error bloqueante y el anuncio en lugar del movimiento de foco—, el defecto de las dos regiones vivas que la regla del anuncio único delató y su arreglo, las seis piezas del sistema que el hito resolvió y las cuatro que siguen faltando. `BlockingError` no se construyó: queda con tres sitios esperándola y uno resuelto a mano. | Equipo DRP |

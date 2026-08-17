@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Interfaz web responsive |
-| Última revisión | 2026-08-11 |
+| Última revisión | 2026-08-17 |
 
 ## Objetivo normativo
 
@@ -136,23 +136,54 @@ explícita con `data-theme`, que gana en las dos direcciones —para que quien t
 el sistema en oscuro pueda quedarse en claro—. **Los 36 pares están medidos en
 los dos modos**, no solo en el claro.
 
-## Lo que todavía no está comprobado
+## Lo que se comprueba sobre pantallas montadas
 
-La medición de esta página es de **tokens**, no de pantallas. Falta lo que solo
-se puede verificar sobre la interfaz montada, y llega en el Hito 4 con la batería
-E2E:
+La medición de la sección anterior es de **tokens**, no de pantallas. Lo que solo
+se puede verificar sobre la interfaz montada lo comprueba el recorrido vertical
+—[`vertical-journey.spec.ts`](../../../frontend/e2e/vertical-journey.spec.ts)—, que
+la CI ejecuta en un trabajo propio:
 
-- Recorrido completo por teclado de cada flujo, con el foco visible en cada
-  parada.
-- Anuncios de lector de pantalla en los cambios que no mueven el foco.
-- Reflujo real a 320 px y en ultrawide, sobre las pantallas construidas.
-- Auditoría automática (axe) integrada en Playwright.
+- **Auditoría automática (axe)** acotada a A y AA, **en los dos modos**, sobre los
+  préstamos del hogar y la vista externa.
+- **Navegación por teclado** hasta la acción de cada una de esas dos pantallas,
+  activándola con `Enter`, con el **anillo de foco comprobado en cada parada** del
+  camino y el salto al contenido como primera parada.
+- **Reflujo a 320 px, a 375 px y en ultrawide**, midiendo que nada desborde a lo
+  ancho abajo y que el contenido no se estire sin tope arriba.
+- **Un solo anuncio por cambio** en el único cambio que no mueve el foco.
 
-Hasta entonces, `look-and-feel.md` sigue en `Borrador` por este motivo, y no por
-falta de decisiones.
+Con esto se cumple la condición que la
+[ADR-006](../../common/architecture/decisions/ADR-006-frontend-stack-and-design-system.md)
+ponía —contraste, foco visible y teclado a 375 px y en ultrawide—, y
+[`look-and-feel.md`](../product-design/look-and-feel.md) pasa a `Vigente`.
+
+### Dos cosas que aprendimos midiendo, y que valen para la próxima auditoría
+
+- **Auditar durante el cambio de tema mide un color que no existe.** Al poner
+  `data-theme` hay 140 ms de `transition-colors` en los que cada color es una
+  mezcla de los dos modos. Auditando ahí, axe acusó al botón principal de dar
+  3,55:1 en oscuro cuando sus tokens dan 6,77:1. La auditoría espera ahora a que
+  no quede ninguna transición viva, y no a un plazo fijo.
+- **Auditar una pantalla que aún carga no dice nada de la pantalla.** Con el
+  `Spinner` puesto, axe recorre cuatro elementos y pasa. La primera versión de la
+  prueba lo hacía, y por eso pasaba unas veces y fallaba otras.
+
+## Lo que sigue sin comprobarse
+
+- **Un lector de pantalla de verdad.** Todo lo de arriba es automático; axe cubre
+  del orden de la mitad de los criterios y ninguna herramienta juzga si un texto
+  alternativo dice algo útil.
+- **Las demás pantallas.** El recorrido audita las dos que atraviesa; las otras
+  diecisiete rutas de [`App.tsx`](../../../frontend/src/App.tsx) están cubiertas por
+  los tokens, por las fichas de componente y por las pruebas de componente, que es
+  menos que una auditoría sobre el DOM.
+- **El conmutador de tema no existe todavía**, así que `data-theme` hoy solo lo
+  pone la prueba. Está anotado como previsto en
+  [`patterns/navigation.md`](../design-system/patterns/navigation.md).
 
 ## Historial
 
 | Fecha | Cambio |
 |---|---|
 | 2026-08-11 | Se fija WCAG 2.2 AA como objetivo normativo y se documenta la auditoría de contraste de los 36 pares, con su script de comprobación en la CI. Se anota lo que queda pendiente de verificar sobre pantallas reales. |
+| 2026-08-17 | Se sustituye «lo que todavía no está comprobado» por lo que el recorrido vertical comprueba de verdad sobre pantallas montadas —axe en los dos modos, teclado con anillo de foco en cada parada, reflujo a 320, 375 y ultrawide, y anuncio único—, con lo que se cumple la condición de la ADR-006 y `look-and-feel.md` pasa a `Vigente`. Se anotan los dos falsos resultados que la propia medición produjo —auditar a mitad de la transición de tema y auditar con el `Spinner` puesto— y lo que sigue sin comprobarse: un lector de pantalla real, las diecisiete rutas que el recorrido no atraviesa y el conmutador de tema, que no existe. |

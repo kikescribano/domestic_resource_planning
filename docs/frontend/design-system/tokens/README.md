@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-10 |
+| Última revisión | 2026-08-17 |
 
 ## Propósito
 
@@ -185,8 +185,18 @@ con la clase `font-display`, y **nunca dentro de una fila de listado**.
   direcciones**. Hace falta porque DRP se consulta en la despensa a las once de
   la noche con el portátil en claro, y porque una preferencia de sistema no es
   una preferencia de aplicación. Además es lo que permite probar los dos modos de
-  forma determinista con Playwright en el Hito 4, en lugar de depender de la
-  configuración de la máquina.
+  forma determinista, sin depender de la configuración de la máquina: el
+  [recorrido vertical](../../../../frontend/e2e/vertical-journey.spec.ts) audita
+  las dos pantallas que atraviesa poniendo el atributo, y así lo hace igual en
+  cualquier portátil y en la CI.
+
+> **Cambiar el atributo no repinta de golpe.** Los componentes llevan
+> `transition-colors`, así que hay **140 ms en los que cada color es una mezcla de
+> los dos modos** —y esa mezcla no la mide ningún script ni sale de ninguna
+> decisión—. Al cerrar la Fase 1 eso acusó al botón principal de dar 3,55:1 en
+> oscuro cuando sus tokens dan 6,77:1. Quien mida colores aplicados tiene que
+> esperar a que no quede ninguna transición viva; quien construya el conmutador de
+> tema tiene aquí la razón por la que el cambio se ve y no se nota.
 
 La mecánica es `color-scheme` más `light-dark()`:
 
@@ -253,3 +263,4 @@ está usando tokens, ya funciona en los dos modos.
 | Fecha | Cambio | Autor |
 |---|---|---|
 | 2026-08-10 | Creación del catálogo con los tokens del Hito 1 y el contrato de modo oscuro. | Equipo DRP |
+| 2026-08-17 | La prueba determinista de los dos modos con `data-theme` ya existe, así que deja de anunciarse en futuro. Se anota lo que costó descubrirla: cambiar el atributo abre 140 ms de transición en los que cada color es una mezcla de los dos modos, y medir ahí da un contraste que no corresponde a ningún color del sistema. | Equipo DRP |

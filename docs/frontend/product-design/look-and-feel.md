@@ -2,10 +2,10 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Borrador |
+| Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Interfaz web responsive |
-| Última revisión | 2026-08-10 |
+| Última revisión | 2026-08-17 |
 
 ## Propósito
 
@@ -238,17 +238,32 @@ Lo que la dirección visual aporta a ese compromiso, con sus números, está en
 
 ## Validación
 
-Antes de pasar a `Vigente`, este documento debe incluir referencias visuales,
-prototipos responsive, revisión de accesibilidad y evidencia de validación sobre
-los principales flujos de usuario.
+**Cumplida, y por eso este documento está `Vigente`.** La
+[ADR-006](../../common/architecture/decisions/ADR-006-frontend-stack-and-design-system.md)
+condicionaba el paso a que el recorrido vertical se ejecutara con Playwright de
+punta a punta y a que una auditoría de accesibilidad confirmara **contraste, foco
+visible y navegación completa por teclado, a 375 px y en ultrawide**. Las dos cosas
+existen y se ejecutan en la CI:
 
-Lo que falta concretamente, y por qué sigue en `Borrador` pese a tener las ocho
-dimensiones cerradas: la ADR-006 condiciona el paso a `Vigente` a que el
-recorrido vertical se ejecute con Playwright de punta a punta y a que una
-auditoría de accesibilidad confirme contraste, foco y navegación por teclado a
-375 px y en ultrawide. Ambas cosas llegan en el **Hito 4** según el
-[roadmap](../../common/product/roadmap.md). Hasta entonces la dirección es
-ejecutable y medida, pero no está validada sobre pantallas reales.
+| Lo que pedía la ADR-006 | Dónde se comprueba |
+|---|---|
+| Recorrido vertical de punta a punta | [`vertical-journey.spec.ts`](../../../frontend/e2e/vertical-journey.spec.ts): del alta del hogar a la devolución desde el correo, en un navegador de verdad y con un contexto sin sesión para la pantalla externa |
+| Contraste | [`check-contrast.py`](../../../scripts/check-contrast.py) mide los 36 pares de tokens en los dos modos; axe los comprueba **aplicados**, también en los dos modos |
+| Foco visible | El anillo se mide en **cada parada** del recorrido de tabulación, no en una muestra |
+| Teclado completo | Se llega a la acción de cada pantalla tabulando y se activa con `Enter`; en la pantalla externa eso es la única forma de cerrar el préstamo |
+| 375 px y ultrawide | Reflujo medido a 320, a 375 y a 2560 px, comprobando arriba que el contenido no se estira sin tope |
+
+**Lo que este documento sigue sin tener, y no bloquea nada:** referencias visuales
+y prototipos, que la plantilla de documento pide de serie. No los hay ni se
+esperan, porque aquí la dirección visual no se expresa en maquetas sino en tokens
+que se ejecutan y se miden —lo que la sección de contraste llama «comprobado, no
+afirmado»—. Una maqueta envejece en silencio; un token que baja de su mínimo
+rompe la construcción.
+
+Lo que sí queda pendiente de verdad está en
+[`accessibility/`](../accessibility/README.md): un lector de pantalla real, las
+diecisiete rutas que el recorrido no atraviesa y el conmutador de tema, que
+todavía no existe.
 
 ## Historial
 
@@ -256,3 +271,4 @@ ejecutable y medida, pero no está validada sobre pantallas reales.
 |---|---|
 | 2026-08-06 | Se crea la plantilla inicial; no hay dirección visual aprobada. |
 | 2026-08-10 | Se cierra la dirección visual del Hito 1: personalidad «cálida y doméstica» concretada en cuatro atributos, cinco principios visuales, las **ocho dimensiones resueltas** sin ningún `Por decidir`, la regla del presupuesto de calidez para contener la densidad en los listados largos, los siete estados de experiencia —incluido el rechazo explícito del modo sin conexión— y la tabla responsive completa. Se fija responsable y se mantiene el estado en `Borrador` hasta la validación con Playwright del Hito 4. |
+| 2026-08-17 | **Pasa a `Vigente`.** La condición de la ADR-006 está cumplida y se ejecuta en la CI: recorrido vertical en navegador real, contraste medido en tokens y comprobado aplicado en los dos modos, anillo de foco en cada parada del recorrido de tabulación, la acción de cada pantalla alcanzada con el teclado y reflujo a 320, 375 y 2560 px. Se dice además que este documento no va a tener maquetas ni prototipos, y por qué: la dirección se expresa en tokens que se miden. Lo que falta se traslada a `accessibility/`. |

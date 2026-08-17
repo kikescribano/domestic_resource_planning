@@ -297,6 +297,28 @@ El último, y el que cierra la Fase 1.
 > fallo del Hito 2 en otra tabla, lo que convierte esa prueba en una que hay que
 > escribir **por columna**—; y el regex con el que las pruebas sacan el token del
 > correo no admitía puntos, y este es el único de los cinco que es un JWT.
+>
+> **El cierre se completó en una sesión posterior (2026-08-17)**, porque el hito
+> dio por hecho el criterio de la ADR-006 sin haberlo cubierto entero: la batería
+> auditaba con axe y medía 375 px, pero **no comprobaba teclado, ni foco, ni
+> ultrawide, ni el modo oscuro**, que es la mitad de lo que esa ADR exige. Al
+> completarla aparecieron tres cosas que ninguna lectura habría dado:
+>
+> - **`blur()` no reinicia el punto desde el que se tabula.** El navegador lo
+>   mantiene donde estuvo el último elemento enfocado, así que la prueba «arranca
+>   arriba» arrancaba por la mitad y el salto al contenido se quedaba sin
+>   comprobar. Se resuelve recargando la pantalla.
+> - **Auditar a mitad del cambio de tema mide un color que no existe.** Los 140 ms
+>   de `transition-colors` acusaron al botón principal de dar 3,55:1 en oscuro
+>   cuando sus tokens dan 6,77:1. Y **auditar con el `Spinner` puesto pasa
+>   siempre**, porque axe recorre cuatro elementos: era la misma prueba pasando
+>   unas veces y fallando otras.
+> - **La pantalla externa anunciaba la devolución dos veces**, con dos regiones
+>   `role="status"` a la vez, que es exactamente lo que su ficha —escrita antes que
+>   el código— prohibía. Corregido, y con una prueba que **cuenta** las regiones.
+>
+> Y con el criterio cumplido de verdad, `look-and-feel.md` pasa a `Vigente`, que
+> era la última condición pendiente de la ADR-006.
 
 ## Lo que queda abierto a propósito
 
@@ -334,6 +356,7 @@ para sostener.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-17 | **Cierre documental de la Fase 1**, que el Hito 4 dejó a medias: seis documentos del frontend seguían diciendo «esto llega en el Hito 4». Se completa la batería E2E con lo que la ADR-006 exigía y no estaba —teclado, foco visible en cada parada, reflujo a 320 px y en ultrawide, y axe en los dos modos—, con lo que `look-and-feel.md` pasa a `Vigente`. Se corrigen los estados de la ficha de la pantalla externa, del registro de componentes y de dos patrones, y se anotan los tres hallazgos de la medición. `CLAUDE.md` deja de describir un repositorio recién arrancado. |
 | 2026-08-17 | **Hito 4 completado, y con él la Fase 1.** Las 4 operaciones que faltaban —contrato al 54 de 54—, el token acotado de dos capas con su alcance comprobado en el filtro, la proyección por rol declarada en el contrato, el tercer proceso diario, la sexta migración, el cliente web con la vista externa sin sesión, el recorrido vertical con Playwright y axe, y la medición que elige el VPS. Se anotan las cinco decisiones tomadas al implementar y los dos agujeros de concurrencia que encontraron los barridos. |
 | 2026-08-13 | **Hito 3 completado.** Las 11 operaciones de ficheros, documentos y avatar; el puerto `FileStorage` con los controles de OWASP; la cuota reservada antes de transmitir; nginx con `X-Accel-Redirect` y URL firmada; el proceso diario de purga; y el cliente web con subida, galería y consumo de cuota. Se anotan las cinco decisiones que hubo que tomar al implementar y el agujero que encontró el barrido. |
 | 2026-08-12 | **Hito 2 completado.** Las 23 operaciones de catálogo, ubicaciones y assets; las dos naturalezas con entrada, fusión, ajuste y baja; las tres validaciones que la base de datos no puede garantizar; el event bus con handlers idempotentes y los ocho eventos; y el cliente web de las cuatro pantallas. Se anotan las cuatro decisiones que hubo que tomar al implementar y las tres cosas que solo se vieron ejecutando. |

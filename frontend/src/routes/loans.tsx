@@ -397,11 +397,14 @@ function ExternalLoanView({
             )}
           </dl>
 
-          {/* El anuncio del cambio, para quien no ve la pantalla. */}
-          <p role="status" className="sr-only">
-            {loan.status === 'RETURNED' ? 'Préstamo devuelto' : ''}
-          </p>
-
+          {/* El anuncio del cambio va en el `Notice` de abajo y no en una región
+              propia. Había las dos, y eso es justo lo que la ficha de esta
+              pantalla prohíbe: `Notice` ya es `role="status"`, así que un lector
+              de pantalla leía la misma noticia dos veces, primero «Préstamo
+              devuelto» y después la frase entera. Se queda la que dice algo más
+              —que no hay que hacer nada más—, y se anuncia porque aquí el foco no
+              se mueve: al desaparecer el botón la pantalla se queda sin ninguna
+              parada de tabulador, que es su estado final correcto. */}
           {isOpen ? (
             <>
               <p className="text-sm text-muted">
