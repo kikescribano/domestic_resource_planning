@@ -619,7 +619,23 @@ interface LoanJpaRepository : JpaRepository<LoanEntity, UUID> {
      * que llama: **solo `ACTIVE`** --marcar de nuevo un `OVERDUE` volveria a
      * publicar su evento en cada pasada-- y **`due_at IS NOT NULL`**, porque un
      * prestamo sin plazo no vence nunca. Juntas son lo que hace la pasada
-     * idempotente.
+     * idempotente **entre ejecuciones sucesivas**.
+     *
+     * El `FOR UPDATE` es lo que la hace idempotente **entre ejecuciones
+     * simultaneas**, y no estaba: medido con dos pasadas a la vez, `LoanOverdue`
+     * salia **dos veces** por el mismo prestamo. Las dos transacciones leian el
+     * mismo candidato `ACTIVE`, las dos lo marcaban y las dos publicaban; el
+     * `UPDATE` se serializaba pero el evento no.
+     *
+     * Con el cerrojo, la segunda espera al commit de la primera y PostgreSQL
+     * **reevalua el `WHERE` sobre la fila ya bloqueada**: como su `status` ya no
+     * es `ACTIVE`, deja de ser candidata y desaparece del resultado. Es decir, la
+     * condicion no hay que repetirla en el codigo --la vuelve a comprobar el
+     * motor-- y por eso este arreglo es una linea y no una comprobacion mas.
+     *
+     * No es un caso rebuscado: el proceso puede solaparse consigo mismo si una
+     * pasada se alarga, y de `LoanOverdue` colgaran los recordatorios (4.2), asi
+     * que duplicarlo son dos avisos a la misma persona por lo mismo.
      */
     @Query(
         value = """
@@ -628,6 +644,7 @@ interface LoanJpaRepository : JpaRepository<LoanEntity, UUID> {
               AND due_at IS NOT NULL
               AND due_at < :now
             ORDER BY due_at
+            FOR UPDATE
         """,
         nativeQuery = true,
     )

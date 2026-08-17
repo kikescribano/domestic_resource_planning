@@ -227,11 +227,55 @@ funcionase.
 > con relleno benigno avisa igual. Medido antes de decidir, en los dos sentidos.
 > El segundo barrido murió por el límite de sesión antes de empezar.
 
-### Hito 4 — Préstamos y cierre de fase · Pendiente
+### Hito 4 — Préstamos y cierre de fase · **Completado (2026-08-17)**
 
-- Préstamos con token acotado para externos, y el vencimiento por proceso programado.
-- Frontend: préstamos del hogar y la vista externa de quien llega con el token acotado.
-- Cierre: batería E2E completa, medición del consumo real de disco y CPU, y **elección del VPS** —VPS-2 frente a VPS-3— con datos medidos en lugar de estimados.
+El último, y el que cierra la Fase 1.
+
+- [x] **Las 4 operaciones del contrato** que faltaban, con las que queda **completo: 54 de 54**. Solo se presta un `DURABLE` y solo si no tiene otro préstamo abierto —`OVERDUE` cuenta, porque vencer no es devolver—, y cada extremo es exactamente un miembro del hogar **o** una persona externa.
+- [x] **El token acotado del externo**, con las dos capas que 5.4.1 pedía: JWT firmado sin `sub` **y** hash en `loan_access_tokens`. La firma lo hace infalsificable; la fila, revocable. Su alcance son exactamente dos operaciones de un préstamo, y se comprueba en el **filtro**, así que fuera de ellas no es una credencial.
+- [x] **La proyección por rol**, declarada en el contrato como `oneOf` y no solo en la prosa: es lo único de la API que devuelve dos formas según quién pregunta.
+- [x] **`MarkOverdueLoans`**, el tercer proceso diario. Con él, los tres recorren los hogares sin `BYPASSRLS`, que es lo que la ADR-003 exige demostrar.
+- [x] **La sexta migración**, `find_household_for_loan_token`: el cuarto momento en el que todavía no se sabe cuál es el hogar, y el único en el que quien pregunta **no tiene cuenta**.
+- [x] **Frontend**: préstamos del hogar y la vista externa —una pantalla sin sesión, sin shell y sin navegación, escrita contra su ficha antes de existir.
+- [x] **Cierre**: recorrido vertical con **Playwright** y auditoría axe, y la **medición de capacidad** que elige el VPS.
+
+> **Cinco decisiones que la definición no preveía**, razonadas en
+> [`decisions.md`](decisions.md). Las dos que más condicionan lo demás:
+>
+> - **El token acotado son las dos capas, no una.** Cada una hace algo que la
+>   otra no puede, y la revocación aquí sí hace falta: el token vive **noventa
+>   días**, porque un préstamo sin `dueAt` puede durar meses.
+> - **La proyección se declara.** Con un solo esquema, el cliente generado
+>   prometía `lender` y `borrower` a una pantalla que nunca los recibe. Y
+>   `confirmReturn` cambia igual, que se pasaba por alto.
+>
+> **La ficha de la vista externa encontró un hueco del contrato antes de que
+> hubiera código**: el papel no viajaba a la vista acotada, y la mitad del texto
+> de esa pantalla depende de él. Es la segunda vez que escribir la ficha antes
+> que la pantalla paga.
+>
+> **Dos barridos de verificación al cerrar**, con instrucción de ejecutar y no de
+> leer, y el primero encontró **un agujero real de concurrencia**: `ConfirmReturn`
+> tenía forma de lee-y-luego-escribe, y cuatro devoluciones simultáneas del mismo
+> token cerraban el préstamo cuatro veces —`[200, 200, 200, 200]` donde el
+> contrato promete un `200` y tres `409`, con `LoanReturned` publicado cuatro
+> veces. No es rebuscado: el enlace del correo se abre en dos sitios o se pulsa
+> dos veces. Aquí no valía el patrón del alta —dejar que un índice único rechace
+> a la segunda— porque no se inserta nada: es un `UPDATE` sobre una fila que ya
+> existe. Se resuelve con `SELECT ... FOR UPDATE` **acotado a la devolución**.
+>
+> **La medición del VPS dio la respuesta contraria a la esperada.** Por CPU
+> bastaría el VPS-2 y la base de datos cabe mil veces en cualquiera de los dos:
+> lo que decide es el **disco**, porque la cuota de 1 GB es un techo *por hogar* y
+> no protege al servidor. Y los tres puntos de la medición importan — con uno
+> solo el número habría salido dieciséis veces mayor. Todo en
+> [`capacity-measurements.md`](../../backend/operations/capacity-measurements.md).
+>
+> **Y dos cosas que solo se vieron ejecutando.** Una propiedad calculada de
+> `ExternalParty` se estaba serializando dentro de la columna `jsonb` —el mismo
+> fallo del Hito 2 en otra tabla, lo que convierte esa prueba en una que hay que
+> escribir **por columna**—; y el regex con el que las pruebas sacan el token del
+> correo no admitía puntos, y este es el único de los cinco que es un JWT.
 
 ## Lo que queda abierto a propósito
 
