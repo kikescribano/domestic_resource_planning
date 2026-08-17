@@ -18,5 +18,11 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: true,
+    // Vitest recoge por defecto todo lo que acabe en `.spec.ts`, y el recorrido
+    // vertical de Playwright vive en `e2e/` con ese nombre. Sin esta línea,
+    // Vitest lo carga en jsdom, no encuentra `@playwright/test` y falla un
+    // fichero entero sin que ninguna prueba lo esté midiendo. Los dos corredores
+    // se reparten el directorio: `src/` es de Vitest y `e2e/` de Playwright.
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
   },
 })
