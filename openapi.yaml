@@ -16,7 +16,7 @@ info:
     código `VALIDATION_ERROR`; los de **regla de negocio**, 409 con el código
     concreto. Y todas las colecciones se devuelven **paginadas**, con la misma
     envoltura `{ items, page, size, total }`.
-  version: "0.2.0-fase1"
+  version: "0.3.0-fase2"
   license:
     name: Ver LICENSE del repositorio
 servers:
@@ -48,6 +48,11 @@ tags:
     description: Invitaciones para sumar a alguien a un hogar
   - name: loans
     description: Préstamos (concepto mínimo del core, ver readme.md 4.1.5)
+  - name: modules
+    description: >
+      Activación de módulos por hogar (ver ADR-010). Es la única familia de
+      operaciones que no es del core: la sirve la plataforma, y es la que decide
+      qué partes del sistema existen para un hogar.
 
 security:
   - bearerAuth: []
@@ -1601,6 +1606,91 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         default: { $ref: "#/components/responses/ServerError" }
 
+  /modules:
+    get:
+      operationId: listModules
+      tags: [modules]
+      summary: Listar el catálogo de módulos con el estado del hogar
+      description: >
+        Devuelve el catálogo COMPLETO de lo que está desplegado, cada entrada
+        con lo que este hogar ha decidido sobre ella. No se recorta por rol: ver
+        que un módulo existe no es poder encenderlo --eso lo corta la
+        autorización de las otras dos operaciones-- y quien no administra
+        necesita saber que hay para poder pedirlo. Devolver dos catálogos según
+        quién pregunte dejaría además al cliente sin poder distinguir "apagado"
+        de "no me lo enseñan".
+
+
+        La ausencia de decisión es INACTIVE: un hogar recién creado no tiene
+        ninguna fila y todos sus módulos salen apagados. El cliente la resuelve
+        UNA VEZ al arrancar la sesión, no una por pantalla.
+      responses:
+        "200":
+          description: Catálogo de módulos con el estado del hogar
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModulePage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /modules/{key}/activation:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        description: Clave del módulo, en UPPER_SNAKE_CASE
+        schema: { type: string, pattern: "^[A-Z][A-Z0-9_]*$", example: SUPPLIERS }
+    post:
+      operationId: activateModule
+      tags: [modules]
+      summary: Activar un módulo en el hogar
+      description: >
+        Solo HOUSEHOLD_ADMIN. Enciende el módulo y lo SIEMBRA desde el estado
+        actual del core -- no reproduciendo eventos: la entrega del bus es
+        at-least-once y en memoria, así que un módulo activado hoy no vio el
+        AssetCreated de hace un mes y no hay dónde ir a buscarlo.
+
+
+        Es idempotente: activar lo ya activo devuelve el mismo estado y NO
+        vuelve a sembrar. La siembra corre dentro de la misma transacción, así
+        que un fallo suyo deja el módulo apagado en lugar de encendido a medias.
+      responses:
+        "200":
+          description: Módulo activo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HouseholdModule" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+    delete:
+      operationId: deactivateModule
+      tags: [modules]
+      summary: Desactivar un módulo en el hogar
+      description: >
+        Solo HOUSEHOLD_ADMIN. CONSERVA LOS DATOS Y LOS OCULTA: el módulo deja de
+        publicar sus rutas --responden 403 MODULE_INACTIVE--, deja de atender
+        eventos y desaparece de la navegación, y sus filas siguen donde estaban.
+        Volver a activarlo las devuelve tal cual.
+
+
+        Se descartó borrar al desactivar, que es destructivo e irreversible y
+        obligaría a definir el borrado en cascada de cuatro módulos antes de
+        escribir el primero; y se descartó bloquear la desactivación cuando hay
+        datos, que convierte la activación en casi irreversible y castiga justo
+        al hogar que probó el módulo.
+      responses:
+        "200":
+          description: Módulo inactivo. Sus datos siguen guardados.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HouseholdModule" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1765,6 +1855,7 @@ components:
             - MERGE_ASSET_DEACTIVATED
             - MERGE_NOT_CONSUMABLE
             - MERGE_SAME_ASSET
+            - MODULE_INACTIVE
             - RATE_LIMITED
             - RESET_TOKEN_INVALID
             - STORAGE_QUOTA_EXCEEDED
@@ -1776,12 +1867,59 @@ components:
           type: object
           description: Contexto adicional del error; su forma depende del código
 
+    HouseholdModule:
+      type: object
+      required: [key, name, description, routePrefix, status]
+      description: >
+        Una entrada del catálogo con lo que este hogar ha decidido sobre ella.
+
+
+        La clave, el nombre, la descripción y el prefijo de ruta NO se guardan
+        por hogar: viven en el registro en código, que es donde está también lo
+        que se despliega. Lo único que es del hogar es el estado y sus fechas.
+      properties:
+        key:
+          type: string
+          example: SUPPLIERS
+          description: >
+            Identificador del módulo, en inglés y en UPPER_SNAKE_CASE porque es
+            un identificador y no un dato.
+        name:
+          type: string
+          example: Proveedores y contactos de servicio
+          description: Lo que ve el usuario. Es un dato, así que va en castellano.
+        description: { type: string }
+        routePrefix:
+          type: string
+          example: /api/v1/suppliers
+          description: >
+            Prefijo bajo el que el módulo publica sus operaciones. Todo lo que
+            cuelga de él responde 403 MODULE_INACTIVE mientras esté apagado,
+            exista o no todavía un controlador que lo atienda.
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+          description: >
+            Sin decisión tomada el estado es INACTIVE. Para el cliente son el
+            mismo caso, así que la respuesta no distingue "nunca se encendió" de
+            "se apagó".
+        activatedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Cuándo se encendió por última vez
+        deactivatedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Cuándo se apagó por última vez
+
     PageMeta:
       type: object
       required: [page, size, total]
       description: >
         Metadatos de paginación, comunes a todas las colecciones. Son las mismas
-        en las once sin excepción por tamaño esperado: una sola forma que
+        en las doce sin excepción por tamaño esperado: una sola forma que
         aprender en el cliente, y ninguna migración el día que una lista que se
         creía pequeña deje de serlo.
       properties:
@@ -2638,11 +2776,11 @@ components:
         - $ref: "#/components/schemas/LoanExternalView"
 
     # --- Colecciones paginadas -------------------------------------------
-    # Nueve esquemas para once endpoints paginados: los dos listados de hijos
+    # Diez esquemas para doce endpoints paginados: los dos listados de hijos
     # --de un asset y de una ubicacion-- reutilizan el de su tipo, porque
     # devuelven lo mismo acotado de otra forma. Uno por tipo y no uno generico
     # porque OpenAPI 3.0 no tiene genericos. Todos comparten PageMeta, asi que
-    # el cliente generado ve la misma forma en las once.
+    # el cliente generado ve la misma forma en las doce.
 
     ArticlePage:
       allOf:
@@ -2713,6 +2851,16 @@ components:
             items:
               type: array
               items: { $ref: "#/components/schemas/Location" }
+
+    ModulePage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/HouseholdModule" }
 
     StoredFilePage:
       allOf:

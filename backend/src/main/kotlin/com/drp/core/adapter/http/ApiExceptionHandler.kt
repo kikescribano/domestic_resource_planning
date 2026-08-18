@@ -4,6 +4,7 @@ import com.drp.core.domain.BusinessRuleViolation
 import com.drp.core.domain.ErrorCode
 import com.drp.core.domain.ResourceNotFound
 import com.drp.core.domain.ValidationFailure
+import com.drp.platform.module.UnknownModule
 import com.drp.core.application.usecase.AuthenticationFailed
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
@@ -123,11 +124,15 @@ class ApiExceptionHandler {
      * Distinguir "no existe" de "existe pero no es tuyo" convertiria cualquier
      * identificador en un oraculo con el que averiguar que hay en otros hogares,
      * que es justo lo que la ADR-002 quiere impedir.
+     *
+     * Lleva tambien la clave de modulo desconocida, que es lo mismo visto desde
+     * plataforma: se declara aparte porque plataforma no puede lanzar el error
+     * del core sin invertir la frontera que la ADR-010 fija.
      */
-    @ExceptionHandler(ResourceNotFound::class)
-    fun onNotFound(failure: ResourceNotFound): ResponseEntity<ErrorResponse> =
+    @ExceptionHandler(ResourceNotFound::class, UnknownModule::class)
+    fun onNotFound(failure: RuntimeException): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(HttpStatus.NOT_FOUND)
-            .body(ErrorResponse(NOT_FOUND, failure.message))
+            .body(ErrorResponse(NOT_FOUND, failure.message ?: "No encontrado"))
 
     /**
      * Una ruta que **no corresponde a ningun manejador**: `404`, igual que un

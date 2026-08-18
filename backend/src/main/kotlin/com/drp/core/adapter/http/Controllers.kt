@@ -1,6 +1,5 @@
 package com.drp.core.adapter.http
 
-import com.drp.platform.page.Pagination
 import com.drp.core.application.port.SessionClaims
 import com.drp.core.application.usecase.AcceptInvitation
 import com.drp.core.application.usecase.AcceptInvitationCommand
@@ -10,9 +9,9 @@ import com.drp.core.application.usecase.CreateHousehold
 import com.drp.core.application.usecase.CreateHouseholdCommand
 import com.drp.core.application.usecase.DeactivateUser
 import com.drp.core.application.usecase.DeleteIdentityAvatar
+import com.drp.core.application.usecase.HouseholdUser
 import com.drp.core.application.usecase.InviteUser
 import com.drp.core.application.usecase.InviteUserCommand
-import com.drp.core.application.usecase.HouseholdUser
 import com.drp.core.application.usecase.ListInvitations
 import com.drp.core.application.usecase.ListUsers
 import com.drp.core.application.usecase.Login
@@ -25,7 +24,10 @@ import com.drp.core.application.usecase.RevokeInvitation
 import com.drp.core.application.usecase.RevokeSession
 import com.drp.core.application.usecase.SetIdentityAvatar
 import com.drp.core.application.usecase.VerifyEmail
+import com.drp.platform.page.PageResponse
+import com.drp.platform.page.Pagination
 import jakarta.validation.Valid
+import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -41,7 +43,6 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartHttpServletRequest
-import java.util.UUID
 
 /**
  * Los controladores del enrolamiento: las dieciseis operaciones del contrato que

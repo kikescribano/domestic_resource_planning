@@ -1,7 +1,6 @@
 package com.drp.core.adapter.http
 
 import com.drp.core.application.port.LoanFilter
-import com.drp.platform.page.Pagination
 import com.drp.core.application.port.SessionClaims
 import com.drp.core.application.usecase.ConfirmReturn
 import com.drp.core.application.usecase.GetLoan
@@ -11,7 +10,10 @@ import com.drp.core.application.usecase.LoanAccess
 import com.drp.core.application.usecase.StartLoan
 import com.drp.core.application.usecase.StartLoanCommand
 import com.drp.core.domain.loan.LoanStatus
+import com.drp.platform.page.PageResponse
+import com.drp.platform.page.Pagination
 import jakarta.validation.Valid
+import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
@@ -22,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import java.util.UUID
 
 @RestController
 @RequestMapping("/api/v1/loans")

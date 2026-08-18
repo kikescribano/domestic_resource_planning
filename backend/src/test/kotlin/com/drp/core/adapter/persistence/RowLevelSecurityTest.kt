@@ -175,10 +175,18 @@ class RowLevelSecurityTest {
         )
     }
 
+    /**
+     * Cuenta solo `public`, que es donde vive el modelo. El modulo de prueba del
+     * Hito 0 crea la suya en un esquema propio a proposito: una tabla de mentira
+     * en `public` obligaria a excluirla por nombre aqui, y esa exclusion taparia
+     * ademas cualquier tabla nueva que alguien olvidara.
+     */
     @Test
-    @DisplayName("el esquema tiene las quince tablas del modelo, ni una mas")
-    fun `el esquema tiene quince tablas`() {
-        owner.queryAllTables().size.shouldBe(15)
+    @DisplayName("el esquema tiene las dieciseis tablas del modelo, ni una mas")
+    fun `el esquema tiene dieciseis tablas`() {
+        // Quince del core mas `household_modules`, que llega con la activacion
+        // de modulos del Hito 0 de la Fase 2 (ADR-010).
+        owner.queryAllTables().size.shouldBe(16)
     }
 
     @Test

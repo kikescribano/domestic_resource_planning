@@ -177,23 +177,6 @@ data class CategoryResponse(
     }
 }
 
-/**
- * La envoltura de paginacion, igual en las once colecciones sin excepcion por
- * tamano esperado: una sola forma que aprender en el cliente, y ninguna
- * migracion el dia que una lista que se creia pequena deje de serlo.
- */
-data class PageResponse<T>(
-    val items: List<T>,
-    val page: Int,
-    val size: Int,
-    val total: Long,
-) {
-    companion object {
-        fun <D, T> of(page: Page<D>, map: (D) -> T) =
-            PageResponse(page.items.map(map), page.page, page.size, page.total)
-    }
-}
-
 /** Forma unica de todo error de la API. */
 data class ErrorResponse(
     val code: String,

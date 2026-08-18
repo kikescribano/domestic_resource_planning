@@ -2,7 +2,6 @@ package com.drp.core.adapter.http
 
 import com.drp.core.application.port.DocumentFilter
 import com.drp.core.application.port.FileStorage
-import com.drp.platform.page.Pagination
 import com.drp.core.application.port.SessionClaims
 import com.drp.core.application.port.StoredFileFilter
 import com.drp.core.application.usecase.AttachDocument
@@ -20,8 +19,12 @@ import com.drp.core.domain.ValidationFailure
 import com.drp.core.domain.file.DocumentType
 import com.drp.core.domain.file.StoredContentType
 import com.drp.core.domain.file.StoredFile
+import com.drp.platform.page.PageResponse
+import com.drp.platform.page.Pagination
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
+import java.nio.charset.StandardCharsets
+import java.util.UUID
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.core.io.InputStreamResource
@@ -41,8 +44,6 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartHttpServletRequest
-import java.nio.charset.StandardCharsets
-import java.util.UUID
 
 @RestController
 @RequestMapping("/api/v1/files")

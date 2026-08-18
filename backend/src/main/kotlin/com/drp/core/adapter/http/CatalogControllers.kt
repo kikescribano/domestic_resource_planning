@@ -1,8 +1,6 @@
 package com.drp.core.adapter.http
 
 import com.drp.core.application.port.ArticleFilter
-import com.drp.platform.page.Page
-import com.drp.platform.page.Pagination
 import com.drp.core.application.port.SessionClaims
 import com.drp.core.application.usecase.ArticleCommand
 import com.drp.core.application.usecase.ArticlePatch
@@ -16,8 +14,12 @@ import com.drp.core.application.usecase.RetireArticle
 import com.drp.core.application.usecase.RetireCategory
 import com.drp.core.application.usecase.UpdateArticle
 import com.drp.core.application.usecase.UpdateCategory
+import com.drp.platform.page.Page
+import com.drp.platform.page.PageResponse
+import com.drp.platform.page.Pagination
 import com.fasterxml.jackson.databind.JsonNode
 import jakarta.validation.Valid
+import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -30,7 +32,6 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import java.util.UUID
 
 /**
  * Los controladores del catalogo del Hito 2.
