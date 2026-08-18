@@ -628,6 +628,78 @@ class AssetJourneyTest : SpringIntegrationTest() {
     }
 
     // ----------------------------------------------------------------------
+    // Numero de serie y fecha de adquisicion
+    // ----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("el numero de serie y la fecha de adquisicion se corrigen despues del alta")
+    fun `los datos de la unidad fisica se pueden rellenar mas tarde`() {
+        val home = http.registerHousehold()
+
+        // El caso real: se da de alta sin ellos, porque la etiqueta con el numero
+        // esta pegada al aparato y nadie lo levanta para apuntarla en ese momento.
+        val boiler = home.createAsset(
+            """{"name":"Taladro GSB 13","type":"DURABLE","categoryId":"${home.category("Herramientas")}"}""",
+        )
+        http.getJson("/api/v1/assets/$boiler", home.accessToken).body!!
+            .shouldContain("\"serialNumber\":null")
+
+        val filled = http.patchJson(
+            "/api/v1/assets/$boiler",
+            """{"serialNumber":"  JU-88-2019-4471  ","acquiredOn":"2019-11-03"}""",
+            home.accessToken,
+        )
+        filled.statusCode.shouldBe(HttpStatus.OK)
+        // Recortado: un numero de serie se copia a mano de una etiqueta y arrastra
+        // espacios con facilidad, y dos que solo difieren en eso son el mismo.
+        filled.body!!.shouldContain("\"serialNumber\":\"JU-88-2019-4471\"")
+        filled.body!!.shouldContain("\"acquiredOn\":\"2019-11-03\"")
+
+        // Y se relee igual: la correccion se guardo, no se quedo en la respuesta.
+        val read = http.getJson("/api/v1/assets/$boiler", home.accessToken).body!!
+        read.shouldContain("JU-88-2019-4471")
+        read.shouldContain("2019-11-03")
+
+        // Vaciarlos es legitimo: el numero se apunto mal y no se tiene el bueno.
+        val cleared = http.patchJson(
+            "/api/v1/assets/$boiler",
+            """{"serialNumber":null,"acquiredOn":null}""",
+            home.accessToken,
+        )
+        cleared.body!!.shouldContain("\"serialNumber\":null")
+        cleared.body!!.shouldContain("\"acquiredOn\":null")
+    }
+
+    @Test
+    @DisplayName("una existencia no lleva numero de serie ni fecha de adquisicion")
+    fun `los datos de la unidad fisica no valen sobre un consumible`() {
+        val home = http.registerHousehold()
+        val pantry = home.createLocation("""{"name":"Despensa","type":"ROOM"}""")
+        val sugar = home.createArticle(
+            """{"name":"Azúcar","categoryId":"${home.category("Alimentación")}","unit":"KILOGRAM"}""",
+        )
+        val stock = home.intake(sugar, pantry, 2)
+
+        // Es la simetrica de `quantity` sobre un DURABLE: cada reposicion suma
+        // sobre la misma fila, asi que no hay unidad fisica de la que hablar.
+        val rejected = http.patchJson(
+            "/api/v1/assets/$stock",
+            """{"serialNumber":"NO-APLICA"}""",
+            home.accessToken,
+        )
+        rejected.statusCode.shouldBe(HttpStatus.BAD_REQUEST)
+        rejected.body!!.shouldContain("serialNumber")
+
+        http.patchJson("/api/v1/assets/$stock", """{"acquiredOn":"2026-01-01"}""", home.accessToken)
+            .statusCode.shouldBe(HttpStatus.BAD_REQUEST)
+
+        // Y lo que si vale sobre una existencia sigue valiendo: la negativa es
+        // del campo, no del PATCH entero.
+        http.patchJson("/api/v1/assets/$stock", """{"quantity":5}""", home.accessToken)
+            .statusCode.shouldBe(HttpStatus.OK)
+    }
+
+    // ----------------------------------------------------------------------
     // Utilidades
     // ----------------------------------------------------------------------
 

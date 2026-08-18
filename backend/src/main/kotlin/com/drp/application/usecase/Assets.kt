@@ -95,6 +95,8 @@ data class AssetPatch(
     val ownerId: Patch<UUID?> = Patch.Absent,
     val location: Patch<AssetLocation?> = Patch.Absent,
     val quantity: Patch<BigDecimal> = Patch.Absent,
+    val serialNumber: Patch<String?> = Patch.Absent,
+    val acquiredOn: Patch<LocalDate?> = Patch.Absent,
     val photoUrl: Patch<String?> = Patch.Absent,
     val photoFileId: Patch<UUID?> = Patch.Absent,
     val notes: Patch<String?> = Patch.Absent,
@@ -362,6 +364,7 @@ class UpdateAsset(
         }
 
         val newQuantity = resolveQuantity(current, patch)
+        requireDurableForIdentityData(current, patch)
         val newArticleId = resolveArticleId(current, patch)
         val newOwnerId = patch.ownerId.orKeep(current.ownerId)
         if (patch.ownerId is Patch.Set && newOwnerId != null) references.requireMember(newOwnerId)
@@ -385,6 +388,8 @@ class UpdateAsset(
                 ownerId = newOwnerId,
                 location = newLocation,
                 quantity = newQuantity,
+                serialNumber = patch.serialNumber.orKeep(current.serialNumber)?.trim()?.takeIf { it.isNotEmpty() },
+                acquiredOn = patch.acquiredOn.orKeep(current.acquiredOn),
                 photoUrl = patch.photoUrl.orKeep(current.photoUrl),
                 photoFileId = patch.photoFileId.orKeep(current.photoFileId),
                 notes = patch.notes.orKeep(current.notes),
@@ -419,6 +424,27 @@ class UpdateAsset(
             throw BusinessRuleViolation(ErrorCode.ASSET_QUANTITY_NEGATIVE, "La cantidad no puede ser negativa")
         }
         return patch.quantity.value
+    }
+
+    /**
+     * El numero de serie y la fecha de adquisicion son de una **unidad fisica**,
+     * asi que solo valen sobre un `DURABLE`. Es la simetrica de `quantity`, que
+     * solo vale sobre un `CONSUMABLE`, y por el mismo motivo: cinco kilos de
+     * azucar no tienen un numero de serie ni una fecha de entrada, porque cada
+     * reposicion suma sobre la misma fila.
+     *
+     * Va como `ValidationFailure` y no como codigo de negocio nuevo: es la
+     * peticion la que esta mal formada --pide algo que ese tipo de asset no
+     * tiene-- y no una regla del hogar que la impida.
+     */
+    private fun requireDurableForIdentityData(current: Asset, patch: AssetPatch) {
+        if (current.isDurable) return
+
+        val offending = buildMap {
+            if (patch.serialNumber is Patch.Set) put("serialNumber", "un CONSUMABLE no lleva número de serie")
+            if (patch.acquiredOn is Patch.Set) put("acquiredOn", "un CONSUMABLE no lleva fecha de adquisición")
+        }
+        if (offending.isNotEmpty()) throw ValidationFailure(offending)
     }
 
     /** Solo para **asignar** articulo a un `DURABLE` que aun no lo tiene. */

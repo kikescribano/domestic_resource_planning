@@ -168,6 +168,8 @@ class AssetController(
                 ownerId = patch.uuid("ownerId"),
                 location = patch.assetLocation(),
                 quantity = patch.requiredDecimal("quantity"),
+                serialNumber = patch.text("serialNumber"),
+                acquiredOn = patch.date("acquiredOn"),
                 photoUrl = patch.text("photoUrl"),
                 photoFileId = patch.uuid("photoFileId"),
                 notes = patch.text("notes"),

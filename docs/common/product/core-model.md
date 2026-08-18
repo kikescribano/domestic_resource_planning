@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Assets, articulos, ubicaciones y documentacion del core |
-| Última revisión | 2026-08-10 |
+| Última revisión | 2026-08-17 |
 
 > Trasladado desde las secciones 4.1.1 a 4.1.3 del [`README principal`](../../../README.md) al iniciar la Fase 1. **Los números de sección se conservan**: hay más de cien referencias cruzadas del tipo «ver 4.1.1» repartidas por el repositorio, y renumerarlas las rompería todas.
 
@@ -71,8 +71,8 @@ graph TD
 | Ubicación (`location`) | Ambos | Referencia a otro Asset **o** a una Location — nunca ambas a la vez |
 | Estado (`status`) | Ambos | `AVAILABLE`, `LENT`, `DECOMMISSIONED` |
 | Cantidad (`quantity`) | Solo `CONSUMABLE` | Existencia actual, expresada en la unidad de su artículo |
-| Número de serie (`serialNumber`) | Solo `DURABLE`, opcional | Lo que distingue dos unidades por lo demás idénticas, y lo que pide un fabricante al reclamar una garantía |
-| Fecha de adquisición (`acquiredOn`) | Solo `DURABLE`, opcional | Cuándo entró en el hogar. Es procedencia, no valor: el importe pertenece al módulo de gastos |
+| Número de serie (`serialNumber`) | Solo `DURABLE`, opcional | Lo que distingue dos unidades por lo demás idénticas, y lo que pide un fabricante al reclamar una garantía. **Se corrige después del alta**, que es cuando se sabe: la etiqueta está pegada detrás del aparato |
+| Fecha de adquisición (`acquiredOn`) | Solo `DURABLE`, opcional | Cuándo entró en el hogar. Es procedencia, no valor: el importe pertenece al módulo de gastos. Se corrige después del alta, igual que el número de serie |
 | Foto (`photoUrl` / `photoFileId`) | Ambos, opcional | Una imagen, en forma de **enlace externo o de fichero guardado en el servidor** —nunca las dos a la vez— igual que en la documentación (ver «Ficheros almacenados»). Reconocer una cosa de un vistazo es la mitad de un inventario doméstico |
 | Notas (`notes`) | Ambos, opcional | Texto libre |
 | Fecha de alta (`createdAt`) | Ambos | — |

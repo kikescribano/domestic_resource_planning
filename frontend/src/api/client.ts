@@ -236,10 +236,32 @@ export interface Article {
   photoFileId: string | null
 }
 
+export type CapacityType = 'WEIGHT' | 'VOLUME' | 'UNITS'
+
 export interface Capacity {
-  type: 'WEIGHT' | 'VOLUME' | 'UNITS'
+  type: CapacityType
   max: number
   unit: string
+}
+
+/**
+ * Qué se declara al poner capacidad, y en qué se mide por defecto.
+ *
+ * Solo `UNITS` se comprueba de verdad: superar un máximo en peso o en volumen no
+ * se puede detectar porque el asset no lleva ninguno de los dos. Se admiten
+ * igualmente porque el dato le sirve a quien lo mira aunque el sistema no pueda
+ * contarlo, y decirlo es más honesto que ofrecer solo uno de los tres.
+ */
+export const CAPACITY_TYPE_LABELS: Record<CapacityType, string> = {
+  UNITS: 'Unidades',
+  WEIGHT: 'Peso',
+  VOLUME: 'Volumen',
+}
+
+export const CAPACITY_DEFAULT_UNITS: Record<CapacityType, string> = {
+  UNITS: 'cajas',
+  WEIGHT: 'kg',
+  VOLUME: 'l',
 }
 
 export interface Location {
@@ -279,6 +301,8 @@ export interface Asset {
   quantity: number | null
   unit: MeasurementUnit | null
   serialNumber: string | null
+  /** `YYYY-MM-DD`: es una fecha sin hora, no un instante. */
+  acquiredOn: string | null
   notes: string | null
   photoUrl: string | null
   photoThumbnailUrl: string | null
@@ -427,6 +451,25 @@ export interface LoanFilters {
 export function formatDate(iso: string | null): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+/**
+ * Una fecha **sin hora**, como la que declara el contrato con `format: date`.
+ *
+ * No vale `formatDate`: `new Date('2019-11-03')` interpreta la cadena como
+ * medianoche **UTC**, así que en un huso negativo se imprime el día anterior. Un
+ * `acquiredOn` es un día del calendario, no un instante, y el 3 de noviembre
+ * tiene que leerse 3 de noviembre en Canarias y en Ciudad de México.
+ */
+export function formatDay(day: string | null): string {
+  if (!day) return '—'
+  const [year, month, date] = day.split('-').map(Number)
+  if (!year || !month || !date) return day
+  return new Date(year, month - 1, date).toLocaleDateString('es-ES', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
 }
 
 /** Cómo se escribe un tamaño para que lo lea una persona. */

@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Ejemplos de request y response de la API |
-| Última revisión | 2026-08-10 |
+| Última revisión | 2026-08-17 |
 
 > Trasladado desde la sección 5.4.3 del [`README principal`](../../../README.md) al iniciar la Fase 1. **Los números de sección se conservan**: hay más de cien referencias cruzadas del tipo «ver 4.1.1» repartidas por el repositorio, y renumerarlas las rompería todas.
 
@@ -172,6 +172,12 @@ El contrato completo, con todos los recursos, parámetros y esquemas de error, s
 { "quantity": 700 }
 ```
 > A diferencia de la entrada, aquí la cantidad es **absoluta**: sustituye, no suma. Publica `AssetQuantityChanged`. Enviar `quantity` sobre un `DURABLE`, o un valor negativo, se rechaza con `409` y el código `ASSET_QUANTITY_NOT_APPLICABLE` / `ASSET_QUANTITY_NEGATIVE`.
+
+**`PATCH /api/v1/assets/{id}`** — apuntar el número de serie que no se tenía al dar de alta
+```json
+{ "serialNumber": "JU-88-2019-4471", "acquiredOn": "2019-11-03" }
+```
+> Los dos son **la simétrica de `quantity`**: solo valen sobre un `DURABLE`, porque describen una unidad física, y sobre una existencia se rechazan con `400` y `VALIDATION_ERROR` —no con un código de negocio: es la petición la que pide algo que ese tipo de asset no tiene—. Se corrigen después del alta a propósito, que es cuando se saben: la etiqueta con el número está pegada detrás del aparato. Enviarlos a `null` los borra, que es lo que hace falta cuando uno se copió mal.
 
 **`GET /api/v1/loans/{id}`** — response con **token acotado de receptor**
 ```json

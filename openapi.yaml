@@ -2198,7 +2198,8 @@ components:
         nombre y categoryId solo son válidos en un asset sin artículo -- si lo
         tiene, se cambian en el artículo. estado no se acepta: lo gobiernan
         DELETE /assets/{id}, POST /loans y POST /loans/{id}/return. ownerId es
-        la vía para reasignar un asset huérfano.
+        la vía para reasignar un asset huérfano. serialNumber y acquiredOn son
+        al revés que cantidad: solo valen sobre un DURABLE.
       properties:
         name: { type: string }
         categoryId: { type: string, format: uuid }
@@ -2209,6 +2210,17 @@ components:
         ownerId: { type: string, format: uuid }
         location: { $ref: "#/components/schemas/LocationRef" }
         quantity: { type: number, minimum: 0 }
+        serialNumber:
+          type: string
+          nullable: true
+          description: >
+            Solo sobre un DURABLE. Se corrige después del alta porque casi nunca
+            se tiene delante al dar de alta: la etiqueta está detrás del aparato.
+        acquiredOn:
+          type: string
+          format: date
+          nullable: true
+          description: Solo sobre un DURABLE. Es procedencia, no valor.
         photoUrl: { type: string, format: uri, nullable: true }
         photoFileId:
           type: string

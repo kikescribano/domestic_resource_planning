@@ -15,6 +15,7 @@ import jakarta.validation.constraints.Positive
 import jakarta.validation.constraints.Size
 import java.math.BigDecimal
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 data class LocationInput(
@@ -158,6 +159,16 @@ class JsonPatch(private val body: JsonNode) {
 
     fun decimal(field: String): Patch<BigDecimal?> =
         if (!has(field)) Patch.Absent else Patch.Set(node(field)?.decimalValue())
+
+    /**
+     * Una fecha sin hora, que es lo que el contrato declara como `format: date`.
+     *
+     * Se parsea aqui y no en el caso de uso para que una fecha mal escrita sea un
+     * `400` del adaptador --que es lo que es-- y no una excepcion a mitad de una
+     * transaccion ya abierta.
+     */
+    fun date(field: String): Patch<LocalDate?> =
+        if (!has(field)) Patch.Absent else Patch.Set(node(field)?.asText()?.let(LocalDate::parse))
 
     /** Para los numeros que se pueden cambiar pero no vaciar, como la cantidad de una existencia. */
     fun requiredDecimal(field: String): Patch<BigDecimal> =

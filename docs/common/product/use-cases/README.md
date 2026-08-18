@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Comandos y queries del core |
-| Última revisión | 2026-08-10 |
+| Última revisión | 2026-08-17 |
 
 > Trasladado desde la sección 5.7 del [`README principal`](../../../../README.md) al iniciar la Fase 1. **Los números de sección se conservan**: hay más de cien referencias cruzadas del tipo «ver 4.1.1» repartidas por el repositorio, y renumerarlas las rompería todas.
 
@@ -25,6 +25,7 @@ Catálogo ilustrativo de los comandos y queries que expone la capa de aplicació
 | Comando | `DeleteFile` | fileId | falla si un documento o una foto lo referencian — primero se desadjunta; marca `deletedAt` y deja los bytes al proceso diario | — |
 | Comando | `SetIdentityAvatar` | contenido | solo imagen y hasta 1 MB; **sustituye** siempre el anterior, así que no acumula ni consume cuota de ningún hogar; la ruta se deriva del `identityId` del token | — |
 | Comando | `RegisterConsumableIntake` | articleId **o** datos de artículo nuevo, ubicación, cantidad, ownerId | crea el artículo si no existe; resuelve la existencia de ese artículo en esa ubicación y **suma** la cantidad, o la crea si no hay ninguna; la cantidad de entrada debe ser > 0 y va en la unidad del artículo | `ArticleCreated` (si creó artículo) + `AssetCreated` o `AssetQuantityChanged` |
+| Comando | `UpdateAsset` | assetId, campos a corregir | la corrección de datos, que entra por el mismo `PATCH /assets/{id}` que las dos siguientes y se distingue por lo que trae el cuerpo. El nombre y la categoría propios solo valen en un asset **sin** artículo —si lo tiene se cambian allí, para no guardar el dato dos veces—; `serialNumber` y `acquiredOn` son la simétrica de `quantity`: solo valen sobre un `DURABLE`, porque describen una unidad física. El tipo y el estado no se tocan por aquí | — |
 | Comando | `MoveAsset` | assetId, nueva ubicación | evita ciclos en la jerarquía; si la ubicación es un Asset, este debe ser `DURABLE`; mover una existencia a una ubicación que ya tiene otra viva del mismo artículo se rechaza con `EXISTENCE_ALREADY_IN_LOCATION` — eso es una fusión, y se resuelve con `MergeStockItems` | `AssetMoved` / `AssetHierarchyChanged` |
 | Comando | `MergeStockItems` | assetId origen, assetId destino | ambas `CONSUMABLE` vivas del **mismo artículo** y distintas entre sí; el destino se queda con la suma de las cantidades y conserva su ubicación y su propietario; el origen queda a `quantity = 0` y `status = DECOMMISSIONED` | `AssetQuantityChanged` (destino) + `AssetDeactivated` (origen) |
 | Comando | `AdjustAssetQuantity` | assetId, nueva cantidad (absoluta) o delta | solo sobre `CONSUMABLE`; la cantidad resultante no puede ser negativa. Es la corrección o el consumo, no la entrada de compra | `AssetQuantityChanged` |
