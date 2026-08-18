@@ -178,14 +178,12 @@ test.describe('recorrido vertical', () => {
    * Es la mitad que ninguna prueba de componente puede dar: el `403` sale del
    * filtro de verdad, la navegación se repinta sobre el DOM real y la pantalla
    * de una ruta apagada se mide con axe y con el tabulador. El módulo que se
-   * enciende es **Proveedores**, que en el Hito 0 es una declaración sin dominio
-   * — y eso es justo lo que hace la prueba honesta: lo que se está comprobando
-   * es el mecanismo, no el módulo.
+   * enciende es **Proveedores**, y lo que se comprueba aquí sigue siendo **el
+   * mecanismo y no el módulo**: lo suyo tiene su propio recorrido, más abajo.
    *
    * La otra mitad del ciclo —que los datos del módulo siguen ahí al reactivarlo—
-   * se comprueba en el backend con el módulo de prueba, que sí tiene tabla. Aquí
-   * no hay ninguna que sobreviva porque ninguno de los cuatro tiene datos
-   * todavía.
+   * se comprueba en el backend, que puede mirar la fila. Aquí lo que se ve es lo
+   * que ve una persona.
    */
   test('un módulo apagado no existe, se enciende desde su pantalla y vuelve a apagarse', async ({
     page,
@@ -235,11 +233,12 @@ test.describe('recorrido vertical', () => {
     await navigateTo(page, 'Proveedores', '/proveedores')
     await expect(page.getByText('Este módulo está apagado')).toHaveCount(0)
 
-    // La API ya no la corta el gate. Responde `404` porque el módulo todavía no
-    // tiene controlador, y esa es exactamente la diferencia que se quería ver:
-    // apagado dice «actívalo», encendido dice «eso no existe».
+    // La API ya no la corta el gate, y desde el Hito 2 **responde de verdad**:
+    // hasta entonces esto daba `404` porque no había controlador detrás, así que
+    // el gate nunca había tapado nada que existiera. Esa es la diferencia entera
+    // que se quería ver aquí — apagado dice «actívalo», encendido contesta.
     const opened = await request.get('/api/v1/suppliers', { headers: { Authorization: `Bearer ${token}` } })
-    expect(opened.status(), 'el gate sigue cortando un módulo ya encendido').not.toBe(403)
+    expect(opened.status(), 'el gate sigue cortando un módulo ya encendido').toBe(200)
 
     // --- 3. Apagarlo otra vez ----------------------------------------------
     await navigateTo(page, 'Módulos del hogar', '/modulos')
@@ -248,6 +247,103 @@ test.describe('recorrido vertical', () => {
     await expect(navigation.getByRole('link', { name: 'Proveedores' })).toHaveCount(0)
     await page.goto('/proveedores')
     await expect(page.getByText('Este módulo está apagado')).toBeVisible()
+  })
+
+  /**
+   * El recorrido del **primer módulo con dominio**, de encenderlo a enlazar un
+   * contacto con un sitio de la casa.
+   *
+   * Va aquí y no en una suite propia a propósito: la batería del recorrido
+   * vertical es una y los módulos se añaden a ella, que es lo que la ADR-001
+   * pide y lo que evita que cada módulo estrene su forma de comprobar lo mismo.
+   *
+   * Lo que solo se puede ver aquí son cuatro cosas: que la pantalla del módulo
+   * **se monta dentro de su guardián** —que hasta este hito no sabía enseñar
+   * nada—, que el enlace con una ubicación del core atraviesa las cinco capas
+   * hasta PostgreSQL y vuelve **con el nombre resuelto**, que la parada nueva no
+   * estropea la navegación a 320 px, y que todo eso se hace con el teclado y pasa
+   * axe en los dos modos.
+   */
+  test('el módulo de Proveedores: encenderlo, dar de alta un contacto y enlazarlo con un sitio', async ({
+    page,
+  }) => {
+    const email = `casa-${Date.now()}@example.test`
+    const password = 'el gato duerme en el sofa'
+
+    await page.goto('/crear-hogar')
+    await page.getByLabel('Nombre del hogar').fill('Casa de los Proveedores')
+    await page.getByLabel('Tu nombre').fill('Kike')
+    await page.getByLabel('Correo').fill(email)
+    await page.getByLabel('Contraseña', { exact: true }).fill(password)
+    await page.getByRole('button', { name: /crear/i }).click()
+    await page.goto(await linkFromEmail(email))
+    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+
+    // --- 1. Un sitio de la casa, que es con lo que se va a enlazar ----------
+    await navigateTo(page, 'Sitios', '/ubicaciones')
+    await page.getByLabel('Nombre').fill('Sala de calderas')
+    await page.getByLabel('Tipo').selectOption({ label: 'Habitación' })
+    await page.getByRole('button', { name: 'Crear ubicación' }).click()
+    // Por el árbol y no por el texto suelto: el nombre aparece también dentro
+    // del `<option>` de «Dentro de», que está en el DOM y no se ve.
+    await expect(
+      page.getByRole('tree', { name: 'Ubicaciones del hogar' }).getByText('Sala de calderas'),
+    ).toBeVisible()
+
+    // --- 2. Encender el módulo, con el teclado ------------------------------
+    // Con el tabulador y desde el principio del documento: encender un módulo es
+    // la puerta de entrada a todo lo demás, y si no se llega a ella sin ratón,
+    // para quien navega así el módulo no existe.
+    await navigateTo(page, 'Módulos del hogar', '/modulos')
+    const encender = page.getByRole('button', { name: /^Encender Proveedores/ })
+    await startKeyboardAtTop(page, encender)
+    await tabTo(page, encender, 'encender Proveedores')
+    await page.keyboard.press('Enter')
+
+    // --- 3. Su pantalla, dentro del guardián --------------------------------
+    await navigateTo(page, 'Proveedores', '/proveedores')
+    await expect(page.getByRole('heading', { level: 1, name: 'Proveedores' })).toBeVisible()
+    // El vacío de un módulo recién encendido es el vacío **de verdad**: su
+    // siembra está vacía a propósito, porque en el core no hay ningún fontanero
+    // que heredar.
+    await expect(page.getByText('Todavía no hay ningún contacto')).toBeVisible()
+    await checkAccessibility(page, 'proveedores, sin nada todavía')
+
+    // --- 4. Dar de alta un contacto -----------------------------------------
+    await page.getByRole('button', { name: 'Añadir contacto' }).click()
+    await page.getByLabel('Nombre').fill('Servicio Técnico Caldera')
+    await page.getByLabel('Categoría de servicio').selectOption('HEATING_COOLING')
+    await page.getByLabel('Teléfono').fill('900 100 100')
+    await page.getByRole('button', { name: 'Guardar contacto' }).click()
+
+    await expect(page.getByRole('button', { name: /Servicio Técnico Caldera/ })).toBeVisible()
+
+    // --- 5. Enlazarlo con el sitio, y ver el nombre resuelto ----------------
+    await page.getByRole('button', { name: /Servicio Técnico Caldera/ }).click()
+    await expect(page.getByText('Todavía no está enlazado con nada.')).toBeVisible()
+
+    await page.getByRole('button', { name: /^Enlazar Servicio Técnico Caldera/ }).click()
+    await page
+      .getByLabel('Sitio que atiende Servicio Técnico Caldera')
+      .selectOption({ label: 'Sala de calderas' })
+    await page.getByRole('button', { name: 'Enlazar', exact: true }).click()
+
+    // El nombre no lo guarda el módulo: lo resuelve el servidor contra el core al
+    // leer. Que aparezca aquí es la vuelta entera cerrada —pantalla, API, caso de
+    // uso, dos tablas de dos árboles distintos y de vuelta.
+    //
+    // Se busca por el botón de quitar, cuyo nombre accesible lleva el del
+    // destino: es lo único que solo puede venir de un enlace ya guardado, y no
+    // se confunde con la opción del desplegable.
+    await expect(page.getByRole('button', { name: 'Quitar Sala de calderas' })).toBeVisible()
+
+    // --- 6. Y lo que solo se mide en un navegador ---------------------------
+    await checkAccessibility(page, 'proveedores, con un contacto enlazado')
+    await checkReflow(page, 'proveedores')
+    // La parada nueva no roba sitio en el pulgar: entra en el grupo de módulos,
+    // que en móvil vive dentro de «Más». Medirlo es parte del hito y no un extra
+    // — es exactamente el defecto que obligó a reorganizar la navegación.
+    await checkTouchTargets(page)
   })
 })
 
