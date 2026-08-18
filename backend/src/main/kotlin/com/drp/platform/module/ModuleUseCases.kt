@@ -1,6 +1,7 @@
 package com.drp.platform.module
 
 import com.drp.core.application.port.SessionClaims
+import com.drp.platform.error.ResourceNotFound
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -63,7 +64,7 @@ class ActivateModule(
      */
     @Transactional
     fun handle(session: SessionClaims, moduleKey: String): ModuleView {
-        val descriptor = registry.find(moduleKey) ?: throw UnknownModule(moduleKey)
+        val descriptor = registry.find(moduleKey) ?: throw ResourceNotFound("El módulo «$moduleKey» no existe")
         val existing = modules.find(moduleKey)
 
         if (existing != null && existing.isActive) return ModuleView(descriptor, existing)
@@ -118,7 +119,7 @@ class DeactivateModule(
 
     @Transactional
     fun handle(session: SessionClaims, moduleKey: String): ModuleView {
-        val descriptor = registry.find(moduleKey) ?: throw UnknownModule(moduleKey)
+        val descriptor = registry.find(moduleKey) ?: throw ResourceNotFound("El módulo «$moduleKey» no existe")
         val existing = modules.find(moduleKey)
 
         // Apagar lo que nunca se encendio no inserta una fila: la ausencia ya

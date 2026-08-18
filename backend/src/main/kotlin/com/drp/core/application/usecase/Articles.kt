@@ -8,9 +8,9 @@ import com.drp.core.application.port.CategoryRepository
 import com.drp.platform.page.Page
 import com.drp.platform.page.Pagination
 import com.drp.core.application.port.SessionClaims
-import com.drp.core.domain.BusinessRuleViolation
-import com.drp.core.domain.ErrorCode
-import com.drp.core.domain.ResourceNotFound
+import com.drp.platform.error.BusinessRuleViolation
+import com.drp.platform.error.ErrorCode
+import com.drp.platform.error.ResourceNotFound
 import com.drp.core.domain.catalog.Article
 import com.drp.core.domain.catalog.MeasurementUnit
 import org.springframework.stereotype.Service

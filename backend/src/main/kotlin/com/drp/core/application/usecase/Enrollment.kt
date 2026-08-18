@@ -14,9 +14,9 @@ import com.drp.core.application.port.PasswordHasher
 import com.drp.core.application.port.SecretGenerator
 import com.drp.core.application.port.TenantResolver
 import com.drp.platform.tenant.TenantContext
-import com.drp.core.domain.BusinessRuleViolation
-import com.drp.core.domain.ErrorCode
-import com.drp.core.domain.ValidationFailure
+import com.drp.platform.error.BusinessRuleViolation
+import com.drp.platform.error.ErrorCode
+import com.drp.platform.error.ValidationFailure
 import com.drp.core.domain.household.Household
 import com.drp.core.domain.household.HouseholdMember
 import com.drp.core.domain.household.MemberRole

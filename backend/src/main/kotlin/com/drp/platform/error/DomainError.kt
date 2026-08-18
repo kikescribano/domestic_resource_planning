@@ -1,4 +1,4 @@
-package com.drp.core.domain
+package com.drp.platform.error
 
 /**
  * Codigos de error de negocio, tal y como los enumera el contrato.
@@ -8,9 +8,24 @@ package com.drp.core.domain
  * contrato, no un caso que el frontend deba adivinar, asi que este enumerado
  * existe para que anadir uno obligue a tocar tambien el contrato.
  *
- * Estan los del Hito 1 --enrolamiento--, los del Hito 2 --catalogo, ubicaciones
- * y assets--, los del Hito 3 --ficheros y documentos-- y los tres de prestamos
- * del Hito 4, con los que la lista queda completa.
+ * Estan los cuatro hitos de la Fase 1 --enrolamiento; catalogo, ubicaciones y
+ * assets; ficheros y documentos; y prestamos-- y, desde la Fase 2, los del primer
+ * modulo con reglas de negocio.
+ *
+ * **Esto vivia en `com.drp.core.domain` y se mudo aqui en el Hito 2 de la Fase
+ * 2**, que es el dia que la [ADR-010] nombraba en su condicion de revision. El
+ * motivo no es de orden sino de frontera: un modulo puede lanzar
+ * `BusinessRuleViolation` desde el primer dia --la direccion `modulo -> core`
+ * esta permitida y ninguna regla de ArchUnit se queja-- y el resultado seria el
+ * core enumerando las reglas de sus modulos, que es lo mismo que la segunda regla
+ * impide en el otro sentido, solo que sin nada que lo delate. El contrato tiene un
+ * unico enumerado de errores en cualquier caso; lo que se decide es **quien lo
+ * posee**, y tiene que ser la capa de la que pueden depender los dos lados.
+ *
+ * Queda un residuo que conviene no perder de vista: plataforma nombra aqui reglas
+ * de un modulo. No es una dependencia de codigo --la cuarta regla de ArchUnit
+ * sigue midiendo eso, y sigue verde-- sino vocabulario compartido con el
+ * contrato. Merece la misma vigilancia que `SessionClaims`.
  *
  * Tres de los de ficheros **no responden `409`**: el contrato les asigna `413` y
  * `415`, que es informacion de transporte y no de dominio. La correspondencia

@@ -1,9 +1,9 @@
 package com.drp.core.application
 
 import com.drp.core.application.port.StoredFileRepository
-import com.drp.core.domain.BusinessRuleViolation
-import com.drp.core.domain.ErrorCode
-import com.drp.core.domain.ResourceNotFound
+import com.drp.platform.error.BusinessRuleViolation
+import com.drp.platform.error.ErrorCode
+import com.drp.platform.error.ResourceNotFound
 import org.springframework.stereotype.Service
 import java.util.UUID
 

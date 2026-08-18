@@ -2,8 +2,8 @@ package com.drp.core.adapter.storage
 
 import com.drp.core.application.port.FileContentProcessor
 import com.drp.core.application.port.ProcessedContent
-import com.drp.core.domain.BusinessRuleViolation
-import com.drp.core.domain.ErrorCode
+import com.drp.platform.error.BusinessRuleViolation
+import com.drp.platform.error.ErrorCode
 import com.drp.core.domain.file.StoredContentType
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value

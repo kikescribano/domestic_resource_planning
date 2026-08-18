@@ -9,7 +9,7 @@ import com.drp.core.application.port.RefreshTokenRepository
 import com.drp.core.application.port.SecretGenerator
 import com.drp.core.application.port.TenantResolver
 import com.drp.platform.tenant.TenantContext
-import com.drp.core.domain.ErrorCode
+import com.drp.platform.error.ErrorCode
 import com.drp.platform.mail.EmailAddress
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
