@@ -2,7 +2,7 @@
 
 > **Estado del documento:** vivo — se actualiza a medida que el proyecto avanza.
 > **Última actualización:** 2026-08-18
-> **Fase actual:** Fase 1 (Core MVP) **completada**; cómo se hizo, hito a hito, en [`docs/common/product/roadmap.md`](docs/common/product/roadmap.md). La **Fase 2 está planificada**: los cuatro módulos de prioridad alta de la sección 4.2, sobre activación por hogar y plataforma de avisos, en [`docs/common/product/phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md)
+> **Fase actual:** Fase 1 (Core MVP) **completada**; cómo se hizo, hito a hito, en [`docs/common/product/roadmap.md`](docs/common/product/roadmap.md). La **Fase 2 está en curso**: los cuatro módulos de prioridad alta de la sección 4.2, sobre activación por hogar y plataforma de avisos, en [`docs/common/product/phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md). Su **Hito 0 está cerrado**: las fronteras de módulo y la activación por hogar ya existen, y el catálogo de los cuatro se puede encender y apagar
 
 ---
 
@@ -516,7 +516,7 @@ pie title Distribución de la batería de tests
 |---|---|---|
 | **Fase 0 — Definición** | Arquitectura, stack, alcance del core, estrategia de testing | 🟢 Completada |
 | **Fase 1 — Core MVP** | Gestión de recursos/assets, autenticación, API REST, event bus y cliente web completo del core | 🟢 Completada |
-| **Fase 2 — Módulos activables** | Activación de módulos por hogar, plataforma de programación y avisos, y los cuatro módulos de prioridad alta de la sección 4.2 | 🟡 Planificada |
+| **Fase 2 — Módulos activables** | Activación de módulos por hogar, plataforma de programación y avisos, y los cuatro módulos de prioridad alta de la sección 4.2 | 🟡 En curso |
 | **Fase 3 — Módulos adicionales** | Según backlog de la sección 4.2 | ⚪ Pendiente |
 
 > **La Fase 1 se cerró el 2026-08-17**, con los cinco hitos completados y las
@@ -575,7 +575,7 @@ Se entrega en **siete hitos**, cada uno atravesando las capas en vertical. **Un 
 
 > **Su contenido, su criterio de aceptación y su estado vivo** están en [`docs/common/product/phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md), y **solo allí**. Esa es la fuente que hay que leer para arrancar un hito y la que hay que actualizar al cerrarlo.
 >
-> La fase añade **dos ADR** a las nueve existentes: fronteras de módulo y activación por hogar (ADR-010), y programación de comprobaciones y entrega de avisos (ADR-011). Se escriben en el hito que las estrena, como se hizo en la Fase 1, no al planificar.
+> La fase añade **dos ADR** a las nueve existentes: fronteras de módulo y activación por hogar ([ADR-010](docs/common/architecture/decisions/ADR-010-module-boundaries-and-activation.md), **escrita** al cerrar el Hito 0), y programación de comprobaciones y entrega de avisos (ADR-011). Se escriben en el hito que las estrena, como se hizo en la Fase 1, no al planificar.
 
 ---
 
@@ -622,6 +622,7 @@ está organizado y en qué estado va— y el detalle vive por ámbito:
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-18 | **Fase 2, Hito 0 completado**: el backend pasa a tres árboles —`com.drp.platform`, `com.drp.core` y `com.drp.module.<clave>`— con **cuatro reglas de ArchUnit que fallan la construcción**, medidas también en el sentido contrario sobre un árbol que las incumple. Llega la **activación por hogar**: `household_modules` con RLS y `FORCE`, un catálogo declarado en código, tres operaciones nuevas en el contrato y el gate en las tres capas —`403 MODULE_INACTIVE` en la API, silencio en el event bus y ausencia en la navegación—. Formalizado en la [ADR-010](docs/common/architecture/decisions/ADR-010-module-boundaries-and-activation.md) |
 | 2026-08-18 | **Fase 2 planificada**, en [`phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md) y con su resumen en la nueva sección 8.3. Deja de ser «un primer módulo por elegir»: entra con los **cuatro** de prioridad alta, porque los riesgos que hay que retirar son cuatro y distintos, y con dos hitos previos sin funcionalidad de producto —las fronteras de módulo con su activación por hogar, y la plataforma que programa y entrega avisos—. La planificación destapó tres huecos que la Fase 1 no dejó abiertos por descuido sino por falta de consumidor: el backend no está empaquetado por módulos, no existe ninguna noción de activación, y **los tres procesos diarios del core no los programa nadie** |
 | 2026-08-17 | **Fase 1 completada (Hito 4).** Préstamos con token acotado para externos, el vencimiento por proceso diario y el cliente web con la vista externa sin sesión: con ello el contrato queda en 54 de 54. Se cierra la fase con el recorrido vertical en navegador real, la auditoría axe y la **elección del VPS con consumo medido** —que resulta decidirla el disco y no la CPU—. El estado de la fase pasa a completada en la sección 8 y la fila del stack deja de decir «por decidir». |
 | 2026-08-05 | Creación inicial: objetivo, analogía ERP→DRP, alcance core/módulos, arquitectura, stack y estrategia de testing |

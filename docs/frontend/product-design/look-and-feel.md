@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Interfaz web responsive |
-| Última revisión | 2026-08-17 |
+| Última revisión | 2026-08-18 |
 
 ## Propósito
 
@@ -200,7 +200,7 @@ sobrante.
 
 | Escenario | Qué validar |
 |---|---|
-| **Móvil vertical mínimo** (375 px) | Ningún scroll horizontal en ninguna vista, incluidas las tablas —que ahí no son tablas sino tarjetas—. Navegación en barra inferior alcanzable con el pulgar. Formulario de una columna, campos de 16 px para que iOS no haga zoom al enfocar, y la acción principal siempre visible sin cerrar el teclado. Todo objetivo pulsable ≥ 44 px. Los nombres largos de asset se truncan en dos líneas con el estado siempre visible. |
+| **Móvil vertical mínimo** (375 px) | Ningún scroll horizontal en ninguna vista, incluidas las tablas —que ahí no son tablas sino tarjetas—. Navegación en barra inferior alcanzable con el pulgar, **con un tope de cinco paradas**: es lo que cabe a 320 px sin bajar de los 44 px de objetivo, y lo que sobra vive en «Más» (ver más abajo). Formulario de una columna, campos de 16 px para que iOS no haga zoom al enfocar, y la acción principal siempre visible sin cerrar el teclado. Todo objetivo pulsable ≥ 44 px. Los nombres largos de asset se truncan en dos líneas con el estado siempre visible. |
 | **Móvil horizontal** (≈ 667×375) | Reflujo sin pérdida de contenido con el teclado abierto, que se come la mitad de la altura: los diálogos pasan a hoja con scroll propio y el campo enfocado se desplaza a la vista. Ningún overlay a pantalla completa que tape su propio botón de cerrar. |
 | **Tablet o ventana intermedia** (768–1024 px) | El punto donde la navegación deja la barra inferior y pasa a lateral, y el listado deja las tarjetas y pasa a tabla compacta: hay que validar que la transición no pierde ninguna acción por el camino. Formularios siguen a una columna aunque quepan dos. |
 | **Escritorio** (1280–1440 px) | Jerarquía con densidad: cabecera de tabla fija, fila entera pulsable, recorrido completo con teclado y foco visible en cada parada, atajos de las acciones frecuentes y ausencia de zonas muertas de más de una pantalla de alto. |
@@ -209,6 +209,25 @@ sobrante.
 Además, y en todos los tramos: la vista debe seguir siendo utilizable con **zoom
 al 200 %** y con la **anchura reducida a 320 px** sin scroll en dos ejes, que es
 el criterio de reflujo de WCAG y el que suele romperse sin que nadie lo note.
+
+> **La barra inferior tiene un tope, y es aritmética.** A 320 px, la anchura de
+> cada parada es 320 dividido entre el número de paradas, así que **cinco es el
+> máximo** que respeta los 44 px de objetivo mínimo que exige la tabla de arriba.
+> Con ocho salían 40 px, y así estuvo la navegación durante toda la Fase 1 sin que
+> nadie lo notara: no se ve mirando la pantalla, porque el enlace sigue teniendo
+> altura de sobra y solo falla a lo ancho.
+>
+> De ahí la forma que tiene desde la Fase 2: **cuatro paradas del core y «Más»**
+> en móvil, y desde `md` una columna lateral con dos grupos —el hogar y los
+> módulos— dentro del **mismo `<nav>`**, recolocado con CSS. La regla que esto no
+> puede romper sigue siendo la de siempre: **un solo landmark de navegación**, así
+> que los rótulos de grupo son párrafos referenciados con `aria-labelledby` y no
+> encabezados —un `h2` ahí saldría antes que el `h1` del contenido— y lo que no
+> toca en móvil se oculta con CSS en lugar de pintarse dos veces.
+>
+> Lo comprueba el recorrido vertical midiendo la caja de cada parada visible a
+> 320 px, que es la única forma de que el defecto no vuelva con el módulo
+> siguiente.
 
 ## Accesibilidad visual y motriz
 

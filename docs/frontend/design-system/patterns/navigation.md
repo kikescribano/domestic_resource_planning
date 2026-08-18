@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-12 |
+| Última revisión | 2026-08-18 |
 
 ## Propósito
 
@@ -13,14 +13,16 @@ Documentar el shell de la aplicación —lo que rodea a todas las pantallas de
 detrás del login— y las reglas que lo sostienen: un solo `<nav>` recolocado,
 el salto al contenido, y el sitio fijo de la acción principal.
 
-Es, junto al formulario, el patrón que **sí está implementado**, y también el que
-el Hito 2 va a poner a prueba: pasa de tres destinos a seis.
+Es, junto al formulario, el patrón que **sí está implementado**, y el que más
+presión ha aguantado: de tres destinos pasó a ocho al cerrarse la Fase 1, y el
+Hito 0 de la Fase 2 lo obligó a admitir doce.
 
 ## Alcance
 
 ### Incluido
 
-- El shell: barra inferior en móvil, columna lateral desde `md`.
+- El shell: barra inferior en móvil, columna lateral desde `md`, y el reparto
+  en dos grupos —el hogar y los módulos— que trajo la Fase 2.
 - La cabecera de pantalla y dónde va la acción principal.
 - Lo que un cambio de ruta tiene que hacer y hoy no hace.
 
@@ -38,9 +40,11 @@ el Hito 2 va a poner a prueba: pasa de tres destinos a seis.
 | Parte | Estado |
 |---|---|
 | Shell responsive con navegación única | **Implementado** |
+| Reparto en dos grupos y tope de cinco paradas en móvil | **Implementado** (Fase 2, Hito 0) |
 | Salto al contenido | **Implementado** |
 | Cabecera de pantalla con ranura de acción | **Implementada, y la ranura sin usar** |
 | Sitio de la acción principal en móvil | **Sin resolver**: la banda inferior ya está ocupada |
+| Cómo caben doce destinos en la barra inferior | **Resuelto** (Fase 2, Hito 0): no caben, y por eso hay «Más» |
 | Anuncio del cambio de ruta | **Previsto**: no hay nada |
 | Conmutador de tema | **Previsto**: ninguna de las tres piezas que el sistema pide |
 
@@ -71,7 +75,8 @@ Anatomía, tal y como está escrita:
 | Contenedor | Columna | Fila (`md:flex-row`) |
 | `<header>` | Fijo abajo, con `border-t` | Estático, 256 px de ancho, con `border-r` |
 | Marca «DRP» | Oculta | Visible, en serif |
-| `<nav aria-label="Principal">` | Fila de enlaces repartidos | Columna |
+| `<nav aria-label="Principal">` | Fila con cuatro paradas del core y «Más» | Columna con dos grupos: el hogar y los módulos |
+| Rótulo de grupo | Oculto | Visible, en `text-caption`, y siempre referenciado con `aria-labelledby` |
 | Enlace | `min-h-touch`, `flex-1`, centrado | Alineado a la izquierda, con radio y fondo al pasar |
 | `<main id="contenido">` | `max-w-shell`, con `pb-24` para no quedar bajo la barra | `md:pb-6` |
 
@@ -85,6 +90,41 @@ Tres detalles que se pierden al leer las clases por encima:
 - **Cerrar sesión no está en la navegación.** Es una acción, no un sitio, y
   ponerla entre los enlaces la deja al lado de «Personas» esperando a que alguien
   la pulse con el pulgar por error. Vive en `AccountPage`, como botón.
+
+### Dos grupos, y el tope de cinco paradas
+
+Lo trajo el **Hito 0 de la Fase 2**, y no por estética: cuatro módulos llevaban la
+navegación de ocho entradas a doce.
+
+**La barra inferior tiene un tope, y es aritmética.** A 320 px cada parada mide
+320 dividido entre el número de paradas, así que **cinco es el máximo** que
+respeta los 44 px de objetivo mínimo. Con ocho salían **40 px**, y así estuvo toda
+la Fase 1 sin que nadie lo notara: el enlace tiene altura de sobra y solo falla a
+lo ancho, que es justo lo que no se ve mirando la pantalla.
+
+Así que:
+
+- **En móvil**, cuatro paradas del core —Hogar, Inventario, Sitios, Préstamos— y
+  **«Más»**, que es una pantalla con el resto del core y con los módulos activos.
+  El corte entre unas y otras es de **frecuencia**, no de importancia: arriba lo
+  de todos los días, en «Más» lo que se toca al montar el hogar.
+- **Desde `md`**, la columna las enseña todas repartidas en dos grupos: **Tu
+  hogar** y **Módulos**. Un hogar sin ningún módulo activo conserva sus ocho
+  enlaces del core y ve una novena entrada, «Módulos del hogar», que es la puerta
+  para encender alguno.
+- **Un módulo apagado no está**, ni en un sitio ni en el otro. Es la tercera capa
+  del gate de la [`ADR-010`](../../../common/architecture/decisions/ADR-010-module-boundaries-and-activation.md);
+  las otras dos son el `403 MODULE_INACTIVE` de la API y el silencio del handler.
+
+Y la regla de siempre no se rompe: **sigue habiendo un solo `<nav>`**. Los rótulos
+de grupo son **párrafos** referenciados con `aria-labelledby` y no encabezados —un
+`h2` ahí saldría antes que el `h1` del contenido y dejaría el documento con los
+niveles al revés— y lo que no toca en móvil se oculta con CSS en lugar de pintarse
+dos veces.
+
+Lo comprueba el recorrido vertical midiendo **la caja de cada parada visible a
+320 px**. Es la única forma de que el defecto no vuelva con el módulo siguiente:
+un enlace de 40 px no se distingue de uno de 44 px a simple vista.
 
 ### El salto al contenido
 
@@ -145,13 +185,14 @@ tiene ranura para ninguna de las dos.
 
 ## Decisiones abiertas
 
-- **Dónde va la acción principal en móvil**, con lo dicho más arriba. Es la
-  decisión que más pantallas del Hito 2 toca.
-- **Cómo caben seis destinos en la barra inferior**, y si con iconos.
+- **Dónde va la acción principal en móvil**, con lo dicho más arriba.
+- ~~**Cómo caben seis destinos en la barra inferior**~~ — **resuelta en la Fase 2,
+  Hito 0**: no caben. Cinco es el tope a 320 px, así que hay cuatro y «Más». Sin
+  iconos, que era la otra salida: una etiqueta corta se lee y un icono hay que
+  aprendérselo.
 - **Cómo se vuelve de una vista de detalle** a 375 px.
 - **Dónde vive el shell.** `HouseholdShell`, `navLinkClass` y `PageHeading` están
-  dentro de `household.tsx`, que es un fichero de rutas. Los tres los va a usar
-  todo el hito.
+  dentro de `household.tsx`, que es un fichero de rutas.
 
 ## Lo que falta
 
@@ -192,4 +233,5 @@ tiene ranura para ninguna de las dos.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-18 | Fase 2, Hito 0: la navegación se parte en dos grupos —el hogar y los módulos— dentro del mismo `<nav>`, y la barra inferior de móvil baja a cuatro paradas más «Más». Queda resuelta la decisión abierta de cuántos destinos caben abajo: cinco a 320 px, medido y comprobado en el recorrido vertical. | Equipo DRP |
 | 2026-08-12 | Creación del documento con el shell del Hito 1 y las tres decisiones que el Hito 2 tiene que tomar. | Equipo DRP |

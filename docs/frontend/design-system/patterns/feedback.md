@@ -50,7 +50,7 @@ Esa tercera es la que entra con el Hito 2 y la que más fácil es pintar mal.
 
 El backend responde de tres formas distintas y el cliente tiene que distinguirlas
 **por su forma, no por su texto**. Las dos primeras las fija
-[`ApiExceptionHandler`](../../../../backend/src/main/kotlin/com/drp/adapter/http/ApiExceptionHandler.kt)
+[`ApiExceptionHandler`](../../../../backend/src/main/kotlin/com/drp/core/adapter/http/ApiExceptionHandler.kt)
 y la tercera es una decisión de este hito.
 
 | Qué ha pasado | Respuesta | Cómo se reconoce | Dónde se pinta |
@@ -105,7 +105,7 @@ Cómo se pinta, que es lo que decide este patrón:
 
 Los códigos de regla de negocio están enumerados en el esquema `Error` de
 `openapi.yaml` —41 en total, para todo el core— y el backend los declara en
-[`DomainError.kt`](../../../../backend/src/main/kotlin/com/drp/domain/DomainError.kt),
+[`DomainError.kt`](../../../../backend/src/main/kotlin/com/drp/core/domain/DomainError.kt),
 que hoy lleva los 28 de los Hitos 1 y 2. Los del Hito 2 son estos, y esta tabla
 es la que evita que cada pantalla improvise:
 
@@ -229,7 +229,7 @@ en un correo o en otras sesiones.
 - [`look-and-feel.md`](../../product-design/look-and-feel.md): los siete estados
   de experiencia.
 - [`openapi.yaml`](../../../../openapi.yaml) y
-  [`DomainError.kt`](../../../../backend/src/main/kotlin/com/drp/domain/DomainError.kt)
+  [`DomainError.kt`](../../../../backend/src/main/kotlin/com/drp/core/domain/DomainError.kt)
 
 ## Historial de cambios
 

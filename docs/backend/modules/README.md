@@ -37,10 +37,37 @@ existe para que un módulo declare sus límites antes de depender de otro, y una
 ficha escrita después es una descripción y no un límite. El reparto en hitos, en
 [`phase-2-roadmap.md`](../../common/product/phase-2-roadmap.md).
 
+## Dónde vive un módulo, y qué lo separa del core
+
+Desde el **Hito 0 de la Fase 2** (2026-08-18) el backend está repartido en tres
+árboles, y las fronteras no son un acuerdo sino una prueba que falla la
+construcción:
+
+```text
+com.drp.platform.*      Bus, TenantContext, paginación y la activación de módulos
+com.drp.core.*          El core, con su reparto en capas intacto
+com.drp.module.<key>.*  Un árbol por módulo, con su propio domain/application/adapter
+```
+
+Un módulo declara su `ModuleDescriptor` —clave, nombre, descripción y prefijo de
+ruta— en su propio árbol, y con eso entra en el catálogo que un hogar puede
+encender. Todo lo que cuelgue de su prefijo responde `403 MODULE_INACTIVE`
+mientras esté apagado; sus handlers de evento heredan de `ModuleEventHandler` y no
+hacen nada para un hogar que no lo tenga activo; y activarlo ejecuta su
+`ModuleSeeder`, que **lee el estado actual del core** en lugar de esperar eventos
+que ya pasaron.
+
+Los cuatro módulos de la Fase 2 tienen ya su árbol con la declaración dentro. Lo
+demás —dominio, tablas, contrato y pantallas— llega con su hito, y **después** de
+su ficha. El detalle completo está en la
+[`ADR-010`](../../common/architecture/decisions/ADR-010-module-boundaries-and-activation.md).
+
 ## Dos reglas que ya condicionan cualquier módulo
 
 - **Un módulo no depende de que otro esté activo.** Toda comunicación entre
-  módulos pasa por el event bus, y el core publica sin saber quién escucha. Es el
+  módulos pasa por el event bus, y el core publica sin saber quién escucha. Desde
+  el Hito 0 esto lo vigila **ArchUnit**: ningún `com.drp.module.a` puede
+  referenciar a `com.drp.module.b`, y la regla está medida en los dos sentidos. Es el
   motivo por el que avisar por una fecha —caducidad, revisión, vencimiento,
   devolución, riego— no tiene módulo propio: cada uno posee su regla, y programar
   la comprobación y entregar el aviso son capacidad de plataforma.
