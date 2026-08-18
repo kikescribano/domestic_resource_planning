@@ -68,6 +68,7 @@ con sus siete puntos. No se reordena ni se recorta.
 | `Avatar` | [`avatar.md`](avatar.md) | **Implementado** | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
 | `QuotaMeter` | Sin ficha | **Implementado** en el Hito 3 | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
 | `LoanExternalPage` | [`loan-external-page.md`](loan-external-page.md) | **Implementado** como `ExternalLoanPage` | [`routes/loans.tsx`](../../../../frontend/src/routes/loans.tsx) |
+| `SuppliersPage` | [`suppliers-page.md`](suppliers-page.md) | **Prevista** — ficha escrita antes que la pantalla, Fase 2 Hito 2 | [`routes/suppliers.tsx`](../../../../frontend/src/routes/suppliers.tsx) |
 
 **Trece componentes reutilizables —nueve en `primitives.tsx` y cuatro en
 `files.tsx`— más una pantalla, y diez de las catorce filas tienen ficha**:
