@@ -17,7 +17,7 @@ temporales», que durante un tiempo aparecían de otra forma en el README.
 | Core de recursos y activos | Gestión común de recursos y activos domésticos | [`common/product/`](../../common/product/README.md) (trasladado desde la §4.1 del README al arrancar la Fase 1) |
 | Proveedores y contactos de servicio | Quién arregla, quién cobra y quién responde de una garantía | [`suppliers.md`](suppliers.md) |
 | Compras y lista de la compra | Qué falta, qué hay que reponer y qué está pedido | Pendiente |
-| Warehouse | Existencias, ubicaciones y movimientos | Pendiente |
+| Warehouse | Existencias, ubicaciones y movimientos | [`warehouse.md`](warehouse.md) |
 | Mantenimiento (CMMS) | Planificación y seguimiento del mantenimiento | Pendiente |
 | Planificador de tareas | Organización y seguimiento de tareas | Pendiente |
 | Gastos y presupuesto | Coste de lo que entra en el hogar y presupuesto por periodo | Pendiente |
@@ -68,6 +68,16 @@ código y es la que enseña qué contiene una de verdad —siete operaciones, do
 tablas en `public` con RLS y `FORCE`, cinco códigos de error propios, ningún
 evento publicado y ninguna comprobación periódica, con el motivo de cada
 ausencia—. Los tres que vienen detrás se escriben con esa como referencia.
+
+**El segundo es Warehouse**, en el Hito 3 (2026-08-18), y es el que estrena las
+dos cosas que Proveedores no podía enseñar: **un módulo que reacciona a lo que
+pasa en el core** —seis de los trece eventos, por la base de handler del Hito 0— y
+**una siembra que lee algo**. Su [`ficha`](warehouse.md) añade además la sección
+que ninguna otra necesitaba todavía: **la frontera contra el core escrita sin
+ambigüedad**, porque es el primer módulo cuyo dominio roza un dato que el core ya
+guarda. El core mantiene **un contador** —`quantity`, en la `unit` que pone el
+artículo— y consumos, mínimos, caducidad y lotes son del módulo; Warehouse **no
+lleva un segundo contador** y lee el del core cuando lo necesita.
 
 **Y una regla que ese módulo estrenó:** la ficha declara **los nombres de tabla
 que el módulo posee**, para que otro no los tome. Es lo que convierte «cada módulo
