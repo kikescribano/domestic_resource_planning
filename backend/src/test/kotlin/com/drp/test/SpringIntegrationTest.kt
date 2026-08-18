@@ -62,6 +62,14 @@ abstract class SpringIntegrationTest {
             registry.add("drp.rate-limit.per-email") { 10_000 }
             registry.add("drp.rate-limit.per-identity-upload") { 10_000 }
 
+            // **El programador, apagado.** Encendido, la pasada diaria del Hito 1
+            // correria dentro de cada contexto que la suite levanta, sobre la
+            // base de datos que todas comparten y a mitad de otra prueba --y esa
+            // pasada marca prestamos, borra ficheros y **purga hogares**. Lo que
+            // la pasada hace se comprueba invocandola a mano, que ademas es el
+            // mismo metodo que invoca el `@Scheduled`.
+            registry.add("drp.schedule.enabled") { false }
+
             // El volumen de ficheros, en un directorio efimero. Se comparte entre
             // clases igual que el contenedor de PostgreSQL: crear uno por clase
             // multiplicaria los arranques sin comprobar nada mas.

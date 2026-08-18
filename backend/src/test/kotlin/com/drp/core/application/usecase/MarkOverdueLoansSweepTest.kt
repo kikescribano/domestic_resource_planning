@@ -3,6 +3,7 @@ package com.drp.core.application.usecase
 import com.drp.core.adapter.http.createDurable
 import com.drp.platform.event.IdempotentEventHandler
 import com.drp.platform.event.DomainEvent
+import com.drp.platform.schedule.DailySweep
 import com.drp.test.DrpPostgres
 import com.drp.test.SpringIntegrationTest
 import com.drp.test.extract
@@ -43,7 +44,7 @@ import java.util.concurrent.TimeUnit
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class MarkOverdueLoansSweepTest : SpringIntegrationTest() {
 
-    @Autowired private lateinit var markOverdue: MarkOverdueLoans
+    @Autowired private lateinit var sweep: DailySweep
     @Autowired private lateinit var http: TestRestTemplate
     @Autowired private lateinit var module: OverdueSubscriber
 
@@ -58,7 +59,7 @@ class MarkOverdueLoansSweepTest : SpringIntegrationTest() {
         val home = overdueLoan()
         module.received.clear()
 
-        markOverdue.run()
+        sweep.run()
 
         // Sin nadie escuchando, un `publish` olvidado no se distingue de uno que
         // funciona: el estado queda igual de bien y la prueba de estado pasa
@@ -78,10 +79,10 @@ class MarkOverdueLoansSweepTest : SpringIntegrationTest() {
     @DisplayName("la segunda pasada no publica nada, que es lo que hace útil el evento")
     fun `no se republica en cada pasada`() {
         val home = overdueLoan()
-        markOverdue.run()
+        sweep.run()
         module.received.clear()
 
-        markOverdue.run()
+        sweep.run()
 
         // De `LoanOverdue` colgarán los recordatorios automáticos (4.2). Un
         // proceso que lo republicara cada noche mandaría un aviso al día a quien
@@ -115,7 +116,7 @@ class MarkOverdueLoansSweepTest : SpringIntegrationTest() {
         repeat(2) {
             pool.submit {
                 start.await()
-                runCatching { markOverdue.run() }
+                runCatching { sweep.run() }
                 done.countDown()
             }
         }
@@ -147,7 +148,7 @@ class MarkOverdueLoansSweepTest : SpringIntegrationTest() {
 
             pool.submit {
                 start.await()
-                runCatching { markOverdue.run() }
+                runCatching { sweep.run() }
                 done.countDown()
             }
             pool.submit {
@@ -164,7 +165,7 @@ class MarkOverdueLoansSweepTest : SpringIntegrationTest() {
             // **RETURNED es absorbente**: una vez devuelto, ninguna pasada
             // posterior puede reabrirlo.
             val afterRace = loanStatusOf(home.loanId)
-            markOverdue.run()
+            sweep.run()
 
             withClue("una pasada posterior reabrió un préstamo ya devuelto") {
                 if (afterRace == "RETURNED") loanStatusOf(home.loanId).shouldBe("RETURNED")
@@ -183,11 +184,11 @@ class MarkOverdueLoansSweepTest : SpringIntegrationTest() {
         val home = overdueLoan()
         setDueAt(home.loanId, Instant.now().plus(1, ChronoUnit.HOURS))
 
-        markOverdue.run()
+        sweep.run()
         loanStatusOf(home.loanId).shouldBe("ACTIVE")
 
         setDueAt(home.loanId, Instant.now().minusMillis(50))
-        markOverdue.run()
+        sweep.run()
         loanStatusOf(home.loanId).shouldBe("OVERDUE")
     }
 
@@ -202,7 +203,7 @@ class MarkOverdueLoansSweepTest : SpringIntegrationTest() {
         http.registerHousehold()
         val second = overdueLoan()
 
-        markOverdue.run()
+        sweep.run()
 
         loanStatusOf(first.loanId).shouldBe("OVERDUE")
         loanStatusOf(second.loanId).shouldBe("OVERDUE")

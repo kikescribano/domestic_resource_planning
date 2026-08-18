@@ -75,6 +75,22 @@ server:
     context-path: /
 
 drp:
+  schedule:
+    # El programador de la pasada diaria (ADR-011). Encendido por omision, que
+    # es lo que quiere un despliegue; las pruebas lo apagan, porque una pasada
+    # suelta en medio de la suite marca prestamos, borra ficheros y **purga
+    # hogares** sobre la base de datos que todas comparten.
+    enabled: ${DRP_SCHEDULE_ENABLED:true}
+    # De madrugada y con la casa dormida: lo que hace la pasada no lo espera
+    # nadie delante de una pantalla, y a esa hora ni compite por la CPU del VPS
+    # ni manda un correo que despierte a nadie.
+    daily-cron: ${DRP_SCHEDULE_CRON:0 15 3 * * *}
+    # La hora es **local**, y eso es una decision de despliegue y no de dominio:
+    # el vencimiento de un prestamo compara instantes --`dueAt` es timestamptz--
+    # y no depende de ninguna zona. Lo que la zona gobierna es a que hora
+    # conviene pasar la escoba.
+    zone: ${DRP_SCHEDULE_ZONE:Europe/Madrid}
+
   security:
     jwt:
       # Clave de firma HS256. Es un SECRETO DE DESPLIEGUE y no vive en el

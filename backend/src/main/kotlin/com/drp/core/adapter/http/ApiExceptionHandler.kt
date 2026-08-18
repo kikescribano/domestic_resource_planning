@@ -5,6 +5,7 @@ import com.drp.core.domain.ErrorCode
 import com.drp.core.domain.ResourceNotFound
 import com.drp.core.domain.ValidationFailure
 import com.drp.platform.module.UnknownModule
+import com.drp.platform.notice.UnknownNotice
 import com.drp.core.application.usecase.AuthenticationFailed
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
@@ -125,11 +126,12 @@ class ApiExceptionHandler {
      * identificador en un oraculo con el que averiguar que hay en otros hogares,
      * que es justo lo que la ADR-002 quiere impedir.
      *
-     * Lleva tambien la clave de modulo desconocida, que es lo mismo visto desde
-     * plataforma: se declara aparte porque plataforma no puede lanzar el error
-     * del core sin invertir la frontera que la ADR-010 fija.
+     * Lleva tambien los dos «no existe» de plataforma --la clave de modulo y el
+     * aviso--, que son lo mismo visto desde el otro arbol: se declaran aparte
+     * porque plataforma no puede lanzar el error del core sin invertir la
+     * frontera que la ADR-010 fija.
      */
-    @ExceptionHandler(ResourceNotFound::class, UnknownModule::class)
+    @ExceptionHandler(ResourceNotFound::class, UnknownModule::class, UnknownNotice::class)
     fun onNotFound(failure: RuntimeException): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(ErrorResponse(NOT_FOUND, failure.message ?: "No encontrado"))

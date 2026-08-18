@@ -7,17 +7,36 @@ import com.drp.core.application.port.HouseholdMemberRepository
 import com.drp.core.application.port.HouseholdRepository
 import com.drp.core.application.port.IdentityRepository
 import com.drp.core.application.port.LoanRepository
-import com.drp.platform.page.Pagination
 import com.drp.core.application.port.StoredFileRepository
-import com.drp.platform.tenant.HouseholdDirectory
-import com.drp.platform.tenant.TenantContext
 import com.drp.core.domain.loan.LoanStatus
+import com.drp.platform.notice.NoticeDraft
+import com.drp.platform.page.Pagination
+import com.drp.platform.schedule.CheckOwner
+import com.drp.platform.schedule.ScheduledCheck
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import org.springframework.transaction.support.TransactionTemplate
 import java.time.Clock
 import java.time.Duration
-import java.util.UUID
+import java.time.Instant
+
+/**
+ * Las tres comprobaciones diarias del core.
+ *
+ * **Ya no recorren los hogares.** Hasta el Hito 1 de la Fase 2 cada una pedia la
+ * lista al `TenantResolver` y abria transaccion por hogar, y ninguna la invocaba
+ * nadie mas que las pruebas. Ahora quien recorre es `DailySweep`, en plataforma,
+ * y esto son [ScheduledCheck] que miran **el hogar actual**: cuando llegan aqui
+ * el `runAs` ya esta puesto, la transaccion abierta y `app.household_id` fijado,
+ * asi que la politica de RLS acota lo que ven igual que en una peticion.
+ *
+ * La razon de que perdieran su recorrido no es de estilo: con el suyo mas el de
+ * plataforma habria **dos**, y solo uno de los dos puede saltarse los hogares
+ * que tengan apagado el modulo que pide la comprobacion (ADR-011).
+ *
+ * Las tres declaran `CheckOwner.Core`, que significa **corren en todos los
+ * hogares**: el core no se apaga, asi que un prestamo vence igual en un hogar
+ * que no ha encendido ningun modulo.
+ */
 
 /**
  * Borra los hogares que nunca llegaron a verificarse.
@@ -27,48 +46,35 @@ import java.util.UUID
  * una identidad que nunca llego a entrar. Habra hogares asi porque el registro
  * es abierto, y es el precio de que lo sea.
  *
- * Como los otros dos procesos diarios, **no nace de una peticion** y por tanto no
- * tiene token del que sacar el hogar: recorre los hogares uno a uno fijando
- * `app.household_id` en cada transaccion, **nunca con `BYPASSRLS`**, que
- * desactivaria la segunda capa para toda la aplicacion y no solo para el
- * proceso. La lista de hogares se obtiene de la funcion acotada de resolucion de
- * inquilino, que solo devuelve identificadores.
- *
  * Es idempotente: solo mira lo que ya sobra.
+ *
+ * **No produce ningun aviso**, y no podria: el destinatario de ese aviso seria un
+ * hogar que acaba de dejar de existir. Es ademas la unica comprobacion que puede
+ * hacer desaparecer el hogar en curso, y por eso conviene saber que el recorrido
+ * ordena las comprobaciones por nombre --esta va la ultima de las tres-- y que lo
+ * que corriera detras no encontraria nada, porque el borrado se lleva en cascada
+ * todo lo suyo.
  */
 @Service
 class PurgeUnverifiedHouseholds(
-    private val directory: HouseholdDirectory,
-    private val tenantContext: TenantContext,
-    private val transactions: TransactionTemplate,
     private val households: HouseholdRepository,
     private val members: HouseholdMemberRepository,
     private val identities: IdentityRepository,
     private val clock: Clock,
-) {
+) : ScheduledCheck {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    fun run(): Int {
+    override val name: String = "PurgeUnverifiedHouseholds"
+    override val owner: CheckOwner = CheckOwner.Core
+
+    override fun check(): List<NoticeDraft> {
         val cutoff = clock.instant().minus(RETENTION)
-        var purged = 0
-
-        for (householdId in directory.allHouseholdIds()) {
-            // Una transaccion por hogar, con su propio contexto. Que un hogar
-            // falle no puede arrastrar a los demas ni dejar a medias el que ya
-            // se habia borrado.
-            val removed = tenantContext.runAs(householdId) {
-                transactions.execute { purgeIfUnverified(cutoff) }
-            } ?: false
-
-            if (removed) purged++
-        }
-
-        if (purged > 0) log.info("Purgados {} hogares sin verificar", purged)
-        return purged
+        if (purgeIfUnverified(cutoff)) log.info("Purgado un hogar sin verificar")
+        return emptyList()
     }
 
-    private fun purgeIfUnverified(cutoff: java.time.Instant): Boolean {
+    private fun purgeIfUnverified(cutoff: Instant): Boolean {
         val household = households.findCurrent() ?: return false
         if (household.createdAt.isAfter(cutoff)) return false
 
@@ -125,10 +131,6 @@ class PurgeUnverifiedHouseholds(
  *   cortadas a medias, con `uploadedAt` a nulo. Una hora es de sobra para la
  *   subida mas lenta que el tope de 25 MB permite.
  *
- * Como los otros dos procesos diarios, **no nace de una peticion** y por tanto no
- * tiene token del que sacar el hogar: recorre los hogares uno a uno fijando
- * `app.household_id` en cada transaccion, **nunca con `BYPASSRLS`**.
- *
  * El orden dentro de cada fichero es el inverso al de la subida, y por el mismo
  * motivo: alli los bytes se escriben **antes** que la fila, para que el disco
  * contenga siempre todo lo que la base de datos da por bueno; aqui se borran
@@ -137,36 +139,30 @@ class PurgeUnverifiedHouseholds(
  * la pasada siguiente-- y nunca una referencia rota.
  *
  * Es idempotente: solo mira lo que ya sobra.
+ *
+ * **No produce aviso.** Recoger basura es mantenimiento y no noticia: nadie
+ * quiere un correo diario diciendo que se han borrado unos bytes que ya habia
+ * borrado el mes pasado.
  */
 @Service
 class PurgeUnusedFiles(
-    private val directory: HouseholdDirectory,
-    private val tenantContext: TenantContext,
-    private val transactions: TransactionTemplate,
     private val files: StoredFileRepository,
     private val storage: FileStorage,
     private val clock: Clock,
-) {
+) : ScheduledCheck {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    fun run(): Int {
-        val now = clock.instant()
-        var purged = 0
+    override val name: String = "PurgeUnusedFiles"
+    override val owner: CheckOwner = CheckOwner.Core
 
-        for (householdId in directory.allHouseholdIds()) {
-            // Una transaccion por hogar y con su propio contexto, igual que en la
-            // purga de hogares: que uno falle no puede arrastrar a los demas.
-            purged += tenantContext.runAs(householdId) {
-                transactions.execute { purgeHousehold(now) }
-            } ?: 0
-        }
-
-        if (purged > 0) log.info("Desenlazados {} ficheros que ya no servian", purged)
-        return purged
+    override fun check(): List<NoticeDraft> {
+        val purged = purgeHousehold(clock.instant())
+        if (purged > 0) log.info("Desenlazados {} ficheros que ya no servían", purged)
+        return emptyList()
     }
 
-    private fun purgeHousehold(now: java.time.Instant): Int {
+    private fun purgeHousehold(now: Instant): Int {
         val purgeable = files.findPurgeable(
             deletedBefore = now.minus(DELETED_GRACE),
             neverAttachedBefore = now.minus(UNATTACHED_GRACE),
@@ -209,16 +205,12 @@ class PurgeUnusedFiles(
  * ocurrir, y sin ese momento no hay evento del que colgar los recordatorios que
  * la gestion avanzada de prestamos (4.2) necesitara.
  *
- * Es **el ejemplo que el CLAUDE.md pone** del proceso que no nace de una
- * peticion: no hay token del que sacar el hogar, asi que recorre los hogares uno
- * a uno fijando `app.household_id` en cada transaccion, igual que los otros dos y
- * **nunca con `BYPASSRLS`**.
- *
  * Tres reglas, y las tres estan en la consulta y no aqui, para que no se puedan
  * olvidar al llamar:
  *
  * - Solo `ACTIVE`. Un `OVERDUE` no se vuelve a marcar, que es lo que hace la
- *   pasada **idempotente**: la segunda no encuentra nada y no publica nada.
+ *   pasada **idempotente**: la segunda no encuentra nada, no publica nada y **no
+ *   avisa por segunda vez**.
  * - Solo con `dueAt` informada. **Un prestamo sin plazo no vence nunca**: es un
  *   prestamo sin fecha, no un plazo infinito.
  * - Solo si la fecha ya paso.
@@ -229,46 +221,57 @@ class PurgeUnusedFiles(
  * `updatedBy` queda a **nulo**, que en este esquema no es un hueco sino un dato:
  * significa que el cambio lo hizo el sistema y no una persona. Este proceso es
  * el caso que el contrato pone de ejemplo al documentar `Authorship`.
+ *
+ * Es la unica de las tres que **si avisa**, y con **un aviso por pasada y no uno
+ * por prestamo**: el resumen diario existe para que cinco reglas no produzcan
+ * treinta correos, y empezar a partirlo aqui seria deshacerlo desde dentro.
  */
 @Service
 class MarkOverdueLoans(
-    private val directory: HouseholdDirectory,
-    private val tenantContext: TenantContext,
-    private val transactions: TransactionTemplate,
     private val loans: LoanRepository,
     private val events: CoreEvents,
     private val clock: Clock,
-) {
+) : ScheduledCheck {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    fun run(): Int {
+    override val name: String = "MarkOverdueLoans"
+    override val owner: CheckOwner = CheckOwner.Core
+
+    override fun check(): List<NoticeDraft> {
         val now = clock.instant()
-        var marked = 0
-
-        for (householdId in directory.allHouseholdIds()) {
-            // Una transaccion por hogar y con su propio contexto, igual que los
-            // otros dos procesos: que uno falle no puede arrastrar a los demas.
-            //
-            // Y hace falta ademas por el evento: `CoreEvents` saca el hogar del
-            // contexto, asi que publicar fuera de `runAs` seria un error.
-            marked += tenantContext.runAs(householdId) {
-                transactions.execute { markHousehold(now) }
-            } ?: 0
-        }
-
-        if (marked > 0) log.info("Marcados {} préstamos como vencidos", marked)
-        return marked
-    }
-
-    private fun markHousehold(now: java.time.Instant): Int {
         val overdue = loans.findOverdueCandidates(now)
+        if (overdue.isEmpty()) return emptyList()
 
+        val names = mutableListOf<String>()
         for (loan in overdue) {
+            loans.assetNameOf(loan)?.let { names.add(it) }
             loans.save(loan.copy(status = LoanStatus.OVERDUE, updatedAt = now, updatedBy = null))
             events.loanOverdue(loan.id, loan.assetId, loan.dueAt!!)
         }
 
-        return overdue.size
+        log.info("Marcados {} préstamos como vencidos", overdue.size)
+        return listOf(noticeFor(overdue.size, names))
+    }
+
+    /**
+     * El aviso lleva los nombres y no solo la cuenta, que es la diferencia entre
+     * un correo que se lee y uno que obliga a entrar para saber de que va. Si
+     * ninguno tiene nombre --un consumible no se presta, pero un duradero puede
+     * no tenerlo-- se queda en la cuenta en lugar de escribir una lista vacia.
+     */
+    private fun noticeFor(count: Int, names: List<String>): NoticeDraft {
+        val what = if (count == 1) "1 préstamo ha vencido" else "$count préstamos han vencido"
+        val detail = if (names.isEmpty()) "" else names.joinToString(", ") + ". "
+
+        return NoticeDraft(
+            kind = KIND,
+            title = what,
+            body = detail + "Siguen contando como prestados hasta que confirmes la devolución.",
+        )
+    }
+
+    private companion object {
+        const val KIND = "LOANS_OVERDUE"
     }
 }

@@ -182,11 +182,14 @@ class RowLevelSecurityTest {
      * ademas cualquier tabla nueva que alguien olvidara.
      */
     @Test
-    @DisplayName("el esquema tiene las dieciseis tablas del modelo, ni una mas")
-    fun `el esquema tiene dieciseis tablas`() {
-        // Quince del core mas `household_modules`, que llega con la activacion
-        // de modulos del Hito 0 de la Fase 2 (ADR-010).
-        owner.queryAllTables().size.shouldBe(16)
+    @DisplayName("el esquema tiene las diecisiete tablas del modelo, ni una mas")
+    fun `el esquema tiene diecisiete tablas`() {
+        // Quince del core mas las dos de plataforma: `household_modules`, de la
+        // activacion de modulos del Hito 0 (ADR-010), y `household_notices`, de
+        // la plataforma de avisos del Hito 1 (ADR-011). Las dos llevan
+        // `household_id`, RLS y `FORCE`, asi que ninguna aparece en la lista de
+        // excepciones de mas arriba.
+        owner.queryAllTables().size.shouldBe(17)
     }
 
     @Test

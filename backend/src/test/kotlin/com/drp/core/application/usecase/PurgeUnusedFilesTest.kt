@@ -1,5 +1,6 @@
 package com.drp.core.application.usecase
 
+import com.drp.platform.schedule.DailySweep
 import com.drp.test.DrpPostgres
 import com.drp.test.SpringIntegrationTest
 import com.drp.test.TestHousehold
@@ -38,7 +39,7 @@ import java.util.UUID
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class PurgeUnusedFilesTest : SpringIntegrationTest() {
 
-    @Autowired private lateinit var purge: PurgeUnusedFiles
+    @Autowired private lateinit var sweep: DailySweep
     @Autowired private lateinit var http: TestRestTemplate
 
     private val postgres = DrpPostgres.instance
@@ -55,7 +56,7 @@ class PurgeUnusedFilesTest : SpringIntegrationTest() {
         bytesExist(household, fileId) shouldBe true
 
         ageColumn(fileId, "deleted_at", hours = 25)
-        purge.run()
+        sweep.run()
 
         bytesExist(household, fileId) shouldBe false
         thumbnailExists(household, fileId) shouldBe false
@@ -69,7 +70,7 @@ class PurgeUnusedFilesTest : SpringIntegrationTest() {
         val fileId = upload(household, imageBytes("png"), "suelta.png", "image/png")
 
         ageColumn(fileId, "uploaded_at", hours = 25)
-        purge.run()
+        sweep.run()
 
         bytesExist(household, fileId) shouldBe false
         rowsFor(fileId) shouldBe 0
@@ -90,7 +91,7 @@ class PurgeUnusedFilesTest : SpringIntegrationTest() {
             )
         }
 
-        purge.run()
+        sweep.run()
 
         rowsFor(fileId) shouldBe 0
     }
@@ -110,7 +111,7 @@ class PurgeUnusedFilesTest : SpringIntegrationTest() {
 
         // Muy por encima de cualquiera de los tres plazos.
         ageColumn(fileId, "uploaded_at", hours = 24 * 30)
-        purge.run()
+        sweep.run()
 
         bytesExist(household, fileId) shouldBe true
         rowsFor(fileId) shouldBe 1
@@ -126,7 +127,7 @@ class PurgeUnusedFilesTest : SpringIntegrationTest() {
         http.patchJson("/api/v1/assets/$assetId", """{"photoFileId":"$fileId"}""", household.accessToken)
 
         ageColumn(fileId, "uploaded_at", hours = 24 * 30)
-        purge.run()
+        sweep.run()
 
         bytesExist(household, fileId) shouldBe true
     }
@@ -142,7 +143,7 @@ class PurgeUnusedFilesTest : SpringIntegrationTest() {
         ageColumn(firstFile, "uploaded_at", hours = 25)
         ageColumn(secondFile, "uploaded_at", hours = 25)
 
-        purge.run()
+        sweep.run()
 
         // Los dos, y **sin** que el proceso haya podido saltarse la politica: el
         // usuario con el que corre no tiene BYPASSRLS, asi que llegar a los dos
@@ -158,10 +159,10 @@ class PurgeUnusedFilesTest : SpringIntegrationTest() {
         val fileId = upload(household, imageBytes("png"), "a.png", "image/png")
         ageColumn(fileId, "uploaded_at", hours = 25)
 
-        purge.run()
+        sweep.run()
         // La segunda pasada no encuentra nada que hacer, y sobre todo no revienta
         // intentando borrar unos bytes que ya no estan.
-        purge.run()
+        sweep.run()
 
         rowsFor(fileId) shouldBe 0
     }
