@@ -122,10 +122,12 @@ docker ps && docker compose ls
   docker compose up -d postgres mailpit && npm --prefix frontend run test:e2e
   ```
 
-- **El enter no siempre envía un formulario** cuando se dirige el navegador con
+- **El `Enter` no siempre envía un formulario** cuando se dirige el navegador con
   herramientas de automatización: el evento sintético no dispara el envío
-  implícito. Pulsa el botón de enviar en lugar de dar por hecho que falló la
-  aplicación.
+  implícito. **Comprobado en los dos sentidos**: a mano, en un navegador de
+  verdad, el mismo formulario sí se envía con `Enter`. Así que cuando no funcione,
+  pulsa el botón y sigue; apuntarlo como defecto de la aplicación sin repetirlo
+  fuera de la automatización es acusar al producto de un fallo de la herramienta.
 
 ## Comprobar que de verdad funciona, no solo que arrancó
 
