@@ -15,7 +15,9 @@
 > **La Fase 1 está completa (2026-08-17).** Los cinco hitos cerrados, las 54
 > operaciones del contrato implementadas y los seis criterios de aceptación
 > demostrados con pruebas que se ejecutan. Este documento se conserva como
-> historia de cómo se hizo; el plan de lo que viene es de la Fase 2.
+> historia de cómo se hizo; el plan de lo que viene está en
+> [`phase-2-roadmap.md`](phase-2-roadmap.md), y es el que hay que leer para
+> arrancar un hito a partir de ahora.
 
 ## Alcance
 

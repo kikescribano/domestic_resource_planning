@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Toda la solución |
-| Última revisión | 2026-08-10 |
+| Última revisión | 2026-08-18 |
 
 Este espacio describe qué problema resuelve DRP y qué comportamiento espera el
 usuario, sin entrar en la implementación.
@@ -28,7 +28,8 @@ cien referencias cruzadas del tipo «ver 4.1.1» por todo el repositorio.
 
 | Documento | Contenido |
 |---|---|
-| [`roadmap.md`](roadmap.md) | Los cinco hitos de la Fase 1, su alcance, su criterio de aceptación y su estado vivo. **Es lo que hay que leer para arrancar un hito**, y lo que hay que actualizar al cerrarlo. El estado de las *fases* sigue en la sección 8 del README. |
+| [`phase-2-roadmap.md`](phase-2-roadmap.md) | Los siete hitos de la Fase 2 —activación de módulos, plataforma de avisos y los cuatro módulos de prioridad alta—, su alcance y su criterio de aceptación. **Es lo que hay que leer para arrancar un hito**, y lo que hay que actualizar al cerrarlo. |
+| [`roadmap.md`](roadmap.md) | Los cinco hitos de la Fase 1, ya cerrados. Se conserva como historia de cómo se hizo el core. El estado de las *fases* sigue en la sección 8 del README. |
 
 ## Documentos previstos
 

@@ -31,6 +31,12 @@ temporales», que durante un tiempo aparecían de otra forma en el README.
 
 Usa [`module-template.md`](module-template.md) para documentar un módulo nuevo.
 
+**Los cuatro de prioridad alta son el alcance de la Fase 2**, y cada uno escribe
+su ficha con esa plantilla **antes** de su primera línea de código: este catálogo
+existe para que un módulo declare sus límites antes de depender de otro, y una
+ficha escrita después es una descripción y no un límite. El reparto en hitos, en
+[`phase-2-roadmap.md`](../../common/product/phase-2-roadmap.md).
+
 ## Dos reglas que ya condicionan cualquier módulo
 
 - **Un módulo no depende de que otro esté activo.** Toda comunicación entre
