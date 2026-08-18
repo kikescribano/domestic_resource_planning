@@ -104,10 +104,18 @@ Cómo se pinta, que es lo que decide este patrón:
 ### Qué hace el cliente con cada código
 
 Los códigos de regla de negocio están enumerados en el esquema `Error` de
-`openapi.yaml` —41 en total, para todo el core— y el backend los declara en
-[`DomainError.kt`](../../../../backend/src/main/kotlin/com/drp/core/domain/DomainError.kt),
-que hoy lleva los 28 de los Hitos 1 y 2. Los del Hito 2 son estos, y esta tabla
-es la que evita que cada pantalla improvise:
+`openapi.yaml` —47 en total— y el backend los declara en
+[`DomainError.kt`](../../../../backend/src/main/kotlin/com/drp/platform/error/DomainError.kt),
+que hoy lleva 43. Los del Hito 2 son estos, y esta tabla es la que evita que cada
+pantalla improvise:
+
+> **Ese fichero ya no es del core.** Desde el Hito 2 de la Fase 2 vive en
+> `com.drp.platform.error`, porque el primer módulo con reglas de negocio dejó
+> claro que el core no puede ser quien enumere las reglas de sus módulos. Para el
+> cliente no cambia nada —el contrato sigue teniendo **un solo** enumerado de
+> errores— y por eso esta tabla se lee igual; lo que cambió es quién lo posee.
+> Cinco de los códigos son ya de un módulo y no del core: los `SUPPLIER_*`, que
+> el cliente solo puede recibir si ese módulo está encendido.
 
 | Código | Cuándo llega | Qué hace la interfaz |
 |---|---|---|
@@ -229,7 +237,7 @@ en un correo o en otras sesiones.
 - [`look-and-feel.md`](../../product-design/look-and-feel.md): los siete estados
   de experiencia.
 - [`openapi.yaml`](../../../../openapi.yaml) y
-  [`DomainError.kt`](../../../../backend/src/main/kotlin/com/drp/core/domain/DomainError.kt)
+  [`DomainError.kt`](../../../../backend/src/main/kotlin/com/drp/platform/error/DomainError.kt)
 
 ## Historial de cambios
 

@@ -335,26 +335,69 @@ se salta un módulo apagado es **el módulo de prueba del Hito 0**, que gana aqu
 comprobación periódica. Cuando Warehouse traiga la caducidad, lo que hay que
 añadir es su `ScheduledCheck` y nada más.
 
-### Hito 2 — Proveedores y contactos de servicio · **Pendiente**
+### Hito 2 — Proveedores y contactos de servicio · **Completado (2026-08-18)**
 
 El primer módulo de verdad, y el más pequeño a propósito: lo que se está probando
 aquí es el camino completo de un módulo, no su dominio.
 
-- [ ] **Ficha del módulo** en `docs/backend/modules/`, escrita antes del código.
-- [ ] **Dominio**: el contacto de servicio —quién arregla, quién cobra, quién
+- [x] **Ficha del módulo** en [`docs/backend/modules/suppliers.md`](../../backend/modules/suppliers.md),
+      escrita antes del código y en un commit propio para que el orden se vea en
+      la historia.
+- [x] **Dominio**: el contacto de servicio —quién arregla, quién cobra, quién
       responde de una garantía— con su categoría de servicio, sus datos de
       contacto y su relación opcional con assets y ubicaciones del core.
-- [ ] **Su migración**, con `household_id`, RLS y `FORCE` en todas sus tablas.
-- [ ] **Sus operaciones en el contrato** bajo `/api/v1/suppliers`, y su pantalla
+- [x] **Su migración `V9`**, con `household_id`, RLS y `FORCE` en sus dos tablas.
+      El recuento del esquema sube de diecisiete a diecinueve y la lista de
+      tablas sin política no se toca.
+- [x] **Siete operaciones en el contrato** bajo `/api/v1/suppliers` con su
+      `operationId`, cinco códigos de error nuevos en el esquema, y su pantalla
       bajo `/proveedores`.
-- [ ] **Su siembra al activarse**, aunque en este módulo esté vacía: se escribe
-      igual, porque es el punto de extensión que los tres siguientes sí usan.
-- [ ] **Recorrido vertical propio**, añadido a la batería existente y no en una
+- [x] **Su siembra al activarse**, vacía y escrita igual: es el punto de
+      extensión que los tres siguientes sí usan.
+- [x] **Recorrido vertical propio**, añadido a la batería existente y no en una
       suite paralela.
 
 > **Un dato maestro sin lector todavía.** Proveedores no tiene consumidor hasta el
 > Hito 4, y eso es deliberado: es el módulo con el que se aprende el camino antes
 > de recorrerlo con un dominio grande encima.
+
+#### Cómo quedó, y lo que hubo que decidir por el camino
+
+El camino de un módulo está recorrido entero y **medido en los dos extremos**:
+ficha antes del código, dominio, migración, contrato, gate, siembra, pantallas y
+recorrido vertical. Lo que este hito añade a lo que ya se sabía es que **el gate
+por fin tapa algo que existe**: hasta ahora un módulo encendido respondía `404`
+porque no había controlador detrás, así que el `403 MODULE_INACTIVE` nunca había
+protegido una ruta de verdad. Ahora apagado responde `403` y encendido responde
+`200`, y las dos mitades están medidas sobre la ruta real.
+
+Las decisiones que la definición no preveía quedan anotadas con su alternativa
+descartada en [`decisions.md`](decisions.md). Las tres que condicionan a los
+módulos siguientes:
+
+- **`ErrorCode` y la familia de `DomainError` se mudan a `com.drp.platform.error`.**
+  Era la deuda que la ADR-010 dejó con esta condición de revisión exacta, y lo
+  peligroso del caso es que **no falla nada**: lanzar un código propio desde un
+  módulo compila y ArchUnit sigue verde, mientras el core acaba enumerando las
+  reglas de sus módulos. Fija el patrón de los tres módulos siguientes.
+- **Las claves ajenas de un módulo hacia el core van con `ON DELETE CASCADE`.**
+  Con el `RESTRICT` que rige por omisión, un enlace de Proveedores convertiría el
+  borrado de una ubicación en un `500` **del core causado por un módulo**.
+- **La categoría de servicio es lista cerrada**, al contrario que la `Category`
+  del core, con `OTHER` como salida y como disparador de revisarlo.
+
+Y **`ModuleScreen` pasa de sustituir a envolver**: era un guardián que no sabía
+enseñar nada, y con eso se cierra la promesa autoprogramada que el Hito 0 dejó
+escrita en la pantalla —«sus pantallas llegan en el Hito 2»— en lugar de dejarla
+apuntando al pasado.
+
+**Lo que este hito no hace, y dónde se hace.** El **barrido de aislamiento** de
+las operaciones nuevas se queda en el **Hito 6**, que es donde el roadmap lo puso
+para toda la fase: hoy `TenantIsolationSweepTest` cubre las treinta y ocho
+operaciones de la Fase 1 y ninguna de plataforma ni de módulo. Se dice aquí
+explícitamente para que no se dé por supuesto. Lo que sí se comprueba ya es que
+un enlace no puede apuntar a una ubicación de otro hogar, porque esa es una
+regla del módulo y no del barrido.
 
 ### Hito 3 — Warehouse · **Pendiente**
 
@@ -493,6 +536,7 @@ conocido.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-18 | **Hito 2 completado**: el primer módulo de verdad recorre el camino entero —ficha antes del código, dominio, migración `V9` con RLS y `FORCE`, siete operaciones en el contrato, siembra vacía escrita igual, pantallas bajo `/proveedores` y recorrido vertical en la batería existente—. El gate tapa por fin una ruta que existe: `403` apagado, `200` encendido. `ErrorCode` y la familia de `DomainError` se mudan a plataforma, que era la deuda que la ADR-010 dejó con su condición de revisión, y con ella se retiran `UnknownModule` y `UnknownNotice`. Diez decisiones que la definición no preveía |
 | 2026-08-18 | **Hito 1 completado**: un solo recorrido periódico en `com.drp.platform`, hogar a hogar sin `BYPASSRLS` y saltándose los que tengan apagado el módulo que pide la comprobación; los tres procesos diarios del core pasan a ser comprobaciones y se ejecutan de verdad; `household_notices` con RLS y `FORCE`, tres operaciones en el contrato, bandeja en el cliente y resumen diario leído del Mailpit real. Correo y lista de hogares se mudan a plataforma en lugar de ensanchar la excepción de ArchUnit. ADR-011, y cuatro decisiones que la definición no preveía |
 | 2026-08-18 | **Hito 0 completado**: fronteras de módulo con ArchUnit medido en los dos sentidos, `household_modules` con RLS y `FORCE`, gate en las tres capas, tres operaciones en el contrato, navegación en dos grupos y ADR-010. Se resuelve la pregunta que este hito tenía asignada y quedan anotadas tres decisiones que la definición no preveía |
 | 2026-08-18 | Se crea al planificar la Fase 2: alcance de cuatro módulos sobre activación por hogar y capacidad de plataforma, siete hitos, criterio de aceptación con dos ADR nuevas, y las tres decisiones de arranque tomadas antes de empezar |

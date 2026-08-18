@@ -301,7 +301,7 @@ ese barrido, no en este hito.
   lista cerrada con `OTHER`, que es lo contrario de lo que el core decidió para su
   `Category` —y la diferencia es deliberada: la del core clasifica **lo que el
   hogar tiene**, que es ilimitado, y esta clasifica **a qué se dedica quien viene
-  a casa**, que en un hogar son doce entradas y no mil. El disparador está
+  a casa**, que son catorce entradas y no mil. El disparador está
   escrito: **el día que `OTHER` sea la categoría más usada**, la lista cerrada
   dejó de clasificar y toca convertirla en catálogo por hogar, con la siembra de
   este módulo —hoy vacía— como el sitio natural donde nacen sus valores por

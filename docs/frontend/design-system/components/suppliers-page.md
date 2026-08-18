@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Prevista** — escrita antes que la pantalla |
+| Estado | **Implementada** — la ficha se escribió antes que la pantalla |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
 | Última revisión | 2026-08-18 |
@@ -14,8 +14,7 @@
 > que arreglar**. La bandeja de avisos del Hito 1 se entregó sin ficha, y es la
 > única pantalla de la Fase 2 de la que no se puede decir lo mismo.
 >
-> Cuando la pantalla exista, este encabezado pasa a «Implementada» y lo que se
-> haya construido distinto se dice en [Estado de
+> **La pantalla ya existe**, y lo que se construyó distinto se dice en [Estado de
 > implementación](#estado-de-implementación-y-enlace-al-componente-real) con su
 > motivo, **sin reescribir la especificación para que parezca que acertó**.
 
@@ -159,19 +158,42 @@ repositorio:**
 
 ## Estado de implementación y enlace al componente real
 
-**Prevista.** No hay código todavía: esta ficha es la especificación con la que
-se va a escribir. Cuando exista, vivirá en
-[`routes/suppliers.tsx`](../../../../frontend/src/routes/suppliers.tsx) y el
-guardián en [`routes/modules.tsx`](../../../../frontend/src/routes/modules.tsx).
+**Implementada.** Vive en
+[`routes/suppliers.tsx`](../../../../frontend/src/routes/suppliers.tsx) como
+`SuppliersPage`, y el guardián en
+[`routes/modules.tsx`](../../../../frontend/src/routes/modules.tsx). Sus pruebas
+de componente están en
+[`suppliers.test.tsx`](../../../../frontend/src/routes/suppliers.test.tsx) y su
+tramo del recorrido vertical, dentro de la batería existente en
+[`vertical-journey.spec.ts`](../../../../frontend/e2e/vertical-journey.spec.ts).
+
+**Lo que se construyó distinto de lo especificado, y por qué:**
+
+- **El filtro se llama «Filtrar por categoría» y no «Categoría de servicio».** El
+  boceto de arriba le daba el mismo rótulo que al campo del formulario de alta, y
+  dos controles con **el mismo nombre accesible** en la misma pantalla son
+  indistinguibles para quien navega con lector de pantalla. No se vio mirando la
+  pantalla: lo delató una prueba que seleccionaba en el control equivocado, que es
+  exactamente el síntoma que sufre quien no la ve.
+- **No hay botón «Editar» en la ficha desplegada.** El contrato tiene su `PATCH`
+  y el cliente su llamada, pero la pantalla se entrega sin formulario de edición:
+  lo que un hogar hace con un contacto de servicio es consultarlo, y corregir un
+  teléfono es un caso menos frecuente que enlazarlo o retirarlo. Queda como lo
+  primero que añadir aquí, y no como una promesa autoprogramada: nada en la
+  pantalla lo anuncia.
+- **Enlazar solo ofrece ubicaciones, no assets.** La API admite las dos cosas y el
+  módulo las guarda igual; lo que falta en el cliente es el `Combobox` con el que
+  buscar entre los assets de una casa, que pueden ser cientos. Con ubicaciones
+  —decenas— el `SelectField` aguanta. Está en la lista de abajo.
 
 **Lo que esta pantalla necesita y el sistema de diseño no tiene**, sin fingir que
 existe:
 
 - `Combobox` — sigue sin construirse desde el Hito 2 de la Fase 1. Elegir con qué
   se enlaza un contacto es exactamente su caso: una lista de ubicaciones y assets
-  que hay que buscar. **Se resuelve con `SelectField`** mientras un hogar
-  doméstico tenga decenas de ubicaciones y no cientos, y queda dicho aquí para
-  que la deuda se vea.
+  que hay que buscar. **Se resuelve con `SelectField` y solo con ubicaciones**,
+  que en una casa son decenas; los assets, que pueden ser cientos, esperan a que
+  esa pieza exista.
 - `Dialog` / hoja inferior — la confirmación de retirada. **Se resuelve sin
   confirmación**: retirar es reversible dando de alta otra vez, y una
   confirmación que no protege de nada solo añade un clic.
@@ -183,3 +205,4 @@ existe:
 | Fecha | Cambio | Autor |
 |---|---|---|
 | 2026-08-18 | Creación, **antes que la pantalla**, como especificación del Hito 2 de la Fase 2. Fija que la ruta es un guardián que envuelve, que la ficha de un contacto se despliega dentro del listado en lugar de tener ruta propia, y las tres piezas del sistema de diseño que faltan con su solución provisional. | Equipo DRP |
+| 2026-08-18 | La pantalla se construye y la ficha pasa a **implementada**. Tres cosas salieron distintas y quedan dichas con su motivo, sin retocar la especificación: el rótulo del filtro —que chocaba en nombre accesible con el del formulario—, la edición de un contacto, que no se entrega, y el enlace, que de momento solo ofrece ubicaciones porque los assets piden el `Combobox` que sigue sin existir. | Equipo DRP |
