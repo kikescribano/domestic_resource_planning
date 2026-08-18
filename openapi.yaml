@@ -60,6 +60,14 @@ tags:
       produce la regla de cada módulo. Los escribe el recorrido periódico, así
       que NO hay operación de crear ni de borrar: lo que una persona hace con un
       aviso es leerlo.
+  - name: suppliers
+    description: >
+      Proveedores y contactos de servicio (Fase 2, Hito 2). Es el primer MÓDULO
+      de verdad, así que todo lo que cuelga de /suppliers responde 403
+      MODULE_INACTIVE mientras el hogar no lo tenga encendido -- que es una
+      diferencia con el core y no un detalle: estas operaciones existen o no
+      según lo que ese hogar haya decidido. Su ficha completa está en
+      docs/backend/modules/suppliers.md.
 
 security:
   - bearerAuth: []
@@ -1787,6 +1795,256 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         default: { $ref: "#/components/responses/ServerError" }
 
+  /suppliers:
+    get:
+      operationId: listSuppliers
+      tags: [suppliers]
+      summary: Listar los contactos de servicio del hogar
+      description: >
+        Los vigentes primero y por nombre, que es como se busca un teléfono
+        cuando algo se ha roto. Los retirados no salen salvo que se pidan.
+
+
+        El filtro de texto mira EL NOMBRE y no los datos de contacto, y es una
+        decisión de seguridad y no de comodidad: el teléfono y el correo del
+        fontanero son datos personales de alguien que no es usuario del sistema,
+        y un buscador por correo convertiría la lista en un directorio
+        consultable. Compara sin distinguir mayúsculas ni acentos, igual que la
+        unicidad del nombre.
+      parameters:
+        - name: serviceCategory
+          in: query
+          required: false
+          description: Agrupa por oficio. Es la única agrupación que ofrece el módulo
+          schema: { $ref: "#/components/schemas/ServiceCategory" }
+        - name: q
+          in: query
+          required: false
+          description: Busca en el nombre, normalizado
+          schema: { type: string }
+        - name: includeRetired
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: Contactos de servicio del hogar
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SupplierPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        default: { $ref: "#/components/responses/ServerError" }
+    post:
+      operationId: createSupplier
+      tags: [suppliers]
+      summary: Dar de alta un contacto de servicio
+      description: >
+        El nombre es único ENTRE LOS VIGENTES del hogar, sin distinguir
+        mayúsculas ni acentos: dos filas con el mismo teléfono son un duplicado
+        que no se ve, y dos con el mismo nombre uno que se ve a la primera.
+
+
+        Y hace falta AL MENOS UNA forma de contacto -- teléfono, correo o web.
+        Los tres campos son opcionales uno a uno y obligatorios en conjunto, así
+        que la regla responde 409 SUPPLIER_CONTACT_REQUIRED y no un 400: lo que
+        falla no es la forma del cuerpo sino lo que ese contacto sería. La
+        dirección postal no cuenta -- sirve para llegar, no para llamar.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SupplierInput" }
+      responses:
+        "201":
+          description: Contacto de servicio creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Supplier" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: >
+            Nombre repetido entre los vigentes (SUPPLIER_DUPLICATE) o sin
+            ninguna forma de contacto (SUPPLIER_CONTACT_REQUIRED)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /suppliers/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getSupplier
+      tags: [suppliers]
+      summary: Ver un contacto de servicio con sus enlaces
+      description: >
+        Los enlaces vienen CON EL NOMBRE de aquello a lo que apuntan, resuelto
+        contra el core al leer y no copiado: renombrar la caldera se ve aquí sin
+        que nadie sincronice nada.
+      responses:
+        "200":
+          description: El contacto y sus enlaces
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SupplierDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+    patch:
+      operationId: updateSupplier
+      tags: [suppliers]
+      summary: Modificar un contacto de servicio
+      description: >
+        Modificación PARCIAL, con la misma semántica que el resto del contrato:
+        un campo ausente no se toca y un campo presente a nulo se borra. La
+        diferencia importa -- un PATCH que solo cambia el teléfono no puede
+        vaciar las notas de paso.
+
+
+        Sigue haciendo falta al menos una forma de contacto DESPUÉS del cambio:
+        vaciar el único teléfono de alguien que no tiene correo responde 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SupplierPatch" }
+      responses:
+        "200":
+          description: Contacto de servicio actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Supplier" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            Nombre repetido (SUPPLIER_DUPLICATE) o sin ninguna forma de contacto
+            (SUPPLIER_CONTACT_REQUIRED)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/ServerError" }
+    delete:
+      operationId: retireSupplier
+      tags: [suppliers]
+      summary: Retirar un contacto de servicio
+      description: >
+        Retirada LÓGICA, igual que la de una categoría del core y por el mismo
+        motivo: los enlaces lo referencian, así que borrar la fila rompería el
+        historial de quién instaló la caldera. Deja de ofrecerse al enlazar,
+        deja de salir en el listado por defecto, y sus enlaces se conservan.
+
+
+        Es idempotente: retirar lo ya retirado devuelve 204 y NO mueve la fecha,
+        que si no falsearía cuándo se dejó de llamar a esa gente.
+      responses:
+        "204": { description: Retirado }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /suppliers/{id}/links:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: linkSupplier
+      tags: [suppliers]
+      summary: Enlazar un contacto con un asset o una ubicación del core
+      description: >
+        El servicio técnico DE LA CALDERA, el taller DEL COCHE, el fontanero DEL
+        PISO DE ARRIBA. Apunta a EXACTAMENTE UNA cosa: dar los dos
+        identificadores o ninguno responde 409 SUPPLIER_LINK_TARGET_INVALID.
+
+
+        El destino se resuelve contra el core antes de insertar, así que enlazar
+        con algo de otro hogar responde 404 -- ni 403 ni un enlace que cuela: la
+        comprobación de una clave ajena no pasa por RLS, y sin resolverlo antes
+        una fila invisible se podría referenciar igual.
+
+
+        Un contacto RETIRADO no admite enlaces nuevos (SUPPLIER_RETIRED). Los
+        que ya tenía se conservan: la caldera la sigue habiendo instalado quien
+        la instaló.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SupplierLinkInput" }
+      responses:
+        "201":
+          description: Enlace creado, con el nombre del destino resuelto
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SupplierLink" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: >
+            No existe el contacto, o no existe EN ESTE HOGAR aquello con lo que
+            se quiere enlazar
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: >
+            Ni uno ni los dos destinos (SUPPLIER_LINK_TARGET_INVALID), enlace ya
+            existente (SUPPLIER_LINK_DUPLICATE) o contacto retirado
+            (SUPPLIER_RETIRED)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /suppliers/{id}/links/{linkId}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: linkId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      operationId: unlinkSupplier
+      tags: [suppliers]
+      summary: Deshacer un enlace
+      description: >
+        Borrado real: un enlace no deja historial que preservar. El contacto y
+        el destino siguen donde estaban.
+
+
+        El enlace va anidado bajo su contacto y eso se respeta: pedir el enlace
+        de OTRO contacto responde 404 aunque ese enlace exista.
+      responses:
+        "204": { description: Enlace deshecho }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1955,6 +2213,11 @@ components:
             - RATE_LIMITED
             - RESET_TOKEN_INVALID
             - STORAGE_QUOTA_EXCEEDED
+            - SUPPLIER_CONTACT_REQUIRED
+            - SUPPLIER_DUPLICATE
+            - SUPPLIER_LINK_DUPLICATE
+            - SUPPLIER_LINK_TARGET_INVALID
+            - SUPPLIER_RETIRED
             - USER_LAST_ADMIN
             - VALIDATION_ERROR
             - VERIFICATION_TOKEN_INVALID
@@ -3030,3 +3293,157 @@ components:
             items:
               type: array
               items: { $ref: "#/components/schemas/User" }
+
+    ServiceCategory:
+      type: string
+      description: >
+        A qué se dedica un contacto de servicio. LISTA CERRADA, al contrario que
+        la categoría de un asset, que es un catálogo por hogar: aquella clasifica
+        lo que el hogar tiene, que no tiene fin porque una casa compra cosas que
+        nadie previó; esta clasifica a qué se dedica quien viene a casa, que es
+        un mundo mucho más corto.
+
+
+        OTHER es la salida, y a la vez el disparador de revisar la decisión: el
+        día que sea la más usada, la lista dejó de clasificar y toca convertirla
+        en catálogo por hogar. Está anotado en la ficha del módulo.
+
+
+        El rótulo que se lee en pantalla es un dato y lo pone el cliente en
+        castellano; esto es un identificador.
+      enum:
+        - PLUMBING
+        - ELECTRICITY
+        - HEATING_COOLING
+        - APPLIANCES
+        - CARPENTRY
+        - MASONRY
+        - PAINTING
+        - LOCKSMITH
+        - CLEANING
+        - GARDENING
+        - PEST_CONTROL
+        - VEHICLE
+        - UTILITIES
+        - OTHER
+
+    SupplierInput:
+      type: object
+      required: [name, serviceCategory]
+      description: >
+        Los cinco datos de contacto son opcionales UNO A UNO y obligatorios EN
+        CONJUNTO: hace falta al menos teléfono, correo o web. Esa regla no se
+        puede expresar campo a campo, así que responde 409 y no 400.
+      properties:
+        name: { type: string, maxLength: 160, example: Fontanería Pérez }
+        serviceCategory: { $ref: "#/components/schemas/ServiceCategory" }
+        contactName:
+          type: string
+          maxLength: 160
+          nullable: true
+          description: La persona con la que se habla dentro de una empresa. Nulo cuando el contacto ES la persona
+        phone: { type: string, maxLength: 40, nullable: true }
+        email: { type: string, maxLength: 320, nullable: true }
+        website: { type: string, maxLength: 500, nullable: true }
+        address:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: No cuenta como forma de contacto -- sirve para llegar, no para llamar
+        notes: { type: string, nullable: true }
+
+    SupplierPatch:
+      type: object
+      description: >
+        Modificación parcial. Un campo AUSENTE no se toca; un campo presente a
+        NULO se borra. Las dos cosas son distintas y el contrato las distingue en
+        todos sus PATCH.
+      properties:
+        name: { type: string, maxLength: 160 }
+        serviceCategory: { $ref: "#/components/schemas/ServiceCategory" }
+        contactName: { type: string, maxLength: 160, nullable: true }
+        phone: { type: string, maxLength: 40, nullable: true }
+        email: { type: string, maxLength: 320, nullable: true }
+        website: { type: string, maxLength: 500, nullable: true }
+        address: { type: string, maxLength: 500, nullable: true }
+        notes: { type: string, nullable: true }
+
+    Supplier:
+      type: object
+      required: [id, name, serviceCategory, createdAt, updatedAt]
+      description: >
+        Un contacto de servicio del hogar. NO distingue empresa de persona: el
+        servicio técnico de la caldera y el electricista del barrio se guardan
+        igual porque lo que el hogar necesita de los dos es lo mismo.
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        serviceCategory: { $ref: "#/components/schemas/ServiceCategory" }
+        contactName: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        website: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        retiredAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            Con valor, el contacto está retirado: no se ofrece al enlazar y no
+            sale en el listado por defecto. Sus enlaces se conservan.
+        createdBy: { type: string, format: uuid, nullable: true }
+        updatedBy: { type: string, format: uuid, nullable: true }
+
+    SupplierLinkInput:
+      type: object
+      description: >
+        EXACTAMENTE UNO de los dos. Ni ninguno ni los dos: eso responde 409
+        SUPPLIER_LINK_TARGET_INVALID, que es una regla del contrato con código
+        propio y no un error de forma.
+      properties:
+        assetId: { type: string, format: uuid, nullable: true }
+        locationId: { type: string, format: uuid, nullable: true }
+
+    SupplierLink:
+      type: object
+      required: [id, targetType, targetId, targetName, createdAt]
+      description: >
+        El enlace de un contacto con algo del core, aplanado a targetType +
+        targetId + targetName. Dentro son dos columnas excluyentes; aquí son tres
+        campos, porque dos claves opcionales obligarían al cliente a comprobar
+        cuál viene informada cada vez que pinta una fila.
+      properties:
+        id: { type: string, format: uuid }
+        targetType:
+          type: string
+          enum: [ASSET, LOCATION]
+        targetId: { type: string, format: uuid }
+        targetName:
+          type: string
+          description: >
+            El nombre que el core le da HOY, resuelto al leer y no copiado: si la
+            caldera se renombra, esto lo dice sin que nadie sincronice nada.
+        createdAt: { type: string, format: date-time }
+        createdBy: { type: string, format: uuid, nullable: true }
+
+    SupplierDetail:
+      type: object
+      required: [supplier, links]
+      properties:
+        supplier: { $ref: "#/components/schemas/Supplier" }
+        links:
+          type: array
+          items: { $ref: "#/components/schemas/SupplierLink" }
+
+    SupplierPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Supplier" }
