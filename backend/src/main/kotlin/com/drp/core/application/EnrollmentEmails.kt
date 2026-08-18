@@ -1,7 +1,7 @@
 package com.drp.core.application
 
-import com.drp.core.application.port.EmailMessage
-import com.drp.core.domain.identity.EmailAddress
+import com.drp.platform.mail.EmailMessage
+import com.drp.platform.mail.EmailAddress
 import com.drp.core.domain.loan.LoanRole
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component

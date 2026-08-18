@@ -41,6 +41,7 @@ class TenantContextIntegrationTest : SpringIntegrationTest() {
     @Autowired private lateinit var households: HouseholdRepository
     @Autowired private lateinit var members: HouseholdMemberRepository
     @Autowired private lateinit var tenantResolver: TenantResolver
+    @Autowired private lateinit var directory: HouseholdDirectory
 
     private lateinit var householdA: SeededHousehold
     private lateinit var householdB: SeededHousehold
@@ -111,7 +112,7 @@ class TenantContextIntegrationTest : SpringIntegrationTest() {
     @DisplayName("la resolucion de inquilino ve los dos hogares, y solo sus identificadores")
     fun `el resolutor alcanza donde la politica no deja`() {
         // Sin contexto ninguno: es justo el escenario de los procesos diarios.
-        val ids = tenantContext.runAs(null) { tenantResolver.allHouseholdIds() }
+        val ids = tenantContext.runAs(null) { directory.allHouseholdIds() }
 
         ids.shouldContainAll(listOf(householdA.householdId, householdB.householdId))
     }

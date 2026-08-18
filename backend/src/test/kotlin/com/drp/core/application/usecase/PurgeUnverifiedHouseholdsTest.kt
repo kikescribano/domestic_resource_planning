@@ -1,6 +1,6 @@
 package com.drp.core.application.usecase
 
-import com.drp.core.application.port.TenantResolver
+import com.drp.platform.tenant.HouseholdDirectory
 import com.drp.test.DrpMailpit
 import com.drp.test.DrpPostgres
 import com.drp.test.SpringIntegrationTest
@@ -36,7 +36,7 @@ import java.util.UUID
 class PurgeUnverifiedHouseholdsTest : SpringIntegrationTest() {
 
     @Autowired private lateinit var purge: PurgeUnverifiedHouseholds
-    @Autowired private lateinit var tenantResolver: TenantResolver
+    @Autowired private lateinit var directory: HouseholdDirectory
     @Autowired private lateinit var http: TestRestTemplate
 
     private val mailpit = DrpMailpit.instance
@@ -137,7 +137,7 @@ class PurgeUnverifiedHouseholdsTest : SpringIntegrationTest() {
 
         // Sin contexto de inquilino --que es como corre el proceso-- la lista
         // llega igualmente. Es lo que hace innecesario el BYPASSRLS.
-        val ids = tenantResolver.allHouseholdIds()
+        val ids = directory.allHouseholdIds()
 
         ids.shouldContain(householdId)
 
@@ -168,7 +168,7 @@ class PurgeUnverifiedHouseholdsTest : SpringIntegrationTest() {
             owner.count("SELECT count(*) FROM households WHERE id = ?", doomedId).shouldBe(0)
             owner.count("SELECT count(*) FROM households WHERE id = ?", safeId).shouldBe(1)
         }
-        tenantResolver.allHouseholdIds().let {
+        directory.allHouseholdIds().let {
             it.shouldNotContain(doomedId)
             it.shouldContain(safeId)
         }

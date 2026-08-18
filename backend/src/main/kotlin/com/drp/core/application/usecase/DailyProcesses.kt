@@ -9,7 +9,7 @@ import com.drp.core.application.port.IdentityRepository
 import com.drp.core.application.port.LoanRepository
 import com.drp.platform.page.Pagination
 import com.drp.core.application.port.StoredFileRepository
-import com.drp.core.application.port.TenantResolver
+import com.drp.platform.tenant.HouseholdDirectory
 import com.drp.platform.tenant.TenantContext
 import com.drp.core.domain.loan.LoanStatus
 import org.slf4j.LoggerFactory
@@ -38,7 +38,7 @@ import java.util.UUID
  */
 @Service
 class PurgeUnverifiedHouseholds(
-    private val tenantResolver: TenantResolver,
+    private val directory: HouseholdDirectory,
     private val tenantContext: TenantContext,
     private val transactions: TransactionTemplate,
     private val households: HouseholdRepository,
@@ -53,7 +53,7 @@ class PurgeUnverifiedHouseholds(
         val cutoff = clock.instant().minus(RETENTION)
         var purged = 0
 
-        for (householdId in tenantResolver.allHouseholdIds()) {
+        for (householdId in directory.allHouseholdIds()) {
             // Una transaccion por hogar, con su propio contexto. Que un hogar
             // falle no puede arrastrar a los demas ni dejar a medias el que ya
             // se habia borrado.
@@ -140,7 +140,7 @@ class PurgeUnverifiedHouseholds(
  */
 @Service
 class PurgeUnusedFiles(
-    private val tenantResolver: TenantResolver,
+    private val directory: HouseholdDirectory,
     private val tenantContext: TenantContext,
     private val transactions: TransactionTemplate,
     private val files: StoredFileRepository,
@@ -154,7 +154,7 @@ class PurgeUnusedFiles(
         val now = clock.instant()
         var purged = 0
 
-        for (householdId in tenantResolver.allHouseholdIds()) {
+        for (householdId in directory.allHouseholdIds()) {
             // Una transaccion por hogar y con su propio contexto, igual que en la
             // purga de hogares: que uno falle no puede arrastrar a los demas.
             purged += tenantContext.runAs(householdId) {
@@ -232,7 +232,7 @@ class PurgeUnusedFiles(
  */
 @Service
 class MarkOverdueLoans(
-    private val tenantResolver: TenantResolver,
+    private val directory: HouseholdDirectory,
     private val tenantContext: TenantContext,
     private val transactions: TransactionTemplate,
     private val loans: LoanRepository,
@@ -246,7 +246,7 @@ class MarkOverdueLoans(
         val now = clock.instant()
         var marked = 0
 
-        for (householdId in tenantResolver.allHouseholdIds()) {
+        for (householdId in directory.allHouseholdIds()) {
             // Una transaccion por hogar y con su propio contexto, igual que los
             // otros dos procesos: que uno falle no puede arrastrar a los demas.
             //

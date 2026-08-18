@@ -1,7 +1,7 @@
 package com.drp.core.domain.invitation
 
 import com.drp.core.domain.household.MemberRole
-import com.drp.core.domain.identity.EmailAddress
+import com.drp.platform.mail.EmailAddress
 import java.time.Instant
 import java.util.UUID
 

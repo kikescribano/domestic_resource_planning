@@ -1,7 +1,5 @@
-package com.drp.core.adapter.email
+package com.drp.platform.mail
 
-import com.drp.core.application.port.EmailMessage
-import com.drp.core.application.port.EmailSender
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.mail.SimpleMailMessage
