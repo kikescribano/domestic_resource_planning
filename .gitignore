@@ -31,6 +31,11 @@ frontend/src/api/generated/
 # Volumenes locales levantados por compose.yaml
 .data/
 
+# Worktrees de sesiones de trabajo. Cuelgan de .claude/, que si se versiona --ahi
+# viven las skills del proyecto-- asi que sin esta linea aparecerian como ruido
+# sin seguimiento en cada `git status`.
+.claude/worktrees/
+
 # Editores
 .idea/
 *.iml
