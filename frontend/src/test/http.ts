@@ -36,7 +36,21 @@ export interface RecordedCall {
   authorization: string | null
 }
 
-export function stubFetch(responses: Record<string, StubbedRoute>) {
+/**
+ * La respuesta que toda pantalla autenticada necesita aunque no hable de
+ * módulos.
+ *
+ * En cuanto hay sesión, el shell pide el catálogo: de él salen la navegación y
+ * el guardián de cada ruta de módulo. Declararlo en cada prueba sería repetir la
+ * misma línea treinta veces, así que va de base y **cualquier prueba lo
+ * sustituye** poniendo la suya con la misma clave.
+ */
+const CATALOGUE_WITHOUT_MODULES: Record<string, StubbedRoute> = {
+  'GET /api/v1/modules': { status: 200, body: { items: [], page: 0, size: 0, total: 0 } },
+}
+
+export function stubFetch(routes: Record<string, StubbedRoute>) {
+  const responses = { ...CATALOGUE_WITHOUT_MODULES, ...routes }
   const calls: RecordedCall[] = []
 
   const implementation = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

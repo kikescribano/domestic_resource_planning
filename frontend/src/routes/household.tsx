@@ -4,6 +4,7 @@ import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router'
 
 import { ApiError, api, humanMessage, type UserRole } from '../api/client'
 import { useAuthenticatedSession, useSession } from '../auth/SessionProvider'
+import { useActiveModuleScreens } from './modules'
 import { Avatar } from '../ui/files'
 import { Button, Field, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primitives'
 
@@ -15,12 +16,23 @@ import { Button, Field, Notice, PageHeading, Spinner, StatusBadge } from '../ui/
  * donde el aire de la barra inferior empieza a costar más de lo que aporta.
  */
 
-const NAVIGATION = [
+/**
+ * Las cuatro paradas de todos los días, que son las que caben en el pulgar.
+ *
+ * El corte entre estas y las de abajo no es de importancia sino de **frecuencia**:
+ * lo de arriba se usa a diario y lo de abajo se toca al montar el hogar o cuando
+ * hay algo que arreglar.
+ */
+const PRIMARY_NAVIGATION = [
   { to: '/', label: 'Hogar', end: true },
   { to: '/inventario', label: 'Inventario', end: false },
   { to: '/ubicaciones', label: 'Sitios', end: false },
-  { to: '/catalogo', label: 'Catálogo', end: false },
   { to: '/prestamos', label: 'Préstamos', end: false },
+]
+
+/** El resto del core. En escritorio va en la barra lateral; en móvil, en «Más». */
+const SECONDARY_NAVIGATION = [
+  { to: '/catalogo', label: 'Catálogo', end: false },
   { to: '/usuarios', label: 'Personas', end: false },
   { to: '/almacenamiento', label: 'Archivo', end: false },
   { to: '/cuenta', label: 'Cuenta', end: false },
@@ -58,8 +70,20 @@ export function RequireSession() {
  * Así que el mismo elemento es barra inferior en móvil --donde llega el pulgar--
  * y columna lateral desde `md`, donde ese aire empieza a costar más de lo que
  * aporta.
+ *
+ * **Y desde la Fase 2, dos grupos y no una lista.** Cuatro módulos llevaban la
+ * navegación de ocho entradas a doce, y doce no caben en una barra inferior: a
+ * 320 px, las ocho de antes ya daban 40 px de ancho por parada, por debajo de los
+ * 44 px que la dirección visual exige de todo objetivo táctil. Así que el móvil
+ * lleva **cuatro paradas y «Más»**, que es una pantalla con el resto; y el
+ * escritorio, donde la columna no se queda corta, las enseña todas repartidas en
+ * **el hogar** y **los módulos**. Un hogar sin módulos activos ve sus ocho
+ * enlaces del core intactos y una novena entrada, que es la puerta para encender
+ * alguno.
  */
 function HouseholdShell() {
+  const modules = useActiveModuleScreens()
+
   return (
     <div className="flex min-h-dvh flex-col bg-surface md:flex-row">
       {/* Salto al contenido: primer tabulador de la página, visible solo al
@@ -80,12 +104,59 @@ function HouseholdShell() {
       >
         <p className="hidden font-display text-title text-ink md:block">DRP</p>
 
-        <nav aria-label="Principal" className="flex md:flex-col md:gap-1">
-          {NAVIGATION.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
-              {item.label}
-            </NavLink>
-          ))}
+        <nav aria-label="Principal" className="flex md:flex-col md:gap-6">
+          {/* Los rótulos de grupo se leen siempre aunque solo se vean desde
+              `md`: `aria-labelledby` toma el texto de un elemento oculto igual
+              que de uno visible, así que en móvil las dos listas siguen estando
+              nombradas para quien navega sin verlas. Son párrafos y no
+              encabezados a propósito: un `h2` aquí saldría antes que el `h1` del
+              contenido y dejaría el documento con los niveles al revés. */}
+          <p id="nav-core" className="hidden text-caption text-ink-subtle md:block">
+            Tu hogar
+          </p>
+          <ul className="flex flex-1 md:flex-col md:gap-1" aria-labelledby="nav-core">
+            {PRIMARY_NAVIGATION.map((item) => (
+              <li key={item.to} className="flex flex-1 md:flex-none">
+                <NavLink to={item.to} end={item.end} className={navLinkClass}>
+                  {item.label}
+                </NavLink>
+              </li>
+            ))}
+            {SECONDARY_NAVIGATION.map((item) => (
+              <li key={item.to} className="hidden md:flex">
+                <NavLink to={item.to} end={item.end} className={navLinkClass}>
+                  {item.label}
+                </NavLink>
+              </li>
+            ))}
+            {/* La quinta parada del móvil, y solo del móvil: en escritorio no
+                hay nada detrás de ella que no esté ya en la columna. */}
+            <li className="flex flex-1 md:hidden">
+              <NavLink to="/mas" className={navLinkClass}>
+                Más
+              </NavLink>
+            </li>
+          </ul>
+
+          <div className="hidden md:block">
+            <p id="nav-modules" className="text-caption text-ink-subtle">
+              Módulos
+            </p>
+            <ul className="mt-1 flex flex-col gap-1" aria-labelledby="nav-modules">
+              {modules.map((module) => (
+                <li key={module.key} className="flex">
+                  <NavLink to={module.path} className={navLinkClass}>
+                    {module.label}
+                  </NavLink>
+                </li>
+              ))}
+              <li className="flex">
+                <NavLink to="/modulos" className={navLinkClass}>
+                  Módulos del hogar
+                </NavLink>
+              </li>
+            </ul>
+          </div>
         </nav>
       </header>
 
@@ -98,7 +169,7 @@ function HouseholdShell() {
 
 function navLinkClass({ isActive }: { isActive: boolean }) {
   return [
-    'flex min-h-touch flex-1 items-center justify-center px-2 py-3 text-body-sm',
+    'flex min-h-touch w-full flex-1 items-center justify-center px-2 py-3 text-body-sm',
     'md:flex-none md:justify-start md:rounded-md md:px-3 md:text-body',
     // El estado activo no se dice solo con color: además del acento lleva peso
     // tipográfico y `aria-current`, que NavLink pone por su cuenta.
@@ -106,6 +177,61 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
       ? 'font-medium text-accent-ink md:bg-accent-soft'
       : 'text-ink-muted md:hover:bg-surface-hover',
   ].join(' ')
+}
+
+/**
+ * «Más», que es la mitad de la navegación que no cabe en el pulgar.
+ *
+ * Solo existe para el móvil: desde `md` la barra lateral las enseña todas y
+ * nadie llega aquí. No es un cajón de sastre —lo que hay dentro son las paradas
+ * del core que se tocan al montar el hogar, más los módulos— y por eso se
+ * enumera entero en lugar de esconderse tras un menú.
+ */
+export function MorePage() {
+  const modules = useActiveModuleScreens()
+
+  return (
+    <>
+      <PageHeading title="Más" />
+
+      <nav aria-label="Resto del hogar">
+        <ul className="flex flex-col gap-2">
+          {SECONDARY_NAVIGATION.map((item) => (
+            <li key={item.to}>
+              <Link
+                to={item.to}
+                className="flex min-h-touch items-center rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
+              >
+                {item.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+
+        <h2 className="mt-8 font-display text-title-sm text-ink">Módulos</h2>
+        <ul className="mt-3 flex flex-col gap-2">
+          {modules.map((module) => (
+            <li key={module.key}>
+              <Link
+                to={module.path}
+                className="flex min-h-touch items-center rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
+              >
+                {module.label}
+              </Link>
+            </li>
+          ))}
+          <li>
+            <Link
+              to="/modulos"
+              className="flex min-h-touch items-center rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
+            >
+              Módulos del hogar
+            </Link>
+          </li>
+        </ul>
+      </nav>
+    </>
+  )
 }
 
 export function HomePage() {

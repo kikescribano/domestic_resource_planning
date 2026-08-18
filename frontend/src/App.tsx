@@ -14,13 +14,14 @@ import {
 } from './routes/enrollment'
 import { AssetDetailPage, AssetsPage, IntakePage, NewAssetPage } from './routes/assets'
 import { CatalogPage } from './routes/catalog'
-import { AccountPage, HomePage, RequireSession, UsersPage } from './routes/household'
+import { AccountPage, HomePage, MorePage, RequireSession, UsersPage } from './routes/household'
 import { ExternalLoanPage, LoansPage } from './routes/loans'
 import { LocationsPage } from './routes/locations'
+import { ModuleScreen, ModulesPage } from './routes/modules'
 import { StoragePage } from './routes/storage'
 
 /**
- * Las rutas del Hito 1.
+ * Las rutas de la aplicación.
  *
  * Las públicas llevan nombre en castellano porque **viajan dentro de un correo**
  * y las lee una persona: el enlace de verificación dice `/verificar-correo`, no
@@ -91,6 +92,22 @@ export function App() {
               <Route path="/usuarios" element={<UsersPage />} />
               <Route path="/almacenamiento" element={<StoragePage />} />
               <Route path="/cuenta" element={<AccountPage />} />
+              {/* La mitad de la navegación que no cabe en el pulgar. Solo se
+                  llega desde móvil; en escritorio la barra lateral las enseña
+                  todas. */}
+              <Route path="/mas" element={<MorePage />} />
+              <Route path="/modulos" element={<ModulesPage />} />
+
+              {/* Las rutas de los cuatro módulos de la Fase 2. Existen desde el
+                  Hito 0 aunque su dominio llegue después, porque son la mitad
+                  visible del gate: entrar en una que está apagada tiene que
+                  llevar a la pantalla que la ofrece, no a un 404. El nombre va
+                  en castellano igual que las rutas públicas, y no coincide con
+                  el prefijo del contrato, que es `/api/v1/suppliers`. */}
+              <Route path="/proveedores" element={<ModuleScreen moduleKey="SUPPLIERS" />} />
+              <Route path="/almacen" element={<ModuleScreen moduleKey="WAREHOUSE" />} />
+              <Route path="/compras" element={<ModuleScreen moduleKey="PURCHASING" />} />
+              <Route path="/mantenimiento" element={<ModuleScreen moduleKey="MAINTENANCE" />} />
             </Route>
           </Routes>
         </SessionProvider>
