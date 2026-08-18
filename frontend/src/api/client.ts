@@ -52,6 +52,11 @@ export type ApiErrorCode =
   | 'STORAGE_QUOTA_EXCEEDED'
   | 'USER_LAST_ADMIN'
   | 'VALIDATION_ERROR'
+  | 'SUPPLIER_CONTACT_REQUIRED'
+  | 'SUPPLIER_DUPLICATE'
+  | 'SUPPLIER_LINK_DUPLICATE'
+  | 'SUPPLIER_LINK_TARGET_INVALID'
+  | 'SUPPLIER_RETIRED'
   | 'VERIFICATION_TOKEN_INVALID'
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
@@ -94,6 +99,11 @@ const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   MERGE_ASSET_DEACTIVATED: 'Alguna de las dos existencias está dada de baja.',
   MERGE_NOT_CONSUMABLE: 'Solo se unen existencias de consumible.',
   MERGE_SAME_ASSET: 'Origen y destino son la misma existencia.',
+  SUPPLIER_CONTACT_REQUIRED: 'Hace falta al menos un teléfono, un correo o una web.',
+  SUPPLIER_DUPLICATE: 'Ya hay un contacto de servicio con ese nombre.',
+  SUPPLIER_LINK_DUPLICATE: 'Ese contacto ya está enlazado con eso.',
+  SUPPLIER_LINK_TARGET_INVALID: 'Elige una cosa con la que enlazarlo.',
+  SUPPLIER_RETIRED: 'Ese contacto está retirado: no admite enlaces nuevos.',
   // Se ve poco a propósito: la pantalla de una ruta apagada ofrece activar el
   // módulo en lugar de enseñar un error. Este texto es para el caso raro de
   // que alguien lo reciba en medio de otra cosa, por haberlo desactivado desde
@@ -369,6 +379,113 @@ export interface Notice {
   createdAt: string
   readAt: string | null
   readBy: string | null
+}
+
+// --- Proveedores y contactos de servicio (Fase 2, Hito 2) --------------------
+
+/**
+ * A qué se dedica un contacto de servicio.
+ *
+ * **Lista cerrada**, al contrario que la categoría de un asset, que es un
+ * catálogo por hogar: aquella clasifica lo que el hogar tiene, que no tiene fin;
+ * esta clasifica a qué se dedica quien viene a casa. `OTHER` es la salida.
+ */
+export type ServiceCategory =
+  | 'PLUMBING'
+  | 'ELECTRICITY'
+  | 'HEATING_COOLING'
+  | 'APPLIANCES'
+  | 'CARPENTRY'
+  | 'MASONRY'
+  | 'PAINTING'
+  | 'LOCKSMITH'
+  | 'CLEANING'
+  | 'GARDENING'
+  | 'PEST_CONTROL'
+  | 'VEHICLE'
+  | 'UTILITIES'
+  | 'OTHER'
+
+/**
+ * El rótulo en castellano de cada categoría.
+ *
+ * Vive aquí y no en el backend a propósito: la clave es un **identificador** y
+ * viaja en inglés; lo que lee una persona es un **dato** de presentación. Que el
+ * servidor devolviera las dos cosas daría dos versiones del mismo nombre, que es
+ * exactamente el defecto que el catálogo de módulos existe para evitar.
+ */
+export const SERVICE_CATEGORY_LABELS: Record<ServiceCategory, string> = {
+  PLUMBING: 'Fontanería',
+  ELECTRICITY: 'Electricidad',
+  HEATING_COOLING: 'Climatización',
+  APPLIANCES: 'Electrodomésticos',
+  CARPENTRY: 'Carpintería',
+  MASONRY: 'Albañilería',
+  PAINTING: 'Pintura',
+  LOCKSMITH: 'Cerrajería',
+  CLEANING: 'Limpieza',
+  GARDENING: 'Jardinería',
+  PEST_CONTROL: 'Control de plagas',
+  VEHICLE: 'Vehículos',
+  UTILITIES: 'Suministros',
+  OTHER: 'Otros',
+}
+
+/**
+ * Quién arregla, quién cobra y quién responde de una garantía.
+ *
+ * Los cinco datos de contacto son opcionales uno a uno y obligatorios en
+ * conjunto: hace falta al menos teléfono, correo o web. Esa regla no se puede
+ * expresar campo a campo, así que el servidor responde `409` y no `400`.
+ */
+export interface Supplier {
+  id: string
+  name: string
+  serviceCategory: ServiceCategory
+  contactName: string | null
+  phone: string | null
+  email: string | null
+  website: string | null
+  address: string | null
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+  /** Con valor, está retirado: no se ofrece al enlazar ni sale en el listado por defecto. */
+  retiredAt: string | null
+  createdBy: string | null
+  updatedBy: string | null
+}
+
+/**
+ * El enlace de un contacto con algo del core, aplanado a tres campos.
+ *
+ * Dentro son dos columnas excluyentes; aquí `targetType` dice a cuál apunta. El
+ * `targetName` lo resuelve el servidor **al leer**, así que renombrar la caldera
+ * se ve sin que nadie sincronice nada.
+ */
+export interface SupplierLink {
+  id: string
+  targetType: 'ASSET' | 'LOCATION'
+  targetId: string
+  targetName: string
+  createdAt: string
+  createdBy: string | null
+}
+
+export interface SupplierDetail {
+  supplier: Supplier
+  links: SupplierLink[]
+}
+
+export interface SupplierInput {
+  name: string
+  serviceCategory: ServiceCategory
+  contactName?: string | null
+  phone?: string | null
+  email?: string | null
+  website?: string | null
+  address?: string | null
+  notes?: string | null
 }
 
 // --- Ficheros y documentos (Hito 3) ------------------------------------------
@@ -886,6 +1003,39 @@ export const api = {
 
   markAllNoticesRead: (accessToken: string) =>
     request<void>('/notices/read', { method: 'POST', accessToken }),
+
+  // --- Proveedores y contactos de servicio ----------------------------------
+  // Todo lo que cuelga de `/suppliers` responde 403 MODULE_INACTIVE si el hogar
+  // no tiene el módulo encendido. El cliente no lo comprueba antes de llamar:
+  // lo hace el guardián de la ruta, con el catálogo que ya está en caché.
+  listSuppliers: (
+    accessToken: string,
+    filters: { serviceCategory?: ServiceCategory; q?: string; includeRetired?: boolean } = {},
+  ) =>
+    request<Page<Supplier>>(
+      `/suppliers${queryString({ ...filters, size: 200 })}`,
+      { accessToken },
+    ),
+
+  getSupplier: (id: string, accessToken: string) =>
+    request<SupplierDetail>(`/suppliers/${id}`, { accessToken }),
+
+  createSupplier: (body: SupplierInput, accessToken: string) =>
+    request<Supplier>('/suppliers', { method: 'POST', body, accessToken }),
+
+  updateSupplier: (id: string, body: Partial<SupplierInput>, accessToken: string) =>
+    request<Supplier>(`/suppliers/${id}`, { method: 'PATCH', body, accessToken }),
+
+  retireSupplier: (id: string, accessToken: string) =>
+    request<void>(`/suppliers/${id}`, { method: 'DELETE', accessToken }),
+
+  // Exactamente uno de los dos. Ni ninguno ni los dos: eso es
+  // SUPPLIER_LINK_TARGET_INVALID, que es una regla y no un error de forma.
+  linkSupplier: (id: string, body: { assetId?: string; locationId?: string }, accessToken: string) =>
+    request<SupplierLink>(`/suppliers/${id}/links`, { method: 'POST', body, accessToken }),
+
+  unlinkSupplier: (id: string, linkId: string, accessToken: string) =>
+    request<void>(`/suppliers/${id}/links/${linkId}`, { method: 'DELETE', accessToken }),
 
   // --- Categorías -----------------------------------------------------------
   listCategories: (accessToken: string, includeRetired = false) =>

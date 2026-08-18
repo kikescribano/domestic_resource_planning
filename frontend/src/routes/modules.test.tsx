@@ -166,6 +166,10 @@ describe('entrar a mano en la ruta de un módulo', () => {
         active = true
         return { status: 200, body: {} }
       },
+      'GET /api/v1/suppliers?size=200': {
+        status: 200,
+        body: { items: [], page: 0, size: 200, total: 0 },
+      },
     })
 
     expect(await screen.findByText('Este módulo está apagado')).toBeInTheDocument()
@@ -175,9 +179,22 @@ describe('entrar a mano en la ruta de un módulo', () => {
     )
 
     // Se queda donde estaba y ahora sí entra: es la diferencia práctica entre el
-    // `403` que devuelve el backend y un `404`.
-    expect(await screen.findByText(/todavía sin nada que enseñar/)).toBeInTheDocument()
+    // `403` que devuelve el backend y un `404`. Desde el Hito 2, «entra» quiere
+    // decir que se monta **su pantalla**: el guardián la envuelve en lugar de
+    // sustituirla, y la mitad de apagado de arriba sigue intacta.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Proveedores' })).toBeInTheDocument()
     expect(await mainNavigation().findByRole('link', { name: 'Proveedores' })).toBeInTheDocument()
+  })
+
+  /**
+   * La otra mitad del guardián, que sigue haciendo falta: tres de los cuatro
+   * módulos no tienen pantalla todavía, y darle hijos a uno no puede dejar a los
+   * demás enseñando una lista vacía que no existe.
+   */
+  it('encendido y sin pantalla todavía, dice la verdad en vez de fingir una lista', async () => {
+    await resumeAt('/mantenimiento', { 'GET /api/v1/modules': catalogue('MAINTENANCE') })
+
+    expect(await screen.findByText(/todavía sin nada que enseñar/)).toBeInTheDocument()
   })
 
   it('apagado y sin administrar, dice a quién pedírselo y no ofrece el botón', async () => {
