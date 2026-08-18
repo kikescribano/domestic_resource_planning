@@ -16,6 +16,7 @@ import com.drp.core.application.port.InvitationRepository
 import com.drp.core.application.port.LoanAccessTokenRepository
 import com.drp.core.application.port.LoanFilter
 import com.drp.core.application.port.LoanRepository
+import com.drp.core.application.port.LocationLoad
 import com.drp.core.application.port.LocationRepository
 import com.drp.platform.page.Page
 import com.drp.platform.page.Pagination
@@ -542,6 +543,16 @@ class AssetRepositoryAdapter(
     override fun countLiveIn(location: AssetLocation): Long =
         assets.countLiveIn(location.assetId, location.locationId)
 
+    override fun measureLiveIn(location: AssetLocation): LocationLoad =
+        assets.measureLiveIn(location.assetId, location.locationId).let {
+            LocationLoad(
+                weightGrams = it.getWeight(),
+                volumeMl = it.getVolume(),
+                unmeasuredWeight = it.getUnknownWeight(),
+                unmeasuredVolume = it.getUnknownVolume(),
+            )
+        }
+
     override fun hasOpenLoan(assetId: UUID): Boolean = assets.countOpenLoans(assetId) > 0
 
     override fun list(filter: AssetFilter, pagination: Pagination): Page<Asset> {
@@ -603,6 +614,8 @@ class ArticleRepositoryAdapter(
                 model = article.model,
                 barcode = article.barcode,
                 packSize = article.packSize,
+                unitWeightGrams = article.unitWeightGrams,
+                unitVolumeMl = article.unitVolumeMl,
                 photoUrl = article.photoUrl,
                 photoFileId = article.photoFileId,
                 notes = article.notes,
@@ -647,6 +660,8 @@ internal fun ArticleEntity.toDomain() = Article(
     model = model,
     barcode = barcode,
     packSize = packSize,
+    unitWeightGrams = unitWeightGrams,
+    unitVolumeMl = unitVolumeMl,
     photoUrl = photoUrl,
     photoFileId = photoFileId,
     notes = notes,

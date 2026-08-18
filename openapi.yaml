@@ -2525,6 +2525,26 @@ components:
           description: >
             Contenido de un envase, en la unidad del artículo. Permite dar
             entrada a "dos paquetes" sin multiplicar a mano.
+        unitWeightGrams:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+          description: >
+            Lo que pesa UNA unidad del artículo, en gramos. Opcional: ausente
+            significa "no se sabe", y cero no vale porque afirmaría que no pesa.
+
+
+            En gramos y no en la unidad del artículo, a propósito: el aviso de
+            capacidad de una ubicación (readme 4.1.2) tiene que SUMAR entre
+            artículos distintos, y con la unidad de cada uno no hay suma que
+            hacer. De aquí sale ese aviso cuando la capacidad es de tipo WEIGHT.
+        unitVolumeMl:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+          description: >
+            Lo que ocupa UNA unidad del artículo, en mililitros. Mismo criterio
+            que unitWeightGrams, para la capacidad de tipo VOLUME.
         photoUrl:
           type: string
           format: uri
@@ -2557,6 +2577,16 @@ components:
         model: { type: string, nullable: true }
         barcode: { type: string, nullable: true }
         packSize:
+          type: number
+          nullable: true
+          exclusiveMinimum: true
+          minimum: 0
+        unitWeightGrams:
+          type: number
+          nullable: true
+          exclusiveMinimum: true
+          minimum: 0
+        unitVolumeMl:
           type: number
           nullable: true
           exclusiveMinimum: true
@@ -2812,10 +2842,17 @@ components:
           enum:
             - LOCATION_CAPACITY_EXCEEDED
           description: >
-            LOCATION_CAPACITY_EXCEEDED -- la ubicación declara una capacidad en
-            unidades y, contando este asset, se supera. Solo se comprueba con
-            capacidad de tipo UNITS: con peso o volumen no hay nada que contar
-            hasta que el asset lleve esos datos, que es del módulo Warehouse.
+            LOCATION_CAPACITY_EXCEEDED -- la ubicación declara una capacidad y,
+            contando este asset, se supera.
+
+
+            Las tres formas se comprueban. UNITS es exacta: contar piezas no
+            necesita ninguna medida. WEIGHT y VOLUME suman la medida que pone el
+            artículo (unitWeightGrams, unitVolumeMl) por la cantidad, y por eso
+            SOLO avisan cuando lo conocido YA se pasa: una suma a la que le
+            faltan artículos sin medir solo puede quedarse corta, así que
+            pasarse es concluyente y caber no lo es. Cuando cabe y falta por
+            medir, no se avisa nada.
         message:
           type: string
           description: Explicación para una persona, en el idioma de la instalación.

@@ -482,11 +482,11 @@ class AssetJourneyTest : SpringIntegrationTest() {
     }
 
     @Test
-    @DisplayName("con capacidad en peso no se avisa: no hay nada que contar hasta que el asset lleve peso")
-    fun `solo se avisa con capacidad en unidades`() {
+    @DisplayName("con capacidad en peso, sin medida no se avisa: nadie ha dicho cuanto pesa")
+    fun `sin medida en el articulo el aviso de peso calla`() {
         val home = http.registerHousehold()
         val shelf = home.createLocation(
-            """{"name":"Balda","type":"SHELF","capacity":{"type":"WEIGHT","max":1,"unit":"kg"}}""",
+            """{"name":"Balda","type":"SHELF","capacity":{"type":"WEIGHT","max":1000,"unit":"g"}}""",
         )
 
         val created = http.postJson(
@@ -496,8 +496,76 @@ class AssetJourneyTest : SpringIntegrationTest() {
             home.accessToken,
         )
 
+        // Un DURABLE sin articulo no tiene de donde sacar el peso, asi que no
+        // entra en la suma **y tampoco suma cero**: se calla, que es lo unico
+        // honesto. Antes del Hito 3 de la Fase 2 esto callaba por otro motivo
+        // --no habia medida en ninguna parte-- y callaba SIEMPRE.
         created.statusCode.shouldBe(HttpStatus.CREATED)
         created.body!!.shouldContain("\"warnings\":[]")
+    }
+
+    @Test
+    @DisplayName("con capacidad en peso y articulos medidos, lo que se pasa SI avisa")
+    fun `el aviso de peso suma la medida del articulo por la cantidad`() {
+        val home = http.registerHousehold()
+        val shelf = home.createLocation(
+            """{"name":"Alacena","type":"SHELF","capacity":{"type":"WEIGHT","max":1000,"unit":"g"}}""",
+        )
+        // Un gramo por unidad, contado en gramos: 900 g caben en 1000 y 1200 no.
+        val rice = home.createArticle(
+            """{"name":"Arroz","categoryId":"${home.category("Alimentación")}",
+                "unit":"GRAM","unitWeightGrams":1}""",
+        )
+
+        val fits = http.postJson(
+            "/api/v1/assets/intake",
+            """{"articleId":"$rice","ownerId":"${home.memberId}","quantity":900,
+                "location":{"type":"LOCATION","id":"$shelf"}}""",
+            home.accessToken,
+        )
+        fits.statusCode.shouldBe(HttpStatus.CREATED)
+        fits.body!!.shouldContain("\"warnings\":[]")
+
+        // Otros 300 g sobre los 900: la suma se pasa, y ahora hay con que verlo.
+        val overflows = http.postJson(
+            "/api/v1/assets/intake",
+            """{"articleId":"$rice","ownerId":"${home.memberId}","quantity":300,
+                "location":{"type":"LOCATION","id":"$shelf"}}""",
+            home.accessToken,
+        )
+
+        // Sigue siendo un aviso y no un rechazo: 200 --suma sobre la existencia
+        // que ya habia-- y la entrada se guarda igual.
+        overflows.statusCode.shouldBe(HttpStatus.OK)
+        overflows.body!!.shouldContain("LOCATION_CAPACITY_EXCEEDED")
+        overflows.body!!.shouldContain("1200")
+    }
+
+    @Test
+    @DisplayName("si lo conocido cabe pero falta por medir, se calla en vez de decir que cabe")
+    fun `una suma incompleta que cabe no afirma nada`() {
+        val home = http.registerHousehold()
+        val shelf = home.createLocation(
+            """{"name":"Vitrina","type":"SHELF","capacity":{"type":"WEIGHT","max":1000,"unit":"g"}}""",
+        )
+        val rice = home.createArticle(
+            """{"name":"Arroz medido","categoryId":"${home.category("Alimentación")}",
+                "unit":"GRAM","unitWeightGrams":1}""",
+        )
+        home.intake(rice, shelf, 100)
+
+        // Un duradero sin medida en el mismo sitio: lo conocido son 100 g de
+        // 1000, pero **nadie sabe cuanto pesa el yunque**. Afirmar que cabe seria
+        // justo lo que la pregunta de 4.1.7 temia.
+        val unmeasured = http.postJson(
+            "/api/v1/assets",
+            """{"name":"Yunque","type":"DURABLE","categoryId":"${home.category("Herramientas")}",
+                "location":{"type":"LOCATION","id":"$shelf"}}""",
+            home.accessToken,
+        )
+
+        unmeasured.statusCode.shouldBe(HttpStatus.CREATED)
+        unmeasured.body!!.shouldContain("\"warnings\":[]")
     }
 
     @Test

@@ -182,7 +182,12 @@ function ArticlesPanel() {
   const queryClient = useQueryClient()
   const [query, setQuery] = useState('')
   const [failure, setFailure] = useState<string | null>(null)
-  const [draft, setDraft] = useState({ name: '', categoryId: '', unit: 'UNIT' as MeasurementUnit })
+  const [draft, setDraft] = useState({
+    name: '',
+    categoryId: '',
+    unit: 'UNIT' as MeasurementUnit,
+    unitWeightGrams: '',
+  })
 
   const categories = useQuery({
     queryKey: ['categories'],
@@ -200,11 +205,18 @@ function ArticlesPanel() {
   const create = useMutation({
     mutationFn: () =>
       api.createArticle(
-        { name: draft.name, categoryId: draft.categoryId, unit: draft.unit },
+        {
+          name: draft.name,
+          categoryId: draft.categoryId,
+          unit: draft.unit,
+          // Se omite en vez de mandarse a nulo: el contrato lo rechaza a cero y
+          // «no lo sé» es la ausencia, no un peso de cero gramos.
+          ...(draft.unitWeightGrams ? { unitWeightGrams: Number(draft.unitWeightGrams) } : {}),
+        },
         accessToken,
       ),
     onSuccess: () => {
-      setDraft({ name: '', categoryId: '', unit: 'UNIT' })
+      setDraft({ name: '', categoryId: '', unit: 'UNIT', unitWeightGrams: '' })
       setFailure(null)
       void queryClient.invalidateQueries({ queryKey: ['articles'] })
     },
@@ -261,6 +273,19 @@ function ArticlesPanel() {
             </option>
           ))}
         </SelectField>
+
+        {/* Opcional, y se dice por qué sirve: sin esto, una ubicación que
+            declara un máximo en kilos no recibe ningún aviso nunca, que es lo
+            que el Hito 3 vino a arreglar. */}
+        <Field
+          label="Peso de una unidad (g)"
+          type="number"
+          inputMode="decimal"
+          min="0"
+          value={draft.unitWeightGrams}
+          onChange={(event) => setDraft({ ...draft, unitWeightGrams: event.target.value })}
+          hint="Opcional. Es lo que deja avisar cuando un sitio con máximo en peso se llena."
+        />
 
         <Button type="submit" variant="primary" busy={create.isPending} busyLabel="Creando…">
           Crear artículo

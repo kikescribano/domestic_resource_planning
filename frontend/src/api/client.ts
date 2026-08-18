@@ -245,6 +245,17 @@ export interface Article {
   model: string | null
   barcode: string | null
   packSize: number | null
+  /**
+   * Lo que pesa y ocupa **una** unidad del artículo, en gramos y mililitros.
+   *
+   * Nulo es «no se sabe», que es el caso normal. De aquí sale el aviso de
+   * capacidad de una ubicación cuando la capacidad es de peso o de volumen: es
+   * la pregunta que la Fase 1 dejó abierta y que el Hito 3 de la Fase 2 resolvió
+   * a favor del core, porque una regla del core no puede depender de un módulo
+   * que se puede apagar.
+   */
+  unitWeightGrams: number | null
+  unitVolumeMl: number | null
   notes: string | null
   retiredAt: string | null
   photoUrl: string | null

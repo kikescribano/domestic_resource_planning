@@ -71,9 +71,10 @@ de tratarlo como error es fuerte.
 
 Una ubicación puede declarar capacidad, y
 [`core-model.md`](../../../common/product/core-model.md) decidió hace tiempo que
-superarla **advierte pero no bloquea**: el sistema no sabe cuánto ocupa cada cosa
-—un asset no lleva peso ni volumen— así que solo puede contar unidades con
-certeza, y bloquear con datos incompletos impediría guardar algo que sí cabe.
+superarla **advierte pero no bloquea**: bloquear con datos incompletos impediría
+guardar algo que sí cabe. Y avisa **solo cuando puede demostrarlo** — un artículo
+puede no declarar su peso ni su volumen, así que si lo conocido ya se pasa se
+avisa, y si cabe pero falta por medir se calla.
 
 Lo que este hito añade es **por dónde viaja el aviso**: en un array `warnings`
 dentro del propio recurso devuelto, con `code` y `message` por entrada. La
