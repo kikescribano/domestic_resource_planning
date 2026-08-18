@@ -4,6 +4,8 @@ import com.drp.platform.event.IdempotentEventHandler
 import com.drp.platform.event.DomainEvent
 import com.drp.test.DrpMailpit
 import com.drp.test.SpringIntegrationTest
+import io.kotest.assertions.withClue
+import io.kotest.matchers.longs.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
@@ -16,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.test.web.client.TestRestTemplate
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.boot.test.web.client.exchange
 import org.springframework.context.annotation.Bean
 import org.springframework.http.HttpEntity
@@ -47,6 +50,13 @@ import kotlin.system.measureTimeMillis
 class EnrollmentJourneyTest : SpringIntegrationTest() {
 
     @Autowired private lateinit var http: TestRestTemplate
+
+    /**
+     * El mismo Argon2id que usa la aplicacion, para poder medir lo que cuesta un
+     * hash **en la maquina que este ejecutando la prueba**. Lo usa la prueba del
+     * reloj, que sin esa referencia acabaria comparando velocidades de disco.
+     */
+    @Autowired private lateinit var passwordEncoder: PasswordEncoder
 
     @Autowired private lateinit var households: HouseholdCreatedRecorder
 
@@ -160,14 +170,36 @@ class EnrollmentJourneyTest : SpringIntegrationTest() {
         val onKnown = medianMillis { http.postJson("/api/v1/households", householdBody(known, "Otra")) }
         val onNew = medianMillis { http.postJson("/api/v1/households", householdBody(uniqueEmail(), "Otra")) }
 
-        // La rama "el correo ya existe" no crea nada, asi que seria muchisimo
-        // mas rapida si no se hasheara igualmente: es el hash de Argon2id lo que
-        // domina las dos y las iguala. El margen es holgado a proposito --lo que
-        // delataria seria un orden de magnitud, no un 40 %.
+        // Lo que cuesta **un hash en esta maquina**, medido aqui mismo. Es lo que
+        // hace que las dos comprobaciones de abajo no dependan de lo rapido que
+        // sea el runner.
+        val oneHash = medianMillis { passwordEncoder.encode("el gato duerme en el sofa") }
+
+        // **La comprobacion que de verdad importa: las dos ramas pagan el hash.**
+        // La rama "ese correo ya existe" no crea nada, asi que seria muchisimo mas
+        // rapida si no hasheara igualmente --y esa es la unica forma conocida de
+        // reabrir la fuga--. Una peticion que hashea no puede tardar menos que un
+        // hash, asi que esto solo puede fallar si el hash ha desaparecido.
+        withClue("un hash cuesta $oneHash ms · conocido $onKnown ms · nuevo $onNew ms") {
+            onKnown.shouldBeGreaterThanOrEqual(oneHash)
+            onNew.shouldBeGreaterThanOrEqual(oneHash)
+        }
+
+        // Y que ademas se parezcan. **En proporcion y no en milisegundos**, que es
+        // lo que este mismo comentario decia y la asercion no hacia: habia un
+        // umbral absoluto de 60 ms, y las dos ramas no son identicas ni pueden
+        // serlo --la que crea el hogar inserta ademas la identidad, la
+        // pertenencia, las categorias sembradas y el token--. Ese trabajo crece
+        // con lo lenta que sea la maquina mientras el Argon2id se mantiene, asi
+        // que en un runner compartido el umbral acababa midiendo la velocidad del
+        // disco: falló en la CI con 61 ms frente a 60, sin que nada hubiera
+        // cambiado en el codigo.
         val slowest = maxOf(onKnown, onNew)
         val fastest = minOf(onKnown, onNew)
-        val tolerated = maxOf(fastest / 2, 60L)
-        (slowest - fastest).shouldBeLessThan(tolerated)
+
+        withClue("conocido $onKnown ms · nuevo $onNew ms") {
+            slowest.shouldBeLessThan(fastest * 3)
+        }
     }
 
     @Test
