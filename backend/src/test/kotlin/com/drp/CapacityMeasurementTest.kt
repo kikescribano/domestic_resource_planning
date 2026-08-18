@@ -1,7 +1,7 @@
 package com.drp
 
-import com.drp.adapter.http.createDurable
-import com.drp.application.port.PasswordHasher
+import com.drp.core.adapter.http.createDurable
+import com.drp.core.application.port.PasswordHasher
 import com.drp.test.DrpPostgres
 import com.drp.test.SpringIntegrationTest
 import com.drp.test.extract

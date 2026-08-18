@@ -1,7 +1,7 @@
 package com.drp.config
 
-import com.drp.adapter.security.JwtAuthenticationFilter
-import com.drp.adapter.security.SecurityProperties
+import com.drp.core.adapter.security.JwtAuthenticationFilter
+import com.drp.core.adapter.security.SecurityProperties
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.servlet.FilterRegistrationBean
