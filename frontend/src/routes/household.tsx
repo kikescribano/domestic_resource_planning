@@ -30,8 +30,17 @@ const PRIMARY_NAVIGATION = [
   { to: '/prestamos', label: 'Préstamos', end: false },
 ]
 
-/** El resto del core. En escritorio va en la barra lateral; en móvil, en «Más». */
+/**
+ * El resto del core. En escritorio va en la barra lateral; en móvil, en «Más».
+ *
+ * **La bandeja de avisos entra aquí y no en la barra inferior**, y no es una
+ * apreciación: el tope medido son cinco paradas a 320 px —cuatro y «Más»— y una
+ * sexta las deja por debajo de los 44 px que exige la dirección visual. Así que
+ * lo que gana una pantalla nueva es sitio en la columna del escritorio y en
+ * «Más», no un hueco en el pulgar.
+ */
 const SECONDARY_NAVIGATION = [
+  { to: '/avisos', label: 'Avisos', end: false },
   { to: '/catalogo', label: 'Catálogo', end: false },
   { to: '/usuarios', label: 'Personas', end: false },
   { to: '/almacenamiento', label: 'Archivo', end: false },

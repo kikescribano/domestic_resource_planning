@@ -53,6 +53,13 @@ tags:
       Activación de módulos por hogar (ver ADR-010). Es la única familia de
       operaciones que no es del core: la sirve la plataforma, y es la que decide
       qué partes del sistema existen para un hogar.
+  - name: notices
+    description: >
+      Avisos del hogar (ver ADR-011). También los sirve la plataforma, y también
+      son de todos: aquí llegan los del core --un préstamo vencido-- y los que
+      produce la regla de cada módulo. Los escribe el recorrido periódico, así
+      que NO hay operación de crear ni de borrar: lo que una persona hace con un
+      aviso es leerlo.
 
 security:
   - bearerAuth: []
@@ -1691,6 +1698,95 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         default: { $ref: "#/components/responses/ServerError" }
 
+  /notices:
+    get:
+      operationId: listNotices
+      tags: [notices]
+      summary: Listar los avisos del hogar
+      description: >
+        Del más reciente al más antiguo, que es como se lee una bandeja. Los
+        avisos son DEL HOGAR y no de cada persona: un hogar es un grupo pequeño
+        que comparte la bandeja igual que comparte el inventario, así que
+        cualquiera de sus personas los ve y cualquiera puede marcarlos.
+
+
+        Un aviso es EL TEXTO QUE SE ESCRIBIÓ ESE DÍA y no una vista de la fila
+        que lo originó: si el préstamo se devuelve mañana, el aviso de que
+        venció siguió siendo cierto. De ahí que no lleve referencia a nada, y de
+        ahí que un aviso sobreviva a que su módulo se apague.
+      parameters:
+        - name: unreadOnly
+          in: query
+          required: false
+          description: >
+            Solo lo que falta por ver. La pantalla arranca aquí; sin el filtro
+            tendría que traerse el histórico entero para tachar lo ya leído en
+            el cliente.
+          schema: { type: boolean, default: false }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: Avisos del hogar
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NoticePage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /notices/read:
+    post:
+      operationId: markAllNoticesRead
+      tags: [notices]
+      summary: Marcar como leídos todos los avisos del hogar
+      description: >
+        Vaciar la bandeja de una vez. Existe porque sin ella la única forma de
+        dejar de ver lo pendiente es pulsar treinta veces, y lo que se hace
+        entonces es dejar de mirar la bandeja.
+
+
+        204 y sin cuerpo: lo que el cliente hace después es volver a leer la
+        lista, no fiarse de lo que se le devolviera aquí.
+      responses:
+        "204": { description: No queda nada sin leer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /notices/{id}/read:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: markNoticeRead
+      tags: [notices]
+      summary: Marcar un aviso como leído
+      description: >
+        Idempotente, y con una vuelta: volver a marcarlo NO mueve la fecha. Es
+        deliberado -- readAt significa cuándo se vio POR PRIMERA VEZ, y si se
+        moviera dejaría de poderse responder "esto lleva sin mirarse una
+        semana".
+
+
+        Marcar leído no borra nada: el aviso sigue en la bandeja completa y solo
+        desaparece del filtro de no leídos.
+      responses:
+        "200":
+          description: El aviso, con su fecha de lectura y quién lo leyó
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Notice" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2851,6 +2947,59 @@ components:
             items:
               type: array
               items: { $ref: "#/components/schemas/Location" }
+
+    Notice:
+      type: object
+      required: [id, kind, title, body, createdAt]
+      description: >
+        Algo que el hogar tiene que saber, encontrado por una comprobación
+        periódica. Lo escribe el recorrido diario, nunca una persona.
+      properties:
+        id: { type: string, format: uuid }
+        moduleKey:
+          type: string
+          nullable: true
+          example: WAREHOUSE
+          description: >
+            De qué módulo es la regla que lo generó, o NULO si es del core. Es
+            lo que hace que un aviso de préstamo vencido siga llegando a un
+            hogar sin ningún módulo encendido.
+        kind:
+          type: string
+          example: LOANS_OVERDUE
+          description: >
+            Qué clase de aviso es. Identificador, así que inglés y
+            UPPER_SNAKE_CASE: el cliente lo usa para agrupar o elegir un icono
+            sin tener que leer el título.
+        title:
+          type: string
+          example: 2 préstamos han vencido
+          description: Lo que ve la persona. Es un dato, así que va en castellano.
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Cuándo se vio por primera vez. Nulo es "sin leer".
+        readBy:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            La PERTENENCIA que lo marcó, no la identidad, igual que toda autoría
+            del core. Es lo que permite saber a quién preguntarle por un aviso
+            que alguien ya dio por visto.
+
+    NoticePage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Notice" }
 
     ModulePage:
       allOf:

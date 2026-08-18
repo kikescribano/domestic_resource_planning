@@ -347,6 +347,30 @@ export interface HouseholdModule {
   deactivatedAt: string | null
 }
 
+// --- Avisos del hogar (Fase 2, Hito 1) ---------------------------------------
+
+/**
+ * Algo que el hogar tiene que saber, encontrado por el recorrido periódico del
+ * backend.
+ *
+ * **No se crean ni se borran desde aquí**: los escribe la pasada diaria y lo
+ * único que una persona hace con un aviso es leerlo. De ahí que el cliente solo
+ * tenga tres llamadas y ninguna sea de escritura de contenido.
+ *
+ * `moduleKey` a nulo significa **del core**, que es lo que hace que un préstamo
+ * vencido siga avisando en un hogar sin ningún módulo encendido.
+ */
+export interface Notice {
+  id: string
+  moduleKey: string | null
+  kind: string
+  title: string
+  body: string
+  createdAt: string
+  readAt: string | null
+  readBy: string | null
+}
+
 // --- Ficheros y documentos (Hito 3) ------------------------------------------
 
 export type FileContentType = 'image/jpeg' | 'image/png' | 'image/webp' | 'application/pdf'
@@ -852,6 +876,16 @@ export const api = {
 
   deactivateModule: (key: string, accessToken: string) =>
     request<HouseholdModule>(`/modules/${key}/activation`, { method: 'DELETE', accessToken }),
+
+  // --- Avisos ---------------------------------------------------------------
+  listNotices: (accessToken: string, unreadOnly = false) =>
+    request<Page<Notice>>(`/notices${queryString({ unreadOnly, size: 100 })}`, { accessToken }),
+
+  markNoticeRead: (id: string, accessToken: string) =>
+    request<Notice>(`/notices/${id}/read`, { method: 'POST', accessToken }),
+
+  markAllNoticesRead: (accessToken: string) =>
+    request<void>('/notices/read', { method: 'POST', accessToken }),
 
   // --- Categorías -----------------------------------------------------------
   listCategories: (accessToken: string, includeRetired = false) =>

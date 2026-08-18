@@ -156,6 +156,20 @@ test.describe('recorrido vertical', () => {
     await navigateTo(page, 'Inventario', '/inventario')
     await page.getByText('Taladro').first().click()
     await expect(page.getByText('Disponible').first()).toBeVisible()
+
+    // --- 6. La bandeja de avisos --------------------------------------------
+    // La pantalla que trae la plataforma de avisos. Sale vacía a propósito: lo
+    // que la llena es el recorrido periódico del backend, que corre de
+    // madrugada y no se dispara desde aquí —eso lo miden sus pruebas, que leen
+    // el resumen del Mailpit de verdad—. Lo que sí se comprueba aquí es lo
+    // único que no se puede comprobar en otro sitio: que una persona llega, que
+    // la pantalla vacía **explica por qué** está vacía en vez de parecer rota, y
+    // que la parada nueva no rompe la navegación en el ancho más estrecho.
+    await navigateTo(page, 'Avisos', '/avisos')
+    await expect(page.getByText('Nada pendiente')).toBeVisible()
+    await checkAccessibility(page, 'la bandeja de avisos')
+    await checkReflow(page, 'la bandeja de avisos')
+    await checkTouchTargets(page)
   })
 
   /**

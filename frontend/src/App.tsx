@@ -18,6 +18,7 @@ import { AccountPage, HomePage, MorePage, RequireSession, UsersPage } from './ro
 import { ExternalLoanPage, LoansPage } from './routes/loans'
 import { LocationsPage } from './routes/locations'
 import { ModuleScreen, ModulesPage } from './routes/modules'
+import { NoticesPage } from './routes/notices'
 import { StoragePage } from './routes/storage'
 
 /**
@@ -97,6 +98,11 @@ export function App() {
                   todas. */}
               <Route path="/mas" element={<MorePage />} />
               <Route path="/modulos" element={<ModulesPage />} />
+              {/* La bandeja de avisos. El enlace del resumen diario que manda
+                  el backend apunta aquí, así que este nombre y el que compone
+                  `NoticeDigest` tienen que coincidir: si uno cambia, el correo
+                  lleva a una pantalla que no existe. */}
+              <Route path="/avisos" element={<NoticesPage />} />
 
               {/* Las rutas de los cuatro módulos de la Fase 2. Existen desde el
                   Hito 0 aunque su dominio llegue después, porque son la mitad
