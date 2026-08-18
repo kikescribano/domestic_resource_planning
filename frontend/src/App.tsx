@@ -20,6 +20,7 @@ import { LocationsPage } from './routes/locations'
 import { ModuleScreen, ModulesPage } from './routes/modules'
 import { NoticesPage } from './routes/notices'
 import { StoragePage } from './routes/storage'
+import { SuppliersPage } from './routes/suppliers'
 
 /**
  * Las rutas de la aplicación.
@@ -110,7 +111,18 @@ export function App() {
                   llevar a la pantalla que la ofrece, no a un 404. El nombre va
                   en castellano igual que las rutas públicas, y no coincide con
                   el prefijo del contrato, que es `/api/v1/suppliers`. */}
-              <Route path="/proveedores" element={<ModuleScreen moduleKey="SUPPLIERS" />} />
+              {/* Proveedores ya tiene pantalla: el guardián la **envuelve** en
+                  lugar de sustituirla, y conserva la mitad de apagado, que es
+                  la tercera capa del gate. Los otros tres siguen sin hijos
+                  hasta su hito. */}
+              <Route
+                path="/proveedores"
+                element={
+                  <ModuleScreen moduleKey="SUPPLIERS">
+                    <SuppliersPage />
+                  </ModuleScreen>
+                }
+              />
               <Route path="/almacen" element={<ModuleScreen moduleKey="WAREHOUSE" />} />
               <Route path="/compras" element={<ModuleScreen moduleKey="PURCHASING" />} />
               <Route path="/mantenimiento" element={<ModuleScreen moduleKey="MAINTENANCE" />} />

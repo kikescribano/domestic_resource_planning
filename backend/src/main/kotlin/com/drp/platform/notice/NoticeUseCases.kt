@@ -1,6 +1,7 @@
 package com.drp.platform.notice
 
 import com.drp.core.application.port.SessionClaims
+import com.drp.platform.error.ResourceNotFound
 import com.drp.platform.page.Page
 import com.drp.platform.page.Pagination
 import org.springframework.stereotype.Service
@@ -22,9 +23,6 @@ import java.util.UUID
  * unico registro de que algo paso ese dia. Lo que una persona hace con un aviso
  * es leerlo.
  */
-
-/** Un aviso al que se le pregunta si ya se vio. */
-class UnknownNotice(noticeId: UUID) : RuntimeException("No existe el aviso $noticeId")
 
 @Service
 class ListNotices(private val notices: NoticeRepository) {
@@ -54,7 +52,7 @@ class MarkNoticeRead(
 
     @Transactional
     fun handle(session: SessionClaims, noticeId: UUID): Notice {
-        val notice = notices.find(noticeId) ?: throw UnknownNotice(noticeId)
+        val notice = notices.find(noticeId) ?: throw ResourceNotFound("No existe el aviso $noticeId")
         if (notice.isRead) return notice
 
         return notices.save(notice.copy(readAt = clock.instant(), readBy = session.memberId))

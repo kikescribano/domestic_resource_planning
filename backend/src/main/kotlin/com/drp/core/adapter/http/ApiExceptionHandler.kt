@@ -1,11 +1,9 @@
 package com.drp.core.adapter.http
 
-import com.drp.core.domain.BusinessRuleViolation
-import com.drp.core.domain.ErrorCode
-import com.drp.core.domain.ResourceNotFound
-import com.drp.core.domain.ValidationFailure
-import com.drp.platform.module.UnknownModule
-import com.drp.platform.notice.UnknownNotice
+import com.drp.platform.error.BusinessRuleViolation
+import com.drp.platform.error.ErrorCode
+import com.drp.platform.error.ResourceNotFound
+import com.drp.platform.error.ValidationFailure
 import com.drp.core.application.usecase.AuthenticationFailed
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
@@ -126,12 +124,14 @@ class ApiExceptionHandler {
      * identificador en un oraculo con el que averiguar que hay en otros hogares,
      * que es justo lo que la ADR-002 quiere impedir.
      *
-     * Lleva tambien los dos «no existe» de plataforma --la clave de modulo y el
-     * aviso--, que son lo mismo visto desde el otro arbol: se declaran aparte
-     * porque plataforma no puede lanzar el error del core sin invertir la
-     * frontera que la ADR-010 fija.
+     * **Uno solo, y hasta el Hito 2 eran tres.** Plataforma tenia sus propios
+     * «no existe» --`UnknownModule` y `UnknownNotice`-- por una razon de frontera
+     * y no de estilo: no podia lanzar el del core sin invertir la direccion que la
+     * ADR-010 fija. Con la familia de errores mudada a `com.drp.platform.error`
+     * ese motivo desaparece, asi que las dos clases se retiran y los tres casos
+     * vuelven a ser el mismo.
      */
-    @ExceptionHandler(ResourceNotFound::class, UnknownModule::class, UnknownNotice::class)
+    @ExceptionHandler(ResourceNotFound::class)
     fun onNotFound(failure: RuntimeException): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(ErrorResponse(NOT_FOUND, failure.message ?: "No encontrado"))

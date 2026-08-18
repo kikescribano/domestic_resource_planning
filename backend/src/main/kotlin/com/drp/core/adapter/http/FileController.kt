@@ -14,8 +14,8 @@ import com.drp.core.application.usecase.ListFiles
 import com.drp.core.application.usecase.ReceivedFile
 import com.drp.core.application.usecase.UploadFile
 import com.drp.core.application.usecase.UploadSource
-import com.drp.core.domain.ResourceNotFound
-import com.drp.core.domain.ValidationFailure
+import com.drp.platform.error.ResourceNotFound
+import com.drp.platform.error.ValidationFailure
 import com.drp.core.domain.file.DocumentType
 import com.drp.core.domain.file.StoredContentType
 import com.drp.core.domain.file.StoredFile

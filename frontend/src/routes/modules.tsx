@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type ReactNode } from 'react'
 import { Link } from 'react-router'
 
 import { api, humanMessage, type HouseholdModule } from '../api/client'
@@ -33,8 +34,12 @@ import { Button, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primiti
  * en la navegación: es lo que le pasa al módulo de prueba del backend, que no
  * tiene pantalla ninguna.
  */
-export const MODULE_SCREENS: Record<string, { path: string; label: string; milestone: string }> = {
-  SUPPLIERS: { path: '/proveedores', label: 'Proveedores', milestone: 'Hito 2' },
+export const MODULE_SCREENS: Record<string, { path: string; label: string; milestone?: string }> = {
+  // Sin `milestone`: **este ya tiene pantalla**. El campo era la promesa
+  // autoprogramada de «sus pantallas llegan en el Hito 2» y este es ese hito; se
+  // retira en lugar de dejarlo apuntando al pasado, que es como una promesa
+  // cumplida se convierte en documentación falsa.
+  SUPPLIERS: { path: '/proveedores', label: 'Proveedores' },
   WAREHOUSE: { path: '/almacen', label: 'Almacén', milestone: 'Hito 3' },
   PURCHASING: { path: '/compras', label: 'Compras', milestone: 'Hito 4' },
   MAINTENANCE: { path: '/mantenimiento', label: 'Mantenimiento', milestone: 'Hito 5' },
@@ -150,17 +155,29 @@ function ModuleRow({ module, canDecide }: { module: HouseholdModule; canDecide: 
 }
 
 /**
- * El guardián de una ruta de módulo.
+ * El guardián de una ruta de módulo, que desde el Hito 2 **envuelve** a la
+ * pantalla de verdad en lugar de sustituirla.
  *
  * Entrar a mano en la ruta de un módulo apagado no lleva a un error sino a la
  * pantalla que **lo ofrece**: es el motivo por el que el backend responde `403`
  * y no `404`, y aquí es donde esa diferencia sirve de algo. Quien administra ve
  * el botón; quien no, a quién pedírselo.
  *
+ * Esa mitad es **la tercera capa del gate** de la ADR-010 y no se puede perder al
+ * darle contenido: sin ella, entrar a mano en la ruta de un módulo apagado
+ * montaría su pantalla, que pediría datos y recibiría `403 MODULE_INACTIVE` — un
+ * error donde el producto ofrece un botón. De ahí que los hijos se pinten
+ * **solo** en la rama activa, y que ninguna pantalla de módulo tenga que
+ * acordarse de comprobar nada.
+ *
+ * Sin hijos sigue sirviendo, y es lo que les pasa a los tres módulos que aún no
+ * tienen pantalla: dice la verdad —está encendido y todavía no hay nada— en lugar
+ * de fingir una lista vacía.
+ *
  * No se llama a la API del módulo para averiguarlo: el catálogo ya está en la
  * caché de la sesión, así que la decisión no cuesta ninguna petición.
  */
-export function ModuleScreen({ moduleKey }: { moduleKey: string }) {
+export function ModuleScreen({ moduleKey, children }: { moduleKey: string; children?: ReactNode }) {
   const { isAdmin } = useSession()
   const session = useAuthenticatedSession()
   const queryClient = useQueryClient()
@@ -222,6 +239,11 @@ export function ModuleScreen({ moduleKey }: { moduleKey: string }) {
       </>
     )
   }
+
+  // Encendido y con pantalla: el guardián se aparta y la pinta. No añade
+  // cabecera propia --la pone la pantalla-- porque dos `h1` en el mismo
+  // documento dejan la jerarquía de encabezados mal.
+  if (children) return <>{children}</>
 
   return (
     <>

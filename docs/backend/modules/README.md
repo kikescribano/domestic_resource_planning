@@ -15,7 +15,7 @@ temporales», que durante un tiempo aparecían de otra forma en el README.
 | Módulo | Responsabilidad | Documento |
 |---|---|---|
 | Core de recursos y activos | Gestión común de recursos y activos domésticos | [`common/product/`](../../common/product/README.md) (trasladado desde la §4.1 del README al arrancar la Fase 1) |
-| Proveedores y contactos de servicio | Quién arregla, quién cobra y quién responde de una garantía | Pendiente |
+| Proveedores y contactos de servicio | Quién arregla, quién cobra y quién responde de una garantía | [`suppliers.md`](suppliers.md) |
 | Compras y lista de la compra | Qué falta, qué hay que reponer y qué está pedido | Pendiente |
 | Warehouse | Existencias, ubicaciones y movimientos | Pendiente |
 | Mantenimiento (CMMS) | Planificación y seguimiento del mantenimiento | Pendiente |
@@ -61,6 +61,19 @@ Los cuatro módulos de la Fase 2 tienen ya su árbol con la declaración dentro.
 demás —dominio, tablas, contrato y pantallas— llega con su hito, y **después** de
 su ficha. El detalle completo está en la
 [`ADR-010`](../../common/architecture/decisions/ADR-010-module-boundaries-and-activation.md).
+
+**El primero que ha recorrido ese camino entero es Proveedores**, en el Hito 2
+(2026-08-18): su [`ficha`](suppliers.md) se escribió antes que su primera línea de
+código y es la que enseña qué contiene una de verdad —siete operaciones, dos
+tablas en `public` con RLS y `FORCE`, cinco códigos de error propios, ningún
+evento publicado y ninguna comprobación periódica, con el motivo de cada
+ausencia—. Los tres que vienen detrás se escriben con esa como referencia.
+
+**Y una regla que ese módulo estrenó:** la ficha declara **los nombres de tabla
+que el módulo posee**, para que otro no los tome. Es lo que convierte «cada módulo
+tiene sus tablas» en algo comprobable antes de escribir la migración, ahora que
+todas viven en `public` —el esquema propio es cosa del módulo de prueba, que lo
+usa para no falsear el recuento de tablas del modelo.
 
 ## Dos reglas que ya condicionan cualquier módulo
 

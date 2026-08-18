@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-17 |
+| Última revisión | 2026-08-18 |
 
 ## Propósito
 
@@ -68,9 +68,10 @@ con sus siete puntos. No se reordena ni se recorta.
 | `Avatar` | [`avatar.md`](avatar.md) | **Implementado** | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
 | `QuotaMeter` | Sin ficha | **Implementado** en el Hito 3 | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
 | `LoanExternalPage` | [`loan-external-page.md`](loan-external-page.md) | **Implementado** como `ExternalLoanPage` | [`routes/loans.tsx`](../../../../frontend/src/routes/loans.tsx) |
+| `SuppliersPage` | [`suppliers-page.md`](suppliers-page.md) | **Implementada** — ficha escrita antes que la pantalla, Fase 2 Hito 2 | [`routes/suppliers.tsx`](../../../../frontend/src/routes/suppliers.tsx) |
 
 **Trece componentes reutilizables —nueve en `primitives.tsx` y cuatro en
-`files.tsx`— más una pantalla, y diez de las catorce filas tienen ficha**:
+`files.tsx`— más dos pantallas, y once de las quince filas tienen ficha**:
 `SelectField`, `PageHeading` y `EmptyState` entraron con el Hito 2 sin la suya, y
 `QuotaMeter` con el Hito 3, documentado como variante dentro de la ficha de
 `UploadField` y acabando en pieza aparte.
@@ -82,6 +83,12 @@ por qué aun así es componente y no patrón. Es también la cuarta ficha escrit
 **antes** que su implementación, y la que mejor demuestra para qué sirve hacerlo:
 encontró un hueco del contrato cuando no había código, y dejó escrita una regla de
 anuncios que al cerrar la fase delató un defecto real.
+
+`SuppliersPage` está aquí por lo mismo y por una razón más: es **la pantalla de un
+módulo**, así que no se monta sola sino dentro de su guardián, y eso es parte de
+su anatomía y no un detalle de enrutado. Su ficha se escribió antes que ella y
+volvió a pagar en el sitio de siempre —un rótulo que chocaba en nombre accesible
+con otro de la misma pantalla—, que es un fallo que no se ve mirándola.
 
 Sigue sin haber un directorio por componente, ni una carpeta de historias, ni una
 galería: mientras quepan en un fichero que se lee de una sentada, partirlos
@@ -177,4 +184,5 @@ porque es donde se incumplen:
 | 2026-08-12 | Creación del directorio con las seis fichas de los componentes que existen, y el registro de los que el Hito 2 va a pedir. | Equipo DRP |
 | 2026-08-14 | Las tres anatomías del Hito 3 pasan de previstas a **implementadas**, en un fichero propio —`files.tsx`— y no en `primitives.tsx`: traen estado y una petición en curso, que es otra clase de complejidad. Se añade `QuotaMeter`, que la ficha de `UploadField` documentaba como variante y acabó siendo pieza aparte. | Equipo DRP |
 | 2026-08-13 | Se corrige el registro, que había quedado desfasado al cerrar el Hito 2: son **nueve** componentes en 376 líneas, no seis en 266, y `SelectField`, `PageHeading` y `EmptyState` están implementados sin ficha. Se dan de alta las tres anatomías del Hito 3 —`UploadField`, `FileGallery` y `Avatar`—, previstas y con ficha, y se anota la excepción de foco que trae la primera. | Equipo DRP |
+| 2026-08-18 | Fase 2, Hito 2: entra `SuppliersPage`, la segunda pantalla con ficha propia y la **quinta escrita antes que su implementación**. Volvió a pagar: la especificación le daba al filtro el mismo rótulo que al campo del formulario de alta, y dos controles con el mismo nombre accesible en una pantalla son indistinguibles para quien no la ve. | Equipo DRP |
 | 2026-08-17 | Cierre documental de la Fase 1. `LoanExternalPage` pasa a **implementada** —vive en su ruta y no en el sistema de diseño, porque es una pantalla— y `QuotaMeter` entra en el registro, del que faltaba. Se corrige «lo que falta por construir», que seguía dando por no construidas las tres piezas del Hito 3 mientras el registro las daba por hechas: la lista queda en los cinco del Hito 2 más `BlockingError`, y deja de estar atada a un hito en curso porque ya no hay ninguno. | Equipo DRP |

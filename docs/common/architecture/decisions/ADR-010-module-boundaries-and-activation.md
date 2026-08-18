@@ -274,3 +274,44 @@ dos operaciones de escritura, todo lo demás queda inerte —la tabla se ignora,
 handlers de módulo dejan de comprobar nada y la navegación deja de tener grupo de
 módulos— sin perder ningún dato. Lo que **no** es reversible barato es el
 renombrado de paquetes, que es exactamente por lo que va en un commit propio.
+
+## Posterior a esta decisión
+
+Esta ADR **no se reescribe**; lo que sigue enlaza hacia adelante lo que la ha
+alcanzado.
+
+- **`ErrorCode` ya no es un enumerado del core.** Esta ADR lo dejó anotado entre
+  sus costes con una condición explícita —«el día que un módulo necesite un
+  código propio habrá que mudarlo a plataforma»— y ese día llegó con el **Hito 2
+  de la Fase 2**, el primer módulo con reglas de negocio. La familia entera
+  —`ErrorCode`, `BusinessRuleViolation`, `ValidationFailure` y
+  `ResourceNotFound`— vive desde entonces en `com.drp.platform.error`.
+
+  Lo que hizo urgente la mudanza es que **nada fallaba**: la dirección `módulo →
+  core` que esta ADR permite hace que un módulo pueda lanzar un código propio sin
+  que ninguna de las cuatro reglas se queje, y el resultado habría sido el core
+  enumerando las reglas de sus módulos —lo mismo que la segunda regla impide en el
+  otro sentido, pero sin nada que lo delate. La alternativa considerada era
+  declarar el core catálogo único de códigos y aceptarlo por escrito; se descartó
+  porque el contrato tiene un solo enumerado de errores en cualquiera de los dos
+  casos, así que lo que se decidía no era el contrato sino **quién lo posee**. El
+  razonamiento completo, con su residuo —plataforma nombra reglas de un módulo
+  aunque no dependa de ninguna clase suya—, está en la sección 4.1.7 del
+  [registro de decisiones](../../product/decisions.md).
+
+  **Dos consecuencias sobre lo que esta ADR describe.** Los dos «no existe»
+  propios de plataforma —`UnknownModule` y `UnknownNotice`— desaparecen: existían
+  solo porque plataforma no podía lanzar el error del core sin invertir esta
+  frontera. Y la lista de excepciones de la tercera regla **sigue teniendo un solo
+  nombre**, `SessionClaims`, que es la condición de revisión que esta ADR fija.
+
+- **El gate protege por fin una ruta que existe.** Mientras ningún módulo tuvo
+  controlador, un módulo encendido respondía `404` —justo la confusión que el
+  `403 MODULE_INACTIVE` evita—, así que el criterio de validación número 1 se
+  comprobaba sobre una ruta vacía. Desde el Hito 2 el recorrido vertical mide las
+  dos mitades sobre `/api/v1/suppliers`: `403` apagado y `200` encendido.
+
+- **`ModuleScreen` envuelve a la pantalla del módulo en lugar de sustituirla.**
+  La tercera capa del gate que esta ADR describe —«entrar a mano en una ruta
+  apagada lleva a la pantalla que la ofrece»— sigue intacta y ahora convive con el
+  contenido real del módulo, que solo se monta en la rama activa.
