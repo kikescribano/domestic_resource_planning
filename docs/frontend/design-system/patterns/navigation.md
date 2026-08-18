@@ -109,9 +109,12 @@ Así que:
   El corte entre unas y otras es de **frecuencia**, no de importancia: arriba lo
   de todos los días, en «Más» lo que se toca al montar el hogar.
 - **Desde `md`**, la columna las enseña todas repartidas en dos grupos: **Tu
-  hogar** y **Módulos**. Un hogar sin ningún módulo activo conserva sus ocho
-  enlaces del core y ve una novena entrada, «Módulos del hogar», que es la puerta
-  para encender alguno.
+  hogar** y **Módulos**. Un hogar sin ningún módulo activo conserva sus enlaces
+  del core y ve además «Módulos del hogar», que es la puerta para encender alguno.
+- **Y ahí es donde entra toda pantalla nueva del core.** «Avisos», que llegó con
+  el Hito 1, no ocupa un hueco en el pulgar sino sitio en la columna y en «Más»,
+  aunque sea de uso diario. El tope de cinco es una medida y no una preferencia,
+  así que lo que se negocia es el grupo, nunca el número.
 - **Un módulo apagado no está**, ni en un sitio ni en el otro. Es la tercera capa
   del gate de la [`ADR-010`](../../../common/architecture/decisions/ADR-010-module-boundaries-and-activation.md);
   las otras dos son el `403 MODULE_INACTIVE` de la API y el silencio del handler.

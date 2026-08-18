@@ -23,8 +23,8 @@ hogar y la plataforma de avisos, en siete hitos. **Ese documento es el que hay q
 leer para arrancar un hito**, y el que hay que actualizar al cerrarlo. La decisión
 de producto que faltaba —qué módulos— está tomada y no hay que volver a abrirla.
 
-**Su Hito 0 está cerrado (2026-08-18)** y con él dos de los tres huecos que la
-planificación había destapado. El backend ya está empaquetado por módulos:
+**Sus Hitos 0 y 1 están cerrados (2026-08-18)** y con ellos los tres huecos que
+la planificación había destapado. El backend ya está empaquetado por módulos:
 
 ```text
 com.drp.platform.*      Bus, TenantContext, paginación y la activación de módulos
@@ -41,9 +41,27 @@ siendo una sola—. La dirección `módulo → core` sí está permitida: un mó
 el estado del core. La [ADR-010](docs/common/architecture/decisions/ADR-010-module-boundaries-and-activation.md)
 lo recoge entero, incluido el gate en tres capas y el `403 MODULE_INACTIVE`.
 
-Lo que **sigue pendiente** es el tercer hueco: **los tres procesos diarios no los
-invoca nadie más que las pruebas**, y no hay un solo `@Scheduled` en el código de
-producción. Es el contenido del Hito 1.
+El tercer hueco también está cerrado: **los tres procesos diarios se ejecutan de
+verdad**. Ya no recorren los hogares por su cuenta —eso era el camino a tener dos
+recorridos, y solo uno puede saltarse los hogares con el módulo apagado— sino que
+son `ScheduledCheck` que miran **el hogar actual**, y quien itera es `DailySweep`
+en `com.drp.platform.schedule`, hogar a hogar y nunca con `BYPASSRLS`. La
+[ADR-011](docs/common/architecture/decisions/ADR-011-scheduled-checks-and-notice-delivery.md)
+lo recoge entero: el recorrido, la tabla de avisos, el resumen diario —uno por
+hogar con lo que haya, **ninguno cuando no hay nada**— y la premisa de la
+instancia única con su condición de revisión.
+
+Dos cosas que conviene tener presentes al tocar esto:
+
+- **El programador se apaga con `drp.schedule.enabled`**, y `SpringIntegrationTest`
+  lo apaga para toda la suite. Encendido, la pasada diaria correría dentro de
+  cualquier contexto de prueba y **purgaría hogares** a mitad de otra.
+- **Enviar correo y saber qué hogares hay son ya de plataforma**
+  (`com.drp.platform.mail`, `HouseholdDirectory`). Se mudaron en lugar de ampliar
+  la lista de excepciones de ArchUnit, que sigue teniendo un solo nombre. Lo que
+  plataforma necesite del core se resuelve con un puerto que el core implemente
+  —como `ScheduledCheck`, `HouseholdDirectory` y `NoticeRecipients`—, nunca con un
+  import.
 
 La Fase 1 no tiene continuación pendiente; lo que se dejó abierto a propósito está
 listado al final de [`roadmap.md`](docs/common/product/roadmap.md), cada cosa con
