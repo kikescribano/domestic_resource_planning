@@ -16,12 +16,23 @@ no existe**. Antes de escribir un caso de uso, una tabla o una pantalla, busca s
 ya está —y si lo que quieres es cambiarlo, hay pruebas que lo fijan y documentos
 que lo explican.
 
-Lo siguiente es la **Fase 2 — Primer módulo funcional**, y su primer paso no es
-código: es elegir el módulo entre los de prioridad alta de la sección 4.2 del
-README, que es decisión de producto. La Fase 1 no tiene continuación pendiente; lo
-que se dejó abierto a propósito está listado al final de
-[`roadmap.md`](docs/common/product/roadmap.md), cada cosa con su motivo y su
-destinatario.
+Lo siguiente es la **Fase 2 — Módulos activables**, **ya planificada** (2026-08-18)
+en [`phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md): los cuatro
+módulos de prioridad alta de la sección 4.2, sobre la activación por hogar y la
+plataforma de avisos, en siete hitos. **Ese documento es el que hay que leer para
+arrancar un hito**, y el que hay que actualizar al cerrarlo. La decisión de
+producto que faltaba —qué módulos— está tomada y no hay que volver a abrirla.
+
+Y tres cosas que la planificación destapó, para que no se den por hechas: **el
+backend no está empaquetado por módulos** —es `com.drp.{domain,application,adapter}`
+y no expresa ninguna frontera—, **no existe ninguna noción de activación** en
+ninguna capa, y **los tres procesos diarios no los invoca nadie más que las
+pruebas**: no hay un solo `@Scheduled` en el código de producción. Los tres son
+contenido de los Hitos 0 y 1.
+
+La Fase 1 no tiene continuación pendiente; lo que se dejó abierto a propósito está
+listado al final de [`roadmap.md`](docs/common/product/roadmap.md), cada cosa con
+su motivo y su destinatario.
 
 La documentación está **en español de España**. Manténla así. El código sigue la
 misma frontera que la documentación: prosa y comentarios en castellano, todo
@@ -322,10 +333,11 @@ pull requests— y **se conserva para la Fase 2**, con «módulo» donde antes d
 «hito»:
 
 - **Un bloque por sesión.** Arranca leyendo el documento de alcance de lo que vas a
-  hacer. Para la Fase 1 fue
-  [`docs/common/product/roadmap.md`](docs/common/product/roadmap.md), que ahora se
-  conserva como historia de cómo se hizo; la Fase 2 necesitará el suyo. No mezcles
-  bloques: son grandes y mezclarlos hace que ninguno se cierre del todo.
+  hacer: hoy es
+  [`docs/common/product/phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md).
+  El [`roadmap.md`](docs/common/product/roadmap.md) de la Fase 1 se conserva como
+  historia de cómo se hizo el core. No mezcles bloques: son grandes y mezclarlos
+  hace que ninguno se cierre del todo.
 - **Un pull request por bloque**, y no se abre el siguiente hasta que el anterior
   está fusionado. Al fusionar, sigue el procedimiento de alineación local de más
   arriba.
