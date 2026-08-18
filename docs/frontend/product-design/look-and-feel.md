@@ -210,12 +210,22 @@ Además, y en todos los tramos: la vista debe seguir siendo utilizable con **zoo
 al 200 %** y con la **anchura reducida a 320 px** sin scroll en dos ejes, que es
 el criterio de reflujo de WCAG y el que suele romperse sin que nadie lo note.
 
-> **La barra inferior tiene un tope, y es aritmética.** A 320 px, la anchura de
-> cada parada es 320 dividido entre el número de paradas, así que **cinco es el
-> máximo** que respeta los 44 px de objetivo mínimo que exige la tabla de arriba.
-> Con ocho salían 40 px, y así estuvo la navegación durante toda la Fase 1 sin que
-> nadie lo notara: no se ve mirando la pantalla, porque el enlace sigue teniendo
-> altura de sobra y solo falla a lo ancho.
+> **La barra inferior tiene un tope, y es aritmética.** A 320 px, el ancho
+> disponible entre el número de paradas da el ancho de cada una, así que **cinco
+> es el máximo** que respeta los 44 px de objetivo mínimo que exige la tabla de
+> arriba. Con ocho salían 40 px, y así estuvo la navegación durante toda la Fase 1
+> sin que nadie lo notara: no se ve mirando la pantalla, porque el enlace sigue
+> teniendo altura de sobra y solo falla a lo ancho.
+>
+> **Y el reparto no es a partes iguales, aunque lo parezca.** `flex-1` reparte
+> *el sobrante*, no el total: la parada con el texto más largo se queda con su
+> ancho de contenido y las demás se reparten lo que quede, así que la de etiqueta
+> más corta acaba siendo la más estrecha —y es justo la que hay que mirar—.
+> Medido: «Más» salía a 43,95 px con cinco paradas. De ahí que cada parada lleve
+> su suelo de 44 px **declarado** y no heredado del texto, y que el relleno
+> lateral del móvil sea la mitad que el de la barra lateral: con el suelo puesto,
+> lo que decide si caben es la suma de los anchos mínimos, y ahí cada píxel de
+> relleno se paga una vez por parada.
 >
 > De ahí la forma que tiene desde la Fase 2: **cuatro paradas del core y «Más»**
 > en móvil, y desde `md` una columna lateral con dos grupos —el hogar y los

@@ -167,9 +167,25 @@ function HouseholdShell() {
   )
 }
 
+/**
+ * `min-w-touch` además de `min-h-touch`, y no es simetría: es lo que la barra
+ * inferior necesita y `flex-1` **no** garantiza.
+ *
+ * `flex-1` reparte el sobrante, no el total: un ítem cuyo texto es largo se
+ * queda con su ancho de contenido y los demás se reparten lo que quede, así que
+ * la parada más corta —«Más»— acaba siendo la más estrecha. Medido en la CI:
+ * 43,95 px, por debajo del mínimo, mientras que en local pasaba porque la
+ * tipografía del sistema mide distinto. Cinco paradas caben a 320 px, pero solo
+ * si cada una tiene su suelo **declarado** en vez de heredado del texto.
+ *
+ * Y por eso el relleno lateral del móvil es `px-1` y no `px-2`: con el suelo
+ * puesto, lo que decide si las cinco caben es la suma de sus anchos mínimos, y
+ * ahí cada píxel de relleno se paga cinco veces. En la barra lateral, donde
+ * sobra sitio, sigue siendo `px-3`.
+ */
 function navLinkClass({ isActive }: { isActive: boolean }) {
   return [
-    'flex min-h-touch w-full flex-1 items-center justify-center px-2 py-3 text-body-sm',
+    'flex min-h-touch min-w-touch w-full flex-1 items-center justify-center px-1 py-3 text-body-sm',
     'md:flex-none md:justify-start md:rounded-md md:px-3 md:text-body',
     // El estado activo no se dice solo con color: además del acento lleva peso
     // tipográfico y `aria-current`, que NavLink pone por su cuenta.

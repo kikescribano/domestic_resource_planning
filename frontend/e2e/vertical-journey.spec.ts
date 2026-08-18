@@ -265,6 +265,8 @@ async function checkTouchTargets(page: Page) {
   const total = await stops.count()
   expect(total, 'la navegación principal se quedó sin paradas').toBeGreaterThan(0)
 
+  const measured: Array<{ label: string; width: number; height: number }> = []
+
   for (let index = 0; index < total; index++) {
     const stop = stops.nth(index)
     // Solo las que se ven: desde `md` la barra lateral enseña más paradas, y en
@@ -272,10 +274,31 @@ async function checkTouchTargets(page: Page) {
     if (!(await stop.isVisible())) continue
 
     const box = await stop.boundingBox()
-    const label = (await stop.textContent())?.trim() ?? `parada ${index}`
-    expect(box?.width ?? 0, `«${label}» mide menos de 44 px de ancho a 320 px`).toBeGreaterThanOrEqual(44)
-    expect(box?.height ?? 0, `«${label}» mide menos de 44 px de alto a 320 px`).toBeGreaterThanOrEqual(44)
+    measured.push({
+      label: (await stop.textContent())?.trim() ?? `parada ${index}`,
+      width: box?.width ?? 0,
+      height: box?.height ?? 0,
+    })
   }
+
+  // El reparto entero en el mensaje, y no solo la parada culpable: lo que falla
+  // aquí casi nunca es esa parada sino **cómo se repartió el ancho**, y saber
+  // cuánto se llevó cada una es la diferencia entre arreglarlo y adivinarlo.
+  const layout = measured.map((stop) => `${stop.label} ${stop.width.toFixed(1)}`).join(' · ')
+
+  for (const stop of measured) {
+    expect(stop.width, `«${stop.label}» a 320 px. Reparto: ${layout}`).toBeGreaterThanOrEqual(44)
+    expect(stop.height, `«${stop.label}» mide menos de 44 px de alto a 320 px`).toBeGreaterThanOrEqual(44)
+  }
+
+  // Y la otra mitad de la misma garantía: que darle a cada parada su suelo de
+  // 44 px no haya empujado la barra fuera de la pantalla. Las dos van juntas
+  // porque se compran una a costa de la otra, y comprobar solo una deja pasar
+  // el arreglo que rompe la contraria.
+  const overflows = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  )
+  expect(overflows, `la navegación desborda a 320 px. Reparto: ${layout}`).toBe(false)
 
   await page.setViewportSize(DESKTOP)
 }
