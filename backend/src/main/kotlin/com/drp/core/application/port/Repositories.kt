@@ -10,7 +10,7 @@ import com.drp.core.domain.file.Document
 import com.drp.core.domain.file.DocumentType
 import com.drp.core.domain.file.StoredContentType
 import com.drp.core.domain.file.StoredFile
-import com.drp.core.domain.identity.EmailAddress
+import com.drp.platform.mail.EmailAddress
 import com.drp.core.domain.identity.Identity
 import com.drp.core.domain.inventory.Asset
 import com.drp.core.domain.inventory.AssetLocation
@@ -69,7 +69,8 @@ interface HouseholdRepository {
  *
  * Es el unico sitio del core que mira fuera del hogar actual, y existe porque
  * hay tres momentos en los que el hogar todavia no se conoce: el login, la
- * aceptacion de una invitacion y los procesos diarios. Se apoya en tres
+ * aceptacion de una invitacion y el enlace del prestamo de un externo. Se apoya
+ * en tres
  * funciones acotadas de PostgreSQL que **solo devuelven identificadores de
  * hogar** (ver `V4__tenant_resolution.sql`), nunca datos: en cuanto se sabe el
  * hogar, el caso de uso lo fija en el `TenantContext` y todo lo demas vuelve a
@@ -79,9 +80,6 @@ interface HouseholdRepository {
  * un identificador, esta esquivando el aislamiento en lugar de resolverlo.
  */
 interface TenantResolver {
-
-    /** Para que los procesos diarios recorran los hogares sin `BYPASSRLS`. */
-    fun allHouseholdIds(): List<UUID>
 
     /** En que hogar entra una identidad al iniciar sesion o renovar. */
     fun householdOfActiveMember(identityId: UUID): UUID?

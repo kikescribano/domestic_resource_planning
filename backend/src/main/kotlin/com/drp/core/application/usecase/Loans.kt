@@ -3,8 +3,8 @@ package com.drp.core.application.usecase
 import com.drp.core.application.EnrollmentEmails
 import com.drp.core.application.event.CoreEvents
 import com.drp.core.application.port.AssetRepository
-import com.drp.core.application.port.EmailMessage
-import com.drp.core.application.port.EmailSender
+import com.drp.platform.mail.EmailMessage
+import com.drp.platform.mail.EmailSender
 import com.drp.core.application.port.HouseholdMemberRepository
 import com.drp.core.application.port.LoanAccessTokenRepository
 import com.drp.core.application.port.LoanFilter
@@ -20,7 +20,7 @@ import com.drp.core.domain.BusinessRuleViolation
 import com.drp.core.domain.ErrorCode
 import com.drp.core.domain.ResourceNotFound
 import com.drp.core.domain.ValidationFailure
-import com.drp.core.domain.identity.EmailAddress
+import com.drp.platform.mail.EmailAddress
 import com.drp.core.domain.inventory.AssetStatus
 import com.drp.core.domain.loan.ExternalParty
 import com.drp.core.domain.loan.Loan

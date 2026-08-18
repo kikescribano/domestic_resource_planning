@@ -1,7 +1,8 @@
 package com.drp.core.application.usecase
 
-import com.drp.core.application.port.TenantResolver
+import com.drp.platform.tenant.HouseholdDirectory
 import com.drp.test.DrpMailpit
+import com.drp.platform.schedule.DailySweep
 import com.drp.test.DrpPostgres
 import com.drp.test.SpringIntegrationTest
 import com.drp.test.count
@@ -35,8 +36,8 @@ import java.util.UUID
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class PurgeUnverifiedHouseholdsTest : SpringIntegrationTest() {
 
-    @Autowired private lateinit var purge: PurgeUnverifiedHouseholds
-    @Autowired private lateinit var tenantResolver: TenantResolver
+    @Autowired private lateinit var sweep: DailySweep
+    @Autowired private lateinit var directory: HouseholdDirectory
     @Autowired private lateinit var http: TestRestTemplate
 
     private val mailpit = DrpMailpit.instance
@@ -53,7 +54,7 @@ class PurgeUnverifiedHouseholdsTest : SpringIntegrationTest() {
         categoriesOf(householdId).shouldBe(5)
 
         ageHousehold(householdId, days = 8)
-        purge.run()
+        sweep.run()
 
         postgres.ownerConnection().use { owner ->
             owner.count("SELECT count(*) FROM households WHERE id = ?", householdId).shouldBe(0)
@@ -75,7 +76,7 @@ class PurgeUnverifiedHouseholdsTest : SpringIntegrationTest() {
         val householdId = householdIdOf(email)
 
         ageHousehold(householdId, days = 400)
-        purge.run()
+        sweep.run()
 
         postgres.ownerConnection().use { owner ->
             owner.count("SELECT count(*) FROM households WHERE id = ?", householdId).shouldBe(1)
@@ -91,7 +92,7 @@ class PurgeUnverifiedHouseholdsTest : SpringIntegrationTest() {
         val householdId = householdIdOf(email)
 
         ageHousehold(householdId, days = 6)
-        purge.run()
+        sweep.run()
 
         postgres.ownerConnection().use {
             it.count("SELECT count(*) FROM households WHERE id = ?", householdId).shouldBe(1)
@@ -103,15 +104,22 @@ class PurgeUnverifiedHouseholdsTest : SpringIntegrationTest() {
     fun `el proceso es idempotente`() {
         val email = "idempotente-${UUID.randomUUID()}@example.test"
         createHousehold(email)
-        ageHousehold(householdIdOf(email), days = 9)
+        val householdId = householdIdOf(email)
+        ageHousehold(householdId, days = 9)
 
-        val first = purge.run()
-        val second = purge.run()
+        sweep.run()
+        postgres.ownerConnection().use {
+            it.count("SELECT count(*) FROM households WHERE id = ?", householdId).shouldBe(0)
+        }
 
-        (first >= 1).shouldBe(true)
-        // Solo mira lo que ya sobra, asi que la segunda pasada no encuentra nada
-        // nuevo que borrar salvo lo que otras pruebas hayan dejado.
-        (second < first).shouldBe(true)
+        // Solo mira lo que ya sobra: la segunda pasada no encuentra nada, no
+        // revienta y deja las cosas como estaban. Se comprueba por el estado y no
+        // por la cuenta que devuelve el barrido, que desde el Hito 1 de la Fase 2
+        // cuenta lo de toda la instalacion y no lo de este hogar.
+        sweep.run()
+        postgres.ownerConnection().use {
+            it.count("SELECT count(*) FROM households WHERE id = ?", householdId).shouldBe(0)
+        }
     }
 
     @Test
@@ -137,7 +145,7 @@ class PurgeUnverifiedHouseholdsTest : SpringIntegrationTest() {
 
         // Sin contexto de inquilino --que es como corre el proceso-- la lista
         // llega igualmente. Es lo que hace innecesario el BYPASSRLS.
-        val ids = tenantResolver.allHouseholdIds()
+        val ids = directory.allHouseholdIds()
 
         ids.shouldContain(householdId)
 
@@ -162,13 +170,13 @@ class PurgeUnverifiedHouseholdsTest : SpringIntegrationTest() {
         ageHousehold(doomedId, days = 10)
         ageHousehold(safeId, days = 10)
 
-        purge.run()
+        sweep.run()
 
         postgres.ownerConnection().use { owner ->
             owner.count("SELECT count(*) FROM households WHERE id = ?", doomedId).shouldBe(0)
             owner.count("SELECT count(*) FROM households WHERE id = ?", safeId).shouldBe(1)
         }
-        tenantResolver.allHouseholdIds().let {
+        directory.allHouseholdIds().let {
             it.shouldNotContain(doomedId)
             it.shouldContain(safeId)
         }

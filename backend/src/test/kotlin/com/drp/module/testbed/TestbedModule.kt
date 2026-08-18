@@ -5,6 +5,9 @@ import com.drp.platform.module.ModuleActivation
 import com.drp.platform.module.ModuleDescriptor
 import com.drp.platform.module.ModuleEventHandler
 import com.drp.platform.module.ModuleSeeder
+import com.drp.platform.notice.NoticeDraft
+import com.drp.platform.schedule.CheckOwner
+import com.drp.platform.schedule.ScheduledCheck
 import com.drp.platform.tenant.TenantContext
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
@@ -31,6 +34,10 @@ import java.util.UUID
  * **Vive en el arbol de pruebas y no se despliega.** Sobrevive a la fase entera
  * como prueba de regresion del mecanismo: cuando un modulo de verdad falle al
  * activarse, esto es lo que dice si lo roto es el modulo o la activacion.
+ *
+ * El Hito 1 le anade **una comprobacion periodica**, que es la cuarta cosa que
+ * el mecanismo atraviesa: es lo que deja demostrar que el recorrido diario se
+ * salta los hogares con el modulo apagado sin esperar a que exista Warehouse.
  *
  * **Por que la condicion sobre una propiedad**, y no un `@TestConfiguration` que
  * se importe. El escaneo de componentes arranca en `com.drp` y alcanza al
@@ -64,6 +71,9 @@ class TestbedModule {
 
     @Bean
     fun testbedSeeder(notes: TestbedNotes, jdbc: JdbcTemplate) = TestbedSeeder(notes, jdbc)
+
+    @Bean
+    fun testbedCheck(notes: TestbedNotes) = TestbedCheck(notes)
 
     @Bean
     fun testbedHandler(
@@ -168,5 +178,34 @@ class TestbedHandler(
     override fun handleActive(event: DomainEvent) {
         if (event.type != "LocationCreated") return
         notes.write("evento: ${event.payload["name"]}")
+    }
+}
+
+/**
+ * La comprobacion periodica del modulo de prueba.
+ *
+ * Declara `CheckOwner.Module`, asi que **el recorrido diario solo la ejecuta en
+ * los hogares que tengan el modulo encendido**. Es el testigo de esa regla: deja
+ * dos rastros distintos --una nota en su tabla y un aviso en la bandeja del
+ * hogar-- para que la prueba pueda distinguir «no corrio» de «corrio y no
+ * aviso».
+ *
+ * No es idempotente a proposito, al contrario que las tres del core: escribe una
+ * nota y un aviso cada vez que pasa, que es justo lo que permite contar pasadas.
+ */
+class TestbedCheck(private val notes: TestbedNotes) : ScheduledCheck {
+
+    override val name: String = "TestbedCheck"
+    override val owner: CheckOwner = CheckOwner.Module(TestbedModule.KEY)
+
+    override fun check(): List<NoticeDraft> {
+        notes.write("comprobado")
+        return listOf(
+            NoticeDraft(
+                kind = "TESTBED_CHECK",
+                title = "El módulo de prueba pasó por aquí",
+                body = "Lo escribe su comprobación periódica, que solo corre donde el módulo está encendido.",
+            ),
+        )
     }
 }

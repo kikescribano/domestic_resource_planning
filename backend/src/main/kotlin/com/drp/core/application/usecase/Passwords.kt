@@ -3,7 +3,7 @@ package com.drp.core.application.usecase
 import com.drp.core.application.EnrollmentEmails
 import com.drp.core.application.SessionIssuer
 import com.drp.core.application.TokenPair
-import com.drp.core.application.port.EmailSender
+import com.drp.platform.mail.EmailSender
 import com.drp.core.application.port.HouseholdMemberRepository
 import com.drp.core.application.port.IdentityRepository
 import com.drp.core.application.port.PasswordHasher
@@ -15,7 +15,7 @@ import com.drp.core.application.port.TenantResolver
 import com.drp.platform.tenant.TenantContext
 import com.drp.core.domain.BusinessRuleViolation
 import com.drp.core.domain.ErrorCode
-import com.drp.core.domain.identity.EmailAddress
+import com.drp.platform.mail.EmailAddress
 import com.drp.core.domain.identity.PasswordPolicy
 import com.drp.core.domain.token.SingleUseToken
 import org.springframework.stereotype.Service

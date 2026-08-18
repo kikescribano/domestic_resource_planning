@@ -5,7 +5,7 @@ import com.drp.core.application.SessionIssuer
 import com.drp.core.application.TokenPair
 import com.drp.core.application.event.CoreEvents
 import com.drp.core.application.port.CategoryRepository
-import com.drp.core.application.port.EmailSender
+import com.drp.platform.mail.EmailSender
 import com.drp.core.application.port.EmailVerificationTokenRepository
 import com.drp.core.application.port.HouseholdMemberRepository
 import com.drp.core.application.port.HouseholdRepository
@@ -20,7 +20,7 @@ import com.drp.core.domain.ValidationFailure
 import com.drp.core.domain.household.Household
 import com.drp.core.domain.household.HouseholdMember
 import com.drp.core.domain.household.MemberRole
-import com.drp.core.domain.identity.EmailAddress
+import com.drp.platform.mail.EmailAddress
 import com.drp.core.domain.identity.Identity
 import com.drp.core.domain.identity.PasswordPolicy
 import com.drp.core.domain.identity.PasswordValidation

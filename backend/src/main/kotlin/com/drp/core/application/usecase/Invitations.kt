@@ -3,7 +3,7 @@ package com.drp.core.application.usecase
 import com.drp.core.application.EnrollmentEmails
 import com.drp.core.application.SessionIssuer
 import com.drp.core.application.TokenPair
-import com.drp.core.application.port.EmailSender
+import com.drp.platform.mail.EmailSender
 import com.drp.core.application.port.HouseholdMemberRepository
 import com.drp.core.application.port.HouseholdRepository
 import com.drp.core.application.port.IdentityRepository
@@ -21,7 +21,7 @@ import com.drp.core.domain.ResourceNotFound
 import com.drp.core.domain.ValidationFailure
 import com.drp.core.domain.household.HouseholdMember
 import com.drp.core.domain.household.MemberRole
-import com.drp.core.domain.identity.EmailAddress
+import com.drp.platform.mail.EmailAddress
 import com.drp.core.domain.identity.Identity
 import com.drp.core.domain.identity.PasswordPolicy
 import com.drp.core.domain.invitation.Invitation

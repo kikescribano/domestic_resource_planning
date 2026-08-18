@@ -29,3 +29,4 @@ Usa [`ADR-template.md`](ADR-template.md) para crear una entrada.
 | [ADR-008](ADR-008-repository-layout-and-build-chain.md) | Estructura del repositorio y cadena de construcción | accepted | — |
 | [ADR-009](ADR-009-outbound-email.md) | Envío de correo saliente | accepted | — |
 | [ADR-010](ADR-010-module-boundaries-and-activation.md) | Fronteras de módulo y activación por hogar | accepted | — |
+| [ADR-011](ADR-011-scheduled-checks-and-notice-delivery.md) | Programación de comprobaciones y entrega de avisos | accepted | — |

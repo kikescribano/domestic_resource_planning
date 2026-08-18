@@ -276,23 +276,23 @@ cuatro tiene todavía una sola fila. Eso lo demuestra el módulo de prueba en la
 batería del backend —escribe, se apaga, deja de escribir, y al reactivarse
 devuelve lo que había—, que es exactamente para lo que existe.
 
-### Hito 1 — Plataforma: programación y avisos · **Pendiente**
+### Hito 1 — Plataforma: programación y avisos · **Completado (2026-08-18)**
 
-- [ ] **ADR-011 — Programación de comprobaciones y entrega de avisos**: el
+- [x] **ADR-011 — Programación de comprobaciones y entrega de avisos**: el
       recorrido por hogares, la instancia única, el resumen diario y por qué esto
       no es un módulo.
-- [ ] **El recorrido periódico por hogar** como capacidad de `com.drp.platform`,
+- [x] **El recorrido periódico por hogar** como capacidad de `com.drp.platform`,
       con la forma que ya tienen los tres procesos diarios y saltando los hogares
       que no tengan activo el módulo que lo pide.
-- [ ] **Los tres procesos diarios del core, programados de verdad**, que es el
+- [x] **Los tres procesos diarios del core, programados de verdad**, que es el
       hueco que la Fase 1 dejó abierto sin nombrarlo.
-- [ ] **Puerto de avisos** con su adaptador de correo sobre el `EmailSender`
+- [x] **Puerto de avisos** con su adaptador de correo sobre el `EmailSender`
       existente, y la tabla de avisos del hogar con su RLS.
-- [ ] **El resumen diario**: un correo por hogar con lo que haya, y ninguno cuando
+- [x] **El resumen diario**: un correo por hogar con lo que haya, y ninguno cuando
       no hay nada — un correo diario vacío es la forma más rápida de que se
       filtren todos.
-- [ ] **Frontend**: la bandeja de avisos del hogar, con su estado leído/no leído.
-- [ ] **Pruebas**: el correo se lee de Mailpit de verdad, como el enrolamiento de
+- [x] **Frontend**: la bandeja de avisos del hogar, con su estado leído/no leído.
+- [x] **Pruebas**: el correo se lee de Mailpit de verdad, como el enrolamiento de
       la Fase 1; y una prueba que compruebe que un hogar con el módulo apagado
       **no** recibe su aviso.
 
@@ -302,6 +302,38 @@ devuelve lo que había—, que es exactamente para lo que existe.
 > es una premisa, no una propiedad: queda escrito en la ADR-011 con su condición
 > de revisión, porque el día que haya dos instancias los procesos se ejecutan dos
 > veces y ninguno avisa de ello.
+
+#### Cómo quedó, y las cuatro cosas que cambiaron sobre lo previsto
+
+Los tres procesos diarios **se ejecutan de verdad** en un despliegue, y la
+plataforma de avisos está entera: tabla con RLS, bandeja en el cliente y resumen
+diario por correo. Lo que falta es lo que ningún módulo ha traído todavía —una
+regla que avise por una fecha—, y eso llega con Warehouse y con CMMS.
+
+Cuatro cosas se decidieron distinto de como estaban escritas, y las cuatro quedan
+anotadas con su alternativa descartada en [`decisions.md`](decisions.md):
+
+- **Los tres procesos diarios pierden su propio recorrido.** La definición decía
+  «programados de verdad», que se lee como envolverlos en un `@Scheduled`; con el
+  suyo más el de plataforma habría **dos recorridos**, y solo uno de los dos puede
+  saltarse los hogares con el módulo apagado. Ahora miran el hogar actual y quien
+  itera es `DailySweep`.
+- **Enviar correo y saber qué hogares hay se mudan a `com.drp.platform`.** No
+  estaba en el alcance y era inevitable: la tercera regla de ArchUnit lo obliga, y
+  ampliar su lista de excepciones habría sido justo la señal que la ADR-010 marca
+  como motivo de revisión. `EmailAddress` se muda con el puerto.
+- **Cada comprobación declara de quién es con un tipo sellado**, no con una clave
+  nullable: con un `String?`, «del core» y «se me olvidó declararlo» se escriben
+  igual y el segundo caso no falla, solo corre donde no debía.
+- **La bandeja de avisos entra en el grupo del hogar y no en la barra inferior.**
+  El tope medido son cinco paradas a 320 px, así que lo que gana una pantalla
+  nueva es sitio en la columna del escritorio y en «Más».
+
+**Lo que el hito no puede demostrar todavía, y dónde se demostrará.** Ningún
+módulo real tiene aún una regla de aviso, así que el testigo de que el recorrido
+se salta un módulo apagado es **el módulo de prueba del Hito 0**, que gana aquí su
+comprobación periódica. Cuando Warehouse traiga la caducidad, lo que hay que
+añadir es su `ScheduledCheck` y nada más.
 
 ### Hito 2 — Proveedores y contactos de servicio · **Pendiente**
 
@@ -461,5 +493,6 @@ conocido.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-18 | **Hito 1 completado**: un solo recorrido periódico en `com.drp.platform`, hogar a hogar sin `BYPASSRLS` y saltándose los que tengan apagado el módulo que pide la comprobación; los tres procesos diarios del core pasan a ser comprobaciones y se ejecutan de verdad; `household_notices` con RLS y `FORCE`, tres operaciones en el contrato, bandeja en el cliente y resumen diario leído del Mailpit real. Correo y lista de hogares se mudan a plataforma en lugar de ensanchar la excepción de ArchUnit. ADR-011, y cuatro decisiones que la definición no preveía |
 | 2026-08-18 | **Hito 0 completado**: fronteras de módulo con ArchUnit medido en los dos sentidos, `household_modules` con RLS y `FORCE`, gate en las tres capas, tres operaciones en el contrato, navegación en dos grupos y ADR-010. Se resuelve la pregunta que este hito tenía asignada y quedan anotadas tres decisiones que la definición no preveía |
 | 2026-08-18 | Se crea al planificar la Fase 2: alcance de cuatro módulos sobre activación por hogar y capacidad de plataforma, siete hitos, criterio de aceptación con dos ADR nuevas, y las tres decisiones de arranque tomadas antes de empezar |

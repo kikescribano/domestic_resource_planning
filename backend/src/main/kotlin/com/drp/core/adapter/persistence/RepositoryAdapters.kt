@@ -24,6 +24,7 @@ import com.drp.core.application.port.RefreshTokenRepository
 import com.drp.core.application.port.StoredFileFilter
 import com.drp.core.application.port.StoredFileRepository
 import com.drp.core.application.port.TenantResolver
+import com.drp.platform.tenant.HouseholdDirectory
 import com.drp.platform.tenant.TenantContext
 import com.drp.core.domain.catalog.Article
 import com.drp.core.domain.catalog.Category
@@ -36,7 +37,7 @@ import com.drp.core.domain.household.Household
 import com.drp.core.domain.household.HouseholdMember
 import com.drp.core.domain.household.MemberRole
 import com.drp.core.domain.identity.Avatar
-import com.drp.core.domain.identity.EmailAddress
+import com.drp.platform.mail.EmailAddress
 import com.drp.core.domain.identity.Identity
 import com.drp.core.domain.inventory.Asset
 import com.drp.core.domain.inventory.AssetLocation
@@ -121,9 +122,14 @@ class HouseholdRepositoryAdapter(
  * devuelven un identificador, no consultas sobre entidades, y dejarlas a la
  * vista en SQL plano hace evidente que son el unico punto del core que mira
  * fuera del hogar actual.
+ *
+ * Implementa ademas el [HouseholdDirectory] de plataforma, que es la cuarta
+ * funcion acotada --`list_household_ids`-- vista desde el otro lado: el
+ * recorrido periodico la necesita y plataforma no puede pedirsela al core, asi
+ * que declara el puerto y el core lo cumple (ADR-011).
  */
 @Repository
-class SqlTenantResolver(private val jdbc: JdbcTemplate) : TenantResolver {
+class SqlTenantResolver(private val jdbc: JdbcTemplate) : TenantResolver, HouseholdDirectory {
 
     override fun allHouseholdIds(): List<UUID> =
         jdbc.queryForList("SELECT * FROM list_household_ids()", UUID::class.java)

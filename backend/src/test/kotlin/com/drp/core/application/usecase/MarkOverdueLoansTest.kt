@@ -1,6 +1,7 @@
 package com.drp.core.application.usecase
 
 import com.drp.core.adapter.http.createDurable
+import com.drp.platform.schedule.DailySweep
 import com.drp.test.DrpPostgres
 import com.drp.test.SpringIntegrationTest
 import com.drp.test.extract
@@ -30,7 +31,7 @@ import java.time.temporal.ChronoUnit
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class MarkOverdueLoansTest : SpringIntegrationTest() {
 
-    @Autowired private lateinit var markOverdue: MarkOverdueLoans
+    @Autowired private lateinit var sweep: DailySweep
     @Autowired private lateinit var http: TestRestTemplate
 
     private val postgres = DrpPostgres.instance
@@ -43,7 +44,7 @@ class MarkOverdueLoansTest : SpringIntegrationTest() {
         val loanId = http.lend(home.accessToken, home.memberId, assetId, dueAt = inDays(7))
 
         expireDue(loanId, daysAgo = 1)
-        markOverdue.run()
+        sweep.run()
 
         http.getJson("/api/v1/loans/$loanId", home.accessToken).body!!
             .extract("status").shouldBe("OVERDUE")
@@ -63,7 +64,7 @@ class MarkOverdueLoansTest : SpringIntegrationTest() {
         val assetId = http.createDurable(home.accessToken, "Escalera")
         val loanId = http.lend(home.accessToken, home.memberId, assetId, dueAt = null)
 
-        markOverdue.run()
+        sweep.run()
 
         // Es un prestamo sin plazo, no un plazo infinito ya cumplido.
         http.getJson("/api/v1/loans/$loanId", home.accessToken).body!!
@@ -77,7 +78,7 @@ class MarkOverdueLoansTest : SpringIntegrationTest() {
         val assetId = http.createDurable(home.accessToken, "Sierra")
         val loanId = http.lend(home.accessToken, home.memberId, assetId, dueAt = inDays(7))
 
-        markOverdue.run()
+        sweep.run()
 
         http.getJson("/api/v1/loans/$loanId", home.accessToken).body!!
             .extract("status").shouldBe("ACTIVE")
@@ -93,7 +94,7 @@ class MarkOverdueLoansTest : SpringIntegrationTest() {
             .statusCode.shouldBe(HttpStatus.OK)
 
         expireDue(loanId, daysAgo = 30)
-        markOverdue.run()
+        sweep.run()
 
         http.getJson("/api/v1/loans/$loanId", home.accessToken).body!!
             .extract("status").shouldBe("RETURNED")
@@ -107,14 +108,23 @@ class MarkOverdueLoansTest : SpringIntegrationTest() {
         val loanId = http.lend(home.accessToken, home.memberId, assetId, dueAt = inDays(7))
         expireDue(loanId, daysAgo = 1)
 
-        val first = markOverdue.run()
-        val second = markOverdue.run()
+        val first = sweep.run()
+        val second = sweep.run()
 
         // La idempotencia no es cosmetica: de `LoanOverdue` colgaran los
         // recordatorios, y una pasada que volviera a publicarlo mandaria un aviso
         // al dia a quien ya lo sabe.
-        withClue("la primera pasada tiene que marcar el prestamo") { (first >= 1).shouldBe(true) }
-        withClue("la segunda no puede volver a marcarlo") { second.shouldBe(0) }
+        // Se mira por el aviso y no por la cuenta de marcados: desde el Hito 1
+        // de la Fase 2 quien recorre es el barrido de plataforma, y lo que
+        // devuelve es lo que ha encontrado en toda la instalacion. Un aviso la
+        // primera vez y ninguno la segunda dice exactamente lo mismo, y ademas
+        // dice la otra mitad --que tampoco se avisa dos veces.
+        withClue("la primera pasada tiene que marcar el préstamo y avisar") {
+            (first.noticesRaised >= 1).shouldBe(true)
+        }
+        withClue("la segunda no puede volver a marcarlo ni volver a avisar") {
+            second.noticesRaised.shouldBe(0)
+        }
     }
 
     @Test
@@ -126,7 +136,7 @@ class MarkOverdueLoansTest : SpringIntegrationTest() {
         val first = overdueLoanInNewHousehold()
         val second = overdueLoanInNewHousehold()
 
-        markOverdue.run()
+        sweep.run()
 
         http.getJson("/api/v1/loans/${first.loanId}", first.accessToken).body!!
             .extract("status").shouldBe("OVERDUE")

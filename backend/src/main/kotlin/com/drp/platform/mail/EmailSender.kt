@@ -1,6 +1,4 @@
-package com.drp.core.application.port
-
-import com.drp.core.domain.identity.EmailAddress
+package com.drp.platform.mail
 
 /**
  * El puerto de correo saliente (ADR-009).
