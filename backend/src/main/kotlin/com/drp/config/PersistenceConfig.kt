@@ -1,7 +1,7 @@
 package com.drp.config
 
-import com.drp.adapter.persistence.TenantAwareTransactionManager
-import com.drp.application.tenant.TenantContext
+import com.drp.platform.tenant.TenantAwareTransactionManager
+import com.drp.platform.tenant.TenantContext
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.persistence.EntityManagerFactory
 import org.hibernate.cfg.AvailableSettings

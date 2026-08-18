@@ -76,7 +76,7 @@ no de quien se acuerde.
 ### Dónde aterriza cada error
 
 Es la decisión que da valor al patrón, y viene del backend:
-[`ApiExceptionHandler`](../../../../backend/src/main/kotlin/com/drp/adapter/http/ApiExceptionHandler.kt)
+[`ApiExceptionHandler`](../../../../backend/src/main/kotlin/com/drp/core/adapter/http/ApiExceptionHandler.kt)
 responde **`400` con `VALIDATION_ERROR` y un detalle por campo** para los errores
 de forma, y **`409` con un código concreto** para los de regla de negocio. Son dos
 familias que no se mezclan, así que tampoco se pintan en el mismo sitio:

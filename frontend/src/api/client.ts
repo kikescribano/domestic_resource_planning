@@ -46,6 +46,7 @@ export type ApiErrorCode =
   | 'MERGE_ASSET_DEACTIVATED'
   | 'MERGE_NOT_CONSUMABLE'
   | 'MERGE_SAME_ASSET'
+  | 'MODULE_INACTIVE'
   | 'RATE_LIMITED'
   | 'RESET_TOKEN_INVALID'
   | 'STORAGE_QUOTA_EXCEEDED'
@@ -93,6 +94,11 @@ const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   MERGE_ASSET_DEACTIVATED: 'Alguna de las dos existencias está dada de baja.',
   MERGE_NOT_CONSUMABLE: 'Solo se unen existencias de consumible.',
   MERGE_SAME_ASSET: 'Origen y destino son la misma existencia.',
+  // Se ve poco a propósito: la pantalla de una ruta apagada ofrece activar el
+  // módulo en lugar de enseñar un error. Este texto es para el caso raro de
+  // que alguien lo reciba en medio de otra cosa, por haberlo desactivado desde
+  // otra pestaña.
+  MODULE_INACTIVE: 'Ese módulo no está activo en este hogar.',
   NOT_FOUND: 'Eso ya no está.',
   FORBIDDEN: 'No tienes permiso para hacer esto.',
   RATE_LIMITED: 'Demasiados intentos. Prueba de nuevo en un momento.',
@@ -318,6 +324,27 @@ export interface AssetFilters {
   type?: AssetType
   status?: AssetStatus
   withoutOwner?: boolean
+}
+
+// --- Módulos activables (Fase 2, Hito 0) -------------------------------------
+
+export type ModuleStatus = 'ACTIVE' | 'INACTIVE'
+
+/**
+ * Una entrada del catálogo con lo que este hogar ha decidido sobre ella.
+ *
+ * El catálogo llega **entero** aunque no se administre: ver que un módulo existe
+ * no es poder encenderlo, y quien no administra necesita saber que hay para
+ * poder pedirlo.
+ */
+export interface HouseholdModule {
+  key: string
+  name: string
+  description: string
+  routePrefix: string
+  status: ModuleStatus
+  activatedAt: string | null
+  deactivatedAt: string | null
 }
 
 // --- Ficheros y documentos (Hito 3) ------------------------------------------
@@ -812,6 +839,19 @@ export const api = {
 
   acceptInvitation: (input: AcceptInvitationInput) =>
     request<TokenPair>('/invitations/accept', { method: 'POST', body: input }),
+
+  // --- Módulos del hogar ----------------------------------------------------
+  // Se resuelve **una vez por sesión** y no una por pantalla: la clave de
+  // consulta es fija, así que React Query la comparte entre el shell, la
+  // pantalla de módulos y cada ruta de módulo.
+  listModules: (accessToken: string) =>
+    request<Page<HouseholdModule>>('/modules', { accessToken }),
+
+  activateModule: (key: string, accessToken: string) =>
+    request<HouseholdModule>(`/modules/${key}/activation`, { method: 'POST', accessToken }),
+
+  deactivateModule: (key: string, accessToken: string) =>
+    request<HouseholdModule>(`/modules/${key}/activation`, { method: 'DELETE', accessToken }),
 
   // --- Categorías -----------------------------------------------------------
   listCategories: (accessToken: string, includeRetired = false) =>

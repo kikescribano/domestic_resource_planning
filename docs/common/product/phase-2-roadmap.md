@@ -199,38 +199,38 @@ tiene en la aplicación. El canal reutiliza el `EmailSender` de la
 
 ## Hitos
 
-### Hito 0 — Fronteras de módulo y activación por hogar · **Pendiente**
+### Hito 0 — Fronteras de módulo y activación por hogar · **Completado (2026-08-18)**
 
 Sin funcionalidad de producto, como el Hito 0 de la Fase 1: es lo que permite que
 los hitos siguientes sean módulos y no funcionalidades.
 
-- [ ] **ADR-010 — Fronteras de módulo y activación por hogar**: el empaquetado de
+- [x] **ADR-010 — Fronteras de módulo y activación por hogar**: el empaquetado de
       arriba, las reglas de ArchUnit, el gate en tres capas, el `403
       MODULE_INACTIVE` y la siembra desde estado. Con su criterio de validación y
       de reversión, como toda ADR.
-- [ ] **Renombrado del core a `com.drp.core`** en un commit propio y sin ningún
+- [x] **Renombrado del core a `com.drp.core`** en un commit propio y sin ningún
       otro cambio dentro, más `com.drp.platform` con lo que hoy es compartido:
       bus, `TenantContext`, puertos e `IdempotentEventHandler`.
-- [ ] **Reglas de ArchUnit** que fallen la construcción, con una prueba por regla
+- [x] **Reglas de ArchUnit** que fallen la construcción, con una prueba por regla
       y **medidas en los dos sentidos**: introducida la dependencia prohibida, la
       prueba falla.
-- [ ] **Migración `V7`**: `household_modules` con su RLS, su `FORCE` y su autoría.
-- [ ] **Registro de módulos en código** —clave, nombre, descripción— y el puerto
+- [x] **Migración `V7`**: `household_modules` con su RLS, su `FORCE` y su autoría.
+- [x] **Registro de módulos en código** —clave, nombre, descripción— y el puerto
       que responde «¿está activo para este hogar?», resuelto una vez por petición.
-- [ ] **Tres operaciones nuevas en el contrato**: listar el catálogo con el estado
+- [x] **Tres operaciones nuevas en el contrato**: listar el catálogo con el estado
       del hogar, activar y desactivar. Solo administrador. Con `operationId`, que
       es lo que la
       [ADR-007](../architecture/decisions/ADR-007-openapi-contract-as-source-of-truth.md)
       necesita.
-- [ ] **El gate HTTP** como interceptor sobre el prefijo de ruta del módulo, con
-      su código de error nuevo enumerado en el esquema.
-- [ ] **La base de handler de módulo**, que extiende `IdempotentEventHandler` y
+- [x] **El gate HTTP** sobre el prefijo de ruta del módulo, con su código de
+      error nuevo enumerado en el esquema.
+- [x] **La base de handler de módulo**, que extiende `IdempotentEventHandler` y
       añade la comprobación de activación sin romper ninguna de las tres garantías
       que esa clase ya resuelve.
-- [ ] **Frontend**: pantalla de módulos del hogar, navegación reorganizada para
+- [x] **Frontend**: pantalla de módulos del hogar, navegación reorganizada para
       que doce entradas quepan, y la pantalla que ofrece activar cuando entras en
       una ruta apagada.
-- [ ] **Recorrido vertical**: con el módulo apagado su API responde `403` y su
+- [x] **Recorrido vertical**: con el módulo apagado su API responde `403` y su
       navegación no está; se activa desde la pantalla, aparece; se desactiva,
       desaparece y **los datos siguen ahí** al volver a activarlo.
 
@@ -240,6 +240,41 @@ los hitos siguientes sean módulos y no funcionalidades.
 > de pruebas y no se despliega**, con una tabla, una ruta y un handler: es el
 > testigo del gate en las tres capas y sobrevive a la fase entera como prueba de
 > regresión del mecanismo.
+
+#### Cómo quedó, y las tres cosas que cambiaron sobre lo previsto
+
+El mecanismo está entero y el catálogo, completo: los cuatro módulos aparecen
+declarados —clave, nombre, descripción y prefijo de ruta— en su propio árbol
+`com.drp.module.<clave>`, sin dominio. **Encenderlos y apagarlos funciona de
+verdad**; lo que hay detrás de cada uno llega con su hito.
+
+Tres cosas se decidieron distinto de como estaban escritas, y las tres quedan
+anotadas con su alternativa descartada en [`decisions.md`](decisions.md):
+
+- **El gate HTTP es un filtro y no un `HandlerInterceptor`.** Un interceptor solo
+  alcanza a las rutas que ya tienen manejador, así que todo lo que un módulo aún
+  no ha construido respondería `404` —justo la confusión que el `403` evita— y una
+  operación añadida mañana bajo su prefijo nacería sin gate.
+- **La barra inferior de móvil baja de ocho paradas a cuatro más «Más».** No era
+  neutral conservarlas: a 320 px daban 40 px de ancho cada una, por debajo de los
+  44 px que exige la dirección visual. El recorrido vertical lo mide ahora, para
+  que el defecto no vuelva con el módulo siguiente.
+- **«Módulos del hogar» es una entrada de navegación propia**, así que un hogar
+  sin módulos activos ve nueve enlaces en escritorio y no ocho exactos. La
+  alternativa —una tarjeta en la pantalla de inicio— escondía la única puerta de
+  la funcionalidad detrás de un descubrimiento casual.
+
+Y **`ModuleEventHandler` abre él mismo la transacción `REQUIRES_NEW`** en lugar
+de dejarlo como norma para cada módulo, que era lo previsto. Los cuatro hitos de
+módulo se ahorran acordarse de la única regla cuyo incumplimiento puede tumbar al
+core.
+
+**Lo que el hito no puede demostrar en el navegador, y dónde se demuestra.** El
+recorrido vertical enseña el ciclo completo salvo una mitad: que los datos del
+módulo siguen ahí al reactivarlo. No hay dónde verlo, porque ninguno de los
+cuatro tiene todavía una sola fila. Eso lo demuestra el módulo de prueba en la
+batería del backend —escribe, se apaga, deja de escribir, y al reactivarse
+devuelve lo que había—, que es exactamente para lo que existe.
 
 ### Hito 1 — Plataforma: programación y avisos · **Pendiente**
 
@@ -395,7 +430,7 @@ del alcance nuevo. Se resuelven en el hito que las toca y se anotan en
 | **Peso y volumen de un asset**, de los que depende que el aviso de capacidad de una ubicación sirva de algo | 3 | Su destinatario asignado era Warehouse, y Warehouse llega. Hoy el aviso solo cuenta unidades |
 | **Unidad de compra frente a unidad de consumo**, y su conversión | 3 y 4 | El core fija que la unidad la pone el artículo y que convertir es de Warehouse; Compras es quien lo necesita de verdad |
 | **Qué pasa cuando un consumible llega a cero**: si entra solo en la lista de la compra o hace falta decirlo | 4 | El catálogo de eventos lo da por hecho, y nadie ha decidido si es automático |
-| **Qué ve un rol no administrador** en la pantalla de módulos: el catálogo entero o solo los activos | 0 | Es una decisión de producto pequeña, y condiciona la navegación |
+| ~~**Qué ve un rol no administrador** en la pantalla de módulos~~ — **resuelta el 2026-08-18: el catálogo entero, con su estado y sin acciones** | 0 | Era una decisión de producto pequeña, y condicionaba la navegación |
 
 Y una que **no vence en esta fase** y conviene no confundir: el traspaso del
 recordatorio de devolución al módulo de préstamos avanzados, único traspaso
@@ -426,4 +461,5 @@ conocido.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-18 | **Hito 0 completado**: fronteras de módulo con ArchUnit medido en los dos sentidos, `household_modules` con RLS y `FORCE`, gate en las tres capas, tres operaciones en el contrato, navegación en dos grupos y ADR-010. Se resuelve la pregunta que este hito tenía asignada y quedan anotadas tres decisiones que la definición no preveía |
 | 2026-08-18 | Se crea al planificar la Fase 2: alcance de cuatro módulos sobre activación por hogar y capacidad de plataforma, siete hitos, criterio de aceptación con dos ADR nuevas, y las tres decisiones de arranque tomadas antes de empezar |

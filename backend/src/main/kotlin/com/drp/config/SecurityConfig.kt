@@ -1,7 +1,8 @@
 package com.drp.config
 
-import com.drp.adapter.security.JwtAuthenticationFilter
-import com.drp.adapter.security.SecurityProperties
+import com.drp.core.adapter.security.JwtAuthenticationFilter
+import com.drp.core.adapter.security.SecurityProperties
+import com.drp.platform.module.http.ModuleGateFilter
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.servlet.FilterRegistrationBean
@@ -18,6 +19,7 @@ import org.springframework.security.crypto.argon2.Argon2PasswordEncoder
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
+import org.springframework.security.web.access.intercept.AuthorizationFilter
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 import java.time.Clock
 import java.time.Duration
@@ -65,6 +67,19 @@ class SecurityConfig {
     ): FilterRegistrationBean<JwtAuthenticationFilter> =
         FilterRegistrationBean(filter).apply { isEnabled = false }
 
+    /**
+     * Lo mismo para el gate de modulos, y aqui la segunda pasada **si** haria
+     * dano: registrado por Spring Boot correria fuera de la cadena de seguridad
+     * --antes de que nadie haya autenticado-- y ahi no hay hogar en el contexto,
+     * asi que todo modulo pareceria apagado y una peticion sin token a la ruta de
+     * un modulo respondería 403 en lugar de 401.
+     */
+    @Bean
+    fun moduleGateServletRegistration(
+        filter: ModuleGateFilter,
+    ): FilterRegistrationBean<ModuleGateFilter> =
+        FilterRegistrationBean(filter).apply { isEnabled = false }
+
     @Bean
     fun securityProperties(
         environment: Environment,
@@ -83,7 +98,11 @@ class SecurityConfig {
     }
 
     @Bean
-    fun securityFilterChain(http: HttpSecurity, jwtFilter: JwtAuthenticationFilter): SecurityFilterChain {
+    fun securityFilterChain(
+        http: HttpSecurity,
+        jwtFilter: JwtAuthenticationFilter,
+        moduleGate: ModuleGateFilter,
+    ): SecurityFilterChain {
         http
             // La API no usa cookies de sesion, asi que no hay nada que un sitio
             // ajeno pueda hacer enviar al navegador por su cuenta: el token va en
@@ -120,6 +139,14 @@ class SecurityConfig {
                     .anyRequest().authenticated()
             }
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter::class.java)
+            // El gate de modulos va **detras de la autorizacion**, que es la
+            // ultima parada de la cadena. Puesto antes, una peticion sin token a
+            // la ruta de un modulo responderia `403 MODULE_INACTIVE` --sin hogar
+            // en el contexto no hay ningun modulo activo-- en lugar del `401` que
+            // le corresponde. Aqui solo llega lo que ya esta autenticado y
+            // autorizado, y lo unico que queda por decidir es si ese hogar tiene
+            // encendido ese modulo.
+            .addFilterAfter(moduleGate, AuthorizationFilter::class.java)
             .httpBasic { it.disable() }
             .formLogin { it.disable() }
             // Sin esto, Spring Security responde 403 a una peticion sin

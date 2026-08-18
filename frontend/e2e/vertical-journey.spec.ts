@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test'
 
 /**
  * El recorrido vertical de la Fase 1, en un navegador de verdad.
@@ -157,7 +157,151 @@ test.describe('recorrido vertical', () => {
     await page.getByText('Taladro').first().click()
     await expect(page.getByText('Disponible').first()).toBeVisible()
   })
+
+  /**
+   * El ciclo de la activación de un módulo, de punta a punta.
+   *
+   * Es la mitad que ninguna prueba de componente puede dar: el `403` sale del
+   * filtro de verdad, la navegación se repinta sobre el DOM real y la pantalla
+   * de una ruta apagada se mide con axe y con el tabulador. El módulo que se
+   * enciende es **Proveedores**, que en el Hito 0 es una declaración sin dominio
+   * — y eso es justo lo que hace la prueba honesta: lo que se está comprobando
+   * es el mecanismo, no el módulo.
+   *
+   * La otra mitad del ciclo —que los datos del módulo siguen ahí al reactivarlo—
+   * se comprueba en el backend con el módulo de prueba, que sí tiene tabla. Aquí
+   * no hay ninguna que sobreviva porque ninguno de los cuatro tiene datos
+   * todavía.
+   */
+  test('un módulo apagado no existe, se enciende desde su pantalla y vuelve a apagarse', async ({
+    page,
+    request,
+  }) => {
+    const email = `admin-${Date.now()}@example.test`
+    const password = 'el gato duerme en el sofa'
+
+    await page.goto('/crear-hogar')
+    await page.getByLabel('Nombre del hogar').fill('Casa de los Módulos')
+    await page.getByLabel('Tu nombre').fill('Kike')
+    await page.getByLabel('Correo').fill(email)
+    await page.getByLabel('Contraseña', { exact: true }).fill(password)
+    await page.getByRole('button', { name: /crear/i }).click()
+    await page.goto(await linkFromEmail(email))
+    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+
+    const navigation = page.getByRole('navigation', { name: 'Principal' })
+
+    // --- 1. Apagado: ni navegación ni API -----------------------------------
+    await expect(navigation.getByRole('link', { name: 'Proveedores' })).toHaveCount(0)
+    await expect(navigation.getByRole('link', { name: 'Módulos del hogar' })).toBeVisible()
+
+    // Y la API, con el token de verdad y contra el filtro de verdad. Es un `403`
+    // con código propio y no un `404`: el frontend necesita esa diferencia para
+    // poder ofrecer la activación en lugar de enseñar un error.
+    const token = await accessToken(request, email, password)
+    const closed = await request.get('/api/v1/suppliers', { headers: { Authorization: `Bearer ${token}` } })
+    expect(closed.status(), 'la ruta de un módulo apagado no responde 403').toBe(403)
+    expect(await closed.text()).toContain('MODULE_INACTIVE')
+
+    // Entrar a mano en su ruta lleva a la pantalla que lo ofrece.
+    await page.goto('/proveedores')
+    await expect(page.getByText('Este módulo está apagado')).toBeVisible()
+    await checkAccessibility(page, 'la ruta de un módulo apagado')
+    await checkReflow(page, 'la ruta de un módulo apagado')
+
+    // --- 2. Encenderlo desde la pantalla de módulos -------------------------
+    await navigateTo(page, 'Módulos del hogar', '/modulos')
+    await checkAccessibility(page, 'módulos del hogar')
+    await checkTouchTargets(page)
+
+    await page.getByRole('button', { name: /^Encender Proveedores/ }).click()
+
+    // Aparece en la navegación, y su ruta deja de ofrecer la activación.
+    await expect(navigation.getByRole('link', { name: 'Proveedores' })).toBeVisible()
+    await navigateTo(page, 'Proveedores', '/proveedores')
+    await expect(page.getByText('Este módulo está apagado')).toHaveCount(0)
+
+    // La API ya no la corta el gate. Responde `404` porque el módulo todavía no
+    // tiene controlador, y esa es exactamente la diferencia que se quería ver:
+    // apagado dice «actívalo», encendido dice «eso no existe».
+    const opened = await request.get('/api/v1/suppliers', { headers: { Authorization: `Bearer ${token}` } })
+    expect(opened.status(), 'el gate sigue cortando un módulo ya encendido').not.toBe(403)
+
+    // --- 3. Apagarlo otra vez ----------------------------------------------
+    await navigateTo(page, 'Módulos del hogar', '/modulos')
+    await page.getByRole('button', { name: /^Apagar Proveedores/ }).click()
+
+    await expect(navigation.getByRole('link', { name: 'Proveedores' })).toHaveCount(0)
+    await page.goto('/proveedores')
+    await expect(page.getByText('Este módulo está apagado')).toBeVisible()
+  })
 })
+
+/** Un access token de verdad, por el mismo camino por el que lo obtiene el cliente. */
+async function accessToken(
+  request: APIRequestContext,
+  email: string,
+  password: string,
+): Promise<string> {
+  const response = await request.post('/api/v1/auth/login', { data: { email, password } })
+  expect(response.ok(), 'no se pudo abrir sesión por la API').toBe(true)
+  return ((await response.json()) as { accessToken: string }).accessToken
+}
+
+/**
+ * Que toda parada de la navegación siga siendo pulsable con el pulgar en el
+ * ancho más estrecho del rango.
+ *
+ * Es lo que obligó a reorganizar la navegación en la Fase 2, y es una medida y
+ * no una opinión: la dirección visual exige 44 px de objetivo mínimo, y con las
+ * ocho paradas que había a 320 px salían **40 px de ancho** cada una. Cuatro
+ * módulos lo habrían llevado a doce. Sin esta comprobación, el mismo defecto
+ * vuelve con el módulo siguiente y nadie se entera mirando la pantalla.
+ */
+async function checkTouchTargets(page: Page) {
+  await page.setViewportSize({ width: 320, height: 640 })
+
+  const stops = page.getByRole('navigation', { name: 'Principal' }).getByRole('link')
+  const total = await stops.count()
+  expect(total, 'la navegación principal se quedó sin paradas').toBeGreaterThan(0)
+
+  const measured: Array<{ label: string; width: number; height: number }> = []
+
+  for (let index = 0; index < total; index++) {
+    const stop = stops.nth(index)
+    // Solo las que se ven: desde `md` la barra lateral enseña más paradas, y en
+    // móvil esas están con `display:none` y no las pulsa nadie.
+    if (!(await stop.isVisible())) continue
+
+    const box = await stop.boundingBox()
+    measured.push({
+      label: (await stop.textContent())?.trim() ?? `parada ${index}`,
+      width: box?.width ?? 0,
+      height: box?.height ?? 0,
+    })
+  }
+
+  // El reparto entero en el mensaje, y no solo la parada culpable: lo que falla
+  // aquí casi nunca es esa parada sino **cómo se repartió el ancho**, y saber
+  // cuánto se llevó cada una es la diferencia entre arreglarlo y adivinarlo.
+  const layout = measured.map((stop) => `${stop.label} ${stop.width.toFixed(1)}`).join(' · ')
+
+  for (const stop of measured) {
+    expect(stop.width, `«${stop.label}» a 320 px. Reparto: ${layout}`).toBeGreaterThanOrEqual(44)
+    expect(stop.height, `«${stop.label}» mide menos de 44 px de alto a 320 px`).toBeGreaterThanOrEqual(44)
+  }
+
+  // Y la otra mitad de la misma garantía: que darle a cada parada su suelo de
+  // 44 px no haya empujado la barra fuera de la pantalla. Las dos van juntas
+  // porque se compran una a costa de la otra, y comprobar solo una deja pasar
+  // el arreglo que rompe la contraria.
+  const overflows = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  )
+  expect(overflows, `la navegación desborda a 320 px. Reparto: ${layout}`).toBe(false)
+
+  await page.setViewportSize(DESKTOP)
+}
 
 /**
  * Un enlace de la navegación principal.

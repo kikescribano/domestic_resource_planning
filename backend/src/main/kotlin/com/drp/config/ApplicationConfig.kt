@@ -1,8 +1,8 @@
 package com.drp.config
 
-import com.drp.application.SessionPolicy
-import com.drp.application.usecase.StoragePolicy
-import com.drp.domain.identity.PasswordPolicy
+import com.drp.core.application.SessionPolicy
+import com.drp.core.application.usecase.StoragePolicy
+import com.drp.core.domain.identity.PasswordPolicy
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

@@ -28,3 +28,4 @@ Usa [`ADR-template.md`](ADR-template.md) para crear una entrada.
 | [ADR-007](ADR-007-openapi-contract-as-source-of-truth.md) | El contrato OpenAPI como fuente de verdad de la API | accepted | — |
 | [ADR-008](ADR-008-repository-layout-and-build-chain.md) | Estructura del repositorio y cadena de construcción | accepted | — |
 | [ADR-009](ADR-009-outbound-email.md) | Envío de correo saliente | accepted | — |
+| [ADR-010](ADR-010-module-boundaries-and-activation.md) | Fronteras de módulo y activación por hogar | accepted | — |

@@ -20,7 +20,7 @@ estorba en una lista de trescientas filas**, y
 ### Incluido
 
 - Las dos formas del listado y qué decide cuál se usa.
-- La paginación, que es uniforme en las once colecciones del contrato.
+- La paginación, que es uniforme en las doce colecciones del contrato.
 - Los filtros y los tres estados vacíos.
 - La ficha del elemento seleccionado, y cómo se distingue en ella lo propio de lo
   heredado del artículo.

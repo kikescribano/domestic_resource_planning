@@ -16,19 +16,34 @@ no existe**. Antes de escribir un caso de uso, una tabla o una pantalla, busca s
 ya está —y si lo que quieres es cambiarlo, hay pruebas que lo fijan y documentos
 que lo explican.
 
-Lo siguiente es la **Fase 2 — Módulos activables**, **ya planificada** (2026-08-18)
-en [`phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md): los cuatro
-módulos de prioridad alta de la sección 4.2, sobre la activación por hogar y la
-plataforma de avisos, en siete hitos. **Ese documento es el que hay que leer para
-arrancar un hito**, y el que hay que actualizar al cerrarlo. La decisión de
-producto que faltaba —qué módulos— está tomada y no hay que volver a abrirla.
+Lo siguiente es la **Fase 2 — Módulos activables**, **en curso** y planificada
+(2026-08-18) en [`phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md):
+los cuatro módulos de prioridad alta de la sección 4.2, sobre la activación por
+hogar y la plataforma de avisos, en siete hitos. **Ese documento es el que hay que
+leer para arrancar un hito**, y el que hay que actualizar al cerrarlo. La decisión
+de producto que faltaba —qué módulos— está tomada y no hay que volver a abrirla.
 
-Y tres cosas que la planificación destapó, para que no se den por hechas: **el
-backend no está empaquetado por módulos** —es `com.drp.{domain,application,adapter}`
-y no expresa ninguna frontera—, **no existe ninguna noción de activación** en
-ninguna capa, y **los tres procesos diarios no los invoca nadie más que las
-pruebas**: no hay un solo `@Scheduled` en el código de producción. Los tres son
-contenido de los Hitos 0 y 1.
+**Su Hito 0 está cerrado (2026-08-18)** y con él dos de los tres huecos que la
+planificación había destapado. El backend ya está empaquetado por módulos:
+
+```text
+com.drp.platform.*      Bus, TenantContext, paginación y la activación de módulos
+com.drp.core.*          El core, con su reparto en capas intacto
+com.drp.module.<key>.*  Un árbol por módulo — hoy solo su declaración
+com.drp                 DrpApplication y config: quien cablea todo
+```
+
+Y **cuatro reglas de ArchUnit fallan la construcción** si alguien cruza una
+frontera: un módulo no referencia a otro, el core no referencia a ninguno, y
+plataforma no se apoya en el core —con **una** excepción nombrada dentro de la
+propia regla, `SessionClaims`, que tiene además una prueba que afirma que sigue
+siendo una sola—. La dirección `módulo → core` sí está permitida: un módulo lee
+el estado del core. La [ADR-010](docs/common/architecture/decisions/ADR-010-module-boundaries-and-activation.md)
+lo recoge entero, incluido el gate en tres capas y el `403 MODULE_INACTIVE`.
+
+Lo que **sigue pendiente** es el tercer hueco: **los tres procesos diarios no los
+invoca nadie más que las pruebas**, y no hay un solo `@Scheduled` en el código de
+producción. Es el contenido del Hito 1.
 
 La Fase 1 no tiene continuación pendiente; lo que se dejó abierto a propósito está
 listado al final de [`roadmap.md`](docs/common/product/roadmap.md), cada cosa con

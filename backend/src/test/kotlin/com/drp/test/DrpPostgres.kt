@@ -55,6 +55,7 @@ class DrpPostgres : PostgreSQLContainer<DrpPostgres>(DockerImageName.parse(IMAGE
                 .also {
                     it.start()
                     it.migrate()
+                    it.createTestbedSchema()
                 }
         }
 
@@ -86,6 +87,24 @@ class DrpPostgres : PostgreSQLContainer<DrpPostgres>(DockerImageName.parse(IMAGE
             .placeholders(mapOf("applicationRole" to APP_USERNAME))
             .load()
             .migrate()
+    }
+
+    /**
+     * Crea el esquema del **modulo de prueba** del Hito 0.
+     *
+     * Va aqui y no en una migracion de Flyway porque ese modulo no se despliega:
+     * es el testigo del mecanismo de activacion y vive en el arbol de pruebas.
+     * Si viajara en `db/migration`, la aplicacion de verdad se lo llevaria a
+     * produccion; y si viajara en una localizacion de Flyway solo para pruebas,
+     * el Flyway que arranca dentro de la aplicacion encontraria una migracion
+     * aplicada que no sabe resolver y fallaria la validacion.
+     */
+    private fun createTestbedSchema() {
+        val script = checkNotNull(javaClass.getResourceAsStream("/db/testbed/schema.sql")) {
+            "No se encuentra db/testbed/schema.sql en el classpath de pruebas"
+        }.use { it.readBytes().toString(Charsets.UTF_8) }
+
+        ownerConnection().use { connection -> connection.createStatement().use { it.execute(script) } }
     }
 
     /** Conexion como la aplicacion: sujeta a las politicas de RLS. */
