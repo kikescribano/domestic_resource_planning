@@ -26,6 +26,14 @@
  *   - Módulos construidos: **cuatro de trece** (proveedores, warehouse, compras
  *     y mantenimiento), todos en estado «En desarrollo» porque no hay despliegue.
  *
+ * Vuelto a comprobar el mismo día contra un README que había avanzado: la sección
+ * 8 ganó una fila, **«Cierre de huecos»**, y los cuatro datos siguen en pie porque
+ * esa fila **no es una fase** —lo dice ella misma, y por eso no renumera nada—, de
+ * modo que las fases siguen siendo cuatro con tres cerradas. Las cuatro ADR que
+ * ese bloque planea (012 a 015) **no están escritas**, así que el recuento sigue
+ * siendo once. El bloque no entra en el deck: es saldo de deuda interna, no avance
+ * de producto, y queda por debajo de la altura a la que habla esta presentación.
+ *
  * Esos cuatro son los datos que más rápido caducan y **hay que repasarlos cada
  * vez**: este fichero no falla ni avisa cuando se queda atrás, simplemente sigue
  * generando un deck impecable que ya no es cierto. Le pasó a su hermano durante
