@@ -1,11 +1,16 @@
-"""Genera `DRP-comercial.pptx`: qué es DRP para quien no lo conoce.
+"""Genera `DRP-comercial-minitheme.pptx`: qué es DRP para quien no lo conoce.
+
+**Hay otra presentación comercial**, `DRP-comercial.pptx`, con el aspecto propio
+de DRP y su propio generador: dicen lo mismo en dos lenguajes visuales y se
+eligen por el destinatario. El índice de marketing lo explica; lo que no vale es
+tocar una y dejar la otra atrás.
 
 Este script es la fuente editable del .pptx. La presentación **no se retoca a
 mano**: se corrige aquí y se vuelve a ejecutar. El procedimiento entero —de dónde
 sale el look and feel, qué obliga la licencia y cómo se verifica— está en la
 skill [`marketing-deck`](../../../../.claude/skills/marketing-deck/SKILL.md).
 
-    python docs/common/marketing/assets/build-drp-comercial.py
+    python docs/common/marketing/assets/build-drp-comercial-minitheme.py
 
 **Refleja el estado del repositorio a 2026-08-19**: Fases 1 y 2 cerradas, cuatro
 módulos construidos, cierre de huecos planificado y sin empezar, Fase 3 sin
@@ -24,7 +29,7 @@ sys.path.insert(0, str(RAIZ / ".claude" / "skills" / "marketing-deck" / "scripts
 
 from slidesgo_deck import Deck  # noqa: E402
 
-SALIDA = RAIZ / "docs" / "common" / "marketing" / "presentations" / "DRP-comercial.pptx"
+SALIDA = RAIZ / "docs" / "common" / "marketing" / "presentations" / "DRP-comercial-minitheme.pptx"
 
 
 def seccion(deck: Deck, numero: str, titulo: str, subtitulo: str, nota: str):

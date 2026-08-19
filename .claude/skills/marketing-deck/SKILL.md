@@ -101,7 +101,11 @@ Slidesgo sobre la propia plantilla.
    `id` con `inspect-template.py`.
 3. **Escribir el generador** en
    [`docs/common/marketing/assets/`](../../../docs/common/marketing/assets/),
-   uno por presentación. A partir de ahí **el .pptx no se edita a mano**: se
+   uno por presentación y **con el sufijo `-minitheme` en el nombre**: en esa
+   carpeta conviven los generadores de [SKILL-001](../../../docs/common/skills/SKILL-001-readme-to-deck.md),
+   que toman de esta plantilla decisiones de diseño y no diapositivas, y sin el
+   sufijo acaban un `build-drp-comercial.js` y un `build-drp-comercial.py`
+   distintos uno al lado del otro. A partir de ahí **el .pptx no se edita a mano**: se
    corrige el generador y se vuelve a ejecutar.
 4. **Anotar cada diapositiva** con `.notes()`, diciendo de qué sección sale. Es
    lo que permite auditar después si sigue siendo cierta.
@@ -155,9 +159,9 @@ corrige.
 | Los renders de QA | Fuera del repositorio: son desechables |
 
 ```bash
-python docs/common/marketing/assets/build-drp-comercial.py
+python docs/common/marketing/assets/build-drp-comercial-minitheme.py
 ```
 
 ```bash
-python .claude/skills/marketing-deck/scripts/qa-deck.py docs/common/marketing/presentations/DRP-comercial.pptx
+python .claude/skills/marketing-deck/scripts/qa-deck.py docs/common/marketing/presentations/DRP-comercial-minitheme.pptx
 ```

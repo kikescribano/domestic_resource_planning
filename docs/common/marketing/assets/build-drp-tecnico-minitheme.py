@@ -1,11 +1,11 @@
-"""Genera `DRP-tecnico.pptx`: cómo está construido DRP.
+"""Genera `DRP-tecnico-minitheme.pptx`: cómo está construido DRP.
 
 Este script es la fuente editable del .pptx. La presentación **no se retoca a
 mano**: se corrige aquí y se vuelve a ejecutar. El procedimiento entero —de dónde
 sale el look and feel, qué obliga la licencia y cómo se verifica— está en la
 skill [`marketing-deck`](../../../../.claude/skills/marketing-deck/SKILL.md).
 
-    python docs/common/marketing/assets/build-drp-tecnico.py
+    python docs/common/marketing/assets/build-drp-tecnico-minitheme.py
 
 **Refleja el estado del repositorio a 2026-08-19**: 98 operaciones en el
 contrato, 28 tablas, once ADR, Fases 1 y 2 cerradas y cuatro módulos
@@ -24,7 +24,7 @@ sys.path.insert(0, str(RAIZ / ".claude" / "skills" / "marketing-deck" / "scripts
 
 from slidesgo_deck import Deck  # noqa: E402
 
-SALIDA = RAIZ / "docs" / "common" / "marketing" / "presentations" / "DRP-tecnico.pptx"
+SALIDA = RAIZ / "docs" / "common" / "marketing" / "presentations" / "DRP-tecnico-minitheme.pptx"
 
 
 def seccion(deck: Deck, numero: str, titulo: str, subtitulo: str, nota: str):
