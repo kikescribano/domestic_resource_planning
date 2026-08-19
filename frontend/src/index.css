@@ -278,6 +278,28 @@
     outline-offset: 2px;
   }
 
+  /* Y los campos de fecha y hora aparte, que es la única excepción y no es
+     nuestra. Chromium **delega el foco a un campo de su shadow DOM** —el día, el
+     mes—, así que el `<input>` de fuera recibe `:focus` pero nunca
+     `:focus-visible` **ni tampoco `:focus`**: llegar a él con el tabulador no
+     dibujaba ningún anillo y quien no usa ratón perdía de vista dónde estaba.
+     De ahí `:focus-within`, que es el único de los tres que atraviesa la
+     frontera del shadow DOM. En un campo de escritura eso es lo mismo que hace
+     el navegador con los de texto —ahí `:focus-visible` también casa al hacer
+     clic—, así que no aparece ningún anillo donde antes no lo hubiera.
+
+     Lo encontró la pasada sistemática de accesibilidad del Hito 6, en la parada
+     25 de mantenimiento. Los recorridos anteriores rellenaban estas fechas con
+     `fill()`, que no pasa por el tabulador. */
+  input[type='date']:focus-within,
+  input[type='time']:focus-within,
+  input[type='datetime-local']:focus-within,
+  input[type='month']:focus-within,
+  input[type='week']:focus-within {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
   ::placeholder {
     color: var(--color-ink-subtle);
     opacity: 1;

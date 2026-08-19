@@ -721,7 +721,163 @@ test.describe('recorrido vertical', () => {
     // que en móvil vive dentro de «Más».
     await checkTouchTargets(page)
   })
+
+  /**
+   * **La pasada sistemática de accesibilidad de las seis pantallas de la Fase 2**,
+   * que es lo que le faltaba a la fase y no la primera visita.
+   *
+   * Los seis recorridos de arriba tocan las seis pantallas —módulos, avisos,
+   * proveedores, almacén, compras y mantenimiento— y cada uno audita **la suya**
+   * en el momento en que llega a ella: axe en los dos modos, reflujo, y el
+   * tabulador hasta el control que ese recorrido necesita. Eso es la primera
+   * visita, y deja tres huecos que solo se ven mirando las seis juntas:
+   *
+   * 1. **El teclado se comprueba hasta un control y no hasta el final.** `tabTo`
+   *    para en cuanto llega, así que lo que hay *después* de ese control no lo ha
+   *    recorrido nadie: un botón de la última fila de una tabla que no se puede
+   *    enfocar no lo delata ningún recorrido.
+   * 2. **El reflujo no llegó a dos de las seis.** La pantalla de módulos y la
+   *    ruta de un módulo apagado se auditaron con axe pero sin los tres anchos.
+   * 3. **Ninguna se auditó con las doce paradas puestas.** Cada recorrido
+   *    enciende un módulo, así que la navegación que midieron tenía nueve o diez
+   *    entradas. Doce es el caso peor de la fase, y es el único que decide si la
+   *    reorganización del Hito 0 aguantó.
+   *
+   * Por eso esta prueba **no es un recorrido**: enciende los cuatro módulos por
+   * la API —el ciclo de la activación ya tiene el suyo, y repetirlo aquí sería
+   * medir dos veces lo mismo— y recorre las seis pantallas aplicándoles a todas
+   * exactamente lo mismo. Que sea la misma comprobación en las seis es el punto:
+   * lo que se olvida en una pantalla nueva no es la comprobación difícil sino la
+   * de siempre.
+   */
+  test('la pasada sistemática: las seis pantallas de la Fase 2, con teclado, reflujo y axe', async ({
+    page,
+    request,
+  }) => {
+    const email = `auditoria-${Date.now()}@example.test`
+    const password = 'el gato duerme en el sofa'
+
+    await page.goto('/crear-hogar')
+    await page.getByLabel('Nombre del hogar').fill('Casa Auditada')
+    await page.getByLabel('Tu nombre').fill('Kike')
+    await page.getByLabel('Correo').fill(email)
+    await page.getByLabel('Contraseña', { exact: true }).fill(password)
+    await page.getByRole('button', { name: /crear/i }).click()
+    await page.goto(await linkFromEmail(email))
+    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+
+    // Los cuatro encendidos de una vez, y por la API. Encenderlos a mano desde la
+    // pantalla ya lo hace el recorrido de cada módulo; lo que hace falta aquí es
+    // **el estado**, que es el que pone las doce paradas en la navegación.
+    const token = await accessToken(request, email, password)
+    for (const key of ['SUPPLIERS', 'WAREHOUSE', 'PURCHASING', 'MAINTENANCE']) {
+      const response = await request.post(`/api/v1/modules/${key}/activation`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      expect(response.status(), `no se pudo encender ${key}`).toBe(200)
+    }
+    await page.reload()
+
+    // A que la sesión se reanude y la navegación se repinte con las cuatro
+    // entradas nuevas. Sin esperar aquí, lo que se mide a continuación es la
+    // pantalla a medio montar, que es la misma trampa que el `Spinner` con axe.
+    const navigation = page.getByRole('navigation', { name: 'Principal' })
+    await expect(navigation.getByRole('link', { name: 'Mantenimiento' })).toBeVisible()
+
+    // El caso peor de la fase, medido una sola vez porque la navegación es una:
+    // doce paradas a 320 px, con su suelo de 44 px y sin desbordar.
+    await checkTouchTargets(page)
+
+    for (const screen of PHASE_TWO_SCREENS) {
+      await navigateTo(page, screen.link, screen.path)
+      await expect(
+        page.getByRole('heading', { level: 1, name: screen.heading }),
+        `«${screen.link}» no llegó a montarse`,
+      ).toBeVisible()
+
+      await checkAccessibility(page, screen.link)
+      await checkReflow(page, screen.link)
+      await sweepKeyboard(page, screen.link)
+    }
+  })
 })
+
+/**
+ * Las seis pantallas que la Fase 2 añadió, con el nombre por el que se llega a
+ * ellas desde la navegación.
+ *
+ * Es una lista y no seis llamadas sueltas a propósito: **una pantalla nueva se
+ * añade aquí y hereda la auditoría entera**, que es lo contrario de lo que pasó
+ * en la Fase 1, donde el criterio de accesibilidad se dio por cubierto pantalla a
+ * pantalla y una se quedó sin él.
+ */
+const PHASE_TWO_SCREENS = [
+  { link: 'Módulos del hogar', path: '/modulos', heading: 'Módulos' },
+  { link: 'Avisos', path: '/avisos', heading: 'Avisos' },
+  { link: 'Proveedores', path: '/proveedores', heading: 'Proveedores' },
+  { link: 'Almacén', path: '/almacen', heading: 'Almacén' },
+  { link: 'Compras', path: '/compras', heading: 'Compras' },
+  { link: 'Mantenimiento', path: '/mantenimiento', heading: 'Mantenimiento' },
+]
+
+/**
+ * Recorre **la pantalla entera** con el tabulador, comprobando el anillo de foco
+ * en cada parada.
+ *
+ * Es la diferencia con [tabTo], que para en cuanto llega a su destino: aquí no
+ * hay destino, y por eso lo que se mide es lo que a `tabTo` se le queda detrás.
+ * Tres cosas se afirman de cada pantalla:
+ *
+ * - **La primera parada es el salto al contenido.** Si deja de serlo, recorrer la
+ *   aplicación con el tabulador pasa por las doce paradas de la navegación en
+ *   cada pantalla.
+ * - **Toda parada dibuja contorno**, que es el compromiso de la ADR-006 medido ya
+ *   aplicado y no sobre el token.
+ * - **El recorrido termina**, y termina saliéndose del documento. Un ciclo que no
+ *   sale es una trampa de foco, y es de los pocos defectos de accesibilidad que
+ *   dejan la aplicación inutilizable en lugar de incómoda.
+ *
+ * El tope de paradas es holgado y no ajustado: lo que tiene que fallar aquí es la
+ * trampa de foco, no una pantalla con una fila de más.
+ */
+async function sweepKeyboard(page: Page, screen: string, limit = 80) {
+  // Desde el principio del documento: se llega hasta aquí haciendo clic, y el
+  // clic deja el punto de partida de la navegación secuencial donde cayó.
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
+
+  const stops: string[] = []
+
+  for (let stop = 1; stop <= limit; stop++) {
+    await page.keyboard.press('Tab')
+
+    const at = await page.evaluate(() => {
+      const node = document.activeElement
+      if (!node || node === document.body || node === document.documentElement) return null
+      return `${node.tagName.toLowerCase()}«${(node.textContent ?? '').trim().slice(0, 32)}»`
+    })
+
+    // Salió del documento: el recorrido ha dado la vuelta entera.
+    if (at === null) break
+
+    if (stop === 1) {
+      await expect(
+        page.getByRole('link', { name: 'Saltar al contenido' }),
+        `«${screen}»: la primera parada del tabulador no es el salto al contenido`,
+      ).toBeFocused()
+    }
+
+    await expectFocusRing(page, `${screen}, parada ${stop}`)
+    stops.push(at)
+  }
+
+  expect(stops.length, `«${screen}»: el tabulador no encontró ninguna parada`).toBeGreaterThan(0)
+  expect(
+    stops.length,
+    `«${screen}»: el tabulador no salió del documento en ${limit} paradas, ` +
+      `así que hay una trampa de foco. Recorrido: ${stops.join(' → ')}`,
+  ).toBeLessThan(limit)
+}
 
 /**
  * Una fecha de dentro de tantos dias, en el formato que espera un `input[type=date]`.
@@ -991,12 +1147,27 @@ async function expectFocusRing(page: Page, where: string) {
     if (!node || node === document.body) return null
 
     const style = getComputedStyle(node)
-    return { style: style.outlineStyle, width: Number.parseFloat(style.outlineWidth) }
+    return {
+      style: style.outlineStyle,
+      width: Number.parseFloat(style.outlineWidth),
+      // Quién es. Sin esto el fallo dice en qué parada pasó y no en cuál de los
+      // veintitantos elementos de la pantalla, que es lo que hace falta para
+      // arreglarlo sin abrir la traza.
+      who:
+        `${node.tagName.toLowerCase()}` +
+        `${node.id ? `#${node.id}` : ''}` +
+        `${node.getAttribute('type') ? `[type=${node.getAttribute('type')}]` : ''}` +
+        `${node.className ? `.${String(node.className).split(/\s+/).slice(0, 3).join('.')}` : ''}` +
+        `«${(node.textContent ?? '').trim().slice(0, 40)}»`,
+    }
   })
 
   expect(ring, `${where}: el tabulador se salió de la página`).not.toBeNull()
-  expect(ring?.style, `${where}: el elemento enfocado no dibuja contorno`).not.toBe('none')
-  expect(ring?.width ?? 0, `${where}: contorno de foco de menos de 2 px`).toBeGreaterThanOrEqual(2)
+  expect(ring?.style, `${where} (${ring?.who}): el elemento enfocado no dibuja contorno`).not.toBe('none')
+  expect(
+    ring?.width ?? 0,
+    `${where} (${ring?.who}): contorno de foco de menos de 2 px`,
+  ).toBeGreaterThanOrEqual(2)
 }
 
 function describe(violations: Array<{ id: string; help: string; nodes: unknown[] }>): string {
