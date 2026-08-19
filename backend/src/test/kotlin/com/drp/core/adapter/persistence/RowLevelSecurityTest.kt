@@ -182,8 +182,8 @@ class RowLevelSecurityTest {
      * ademas cualquier tabla nueva que alguien olvidara.
      */
     @Test
-    @DisplayName("el esquema tiene las veintiocho tablas del modelo, ni una mas")
-    fun `el esquema tiene veintiocho tablas`() {
+    @DisplayName("el esquema tiene las veintinueve tablas del modelo, ni una mas")
+    fun `el esquema tiene veintinueve tablas`() {
         // Quince del core, dos de plataforma --`household_modules`, de la
         // activacion de modulos del Hito 0 (ADR-010), y `household_notices`, de
         // la plataforma de avisos del Hito 1 (ADR-011)-- y **once de los cuatro
@@ -198,7 +198,13 @@ class RowLevelSecurityTest {
         // en la lista de excepciones de mas arriba: **este recuento sube y el
         // otro no**, que es justamente lo que hay que mirar cuando un modulo trae
         // tablas. Se actualiza a proposito y no para que pase.
-        owner.queryAllTables().size.shouldBe(28)
+        //
+        // La vigesimonovena es `event_outbox`, la tercera de plataforma: la cola
+        // del Transactional Outbox del Hito 1 del cierre de huecos (ADR-013).
+        // Lleva `household_id`, RLS y `FORCE` como cualquier otra --y aqui la
+        // politica hace mas trabajo que en casi ninguna, porque quien la lee no
+        // nace de una peticion--, asi que tampoco toca la lista de las cinco.
+        owner.queryAllTables().size.shouldBe(29)
     }
 
     @Test
@@ -240,6 +246,14 @@ class RowLevelSecurityTest {
                 // del aislamiento y crecer sin que nadie lo note es justo lo que
                 // esta prueba impide.
                 "list_households_for_identity",
+                // Y la sexta, con el Transactional Outbox (ADR-013): que hogares
+                // tienen entregas pendientes, para que el relay no recorra en
+                // vacio mil hogares cada pocos segundos. Cumple las tres
+                // propiedades de la familia --solo identificadores de hogar,
+                // pregunta cerrada y de `drp_resolver`-- y entra en esta lista
+                // por la misma razon que la anterior: la unica grieta deliberada
+                // del aislamiento no puede crecer sin que nadie lo note.
+                "list_households_with_pending_events",
             ),
         )
         owners.forEach { (function, role, privileged) ->

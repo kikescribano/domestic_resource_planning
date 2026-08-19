@@ -16,10 +16,12 @@ Este directorio documentará cómo ejecutar y mantener el backend en cada entorn
   la elección de VPS que sale de ello al cerrar la Fase 1. La conclusión es la
   que no se esperaba: quien decide es el disco, no la CPU.
 
-- [`scheduled-jobs.md`](scheduled-jobs.md): qué corre la pasada diaria, con qué
-  se configura, **la restricción de instancia única** que hay que respetar al
-  desplegar, y qué mirar cuando algo no pasa. Llega con el Hito 1 de la Fase 2,
-  que es cuando los tres procesos diarios pasaron a ejecutarse de verdad.
+- [`scheduled-jobs.md`](scheduled-jobs.md): **los dos trabajos que corren solos**
+  —la pasada diaria y el relay del outbox—, con qué se configuran, **la
+  restricción de instancia única** que hay que respetar al desplegar, y qué mirar
+  cuando algo no pasa. Llega con el Hito 1 de la Fase 2, que es cuando los tres
+  procesos diarios pasaron a ejecutarse de verdad, y gana el relay con el Hito 1
+  del cierre de huecos.
 
 - [`demo-dataset.md`](demo-dataset.md): el juego de datos de demostración —un
   hogar de cuatro personas con vivienda, trastero y catorce meses de histórico
