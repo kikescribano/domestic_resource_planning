@@ -5,27 +5,44 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 /**
- * La declaracion del modulo, que es lo unico que el Hito 0 deja en este arbol.
+ * La declaracion del modulo: lo que le permite existir en el catalogo que un hogar
+ * puede encender.
  *
- * Su dominio, sus tablas y sus pantallas llegan con su hito y con su ficha en
- * `docs/backend/modules/`, escrita antes que la primera linea de codigo. Lo que
- * hace falta ya es que **exista en el catalogo**: sin descriptor no se puede
- * encender, y el mecanismo de activacion no tendria nada que activar.
+ * El Hito 0 dejo aqui solo esto, sin dominio; el **Hito 4 lo ha llenado**. Su ficha
+ * esta en `docs/backend/modules/purchasing.md` y se escribio antes que la primera
+ * linea de codigo, con la frontera contra Warehouse sin ambiguedad: **Warehouse
+ * detecta la falta, Compras decide que se compra y cuando**.
  *
- * El prefijo de ruta lo declara el modulo y no plataforma, que es lo que obliga
- * a que el prefijo que el gate protege y el que el modulo publique sean por
- * fuerza el mismo. Hasta el Hito 4, todo lo que cuelga de el responde `403
- * MODULE_INACTIVE` si el modulo esta apagado y `404` si esta encendido: no hay
- * controlador todavia.
+ * Es el modulo con el que se retira **el riesgo arquitectonico principal de la
+ * fase** --dos modulos que se hablan sin depender uno de que el otro este activo--
+ * y trae dos primeras veces:
+ *
+ * - **Lee el dato maestro de otro modulo**, por un puerto de plataforma que no
+ *   nombra a ningun modulo (`MasterDataDirectory`) y con la degradacion puesta en
+ *   plataforma: con Proveedores apagado el directorio responde vacio y aqui no hay
+ *   una sola rama para ello.
+ * - **Escribe en el core.** Cerrar una compra invoca `RegisterConsumableIntake`,
+ *   que **crea existencias**; Warehouse solo movia un contador que ya existia. Y
+ *   como el core publica al hacerlo, cerrar una compra deja un asiento en el
+ *   cuaderno de Warehouse sin que ninguno de los dos modulos sepa del otro.
+ *
+ * El prefijo de ruta lo declara el modulo y no plataforma, que es lo que obliga a
+ * que el prefijo que el gate protege y el que el controlador publica sean por
+ * fuerza el mismo.
  */
 @Configuration
 class PurchasingModule {
 
     @Bean
     fun purchasingModuleDescriptor() = ModuleDescriptor(
-        key = "PURCHASING",
+        key = KEY,
         name = "Compras y lista de la compra",
         description = "Qué falta, qué hay que reponer y qué está pedido, hasta que la compra entra en casa.",
-        routePrefix = "/api/v1/purchasing",
+        routePrefix = ROUTE_PREFIX,
     )
+
+    companion object {
+        const val KEY = "PURCHASING"
+        const val ROUTE_PREFIX = "/api/v1/purchasing"
+    }
 }

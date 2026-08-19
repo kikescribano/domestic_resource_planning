@@ -62,6 +62,11 @@ export type ApiErrorCode =
   | 'STOCK_CONSUMPTION_EXCEEDS_QUANTITY'
   | 'STOCK_LOT_DUPLICATE'
   | 'STOCK_LOT_EXCEEDS_QUANTITY'
+  | 'SHOPPING_ITEM_DUPLICATE'
+  | 'SHOPPING_ITEM_NOT_PENDING'
+  | 'PURCHASE_EMPTY'
+  | 'PURCHASE_NOT_OPEN'
+  | 'PURCHASE_SUPPLIER_UNKNOWN'
   | 'VERIFICATION_TOKEN_INVALID'
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
@@ -114,6 +119,14 @@ const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   STOCK_CONSUMPTION_EXCEEDS_QUANTITY: 'No puedes gastar más de lo que hay.',
   STOCK_LOT_DUPLICATE: 'Ya tienes anotada esa misma caducidad para este artículo.',
   STOCK_LOT_EXCEEDS_QUANTITY: 'Las caducidades anotadas sumarían más de lo que hay.',
+  SHOPPING_ITEM_DUPLICATE: 'Eso ya está en la lista de la compra.',
+  SHOPPING_ITEM_NOT_PENDING: 'Esa línea ya se compró o se descartó.',
+  PURCHASE_EMPTY: 'Una compra necesita al menos una cosa que comprar.',
+  PURCHASE_NOT_OPEN: 'Esa compra ya está cerrada.',
+  // Dice las dos cosas porque el servidor no distingue las dos cosas, y eso es
+  // deliberado: Compras no sabe --ni tiene por qué-- si Proveedores está apagado
+  // o si ese sitio no existe.
+  PURCHASE_SUPPLIER_UNKNOWN: 'No se puede usar ese sitio: o ya no está, o el módulo de proveedores está apagado.',
   // Se ve poco a propósito: la pantalla de una ruta apagada ofrece activar el
   // módulo en lugar de enseñar un error. Este texto es para el caso raro de
   // que alguien lo reciba en medio de otra cosa, por haberlo desactivado desde
@@ -295,6 +308,90 @@ export interface StockItem {
   belowMinimum: boolean
   nearestExpiry: string | null
   lotCount: number
+}
+
+/**
+ * Una línea de la lista de la compra.
+ *
+ * `name` es el del artículo del core cuando lo tiene y el nombre suelto cuando
+ * no: **siempre hay uno y nunca hay dos**. `unit` y `packLabel` salen también del
+ * artículo, así que una línea de texto suelto los trae a nulo.
+ *
+ * `packLabel` es la presentación de compra **compuesta y no guardada** —«6 UNIT»—
+ * a partir del `packSize` del core. Es la respuesta del módulo a si esa
+ * presentación necesita nombre propio: no.
+ */
+export interface ShoppingItem {
+  id: string
+  articleId: string | null
+  name: string
+  unit: MeasurementUnit | null
+  packLabel: string | null
+  quantity: number | null
+  origin: ShoppingItemOrigin
+  status: ShoppingItemStatus
+  note: string | null
+  purchaseId: string | null
+  receivedAssetId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Por qué entró la línea. **El orden no es alfabético**: es el que decide qué
+ * noticia manda y el que ordena la lista.
+ *
+ * `MANUAL` es el único que existe con el almacén apagado, y está bien que así
+ * sea: sin ese módulo nadie está detectando la falta.
+ */
+export type ShoppingItemOrigin = 'MANUAL' | 'LOW_STOCK' | 'DEPLETED'
+
+export type ShoppingItemStatus = 'NEEDED' | 'IN_PURCHASE' | 'BOUGHT' | 'DISMISSED'
+
+/** Cómo se lee cada origen en pantalla. Los identificadores van en inglés; esto es dato. */
+export const ITEM_ORIGIN_LABELS: Record<ShoppingItemOrigin, string> = {
+  MANUAL: 'Apuntado a mano',
+  LOW_STOCK: 'Queda poco',
+  DEPLETED: 'Se ha acabado',
+}
+
+export type PurchaseStatus = 'OPEN' | 'RECEIVED' | 'CANCELLED'
+
+/**
+ * Una compra.
+ *
+ * `supplier` es **el nombre de aquel día**, copiado al abrirla: una compra es
+ * historia, y además es lo único que se puede pintar cuando el módulo de
+ * proveedores está apagado.
+ */
+export interface Purchase {
+  id: string
+  supplierId: string | null
+  supplier: string | null
+  status: PurchaseStatus
+  note: string | null
+  receivedAt: string | null
+  cancelledAt: string | null
+  createdAt: string
+}
+
+export interface PurchaseDetail {
+  purchase: Purchase
+  lines: ShoppingItem[]
+}
+
+/**
+ * Dónde se puede comprar, leído del módulo de proveedores por un puerto del
+ * servidor.
+ *
+ * `detail` trae el **identificador** de la categoría de servicio y no su rótulo,
+ * porque el texto que se lee en pantalla es un dato en castellano y lo pone el
+ * cliente —que ya tiene ese mapa en `SERVICE_CATEGORY_LABELS`.
+ */
+export interface PurchasingSupplier {
+  id: string
+  name: string
+  detail: string | null
 }
 
 export type MovementKind =
@@ -763,10 +860,20 @@ export function formatBytes(bytes: number): string {
   return `${value.toLocaleString('es-ES', { maximumFractionDigits: value < 10 ? 1 : 0 })} ${units[unit]}`
 }
 
-function queryString(params: Record<string, string | number | boolean | undefined>): string {
+function queryString(
+  params: Record<string, string | number | boolean | readonly string[] | undefined>,
+): string {
   const search = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== '') search.set(key, String(value))
+    // Un array se repite en lugar de unirse por comas, que es lo que declara el
+    // contrato para los parámetros repetibles —el `status` de la lista de la
+    // compra es el primero—. Unirlos funcionaría hoy, porque Spring parte por
+    // comas, pero ataría el cliente a esa conveniencia.
+    if (Array.isArray(value)) {
+      for (const entry of value) search.append(key, entry)
+    } else if (value !== undefined && value !== '') {
+      search.set(key, String(value))
+    }
   }
   const text = search.toString()
   return text ? `?${text}` : ''
@@ -1181,6 +1288,55 @@ export const api = {
 
   updateWarehouseArticle: (articleId: string, body: Record<string, unknown>, accessToken: string) =>
     request<WarehouseArticle>(`/warehouse/articles/${articleId}`, { method: 'PATCH', body, accessToken }),
+
+  // --- Compras --------------------------------------------------------------
+  // Todo lo que cuelga de /purchasing responde 403 MODULE_INACTIVE mientras el
+  // hogar no lo tenga encendido. La pantalla no lo comprueba: la envuelve
+  // `ModuleScreen`.
+
+  listShoppingList: (accessToken: string, filters: { status?: ShoppingItemStatus[]; q?: string } = {}) =>
+    request<Page<ShoppingItem>>(`/purchasing/list${queryString({ ...filters, size: 200 })}`, { accessToken }),
+
+  // Un artículo O un nombre suelto, nunca los dos. Es la operación que hace que
+  // la lista siga sirviendo con el almacén apagado.
+  addShoppingListItem: (
+    body: { articleId?: string; name?: string; quantity?: number; note?: string },
+    accessToken: string,
+  ) => request<ShoppingItem>('/purchasing/list', { method: 'POST', body, accessToken }),
+
+  updateShoppingListItem: (id: string, body: Record<string, unknown>, accessToken: string) =>
+    request<ShoppingItem>(`/purchasing/list/${id}`, { method: 'PATCH', body, accessToken }),
+
+  // Baja lógica: descartar «sal» es un dato sobre lo que el hogar no quiere
+  // comprar, y borrar la fila dejaría que el mismo evento la volviera a meter.
+  dismissShoppingListItem: (id: string, accessToken: string) =>
+    request<void>(`/purchasing/list/${id}`, { method: 'DELETE', accessToken }),
+
+  listPurchases: (accessToken: string, filters: { status?: PurchaseStatus } = {}) =>
+    request<Page<Purchase>>(`/purchasing/purchases${queryString({ ...filters, size: 200 })}`, { accessToken }),
+
+  getPurchase: (id: string, accessToken: string) =>
+    request<PurchaseDetail>(`/purchasing/purchases/${id}`, { accessToken }),
+
+  createPurchase: (body: { supplierId?: string; note?: string; itemIds: string[] }, accessToken: string) =>
+    request<PurchaseDetail>('/purchasing/purchases', { method: 'POST', body, accessToken }),
+
+  // **El cierre del ciclo**: acaba invocando la entrada de consumibles del core,
+  // que suma sobre la existencia de esa ubicación.
+  receivePurchase: (
+    id: string,
+    body: { lines: Array<{ itemId: string; quantity?: number; ownerId?: string; locationId?: string }> },
+    accessToken: string,
+  ) => request<PurchaseDetail>(`/purchasing/purchases/${id}/receipt`, { method: 'POST', body, accessToken }),
+
+  // Sus líneas vuelven a la lista: lo que hacía falta sigue haciendo falta.
+  cancelPurchase: (id: string, accessToken: string) =>
+    request<void>(`/purchasing/purchases/${id}`, { method: 'DELETE', accessToken }),
+
+  // Cuelga de /purchasing y no de /suppliers, así que con proveedores apagado
+  // devuelve **lista vacía y no 403**: la degradación la pone el servidor.
+  listPurchasingSuppliers: (accessToken: string, q?: string) =>
+    request<PurchasingSupplier[]>(`/purchasing/suppliers${queryString({ q })}`, { accessToken }),
 
   // --- Categorías -----------------------------------------------------------
   listCategories: (accessToken: string, includeRetired = false) =>

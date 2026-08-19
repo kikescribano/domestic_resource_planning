@@ -16,7 +16,7 @@ temporales», que durante un tiempo aparecían de otra forma en el README.
 |---|---|---|
 | Core de recursos y activos | Gestión común de recursos y activos domésticos | [`common/product/`](../../common/product/README.md) (trasladado desde la §4.1 del README al arrancar la Fase 1) |
 | Proveedores y contactos de servicio | Quién arregla, quién cobra y quién responde de una garantía | [`suppliers.md`](suppliers.md) |
-| Compras y lista de la compra | Qué falta, qué hay que reponer y qué está pedido | Pendiente |
+| Compras y lista de la compra | Qué falta, qué hay que reponer y qué está pedido | [`purchasing.md`](purchasing.md) |
 | Warehouse | Existencias, ubicaciones y movimientos | [`warehouse.md`](warehouse.md) |
 | Mantenimiento (CMMS) | Planificación y seguimiento del mantenimiento | Pendiente |
 | Planificador de tareas | Organización y seguimiento de tareas | Pendiente |
@@ -78,6 +78,20 @@ ambigüedad**, porque es el primer módulo cuyo dominio roza un dato que el core
 guarda. El core mantiene **un contador** —`quantity`, en la `unit` que pone el
 artículo— y consumos, mínimos, caducidad y lotes son del módulo; Warehouse **no
 lleva un segundo contador** y lee el del core cuando lo necesita.
+
+**El tercero es Compras**, en el Hito 4 (2026-08-19), y es el que retira el
+riesgo arquitectónico principal de la fase: **dos módulos que se hablan sin
+depender uno de que el otro esté activo**. Su [`ficha`](purchasing.md) trae dos
+cosas que ninguna anterior podía traer. La primera es **cómo lee un módulo el
+dato maestro de otro**, que Proveedores dejó abierta con destinatario aquí: se
+resuelve con un **puerto en plataforma que no nombra a ningún módulo**
+—`MasterDataDirectory`, pedido por la clave del módulo dueño, con la misma forma
+que ya tenían `ModuleSeeder` y `ScheduledCheck`— y con la degradación puesta en
+plataforma, de modo que un directorio de un módulo apagado responde vacío sin que
+el consumidor tenga una sola rama para ello. La segunda es que **es el primer
+módulo que escribe en el core**: cerrar una compra invoca
+`RegisterConsumableIntake`, que crea existencias, y eso deja un asiento en el
+cuaderno de Warehouse sin que ninguno de los dos módulos sepa del otro.
 
 **Y una regla que ese módulo estrenó:** la ficha declara **los nombres de tabla
 que el módulo posee**, para que otro no los tome. Es lo que convierte «cada módulo

@@ -10,7 +10,8 @@ package com.drp.platform.error
  *
  * Estan los cuatro hitos de la Fase 1 --enrolamiento; catalogo, ubicaciones y
  * assets; ficheros y documentos; y prestamos-- y, desde la Fase 2, los de los
- * modulos con reglas de negocio: Proveedores en el Hito 2 y Warehouse en el 3.
+ * modulos con reglas de negocio: Proveedores en el Hito 2, Warehouse en el 3 y
+ * Compras en el 4.
  *
  * **Esto vivia en `com.drp.core.domain` y se mudo aqui en el Hito 2 de la Fase
  * 2**, que es el dia que la [ADR-010] nombraba en su condicion de revision. El
@@ -66,7 +67,12 @@ enum class ErrorCode {
     MERGE_ASSET_DEACTIVATED,
     MERGE_NOT_CONSUMABLE,
     MERGE_SAME_ASSET,
+    PURCHASE_EMPTY,
+    PURCHASE_NOT_OPEN,
+    PURCHASE_SUPPLIER_UNKNOWN,
     RESET_TOKEN_INVALID,
+    SHOPPING_ITEM_DUPLICATE,
+    SHOPPING_ITEM_NOT_PENDING,
     STOCK_CONSUMPTION_EXCEEDS_QUANTITY,
     STOCK_CONSUMPTION_NOT_POSITIVE,
     STOCK_ITEM_NOT_TRACKED,
