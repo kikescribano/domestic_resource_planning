@@ -182,21 +182,23 @@ class RowLevelSecurityTest {
      * ademas cualquier tabla nueva que alguien olvidara.
      */
     @Test
-    @DisplayName("el esquema tiene las veinticinco tablas del modelo, ni una mas")
-    fun `el esquema tiene veinticinco tablas`() {
+    @DisplayName("el esquema tiene las veintiocho tablas del modelo, ni una mas")
+    fun `el esquema tiene veintiocho tablas`() {
         // Quince del core, dos de plataforma --`household_modules`, de la
         // activacion de modulos del Hito 0 (ADR-010), y `household_notices`, de
-        // la plataforma de avisos del Hito 1 (ADR-011)-- y **ocho de los tres
+        // la plataforma de avisos del Hito 1 (ADR-011)-- y **once de los cuatro
         // modulos de verdad**: `suppliers` y `supplier_links` del Hito 2, las
         // cuatro de Warehouse del Hito 3 --`warehouse_articles`,
-        // `warehouse_locations`, `warehouse_lots` y `warehouse_movements`-- y las
-        // dos de Compras del Hito 4: `purchases` y `shopping_list_items`.
+        // `warehouse_locations`, `warehouse_lots` y `warehouse_movements`--, las
+        // dos de Compras del Hito 4 --`purchases` y `shopping_list_items`-- y las
+        // tres de Mantenimiento del Hito 5: `maintenance_items`,
+        // `maintenance_plans` y `maintenance_interventions`.
         //
-        // Las ocho llevan `household_id`, RLS y `FORCE`, asi que ninguna aparece
+        // Las once llevan `household_id`, RLS y `FORCE`, asi que ninguna aparece
         // en la lista de excepciones de mas arriba: **este recuento sube y el
         // otro no**, que es justamente lo que hay que mirar cuando un modulo trae
         // tablas. Se actualiza a proposito y no para que pase.
-        owner.queryAllTables().size.shouldBe(25)
+        owner.queryAllTables().size.shouldBe(28)
     }
 
     @Test

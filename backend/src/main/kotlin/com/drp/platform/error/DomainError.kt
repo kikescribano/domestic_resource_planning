@@ -10,8 +10,8 @@ package com.drp.platform.error
  *
  * Estan los cuatro hitos de la Fase 1 --enrolamiento; catalogo, ubicaciones y
  * assets; ficheros y documentos; y prestamos-- y, desde la Fase 2, los de los
- * modulos con reglas de negocio: Proveedores en el Hito 2, Warehouse en el 3 y
- * Compras en el 4.
+ * modulos con reglas de negocio: Proveedores en el Hito 2, Warehouse en el 3,
+ * Compras en el 4 y Mantenimiento en el 5.
  *
  * **Esto vivia en `com.drp.core.domain` y se mudo aqui en el Hito 2 de la Fase
  * 2**, que es el dia que la [ADR-010] nombraba en su condicion de revision. El
@@ -63,6 +63,11 @@ enum class ErrorCode {
     LOCATION_DUPLICATE,
     LOCATION_HAS_ASSETS,
     LOCATION_HAS_CHILDREN,
+    MAINTENANCE_ASSET_NOT_ELIGIBLE,
+    MAINTENANCE_LEAD_EXCEEDS_INTERVAL,
+    MAINTENANCE_PLAN_CANCELLED,
+    MAINTENANCE_PLAN_DUPLICATE,
+    MAINTENANCE_SUPPLIER_UNKNOWN,
     MERGE_ARTICLE_MISMATCH,
     MERGE_ASSET_DEACTIVATED,
     MERGE_NOT_CONSUMABLE,
