@@ -7,6 +7,8 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import java.time.LocalDate
+import java.time.ZoneOffset
 import java.util.UUID
 
 /**
@@ -115,3 +117,20 @@ fun String.extract(field: String): String =
 fun String.extractRaw(field: String): String =
     Regex("\"$field\"\\s*:\\s*([^,}\\s]+)").find(this)?.groupValues?.get(1)
         ?: error("No aparece \"$field\" en la respuesta:\n$this")
+
+/**
+ * **El dia de hoy tal y como lo ve la aplicacion**, que no es el de la maquina.
+ *
+ * El reloj de la aplicacion es `Clock.systemUTC()` --ver `SecurityConfig`-- asi
+ * que toda regla que compare fechas de calendario, como la de CMMS que rechaza
+ * una intervencion «del futuro», usa **la fecha UTC**. Una prueba que enviara
+ * `LocalDate.now()` mandaria la fecha de la zona de la maquina, y las dos no son
+ * la misma durante las primeras horas del dia en cualquier zona por delante de
+ * UTC: a la 01:30 en Madrid la aplicacion todavia esta en el dia anterior, asi
+ * que «hoy» le llega como manana y responde `400`.
+ *
+ * El sintoma no se parece a la causa --la suite pasa entera de dia y falla de
+ * madrugada, siempre en CMMS-- asi que la fecha se pide aqui y no a
+ * `LocalDate.now()`.
+ */
+fun today(): LocalDate = LocalDate.now(ZoneOffset.UTC)

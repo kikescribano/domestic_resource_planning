@@ -14,6 +14,7 @@ import com.drp.test.postJson
 import com.drp.test.queryAll
 import com.drp.test.registerHousehold
 import com.drp.test.seededCategory
+import com.drp.test.today
 import com.drp.test.uploadFile
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
@@ -415,7 +416,7 @@ class PurgeClosedHouseholdsTest : SpringIntegrationTest() {
         ).statusCode.shouldBe(HttpStatus.CREATED)
         http.postJson(
             "$CMMS/interventions",
-            """{"assetId":"$drill","kind":"CORRECTIVE","performedOn":"${LocalDate.now()}",
+            """{"assetId":"$drill","kind":"CORRECTIVE","performedOn":"${today()}",
                 "summary":"Se cambió la escobilla"}""",
             token,
         ).statusCode.shouldBe(HttpStatus.CREATED)
@@ -493,7 +494,7 @@ class PurgeClosedHouseholdsTest : SpringIntegrationTest() {
     private fun avatarPathOf(identityId: UUID): Path =
         storageRoot.resolve("avatar/${identityId.toString().take(2)}/$identityId")
 
-    private fun inDays(days: Long): String = LocalDate.now().plusDays(days).toString()
+    private fun inDays(days: Long): String = today().plusDays(days).toString()
 
     private companion object {
         const val WAREHOUSE = "/api/v1/warehouse"

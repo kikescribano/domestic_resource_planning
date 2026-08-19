@@ -11,6 +11,7 @@ import com.drp.test.imageBytes
 import com.drp.test.patchJson
 import com.drp.test.postJson
 import com.drp.test.registerHousehold
+import com.drp.test.today
 import com.drp.test.uploadFile
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -778,7 +779,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             http.postJson(
                 LOTS,
                 """{"assetId":"$id","lotCode":"Sonda${short()}",
-                    "expiresOn":"${LocalDate.now().plusMonths(6)}","quantity":1}""",
+                    "expiresOn":"${today().plusMonths(6)}","quantity":1}""",
                 b.accessToken,
             )
         }
@@ -913,7 +914,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             http.postJson(
                 PLANS,
                 """{"assetId":"$id","name":"Sonda${short()}","intervalMonths":12,
-                    "nextDueOn":"${LocalDate.now().plusDays(30)}"}""",
+                    "nextDueOn":"${today().plusDays(30)}"}""",
                 b.accessToken,
             )
         }
@@ -927,7 +928,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             http.postJson(
                 PLANS,
                 """{"assetId":"${freshDurableB()}","name":"Sonda${short()}","intervalMonths":12,
-                    "nextDueOn":"${LocalDate.now().plusDays(30)}","supplierId":"$id"}""",
+                    "nextDueOn":"${today().plusDays(30)}","supplierId":"$id"}""",
                 b.accessToken,
             )
         }
@@ -949,7 +950,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         ) { id ->
             http.postJson(
                 INTERVENTIONS,
-                """{"assetId":"$id","kind":"CORRECTIVE","performedOn":"${LocalDate.now()}",
+                """{"assetId":"$id","kind":"CORRECTIVE","performedOn":"${today()}",
                     "summary":"Sonda${short()}"}""",
                 b.accessToken,
             )
@@ -961,7 +962,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             http.postJson(
                 INTERVENTIONS,
                 """{"assetId":"$durB","planId":"$id","kind":"PREVENTIVE",
-                    "performedOn":"${LocalDate.now()}","summary":"Sonda${short()}"}""",
+                    "performedOn":"${today()}","summary":"Sonda${short()}"}""",
                 b.accessToken,
             )
         }
@@ -974,7 +975,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         ) { id ->
             http.postJson(
                 INTERVENTIONS,
-                """{"assetId":"${freshDurableB()}","kind":"CORRECTIVE","performedOn":"${LocalDate.now()}",
+                """{"assetId":"${freshDurableB()}","kind":"CORRECTIVE","performedOn":"${today()}",
                     "summary":"Sonda${short()}","supplierId":"$id"}""",
                 b.accessToken,
             )
@@ -1398,7 +1399,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             http.postJson(
                 LOTS,
                 """{"assetId":"$stockB","lotCode":"LOTE-DE-A",
-                    "expiresOn":"${LocalDate.now().plusDays(1)}","quantity":1}""",
+                    "expiresOn":"${today().plusDays(1)}","quantity":1}""",
                 b.accessToken,
             ),
         )
@@ -1408,7 +1409,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             http.postJson(
                 PLANS,
                 """{"assetId":"${freshDurableB()}","name":"RevisionDeA","intervalMonths":12,
-                    "nextDueOn":"${LocalDate.now().plusDays(30)}"}""",
+                    "nextDueOn":"${today().plusDays(30)}"}""",
                 b.accessToken,
             ),
         )
@@ -1840,7 +1841,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
      */
     private fun TestHousehold.createLot(assetId: String, code: String): String = created(
         LOTS,
-        """{"assetId":"$assetId","lotCode":"$code","expiresOn":"${LocalDate.now().plusDays(1)}","quantity":10}""",
+        """{"assetId":"$assetId","lotCode":"$code","expiresOn":"${today().plusDays(1)}","quantity":10}""",
     )
 
     private fun TestHousehold.addShoppingItem(body: String): String = created(SHOPPING_LIST, body)
@@ -1851,12 +1852,12 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     private fun TestHousehold.createPlan(assetId: String, name: String): String = created(
         PLANS,
         """{"assetId":"$assetId","name":"$name","intervalMonths":12,
-            "nextDueOn":"${LocalDate.now().plusDays(30)}"}""",
+            "nextDueOn":"${today().plusDays(30)}"}""",
     )
 
     private fun TestHousehold.registerIntervention(assetId: String, summary: String): String = created(
         INTERVENTIONS,
-        """{"assetId":"$assetId","kind":"CORRECTIVE","performedOn":"${LocalDate.now()}","summary":"$summary"}""",
+        """{"assetId":"$assetId","kind":"CORRECTIVE","performedOn":"${today()}","summary":"$summary"}""",
     )
 
     /** El primer aviso del hogar, que la pasada diaria acaba de escribirle. */

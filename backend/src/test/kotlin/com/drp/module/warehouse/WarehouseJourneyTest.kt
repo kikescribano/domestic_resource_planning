@@ -11,6 +11,7 @@ import com.drp.test.patchJson
 import com.drp.test.postJson
 import com.drp.test.registerHousehold
 import com.drp.test.seededCategory
+import com.drp.test.today
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -503,7 +504,7 @@ class WarehouseJourneyTest : SpringIntegrationTest() {
         val stock = home.intake(home.article("Garbanzos", "GRAM"), home.location("Despensa"), 1000)
         http.postJson(
             "$WAREHOUSE/lots",
-            """{"assetId":"$stock","expiresOn":"${LocalDate.now().plusMonths(6)}","quantity":400}""",
+            """{"assetId":"$stock","expiresOn":"${today().plusMonths(6)}","quantity":400}""",
             home.accessToken,
         ).statusCode.shouldBe(HttpStatus.CREATED)
 
@@ -529,7 +530,7 @@ class WarehouseJourneyTest : SpringIntegrationTest() {
         // Dentro de la ventana por omision del modulo, que son siete dias.
         http.postJson(
             "$WAREHOUSE/lots",
-            """{"assetId":"$stock","lotCode":"L-9","expiresOn":"${LocalDate.now().plusDays(2)}","quantity":4}""",
+            """{"assetId":"$stock","lotCode":"L-9","expiresOn":"${today().plusDays(2)}","quantity":4}""",
             home.accessToken,
         ).statusCode.shouldBe(HttpStatus.CREATED)
 
@@ -555,7 +556,7 @@ class WarehouseJourneyTest : SpringIntegrationTest() {
         val stock = home.intake(home.article("Requesón", "UNIT"), home.location("Nevera"), 2)
         http.postJson(
             "$WAREHOUSE/lots",
-            """{"assetId":"$stock","expiresOn":"${LocalDate.now().plusDays(3)}","quantity":2}""",
+            """{"assetId":"$stock","expiresOn":"${today().plusDays(3)}","quantity":2}""",
             home.accessToken,
         ).statusCode.shouldBe(HttpStatus.CREATED)
 
@@ -578,7 +579,7 @@ class WarehouseJourneyTest : SpringIntegrationTest() {
         val stock = home.intake(home.article("Kéfir", "UNIT"), home.location("Nevera"), 1)
         http.postJson(
             "$WAREHOUSE/lots",
-            """{"assetId":"$stock","expiresOn":"${LocalDate.now().minusDays(1)}","quantity":1}""",
+            """{"assetId":"$stock","expiresOn":"${today().minusDays(1)}","quantity":1}""",
             home.accessToken,
         ).statusCode.shouldBe(HttpStatus.CREATED)
 
@@ -635,7 +636,7 @@ class WarehouseJourneyTest : SpringIntegrationTest() {
             val stock = home.intake(home.article("Nata líquida", "MILLILITER"), home.location("Nevera"), 200)
             http.postJson(
                 "$WAREHOUSE/lots",
-                """{"assetId":"$stock","expiresOn":"${LocalDate.now().plusDays(1)}","quantity":200}""",
+                """{"assetId":"$stock","expiresOn":"${today().plusDays(1)}","quantity":200}""",
                 home.accessToken,
             ).statusCode.shouldBe(HttpStatus.CREATED)
             if (!keepOn) home.deactivate()
