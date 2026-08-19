@@ -2,34 +2,40 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Lo primero: el core está implementado
+## Lo primero: el core y los cuatro primeros módulos están implementados
 
-**La Fase 1 (Core MVP) se cerró el 2026-08-17**, en cinco hitos y cinco pull
-requests. Lo que hay es un monorepo con `backend/` (Kotlin, Gradle con Kotlin DSL)
-y `frontend/` (TypeScript, React sobre Vite), más `compose.yaml`, `scripts/` y
-`.github/workflows/`, y dentro **el core entero**: las 54 operaciones del contrato,
-las 15 tablas con su RLS, los tres procesos diarios, el almacenamiento de ficheros
-con nginx delante y un cliente web para todos los flujos.
+**La Fase 1 (Core MVP) se cerró el 2026-08-17** y **la Fase 2 (Módulos
+activables) el 2026-08-19**, en cinco y siete hitos, un pull request cada uno. Lo
+que hay es un monorepo con `backend/` (Kotlin, Gradle con Kotlin DSL) y
+`frontend/` (TypeScript, React sobre Vite), más `compose.yaml`, `scripts/` y
+`.github/workflows/`, y dentro:
+
+- **El core entero**: los tres procesos diarios, el almacenamiento de ficheros con
+  nginx delante y un cliente web para todos los flujos.
+- **El mecanismo de activación por hogar** y **la plataforma** que programa las
+  comprobaciones periódicas y entrega los avisos.
+- **Los cuatro módulos de prioridad alta** de la sección 4.2: Proveedores,
+  Warehouse, Compras y Mantenimiento (CMMS).
+
+En cifras: **98 operaciones** en el contrato, **28 tablas** con RLS y `FORCE`, y
+**siete recorridos verticales** en un navegador de verdad.
 
 Así que la advertencia es la contraria a la que había aquí: **no supongas que algo
 no existe**. Antes de escribir un caso de uso, una tabla o una pantalla, busca si
 ya está —y si lo que quieres es cambiarlo, hay pruebas que lo fijan y documentos
 que lo explican.
 
-Lo siguiente es la **Fase 2 — Módulos activables**, **en curso** y planificada
-(2026-08-18) en [`phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md):
-los cuatro módulos de prioridad alta de la sección 4.2, sobre la activación por
-hogar y la plataforma de avisos, en siete hitos. **Ese documento es el que hay que
-leer para arrancar un hito**, y el que hay que actualizar al cerrarlo. La decisión
-de producto que faltaba —qué módulos— está tomada y no hay que volver a abrirla.
+**Lo siguiente es la Fase 3 —los nueve módulos restantes de 4.2— y todavía no está
+planificada.** Convertir una fase en un plan es su propia sesión de trabajo y su
+propio pull request, como lo fue para la 2: no se improvisa al final de otra cosa.
+Lo que la Fase 2 dejó dicho sobre lo que le queda al proyecto está al final de
+[`phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md), que es también
+donde vive el detalle de cómo se hizo. **El estado de las fases vive en la sección
+8 del README y solo allí**; el de cada módulo, en la 4.2.
 
-**En qué hito va la fase lo dice ese documento y solo ese**: aquí se decía, y se
-quedó viejo a los dos días. Lo que sí conviene tener presente antes de tocar nada
-es lo que los hitos ya cerrados dejaron montado, porque condiciona todo lo que
-venga.
-
-Los tres huecos que la planificación había destapado están cerrados. El backend
-está empaquetado por módulos:
+Lo que sí conviene tener presente antes de tocar nada es lo que las dos fases
+dejaron montado, porque condiciona todo lo que venga. El backend está empaquetado
+por módulos:
 
 ```text
 com.drp.platform.*      Bus, TenantContext, paginación y la activación de módulos
@@ -68,9 +74,24 @@ Dos cosas que conviene tener presentes al tocar esto:
   —como `ScheduledCheck`, `HouseholdDirectory` y `NoticeRecipients`—, nunca con un
   import.
 
-La Fase 1 no tiene continuación pendiente; lo que se dejó abierto a propósito está
-listado al final de [`roadmap.md`](docs/common/product/roadmap.md), cada cosa con
+Ninguna de las dos fases tiene continuación pendiente; lo que se dejó abierto a
+propósito está listado al final de [`roadmap.md`](docs/common/product/roadmap.md)
+y de [`phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md), cada cosa con
 su motivo y su destinatario.
+
+Y tres cosas que el cierre de la Fase 2 dejó fijadas y conviene no volver a abrir:
+
+- **El barrido de aislamiento cubre el contrato entero**, en
+  `TenantIsolationSweepTest`, organizado **por forma de ataque y no por recurso**.
+  Una operación nueva se añade ahí, con el criterio de inclusión que la cabecera
+  de esa clase explica; no nace una clase de barrido nueva.
+- **La auditoría de accesibilidad de una pantalla nueva se hereda**: se añade a
+  la lista `PHASE_TWO_SCREENS` del recorrido vertical y con eso pasa teclado,
+  reflujo y axe en los dos modos. No hace falta escribir nada más.
+- **La capacidad se mide en dos magnitudes**, no en una: lo que crece con lo que
+  el hogar *tiene* y lo que crece con lo que *hace*. Están en
+  [`capacity-measurements.md`](docs/backend/operations/capacity-measurements.md),
+  junto al criterio de retención de las cinco tablas que crecen sin techo.
 
 La documentación está **en español de España**. Manténla así. El código sigue la
 misma frontera que la documentación: prosa y comentarios en castellano, todo
@@ -371,11 +392,12 @@ pull requests— y **se conserva para la Fase 2**, con «módulo» donde antes d
 «hito»:
 
 - **Un bloque por sesión.** Arranca leyendo el documento de alcance de lo que vas a
-  hacer: hoy es
-  [`docs/common/product/phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md).
-  El [`roadmap.md`](docs/common/product/roadmap.md) de la Fase 1 se conserva como
-  historia de cómo se hizo el core. No mezcles bloques: son grandes y mezclarlos
-  hace que ninguno se cierre del todo.
+  hacer. Los dos que hay —[`roadmap.md`](docs/common/product/roadmap.md) de la
+  Fase 1 y
+  [`phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md) de la 2— están
+  **cerrados** y se conservan como historia de cómo se hizo cada cosa; el de la
+  Fase 3 no existe todavía, y **escribirlo es una sesión propia**. No mezcles
+  bloques: son grandes y mezclarlos hace que ninguno se cierre del todo.
 - **Un pull request por bloque**, y no se abre el siguiente hasta que el anterior
   está fusionado. Al fusionar, sigue el procedimiento de alineación local de más
   arriba.
