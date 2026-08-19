@@ -2,7 +2,7 @@
 
 | ID | Skill | Ámbito | Estado | Definición | Implementación |
 |---|---|---|---|---|---|
-| SKILL-001 | Presentación de resumen a partir del README | common | Vigente | [`SKILL-001-readme-to-deck.md`](SKILL-001-readme-to-deck.md) | [`../marketing/assets/build-drp-resumen.js`](../marketing/assets/build-drp-resumen.js) y [`assets/preview-pptx.py`](assets/preview-pptx.py) |
+| SKILL-001 | Presentaciones a partir del README | common | Vigente | [`SKILL-001-readme-to-deck.md`](SKILL-001-readme-to-deck.md) | [`../marketing/assets/build-drp-resumen.js`](../marketing/assets/build-drp-resumen.js), [`../marketing/assets/build-drp-comercial.js`](../marketing/assets/build-drp-comercial.js) y [`assets/preview-pptx.py`](assets/preview-pptx.py) |
 
 ## Reglas del catálogo
 
