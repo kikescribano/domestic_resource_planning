@@ -51,6 +51,12 @@ el cierre por un lado, CMMS por otro. **No se parte en ningún otro sitio**,
 porque cualquier otro corte deja un módulo a medias o la activación sin
 consumidor.
 
+> **Alcanzado el 2026-08-19, y declarado: la fase no se parte y sigue con CMMS.**
+> El Hito 4 retiró el cuarto riesgo, así que el corte está disponible; se decide
+> no tomarlo porque partir aquí no ahorra nada —quedan dos hitos, y el 6 no se
+> puede ejecutar sin el 5— y dejaría un módulo de prioridad alta a medio camino.
+> El razonamiento completo está al final del Hito 4.
+
 ## Cómo se trabaja
 
 Igual que en la Fase 1, con «módulo» donde antes decía «hito»:
@@ -470,27 +476,92 @@ este hito le deja un aviso escrito en la ficha: `warehouse_movements` es **la
 primera tabla del modelo que crece con lo que el hogar hace y no con lo que
 tiene**, así que es por donde hay que empezar a mirar.
 
-### Hito 4 — Compras y lista de la compra · **Pendiente**
+### Hito 4 — Compras y lista de la compra · **Completado (2026-08-19)**
 
 El hito que cierra el ciclo y el que retira el riesgo arquitectónico principal:
 **dos módulos que se hablan sin depender uno de que el otro esté activo**.
 
-- [ ] **Ficha del módulo**, con la frontera contra Warehouse: Warehouse detecta la
-      falta, Compras decide qué se compra y cuándo.
-- [ ] **Dominio**: lista de la compra, estado de lo pedido, y el cierre de la
-      compra que termina en una entrada de consumible del core.
-- [ ] **Consumo de los eventos de Warehouse**, con la prueba que importa:
-      **Warehouse apagado y Compras encendido, y ninguno de los dos se rompe**; y
-      al revés.
-- [ ] **Lectura de Proveedores** para saber dónde se compra, degradando
-      limpiamente si ese módulo está apagado.
-- [ ] **El cierre del ciclo**: comprar y recibir acaba llamando a la entrada de
-      consumibles del core, que ya existe y **suma** sobre la existencia de esa
-      ubicación.
-- [ ] **Sus pantallas** bajo `/compras`, y su recorrido vertical.
+- [x] **Ficha del módulo** en [`docs/backend/modules/purchasing.md`](../../backend/modules/purchasing.md),
+      escrita antes del código y en un commit propio, con la frontera contra
+      Warehouse sin ambigüedad: **Warehouse detecta la falta, Compras decide qué
+      se compra y cuándo**. Compras no mira existencias ni mínimos, y Warehouse no
+      sabe que Compras existe.
+- [x] **Dominio**: lista de la compra, estado de lo pedido y el cierre de la
+      compra, en dos tablas con `household_id`, RLS y `FORCE`. El recuento del
+      esquema sube de veintitrés a veinticinco y la lista de tablas sin política
+      no se toca.
+- [x] **Consumo de los dos eventos de Warehouse** por la base de handler del Hito
+      0, con **las dos mitades de la prueba que importa medidas**: Warehouse
+      apagado y Compras encendido —los eventos no llegan, la lista deja de
+      llenarse sola y se añade a mano—, y al revés —Warehouse publica, escribe su
+      cuaderno y nadie escucha—, con un tercer hogar con los dos encendidos como
+      comparación.
+- [x] **Lectura de Proveedores** por un **puerto en plataforma que no nombra a
+      ningún módulo**, con la degradación puesta en plataforma. Ver más abajo.
+- [x] **El cierre del ciclo**: recibir una compra acaba llamando a
+      `RegisterConsumableIntake`, que **suma** sobre la existencia de esa
+      ubicación — y con Warehouse encendido, eso aparece en su cuaderno.
+- [x] **Su siembra al activarse**, sobre los consumibles del core que están a
+      cero, e idempotente por construcción.
+- [x] **Diez operaciones en el contrato** bajo `/api/v1/purchasing` con su
+      `operationId`, cinco códigos de error nuevos en `com.drp.platform.error`, y
+      sus pantallas bajo `/compras` con recorrido vertical **añadido a la batería
+      existente**.
 
-> **Aquí está el punto de corte de la fase.** Cerrado este hito, los cuatro
-> riesgos de la tabla de alcance están retirados y hay tres módulos funcionando.
+#### Cómo quedó, y lo que hubo que decidir por el camino
+
+**El riesgo que este hito retira es el tercero de la tabla de alcance, y era el
+principal: dos módulos que se hablan sin depender uno de que el otro esté
+activo.** Con él, **los cuatro riesgos están retirados**. Y trae dos primeras
+veces que ningún módulo anterior podía traer: **leer el dato maestro de otro
+módulo** y **escribir en el core** — Warehouse movía un contador que ya existía;
+Compras crea existencias.
+
+Las decisiones que la definición no preveía están anotadas con su alternativa
+descartada en [`decisions.md`](decisions.md). Las tres que cierran preguntas
+heredadas:
+
+- **Cómo lee un módulo el dato maestro de otro: un puerto en plataforma, y
+  llamado de modo que plataforma no nombre a ningún módulo.** Se descarta la
+  alternativa de eventos con copia local por un motivo que no es de gusto: **esa
+  copia no se puede sembrar**, porque el estado del que habría que sembrarla vive
+  en las tablas del otro módulo. El puerto es `MasterDataDirectory` —el mecanismo,
+  pedido por la clave del módulo dueño— y no `SupplierDirectory`, que es lo que
+  evita el residuo que la mudanza de `ErrorCode` dejó anotado para vigilar. **La
+  lista de excepciones de ArchUnit sigue teniendo un solo nombre.**
+- **Lo que llega a cero entra solo en la lista** — y para que eso fuera cierto
+  hubo que arreglar Warehouse: `StockDepleted` colgaba de la rama de bajo mínimos,
+  así que **no se publicaba nunca para un artículo sin mínimo declarado**, que son
+  casi todos. Nadie lo había notado porque hasta este hito no había consumidor.
+- **La presentación de compra se compone y no se guarda.** Era la media pregunta
+  que venía de la Fase 1: no necesita nombre propio, porque `packSize` y `unit` ya
+  lo dicen, y un texto libre sería una segunda fuente de verdad que puede
+  contradecir al envase.
+
+**Lo que este hito no hace, y dónde se hace.** El **barrido de aislamiento** de
+las diez operaciones nuevas se queda en el **Hito 6**, igual que las siete de
+Proveedores y las diez de Warehouse: se dice aquí explícitamente para que no se dé
+por supuesto. La **purga de `household_notices`** sigue sin hito asignado, y este
+hito le añade **dos candidatos más al mismo sitio** —`shopping_list_items` y
+`purchases`, que como el cuaderno de Warehouse crecen con lo que el hogar *hace* y
+no con lo que *tiene*—, de modo que ya son cuatro tablas y no una. **Volver a
+medir la capacidad** también es del Hito 6.
+
+> **Aquí está el punto de corte de la fase, y queda declarado.** Cerrado este
+> hito, **los cuatro riesgos de la tabla de alcance están retirados y hay tres
+> módulos funcionando**: la arquitectura está entera y CMMS no aporta ningún
+> riesgo arquitectónico que no esté ya retirado.
+>
+> **La fase no se parte aquí y sigue con CMMS.** El motivo es que partirla ahora
+> no ahorra nada de lo que un corte sirve para ahorrar: los Hitos 5 y 6 son los
+> dos únicos que quedan, el 6 **no se puede ejecutar sin el 5** —su barrido de
+> aislamiento y su auditoría de accesibilidad cubren las operaciones y las
+> pantallas de los cuatro módulos, y su barrido de promesas aplazadas tiene que
+> alcanzar las que CMMS deje— y cerrar la fase sin el cuarto módulo dejaría la
+> sección 4.2 del README con un módulo de prioridad alta a medio camino, que es
+> justo lo que el criterio de corte quería evitar. Lo que el punto de corte
+> garantiza sigue en pie y es lo que había que declarar: **si hubiera que
+> pararlo, este es el único sitio donde el trabajo entregado se sostiene solo.**
 
 ### Hito 5 — Mantenimiento (CMMS) · **Pendiente**
 
@@ -554,8 +625,8 @@ del alcance nuevo. Se resuelven en el hito que las toca y se anotan en
 | Pregunta | Hito | Por qué vence ahora |
 |---|---|---|
 | ~~**Peso y volumen de un asset**~~ — **resuelta el 2026-08-19: van al core, y van en `articles`**, porque el aviso de capacidad es una regla del core y una regla del core no puede depender de un módulo que se puede apagar | 3 | Su destinatario asignado era Warehouse, y Warehouse llegó. Resultó no ser suya |
-| ~~**Unidad de compra frente a unidad de consumo**~~ — **medio resuelta el 2026-08-19: la conversión ya está guardada y es del core** (`Article.packSize`); lo que falta es **nombrar** la presentación de compra, que es concepto de compra y nace en el Hito 4 | 3 y 4 | El core fija que la unidad la pone el artículo y que convertir es de Warehouse; Compras es quien lo necesita de verdad |
-| **Qué pasa cuando un consumible llega a cero**: si entra solo en la lista de la compra o hace falta decirlo | 4 | El catálogo de eventos lo da por hecho, y nadie ha decidido si es automático |
+| ~~**Unidad de compra frente a unidad de consumo**~~ — **resuelta del todo el 2026-08-19**: la conversión ya estaba guardada y es del core (`Article.packSize`), y **la presentación de compra no necesita nombre propio** — se compone con `packSize` y `unit` en lugar de guardarse, porque un texto libre sería una segunda fuente de verdad que puede contradecir al envase | 3 y 4 | El core fija que la unidad la pone el artículo y que convertir es de Warehouse; Compras es quien lo necesita de verdad |
+| ~~**Qué pasa cuando un consumible llega a cero**~~ — **resuelta el 2026-08-19: entra solo en la lista, sin que nadie lo diga**, porque quedarse sin algo es el disparador canónico de una lista de la compra y descartar una línea es un clic. Al escribirlo se destapó que `StockDepleted` **no se publicaba nunca sin mínimo declarado**, y se corrigió en Warehouse, que es de quien es | 4 | El catálogo de eventos lo da por hecho, y nadie ha decidido si es automático |
 | ~~**Qué ve un rol no administrador** en la pantalla de módulos~~ — **resuelta el 2026-08-18: el catálogo entero, con su estado y sin acciones** | 0 | Era una decisión de producto pequeña, y condicionaba la navegación |
 
 Y una que **no vence en esta fase** y conviene no confundir: el traspaso del
@@ -587,6 +658,7 @@ conocido.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-19 | **Hito 4 completado**: el módulo que cierra el ciclo de la reposición y **retira el riesgo arquitectónico principal de la fase** —dos módulos que se hablan sin depender uno de que el otro esté activo—, con las dos mitades medidas y un tercer hogar con los dos encendidos como comparación. Vence la pregunta heredada de **cómo lee un módulo el dato maestro de otro**: un puerto en plataforma que **no nombra a ningún módulo**, con la degradación puesta en plataforma y la lista de excepciones de ArchUnit intacta. Compras es además **el primero que escribe en el core** —recibir invoca la entrada de consumibles, que crea existencias, y eso deja asiento en el cuaderno de Warehouse—. Dos tablas con RLS y `FORCE` que suben el recuento de veintitrés a veinticinco, diez operaciones en el contrato, siembra desde los consumibles a cero del core, y un arreglo en Warehouse que su primer consumidor destapó: `StockDepleted` no se publicaba sin mínimo declarado. **Con esto los cuatro riesgos están retirados**, y se declara el punto de corte: la fase no se parte y sigue con CMMS |
 | 2026-08-19 | **Hito 3 completado**: el primer módulo que reacciona al core —seis de los trece eventos por la base de handler del Hito 0, con la prueba de que un hogar apagado no ve ni una fila escrita—, cuatro tablas con RLS y `FORCE` que suben el recuento de diecinueve a veintitrés, diez operaciones en el contrato, la primera siembra de verdad **e idempotente**, y los dos primeros avisos por fecha de un módulo, leídos del Mailpit real y sin repetirse cada noche. Se resuelven las dos preguntas heredadas: **peso y volumen van al core y van en el artículo** —con su propia migración `V11`, porque es un cambio del core— y la conversión de unidad de compra ya estaba guardada en `packSize`. Se construye el `Combobox` aplazado desde la Fase 1. Once decisiones que la definición no preveía |
 | 2026-08-18 | **Hito 2 completado**: el primer módulo de verdad recorre el camino entero —ficha antes del código, dominio, migración `V9` con RLS y `FORCE`, siete operaciones en el contrato, siembra vacía escrita igual, pantallas bajo `/proveedores` y recorrido vertical en la batería existente—. El gate tapa por fin una ruta que existe: `403` apagado, `200` encendido. `ErrorCode` y la familia de `DomainError` se mudan a plataforma, que era la deuda que la ADR-010 dejó con su condición de revisión, y con ella se retiran `UnknownModule` y `UnknownNotice`. Diez decisiones que la definición no preveía |
 | 2026-08-18 | **Hito 1 completado**: un solo recorrido periódico en `com.drp.platform`, hogar a hogar sin `BYPASSRLS` y saltándose los que tengan apagado el módulo que pide la comprobación; los tres procesos diarios del core pasan a ser comprobaciones y se ejecutan de verdad; `household_notices` con RLS y `FORCE`, tres operaciones en el contrato, bandeja en el cliente y resumen diario leído del Mailpit real. Correo y lista de hogares se mudan a plataforma en lugar de ensanchar la excepción de ArchUnit. ADR-011, y cuatro decisiones que la definición no preveía |

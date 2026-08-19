@@ -6,7 +6,7 @@
 | Responsable | Equipo DRP |
 | Clave | `SUPPLIERS` |
 | Prefijo de ruta | `/api/v1/suppliers` |
-| Última revisión | 2026-08-18 |
+| Última revisión | 2026-08-19 |
 
 > **Esta ficha se escribió antes que la primera línea de código del módulo**, que
 > es la regla que el [catálogo](README.md) fija y el motivo por el que existe: un
@@ -287,16 +287,28 @@ ese barrido, no en este hito.
 
 ## Decisiones abiertas
 
-- **Cómo lee otro módulo el dato maestro de Proveedores.** Vence en el **Hito 4**,
-  que es el primero que lo necesita. ArchUnit prohíbe que Compras importe una
-  clase de `com.drp.module.suppliers`, así que las salidas son dos: un **puerto en
-  plataforma** que Proveedores implemente —que es lo que la ADR-010 señala en su
-  condición de revisión— o **eventos** que el consumidor materialice en su propio
-  lado. La primera es más directa y hace que el consumidor dependa de que el
-  módulo esté encendido en el instante de la consulta; la segunda no, y a cambio
-  obliga a cada consumidor a guardar su copia. **No se decide aquí** porque
-  decidirla sin el consumidor delante es decidirla a ciegas, que es justo lo que
-  esta ficha existe para evitar en el otro sentido.
+- ~~**Cómo lee otro módulo el dato maestro de Proveedores.**~~ **Resuelta en el
+  Hito 4 (2026-08-19), con Compras delante: un puerto en plataforma.** Escribir la
+  pregunta aquí y no contestarla pagó, que es lo que esta ficha pretendía: la
+  alternativa de **eventos con copia local** resultó tener un defecto que no se ve
+  sin el consumidor delante — **esa copia no se puede sembrar**. La entrega del bus
+  es at-least-once y en memoria, así que un hogar que encienda Compras hoy no vio
+  el alta de hace un mes, y la ADR-010 resuelve ese caso mandando sembrar **desde
+  el estado**, que aquí vive en las tablas de este módulo: justo lo que no se puede
+  leer desde fuera. La copia nacería vacía para siempre.
+
+  El puerto **no se llama `SupplierDirectory` ni nombra a este módulo**: es
+  `MasterDataDirectory`, en `com.drp.platform.directory`, y se pide por la clave
+  del módulo dueño —la misma forma que `ModuleSeeder` y `ScheduledCheck`—, de modo
+  que plataforma declara el mecanismo sin aprender la palabra «proveedor». Este
+  módulo lo implementa en `SupplierDirectory`, dentro de su propio árbol, y por él
+  solo pasa **lo mínimo**: identificador, nombre y categoría. Ni teléfono ni
+  correo, que son los datos personales de terceros que esta ficha protege.
+
+  **La degradación la pone plataforma**: la fachada comprueba la activación antes
+  de preguntar nada, así que con este módulo apagado el consumidor recibe vacío y
+  no tiene una sola rama para ello. El razonamiento completo está en
+  [`purchasing.md`](purchasing.md) y en [`decisions.md`](../../common/product/decisions.md).
 - **Si la categoría de servicio tiene que pasar a catálogo por hogar.** Hoy es una
   lista cerrada con `OTHER`, que es lo contrario de lo que el core decidió para su
   `Category` —y la diferencia es deliberada: la del core clasifica **lo que el
@@ -330,3 +342,4 @@ ese barrido, no en este hito.
 | Fecha | Cambio | Autor |
 |---|---|---|
 | 2026-08-18 | Creación, **antes de la primera línea de código** del módulo, como pide el catálogo. Declara las siete operaciones, las dos tablas, las cinco invariantes, los cinco códigos de error, que no publica eventos ni declara comprobación periódica, y las tres decisiones abiertas con su destinatario. | Equipo DRP |
+| 2026-08-19 | **El Hito 4 vence la decisión abierta que esta ficha dejó con destinatario**: otro módulo lee este dato maestro por un **puerto en plataforma que no nombra a ningún módulo**, implementado aquí en `SupplierDirectory`. Se descarta la alternativa de eventos con copia local, que no se podría sembrar. El resto de la ficha no cambia: el módulo sigue sin publicar eventos y sin comprobación periódica. | Equipo DRP |

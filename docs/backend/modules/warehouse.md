@@ -233,6 +233,17 @@ debajo del mínimo no se vuelve a publicar, y vuelve a armarse cuando la cantida
 sube por encima. Un evento por cada cucharada de azúcar dejaría a Compras
 recibiendo cientos al día para no decir nada nuevo.
 
+> **Corregido el 2026-08-19, en el Hito 4, cuando llegó el consumidor.**
+> `StockDepleted` colgaba de la rama de «acaba de bajar del mínimo», así que un
+> artículo **sin ficha de mínimo —que son casi todos— no lo publicaba jamás**, al
+> contrario de lo que esta tabla declara. Nadie lo había notado porque hasta
+> entonces no había nadie escuchando, y lo destapó Compras al construir sobre la
+> regla «lo que llega a cero entra en la lista», que era falsa para casi toda una
+> despensa. El cruce a cero se deduce ahora **del delta que ya trae el evento del
+> core** —el total de antes es el de ahora menos lo que acaba de cambiar— y no
+> hizo falta ninguna columna nueva. **Los dos avisos por fecha no cambian**: esos
+> sí exigen ficha con mínimo, y para ellos es lo correcto.
+
 **Lo que un consumidor puede dar por hecho**, declarado aquí para que el Hito 4 no
 tenga que adivinarlo:
 
@@ -465,15 +476,14 @@ aviso sería de una sola vez en la vida del artículo.
 
 ## Decisiones abiertas
 
-- **Cómo nombra Compras la presentación de compra.** La *conversión* entre unidad
-  de compra y unidad de consumo **ya está resuelta y no es de aquí**: el core la
-  guarda en `Article.packSize` —«cuánto trae un envase, en la unidad del
-  artículo»— y Warehouse la usa al dar entrada. Lo que no existe es el **nombre**
-  de esa presentación —«pack de 6», «garrafa de 5 l»— ni la posibilidad de que un
-  artículo tenga varias según dónde se compre. Eso es un concepto de compra y no
-  de existencias, así que **vence en el Hito 4** y nace allí. Se anota aquí porque
-  la pregunta heredada de la Fase 1 llegaba dirigida a los Hitos 3 y 4, y desde
-  este lado ya está contestada.
+- ~~**Cómo nombra Compras la presentación de compra.**~~ **Resuelta en el Hito 4
+  (2026-08-19): no necesita nombre propio.** La *conversión* ya estaba resuelta y
+  no era de aquí —el core la guarda en `Article.packSize`—, y lo que faltaba era
+  el **nombre** de esa presentación. Compras decidió **componerlo y no guardarlo**:
+  el par `packSize`/`unit` ya lo dice todo, y un texto libre sería una segunda
+  fuente de verdad que puede contradecir al envase. El disparador de revisarlo
+  está escrito en [`purchasing.md`](purchasing.md): el día que un artículo necesite
+  dos presentaciones a la vez, deja de ser una etiqueta y pasa a ser una tabla.
 - **Si el consumo debe poder repartirse entre lotes.** Hoy `RecordConsumption`
   descuenta del contador del core y **no toca ningún lote**: quien se acabe un lote
   lo marca a mano con `DiscardStockLot`. Repartir automáticamente exigiría decidir
@@ -510,4 +520,5 @@ aviso sería de una sola vez en la vida del artículo.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-19 | **El Hito 4 trae el consumidor previsto y con él dos cierres.** `StockDepleted` **no se publicaba nunca sin mínimo declarado**, al contrario de lo que esta ficha declaraba: corregido deduciendo el cruce a cero del delta del evento, sin columna nueva. Y la decisión abierta sobre la presentación de compra queda resuelta desde el otro lado: no necesita nombre propio. | Equipo DRP |
 | 2026-08-18 | Creación, **antes de la primera línea de código** del módulo. Declara las diez operaciones, las cuatro tablas, las seis invariantes, los cinco códigos de error, los seis eventos consumidos y los dos publicados con su consumidor previsto, y **la frontera contra el core sin ambigüedad**: el core mantiene un contador y Warehouse no lleva ninguno. Deja decididas las tres cosas que la definición no resolvía —qué hace un handler sin ficha, si reactivar resiembra y si un aviso se repite— y tres decisiones abiertas con su destinatario. | Equipo DRP |
