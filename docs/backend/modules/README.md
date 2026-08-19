@@ -18,7 +18,7 @@ temporales», que durante un tiempo aparecían de otra forma en el README.
 | Proveedores y contactos de servicio | Quién arregla, quién cobra y quién responde de una garantía | [`suppliers.md`](suppliers.md) |
 | Compras y lista de la compra | Qué falta, qué hay que reponer y qué está pedido | [`purchasing.md`](purchasing.md) |
 | Warehouse | Existencias, ubicaciones y movimientos | [`warehouse.md`](warehouse.md) |
-| Mantenimiento (CMMS) | Planificación y seguimiento del mantenimiento | Pendiente |
+| Mantenimiento (CMMS) | Planificación y seguimiento del mantenimiento | [`maintenance.md`](maintenance.md) |
 | Planificador de tareas | Organización y seguimiento de tareas | Pendiente |
 | Gastos y presupuesto | Coste de lo que entra en el hogar y presupuesto por periodo | Pendiente |
 | Eventos temporales | Hechos o periodos que afectan a recursos | Pendiente |
@@ -92,6 +92,26 @@ el consumidor tenga una sola rama para ello. La segunda es que **es el primer
 módulo que escribe en el core**: cerrar una compra invoca
 `RegisterConsumableIntake`, que crea existencias, y eso deja un asiento en el
 cuaderno de Warehouse sin que ninguno de los dos módulos sepa del otro.
+
+**Y el cuarto es Mantenimiento (CMMS)**, en el Hito 5 (2026-08-19), con el que
+los cuatro de prioridad alta quedan construidos. Su [`ficha`](maintenance.md) es
+la única que ha tenido que escribir **una frontera contra un módulo que no
+existe**: el planificador de tareas. Warehouse escribió la suya contra el core y
+Compras contra Warehouse, los dos con el otro lado delante; aquí no había con
+quien contrastarla, y el catálogo de eventos ya le había asignado dos trabajos al
+planificador. La línea queda escrita sin ambigüedad —**de CMMS es el cuándo, del
+planificador el quién lo hace**— con sus tres consecuencias cumplidas hoy: ningún
+plan lleva responsable, no hay calendario materializado y este módulo no consume
+`UserDeactivated`.
+
+Trae además las dos cosas que ningún módulo anterior podía traer. Es **el segundo
+consumidor del puerto de dato maestro**, que es su prueba de verdad —se diseñó con
+un consumidor delante— y decide **no ensancharlo**: filtrar por categoría sería la
+funcionalidad equivocada, y lo que hace falta —agrupar el selector— ya cabe en el
+`detail` que el puerto entrega. Y es el primero cuyo **aviso por fecha tiene que
+volver a armarse**: una revisión es periódica, así que el estado del aviso cuelga
+de **la próxima fecha prevista** y no del plan, de modo que cualquier camino que
+mueva la fecha lo rearma sin tener que acordarse.
 
 **Y una regla que ese módulo estrenó:** la ficha declara **los nombres de tabla
 que el módulo posee**, para que otro no los tome. Es lo que convierte «cada módulo
