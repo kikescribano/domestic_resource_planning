@@ -3,6 +3,7 @@
 | ID | Skill | Ámbito | Estado | Definición | Implementación |
 |---|---|---|---|---|---|
 | SKILL-001 | Presentación de resumen a partir del README | common | Vigente | [`SKILL-001-readme-to-deck.md`](SKILL-001-readme-to-deck.md) | [`../marketing/assets/build-drp-resumen.js`](../marketing/assets/build-drp-resumen.js) y [`assets/preview-pptx.py`](assets/preview-pptx.py) |
+| SKILL-002 | Presentaciones sobre la plantilla de Slidesgo | common | Vigente | [`.claude/skills/marketing-deck/SKILL.md`](../../../.claude/skills/marketing-deck/SKILL.md) | [`scripts/`](../../../.claude/skills/marketing-deck/scripts/slidesgo_deck.py) de esa misma skill, y los generadores [`build-drp-comercial.py`](../marketing/assets/build-drp-comercial.py) y [`build-drp-tecnico.py`](../marketing/assets/build-drp-tecnico.py) |
 
 ## Reglas del catálogo
 
