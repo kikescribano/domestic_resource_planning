@@ -2,9 +2,9 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Vigente |
+| Estado | Cerrado |
 | Responsable | Equipo DRP |
-| Ámbito | Ejecución de la Fase 2 |
+| Ámbito | Ejecución de la Fase 2, **completada el 2026-08-19** |
 | Última revisión | 2026-08-19 |
 
 > El estado de **las fases** vive en la sección 8 del
@@ -664,7 +664,7 @@ año y no varias al día. **Volver a medir la capacidad** también es del Hito 6
 > está entero: el mecanismo (Hito 0), la plataforma (Hito 1) y los cuatro módulos
 > (Hitos 2 a 5). El Hito 6 no añade producto: consolida.
 
-### Hito 6 — Cierre de la fase · **Pendiente**
+### Hito 6 — Cierre de la fase · **Completado (2026-08-19)**
 
 Existe porque la Fase 1 aprendió que no se cierra solo: el Hito 4 dio por hecho un
 criterio de accesibilidad que no había cubierto, y seis documentos del frontend se
@@ -674,38 +674,40 @@ a por ellos.
 **Y ahora la lista está completa delante**, que es lo que este hito no tenía hasta
 cerrar el 5. Lo que le queda, con las cifras reales:
 
-- [ ] **Barrido de aislamiento sobre las operaciones nuevas**, con la misma forma
+- [x] **Barrido de aislamiento sobre las operaciones nuevas**, con la misma forma
       que el de la Fase 1: autenticado como hogar A, ninguna operación de ningún
       módulo devuelve ni modifica datos del hogar B, ni por identificador directo.
-      Hoy `TenantIsolationSweepTest` cubre **las treinta y ocho operaciones de la
-      Fase 1 y ninguna de plataforma ni de módulo**, y lo que falta son **cuarenta
-      y una**: las tres de la activación (Hito 0), las tres de avisos (Hito 1),
-      las siete de Proveedores, las diez de Warehouse, las diez de Compras y las
-      once de Mantenimiento. Los cuatro hitos de módulo lo dejaron aquí a
-      propósito y lo dijeron cada uno en su ficha.
-- [ ] **Auditoría de accesibilidad completa** de las pantallas nuevas: teclado,
+      `TenantIsolationSweepTest` cubría **las treinta y ocho operaciones de la
+      Fase 1 y ninguna de plataforma ni de módulo**, y lo que faltaba eran
+      **cuarenta y cuatro** —aquí decía cuarenta y una, y el recuento de al lado
+      ya sumaba cuarenta y cuatro: el contrato tiene noventa y ocho operaciones y
+      la Fase 1 dejó cincuenta y cuatro—: las tres de la activación (Hito 0), las
+      tres de avisos (Hito 1), las siete de Proveedores, las diez de Warehouse,
+      las diez de Compras y las once de Mantenimiento. Los cuatro hitos de módulo
+      lo dejaron aquí a propósito y lo dijeron cada uno en su ficha.
+- [x] **Auditoría de accesibilidad completa** de las pantallas nuevas: teclado,
       foco visible en cada parada, reflujo de 320 px a ultrawide y axe en los dos
       modos. No basta con axe. Son **seis pantallas** —módulos, avisos,
       proveedores, almacén, compras y mantenimiento— y la batería tiene ya seis
       recorridos que las tocan; lo que falta es la pasada sistemática, no la
       primera visita.
-- [ ] **Barrido de las promesas aplazadas**: buscar en la documentación toda frase
+- [x] **Barrido de las promesas aplazadas**: buscar en la documentación toda frase
       del tipo «lo hará el hito siguiente» y cerrarla o convertirla en tarea con
       destinatario. **Las cuatro de `MODULE_SCREENS` ya están cerradas** —cada
       módulo perdió la suya al construir su pantalla, y el campo se retiró con la
       última—, así que lo que queda son las de la documentación.
-- [ ] **Volver a medir la capacidad**, porque cuatro módulos cambian el consumo de
+- [x] **Volver a medir la capacidad**, porque cuatro módulos cambian el consumo de
       disco por hogar, que es lo que decidió el VPS. **Por dónde empezar está
       dicho**: las cuatro tablas que crecen con lo que el hogar *hace* y no con lo
       que *tiene* —`warehouse_movements`, `shopping_list_items`, `purchases` y
       `maintenance_interventions`—, más `household_notices`, que la ADR-011 dejó
       anotada entre sus costes.
-- [ ] **Decidir de quién es la purga de esas cinco tablas**, que sigue sin hito
+- [x] **Decidir de quién es la purga de esas cinco tablas**, que sigue sin hito
       asignado desde el Hito 1 y ya no puede seguir aplazándose sin decir por qué:
       su sitio natural sigue siendo una comprobación más del recorrido diario, y
       es el único punto de la fase que ha ido creciendo hito a hito sin
       destinatario.
-- [ ] **Resolver las decisiones abiertas que dejaron los cuatro módulos con
+- [x] **Resolver las decisiones abiertas que dejaron los cuatro módulos con
       «quien abra el Hito 6» como responsable**, que son las que solo se pueden
       contestar mirando datos reales: si la categoría de servicio de Proveedores
       tiene que pasar a catálogo por hogar, si el consumo de Warehouse debe
@@ -715,7 +717,7 @@ cerrar el 5. Lo que le queda, con las cifras reales:
       por hogar, que Warehouse y Mantenimiento dejaron abierta por separado y que
       conviene resolver junta — dos tablas de configuración de dos módulos para lo
       mismo serían la señal de que lo que falta es una de plataforma.
-- [ ] **Decidir qué se hace con la prueba del reloj del enrolamiento**, que es la
+- [x] **Decidir qué se hace con la prueba del reloj del enrolamiento**, que es la
       única de la suite que mide tiempos y **ya ha fallado dos veces en la CI sin
       que nada hubiera cambiado en el código**: la primera por un umbral absoluto
       de 60 ms —que se cambió por una proporción— y la segunda el 2026-08-19, en
@@ -724,8 +726,8 @@ cerrar el 5. Lo que le queda, con las cifras reales:
       única forma conocida de reabrir la fuga— así que **no se relaja sin más**;
       lo que hay que decidir es si esa propiedad se comprueba mejor de otra
       manera que cronometrando en un runner compartido.
-- [ ] **Actualizar el deck de marketing**, que no avisa cuando se queda atrás.
-- [ ] **README**: sección 4.2 con los cuatro módulos en su estado real, sección 8
+- [x] **Actualizar el deck de marketing**, que no avisa cuando se queda atrás.
+- [x] **README**: sección 4.2 con los cuatro módulos en su estado real, sección 8
       con la fase cerrada, sección 10 con su fila de historial.
 
 > **El Hito 6 no añade producto: consolida.** Los cuatro riesgos de la tabla de
@@ -733,6 +735,97 @@ cerrar el 5. Lo que le queda, con las cifras reales:
 > el 5, así que lo que queda es lo que la Fase 1 aprendió que no se cierra solo.
 > Es además el único hito de la fase que **no se puede ejecutar antes que los
 > demás**, y por eso el punto de corte lo dejó fuera del corte.
+
+#### Cómo quedó, y los cuatro defectos que consolidar destapó
+
+**Consolidar no era repasar: los tres barridos encontraron cuatro defectos que
+ninguna prueba de recorrido podía ver.** Y no es casualidad que fueran esos tres:
+los tres preguntan por lo que **no** se hizo —un identificador que el hogar no
+tiene, una parada del tabulador a la que ningún recorrido llega, un año que
+todavía no ha pasado— y un recorrido, por definición, solo pasa por donde va.
+
+- **El barrido de aislamiento cubre el contrato entero**: 313 comprobaciones
+  sobre las noventa y ocho operaciones, sin una desviación. **Ningún
+  identificador delata** —ajeno e inexistente responden igual en las cuarenta y
+  dos operaciones con identificador en la ruta— y el criterio de inclusión queda
+  por fin escrito, que es lo que la Fase 1 nunca dijo. Destapó que **dos
+  operaciones de Warehouse respondían `500`** ante un identificador de otro hogar
+  donde el contrato declara `404`, porque abrían la ficha del módulo antes de
+  comprobar nada y la clave ajena reventaba primero; y que **recibir una compra
+  ignoraba en silencio** una línea que no fuera suya, respondiendo `200` y
+  descartando lo que el cliente había dicho.
+- **La auditoría de accesibilidad** recorre las seis pantallas enteras —teclado
+  con anillo de foco **en cada parada**, reflujo de 320 px a ultrawide y axe en
+  los dos modos— con los cuatro módulos encendidos, que es el caso peor de la
+  fase y el único con doce paradas en la navegación. Encontró que
+  **`input[type=date]` no dibujaba ningún anillo de foco**: Chromium delega el
+  foco a un campo de su shadow DOM, así que el `<input>` no casa con
+  `:focus-visible` **ni con `:focus`**, y la regla de la capa base no le
+  alcanzaba. Llevaba ahí desde que existe el primer campo de fecha.
+- **La capacidad, vuelta a medir**, obliga a partir la medición en dos: la
+  pendiente por hogar pasa de 61 kB a **116 kB** con los cuatro módulos, y
+  aparece una magnitud que antes no existía —lo que crece con lo que el hogar
+  *hace*, **2457 B por día**—. **La elección de VPS-3 sigue en pie y sigue
+  decidiéndola el disco**, por tres órdenes de magnitud.
+
+Las decisiones que la definición no preveía están anotadas con su alternativa
+descartada en [`decisions.md`](decisions.md). Las cuatro que más lejos llegan:
+
+- **El barrido crece en su clase en lugar de nacer una por módulo**, y el motivo
+  no es ahorrar contextos de Spring aunque también lo sea: **las referencias que
+  hay que atacar cruzan la frontera del módulo** —el `supplierId` de un plan de
+  CMMS, el `articleId` del core en una línea de la compra— y una clase por módulo
+  no podría escribirlas. Cero contextos nuevos, y siguen siendo treinta y nueve.
+- **La prueba del reloj se retira: la propiedad se cuenta.** Lo que medía sigue
+  haciendo falta, pero lo medía con el instrumento equivocado; ahora es un test
+  unitario determinista que cuenta las llamadas a `hash`, medido en los dos
+  sentidos, y que afirma de paso lo que el reloj no podía ver: que esa rama **no
+  escribe ni una fila**.
+- **La purga de las cinco tablas no se escribe, y por primera vez con un número
+  delante.** A 875 kiB por hogar y año, un hogar tarda diez años en llegar a
+  9 MB. Lo que se escribe es el criterio de retención con su disparador, que es
+  lo que llevaba pendiente desde el Hito 1.
+- **Las dos decisiones que solo los datos reales pueden contestar dejan de tener
+  un hito por responsable.** No hay datos reales y no puede haberlos: no hay
+  despliegue. Lo que sí se cierra es el disparador, que pasa de ser una impresión
+  a ser una consulta.
+
+**Y los cuatro módulos se quedan en «En desarrollo» en la sección 4.2**, que es
+la decisión que el hito tenía que tomar y explicar. «En producción» significa
+algo distinto de «el código está entero», y lo que falta no es código: **no hay
+ningún despliegue**. Decirlo de los cuatro módulos sería decirlo también del
+core, que lleva desde agosto igual de terminado y igual de no desplegado.
+
+## Qué le queda al proyecto con la fase cerrada
+
+Igual que el Hito 5 dijo qué le quedaba al 6, la fase cerrada tiene que decir qué
+le queda al proyecto. Son tres cosas, y ninguna es una continuación de esta fase:
+
+**1. La Fase 3 — los nueve módulos restantes de la sección 4.2.** Y **no se
+planifica aquí**: convertir una fase en un plan fue su propia sesión y su propio
+pull request cuando le tocó a la 2, y hacerlo al final de un hito de cierre es
+exactamente cómo se planifica mal. Lo que sí se puede decir, porque es un hecho de
+esta fase y no una previsión: **ninguno de los nueve pide arquitectura nueva**. El
+camino de un módulo está recorrido cuatro veces —ficha antes del código, dominio,
+migración con RLS y `FORCE`, contrato con `operationId`, siembra idempotente,
+gate en tres capas, pantallas y recorrido vertical añadido a la batería
+existente— y las cuatro veces salió el mismo camino.
+
+**2. El Transactional Outbox, que esta fase acerca sin resolver.** Está en la
+sección «Lo que sigue fuera» de más abajo, con su síntoma conocido, y sigue ahí:
+con cuatro módulos escuchando, perder un evento en un reinicio deja de ser
+teórico. La siembra desde estado lo mitiga y no lo arregla.
+
+**3. Lo que separa «En desarrollo» de «En producción», que no es código.** No hay
+despliegue: el VPS está elegido con consumo medido y nada más. Eso no es una tarea
+de ingeniería pendiente sino una decisión que nadie ha tomado, y su consecuencia
+ya se nota — **dos de las decisiones que este hito tenía que resolver no se pueden
+resolver sin hogares reales dentro**, y su responsable pasó a ser la primera
+revisión de operación que exista. Es el único punto donde el proyecto no puede
+avanzar leyendo su propio código.
+
+Y **una cosa que no le queda**: la Fase 2 no tiene continuación pendiente. Lo que
+se dejó abierto a propósito está listado abajo, cada cosa con su motivo.
 
 ## Criterio de aceptación
 
@@ -794,6 +887,7 @@ conocido.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-19 | **Hito 6 completado, y con él la Fase 2.** El hito no añade producto: consolida — y consolidar destapó **cuatro defectos que ninguna prueba de recorrido podía ver**, porque los tres barridos preguntan por lo que *no* se hizo. El **barrido de aislamiento** pasa de las treinta y ocho operaciones de la Fase 1 al **contrato entero**, con 313 comprobaciones y sin una desviación, y con **el criterio de inclusión escrito**: entra la operación que puede nombrar o devolver algo del hogar de al lado; queda fuera la que no acepta ningún identificador ni devuelve ninguna fila, porque esa prueba no podría fallar. De las cuarenta y cuatro nuevas —**el número que este documento tenía mal, que decía cuarenta y una**— cuarenta y una entran por las cuatro formas de ataque y tres por el cierre. Destapó dos `500` de Warehouse donde el contrato declara `404` y que **recibir una compra ignoraba en silencio** una línea ajena. La **auditoría de accesibilidad** recorre las seis pantallas enteras con los cuatro módulos encendidos —doce paradas, el caso peor— y encontró que **`input[type=date]` no dibujaba anillo de foco**, porque Chromium delega el foco a su shadow DOM y el campo no casa ni con `:focus-visible` ni con `:focus`. La **capacidad, vuelta a medir**, obliga a partir la medición en dos: por hogar pasa de 61 kB a **116 kB**, y aparece lo que crece con lo que el hogar *hace* —**2457 B/día**—; **VPS-3 sigue en pie y sigue decidiéndolo el disco**. Se cierra la **purga de las cinco tablas** con un número delante en vez de por aplazamiento, se resuelven o reafirman las **cinco decisiones abiertas** —la antelación del aviso eran dos preguntas y es una: será de plataforma— y **la prueba del reloj se retira**, porque la propiedad se cuenta y no se cronometra. El deck de marketing, regenerado desde su script. **Los cuatro módulos se quedan en «En desarrollo», y se dice por qué**: no hay ningún despliegue, y decir lo contrario sería decirlo también del core. Doce decisiones que la definición no preveía |
 | 2026-08-19 | **Hito 5 completado, y con él los cuatro módulos de prioridad alta**: Mantenimiento (CMMS) llega con tres tablas que suben el recuento de veinticinco a veintiocho, once operaciones que llevan el contrato a noventa y ocho, y el sexto recorrido vertical de la batería. Es el único módulo cuya frontera principal se ha escrito **sin el otro lado delante** —**de CMMS es el cuándo y del planificador de tareas el quién lo hace**—, con sus tres consecuencias cumplidas en código: ninguna tabla lleva responsable, no hay ocurrencias materializadas y no consume `UserDeactivated`. Es también **la prueba de verdad del puerto de dato maestro**, que **no se ensancha** —filtrar por categoría escondería justo al contacto que hace falta— y que de paso ejercita por fin la garantía que Proveedores declaró por adelantado: un contacto retirado sigue siendo legible por su identificador. Y el primero cuyo **aviso por fecha se rearma**, colgado de la próxima fecha prevista y no del plan. Se corrige el catálogo de eventos de 5.2.3 —`AssetCreated` abre la **ficha** de la máquina y no un plan por defecto, que no se sostiene— y se retira la última promesa autoprogramada del Hito 0, el campo `milestone`. El recorrido vertical vuelve a encontrar lo que solo se ve en un navegador: **recargar devolvía al login con la sesión viva en el servidor**. Doce decisiones que la definición no preveía |
 | 2026-08-19 | **Hito 4 completado**: el módulo que cierra el ciclo de la reposición y **retira el riesgo arquitectónico principal de la fase** —dos módulos que se hablan sin depender uno de que el otro esté activo—, con las dos mitades medidas y un tercer hogar con los dos encendidos como comparación. Vence la pregunta heredada de **cómo lee un módulo el dato maestro de otro**: un puerto en plataforma que **no nombra a ningún módulo**, con la degradación puesta en plataforma y la lista de excepciones de ArchUnit intacta. Compras es además **el primero que escribe en el core** —recibir invoca la entrada de consumibles, que crea existencias, y eso deja asiento en el cuaderno de Warehouse—. Dos tablas con RLS y `FORCE` que suben el recuento de veintitrés a veinticinco, diez operaciones en el contrato, siembra desde los consumibles a cero del core, y un arreglo en Warehouse que su primer consumidor destapó: `StockDepleted` no se publicaba sin mínimo declarado. **Con esto los cuatro riesgos están retirados**, y se declara el punto de corte: la fase no se parte y sigue con CMMS |
 | 2026-08-19 | **Hito 3 completado**: el primer módulo que reacciona al core —seis de los trece eventos por la base de handler del Hito 0, con la prueba de que un hogar apagado no ve ni una fila escrita—, cuatro tablas con RLS y `FORCE` que suben el recuento de diecinueve a veintitrés, diez operaciones en el contrato, la primera siembra de verdad **e idempotente**, y los dos primeros avisos por fecha de un módulo, leídos del Mailpit real y sin repetirse cada noche. Se resuelven las dos preguntas heredadas: **peso y volumen van al core y van en el artículo** —con su propia migración `V11`, porque es un cambio del core— y la conversión de unidad de compra ya estaba guardada en `packSize`. Se construye el `Combobox` aplazado desde la Fase 1. Once decisiones que la definición no preveía |

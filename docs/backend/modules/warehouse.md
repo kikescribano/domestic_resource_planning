@@ -421,10 +421,24 @@ vez, que es la verdad.
 | Recorrido vertical | Añadido a la batería existente y no en una suite paralela: encender el módulo, ver lo que ya había, fijar un mínimo, registrar un consumo, ver el asiento y dar de alta un lote con caducidad, con axe en los dos modos, foco, teclado y reflujo de 320 px a ultrawide |
 
 **El barrido de aislamiento** —autenticado como hogar A, ninguna operación
-devuelve ni modifica datos del hogar B— lo tiene asignado el **Hito 6**, que es
-donde el roadmap lo puso para toda la fase. **Se deja allí a propósito y se dice
-aquí para que no se dé por supuesto**: las diez operaciones de este módulo entran
-en ese barrido, no en este hito.
+devuelve ni modifica datos del hogar B— lo tuvo asignado el **Hito 6**, que es
+donde el roadmap lo puso para toda la fase.
+
+> **Cerrado el 2026-08-19, en el Hito 6, y este módulo es el que más sacó de
+> él.** Las diez operaciones entraron en el barrido y **destapó dos defectos que
+> ninguna prueba de recorrido podía ver**, porque las dos piden un identificador
+> que el hogar no tiene: `PATCH /warehouse/articles/{articleId}` y
+> `PATCH /warehouse/locations/{locationId}` respondían **`500`** ante un
+> identificador de otro hogar, donde el contrato declara `404`. Abrían la ficha
+> antes de comprobar nada, así que la clave ajena reventaba antes de llegar al
+> `ResourceNotFound`. Ahora se comprueba primero que la fila del core existe —que
+> con RLS significa a la vez «no existe» y «no es tuya», que es justo lo que hay
+> que responder—, con `articleName` y un `locationName` nuevo del mismo corte.
+>
+> Y quedó anotado con su motivo lo que **no** era defecto: tres operaciones de
+> este módulo se niegan con `409 STOCK_ITEM_NOT_TRACKED` y no con `404`, que es
+> lo que el contrato declara y además dice **menos** que un `404` —no distingue
+> «no existe» de «existe y no es consumible viva»—.
 
 ## Operación
 
@@ -438,10 +452,14 @@ en ese barrido, no en este hito.
   cambia el orden de magnitud del disco por hogar.** Todo lo que había hasta ahora
   crece con lo que el hogar *tiene*; el cuaderno crece con lo que el hogar *hace*,
   y una casa que apunta sus consumos escribe varias filas al día para siempre.
-  **Volver a medir la capacidad es del Hito 6** y aquí no se mide; queda dicho
-  para que quien lo haga sepa dónde mirar primero. Y la purga del histórico no
-  existe todavía: su sitio natural es una comprobación más de este mismo
-  recorrido, igual que la de `household_notices` que la ADR-011 dejó anotada.
+  **Medido el 2026-08-19, en el Hito 6**, y el aviso valía: es la tabla que más
+  crece de las cinco. La [medición](../operations/capacity-measurements.md) se
+  partió en dos por esto —lo que el hogar *tiene* y lo que *hace* son magnitudes
+  distintas y un solo número las mezcla— y la segunda da **2457 B por día, unos
+  875 kiB por hogar y año**. La purga sigue sin escribirse **y ahora con un
+  motivo y no por olvido**: a ese ritmo un hogar tarda diez años en llegar a 9 MB,
+  así que borrar hoy el historial de una casa resolvería el problema equivocado.
+  Su criterio de retención y su disparador están escritos allí.
 - **Recuperación.** Este módulo **sí** deriva su estado del core, así que sí existe
   el caso «se ha quedado desincronizado» — y la salida es la siembra, que es
   idempotente y se ejecuta al reactivar.
@@ -484,18 +502,53 @@ aviso sería de una sola vez en la vida del artículo.
   fuente de verdad que puede contradecir al envase. El disparador de revisarlo
   está escrito en [`purchasing.md`](purchasing.md): el día que un artículo necesite
   dos presentaciones a la vez, deja de ser una etiqueta y pasa a ser una tabla.
-- **Si el consumo debe poder repartirse entre lotes.** Hoy `RecordConsumption`
-  descuenta del contador del core y **no toca ningún lote**: quien se acabe un lote
-  lo marca a mano con `DiscardStockLot`. Repartir automáticamente exigiría decidir
-  un orden —el que antes caduca, presumiblemente— y ese orden es una regla de
-  producto que nadie ha pedido todavía. El disparador está escrito: **el día que la
-  suma de los lotes se quede sistemáticamente por encima de lo que hay**, es que la
-  gente consume sin marcar y toca hacerlo automático. Responsable: quien abra el
-  Hito 6, que es quien mira los datos reales de la fase.
-- **Si la antelación del aviso necesita un valor por hogar.** Hoy la cadena es
-  sitio → artículo → **siete días**, que está en el código. Un ajuste por hogar
-  sería una tabla de configuración del módulo que hoy no resuelve ningún problema;
-  se anota porque es lo primero que va a pedir quien tenga una despensa grande.
+- **Si el consumo debe poder repartirse entre lotes.** **Reafirmada el
+  2026-08-19, al cerrar la fase: sigue sin repartirse, y el disparador pasa a ser
+  algo que el propio módulo ya sabe ver.** Hoy `RecordConsumption` descuenta del
+  contador del core y **no toca ningún lote**: quien se acabe un lote lo marca a
+  mano con `DiscardStockLot`. Repartir automáticamente exigiría decidir un orden
+  —el que antes caduca, presumiblemente— y ese orden es una regla de producto que
+  nadie ha pedido.
+
+  Lo que sí se puede cerrar sin datos reales es **dónde se mira**, que es lo que
+  el disparador no decía. La invariante `requireLotsFit` impide que los lotes
+  sumen más que la existencia **al crearlos o al ampliarlos**, pero un consumo
+  baja el contador del core sin tocar ningún lote: **la desigualdad se puede
+  romper por el otro lado, y el módulo lo tiene delante**. La suma de los lotes
+  vivos de una existencia contra su `quantity` está en sus propias tablas y en la
+  del core, así que el disparador es una consulta y no una impresión:
+
+  > El día que **más de un hogar de cada cuatro** tenga alguna existencia cuyos
+  > lotes vivos sumen por encima de su cantidad, la gente está consumiendo sin
+  > marcar y el reparto automático deja de ser una comodidad.
+
+  **Responsable**: la primera revisión de operación con hogares reales dentro, no
+  un hito — igual que la de la categoría de servicio de
+  [Proveedores](suppliers.md), y por el mismo motivo: son preguntas de uso y no
+  de diseño.
+- ~~**Si la antelación del aviso necesita un valor por hogar.**~~ **Resuelta el
+  2026-08-19, y resuelta junto con la de [Mantenimiento](maintenance.md), que era
+  la misma pregunta escrita dos veces: cuando haga falta será una tabla de
+  plataforma, y no una de este módulo.** Hoy la cadena es sitio → artículo →
+  **siete días**, que está en el código.
+
+  Lo que la hace resoluble sin datos es que **no es una pregunta de uso sino de
+  dónde vive el dato**. Este módulo tiene ya dos eslabones de anulación —el sitio
+  y el artículo— y CMMS tiene el suyo —el plan—; lo que a las dos cadenas les
+  falta es **el mismo último eslabón**, el valor por defecto del hogar. Ponerlo en
+  cada módulo daría dos tablas de configuración para la misma preferencia, y esa
+  duplicación es la señal, no el problema: **la antelación no es una regla del
+  módulo sino una preferencia del hogar sobre la entrega**, y la entrega es de
+  plataforma ([ADR-011](../../common/architecture/decisions/ADR-011-scheduled-checks-and-notice-delivery.md)).
+  Cada módulo seguiría poseyendo **su regla** —qué se avisa y cuándo— que es lo
+  que la sección 4.2 del README decidió; lo que se movería es solo el número.
+
+  **No se construye ahora**, y el disparador es el tercero: **el día que un tercer
+  módulo traiga una regla de fecha con antelación propia** —garantías, mascotas y
+  plantas o préstamos avanzados son los candidatos— la duplicación pasa de dos a
+  tres y ya no se puede llamar coincidencia. Responsable: quien abra ese módulo.
+  Con dos, cambiar un número en el código sigue costando menos que una tabla que
+  nadie ha pedido.
 
 ## Referencias
 
@@ -520,5 +573,6 @@ aviso sería de una sola vez en la vida del artículo.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-19 | **El Hito 6 cierra los tres pendientes de esta ficha, y es la que más sacó del barrido de aislamiento**: destapó que las dos operaciones de ficha —artículo y sitio— respondían `500` ante un identificador de otro hogar donde el contrato declara `404`, porque abrían la ficha antes de comprobar nada. La **capacidad** está vuelta a medir y el aviso de esta ficha valía: `warehouse_movements` es la tabla que más crece, y la medición se partió en dos por ello. De las dos decisiones abiertas, el **reparto entre lotes** se reafirma con un disparador que ahora es una consulta sobre datos propios, y la **antelación por hogar** queda **resuelta junto con la de CMMS**: será de plataforma cuando llegue el tercer módulo con regla de fecha. | Equipo DRP |
 | 2026-08-19 | **El Hito 4 trae el consumidor previsto y con él dos cierres.** `StockDepleted` **no se publicaba nunca sin mínimo declarado**, al contrario de lo que esta ficha declaraba: corregido deduciendo el cruce a cero del delta del evento, sin columna nueva. Y la decisión abierta sobre la presentación de compra queda resuelta desde el otro lado: no necesita nombre propio. | Equipo DRP |
 | 2026-08-18 | Creación, **antes de la primera línea de código** del módulo. Declara las diez operaciones, las cuatro tablas, las seis invariantes, los cinco códigos de error, los seis eventos consumidos y los dos publicados con su consumidor previsto, y **la frontera contra el core sin ambigüedad**: el core mantiene un contador y Warehouse no lleva ninguno. Deja decididas las tres cosas que la definición no resolvía —qué hace un handler sin ficha, si reactivar resiembra y si un aviso se repite— y tres decisiones abiertas con su destinatario. | Equipo DRP |

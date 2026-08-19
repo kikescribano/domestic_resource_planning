@@ -386,3 +386,25 @@ alcanzado.
   describe. Un módulo futuro sin pantalla no necesita ruta: sin entrada en el mapa
   del cliente se enciende igual y no aparece en la navegación, que es lo que le
   pasa hoy al módulo de prueba.
+
+- **El criterio de validación número 2 de esta ADR queda medido sobre el contrato
+  entero.** Pedía que con un módulo inactivo su API respondiera `403`, y eso se
+  comprobaba módulo a módulo desde el Hito 2. Lo que el cierre de la fase añade es
+  la pregunta contraria, que ningún hito de módulo podía hacer: **con el módulo
+  activo**, ¿se puede alcanzar al hogar de al lado? El barrido de aislamiento del
+  Hito 6 la contesta sobre las noventa y ocho operaciones —313 comprobaciones,
+  cero desviaciones— y esa configuración es la única en la que la respuesta
+  significa algo: con el módulo apagado, el gate taparía la pregunta.
+
+  Y confirma la frontera desde un ángulo nuevo: **el `MasterDataDirectory` no
+  filtra entre hogares**. Un `supplierId` de otro hogar sale del puerto como
+  inexistente y se niega con el mismo código con el que se niega un módulo
+  apagado, que es exactamente la degradación que el Hito 4 puso en plataforma.
+
+- **Las cuatro reglas de ArchUnit siguen verdes al cerrar la fase, y la lista de
+  excepciones de la tercera sigue teniendo un solo nombre**: `SessionClaims`. Es
+  lo que esta ADR marcó como su propia condición de revisión —«el día que haya que
+  ampliar la lista, la frontera está mal dibujada»— y llega al final de la fase
+  sin haber tenido que ampliarla, con cuatro módulos, dos capacidades mudadas a
+  plataforma (`com.drp.platform.mail` y `HouseholdDirectory`) y un puerto de dato
+  maestro construido en medio.

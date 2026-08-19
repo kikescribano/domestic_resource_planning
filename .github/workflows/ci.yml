@@ -177,9 +177,21 @@ jobs:
         run: npm ci
         working-directory: frontend
 
+      # `--with-deps` es un `apt-get`, y ahi no hay nada que lo acote: el
+      # 2026-08-19 el mirror del runner --azure.archive.ubuntu.com-- dejo de
+      # responder, apt cayo al archivo de Ubuntu, bajo los InRelease y **se quedo
+      # parado 71 minutos** hasta que alguien cancelo el trabajo a mano. El tope
+      # no arregla la averia, que es de la infraestructura y no nuestra: lo que
+      # hace es que se note en diez minutos en vez de en setenta, y que el
+      # reintento sea una decision y no un rescate.
+      #
+      # Diez y no menos porque la descarga del navegador va debajo del mismo paso
+      # y en un dia malo tarda de verdad; el tope tiene que dejar pasar lo lento y
+      # cortar lo colgado, que no son lo mismo.
       - name: Instalar el navegador
         run: npx playwright install chromium --with-deps
         working-directory: frontend
+        timeout-minutes: 10
 
       - name: Recorrido vertical y auditoria de accesibilidad
         run: npm run test:e2e

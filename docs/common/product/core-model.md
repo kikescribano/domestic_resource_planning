@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Assets, articulos, ubicaciones y documentacion del core |
-| Última revisión | 2026-08-17 |
+| Última revisión | 2026-08-19 |
 
 > Trasladado desde las secciones 4.1.1 a 4.1.3 del [`README principal`](../../../README.md) al iniciar la Fase 1. **Los números de sección se conservan**: hay más de cien referencias cruzadas del tipo «ver 4.1.1» repartidas por el repositorio, y renumerarlas las rompería todas.
 
@@ -243,7 +243,7 @@ Lo que **no** se hace es colgar el resto del dominio de la vivienda. Categorías
 - Si se informa una capacidad, superarla al asignar un asset **advierte pero no bloquea**: bloquear con datos incompletos impediría guardar algo que sí cabe. **Las tres formas se comprueban desde el Hito 3 de la Fase 2**, que resolvió la pregunta abierta de 4.1.7 poniendo la medida en el artículo (`unitWeightGrams`, `unitVolumeMl`) y no en el asset ni en un módulo. `UNITS` es exacta; con peso o volumen se suma lo que los artículos declaren y **solo se avisa cuando lo conocido ya se pasa** —una suma incompleta únicamente puede quedarse corta, así que pasarse es concluyente y caber no lo es—.
 - Una ubicación no puede eliminarse si tiene ubicaciones hijas o assets dentro.
 
-> **Por decidir, y no aquí:** que el aviso de capacidad sea útil más allá de contar unidades exige que el asset lleve peso o volumen, y eso solo tiene sentido si alguien los rellena. Es terreno del módulo **Warehouse** (ver 4.2), que es quien va a necesitar medir lo que ocupa cada cosa; se resolverá al definir los módulos, no antes. Queda anotado como pregunta en 4.1.7 en lugar de inventar aquí un campo que nadie mantendría.
+> **Resuelta el 2026-08-19, en el Hito 3 de la Fase 2, y retirada de aquí el 2026-08-19 al cerrar la fase.** Esta nota decía que el peso y el volumen eran «terreno del módulo Warehouse» y que se resolverían al definir los módulos. Se resolvieron, y **resultaron no ser de Warehouse sino del core**: el aviso de capacidad es una regla del core y una regla del core no puede depender de un módulo que se puede apagar, así que `unitWeightGrams` y `unitVolumeMl` viven en `articles`, con su propia migración `V11`. El párrafo de arriba ya lo dice; esta nota llevaba dos días contradiciéndolo justo debajo. Se conserva el rastro en lugar de borrarlo sin más porque **el error que hay que no repetir no es haberla escrito sino no haberla retirado**: una promesa cumplida al lado de la afirmación que la cumple es lo que un lector lee como una pregunta todavía abierta. El registro completo está en 4.1.7.
 
 ## 4.1.3 Modelo de dominio del core (vista conjunta)
 

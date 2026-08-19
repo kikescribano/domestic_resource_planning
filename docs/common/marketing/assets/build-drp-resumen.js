@@ -8,11 +8,17 @@
  *   npm install pptxgenjs
  *   node build-drp-resumen.js ../DRP-resumen.pptx
  *
- * Refleja el estado del README a 2026-08-10. Al cambiar el README de forma
- * sustantiva, actualiza el contenido de aquí y vuelve a ejecutarlo.
+ * Refleja el estado del README a 2026-08-19: **Fase 1 (core) y Fase 2 (módulos
+ * activables) cerradas**. Al cambiar el README de forma sustantiva, actualiza el
+ * contenido de aquí y vuelve a ejecutarlo.
  *
  * Ojo con una trampa de este fichero: no falla ni avisa cuando se queda atrás,
- * simplemente sigue generando un deck que ya no es cierto.
+ * simplemente sigue generando un deck que ya no es cierto. Pasó: al cerrar la
+ * Fase 2 seguía diciendo «Fase 1 en curso», nueve ADR y cuatro módulos por
+ * diseñar, nueve días después de que las tres cosas dejaran de ser verdad. Los
+ * cuatro datos que más rápido caducan, y que hay que repasar siempre, son **la
+ * fase, el número de ADR, el de operaciones del contrato y cuántos módulos hay
+ * construidos**.
  */
 const pptxgen = require("pptxgenjs");
 
@@ -112,9 +118,9 @@ function lines(items, o = {}) {
   });
 
   const chips = [
-    ["Fase 1 en curso", TEAL],
-    ["Core MVP", "24534F"],
-    ["2026-08-10", "24534F"],
+    ["Fases 1 y 2 cerradas", TEAL],
+    ["Core + 4 módulos", "24534F"],
+    ["2026-08-19", "24534F"],
   ];
   let cx = 0.95;
   chips.forEach(([t, c]) => {
@@ -150,7 +156,7 @@ function lines(items, o = {}) {
     x: 7.75, y: 6.25, w: 4.95, h: 0.72, margin: 0, valign: "top", fontFace: SANS, fontSize: 10.5, italic: true, color: "7E9895", lineSpacing: 15,
   });
 
-  s.addNotes("Portada. Resumen del README.md de DRP (estado 2026-08-10): Fase 0 cerrada y Fase 1 (Core MVP) en curso, con el Hito 0 completado.");
+  s.addNotes("Portada. Resumen del README.md de DRP (estado 2026-08-19): Fases 0, 1 y 2 cerradas. El core completo y los cuatro módulos de prioridad alta, activables hogar por hogar.");
 }
 
 // ═══ 2 · Problema y visión ════════════════════════════════════════════════════
@@ -525,8 +531,8 @@ function lines(items, o = {}) {
 // ═══ 11 · Módulos futuros ═════════════════════════════════════════════════════
 {
   const s = newSlide();
-  head(s, "MÓDULOS FUTUROS", "Trece módulos, activables por prioridad");
-  s.addText("Ninguno es obligatorio: el core funciona con todos desactivados. Cada uno se activa cuando el hogar lo necesita.", {
+  head(s, "MÓDULOS", "Trece, activables por hogar — cuatro ya construidos");
+  s.addText("Ninguno es obligatorio: el core funciona con todos apagados. Los enciende el administrador de su hogar, y apagarlos conserva los datos.", {
     x: M, y: 1.42, w: CW, h: 0.32, margin: 0, valign: "middle", fontFace: SANS, fontSize: 14, color: MUTED,
   });
 
@@ -534,13 +540,13 @@ function lines(items, o = {}) {
   // los de prioridad alta llevan descripción, los de baja solo el nombre.
   const bands = [
     {
-      label: "PRIORIDAD ALTA", y: 1.9, h: 1.46, accent: TEAL,
+      label: "ALTA · HECHOS", y: 1.9, h: 1.46, accent: TEAL,
       fill: TEAL, line: TEAL, title: WHITE, desc: "CFE4E0",
       mods: [
         ["Proveedores y contactos de servicio", "Quién arregla, quién cobra y quién responde de una garantía."],
         ["Compras y lista de la compra", "Qué falta, qué reponer y qué está pedido. Cierra el ciclo de Warehouse."],
         ["Warehouse", "Despensa, garaje y trastero: stock, consumo, mínimos y caducidad."],
-        ["CMMS doméstico", "Mantenimiento preventivo y correctivo: planes, avisos e histórico."],
+        ["Mantenimiento (CMMS)", "Preventivo y correctivo: planes, avisos que se rearman e histórico."],
       ],
     },
     {
@@ -596,11 +602,11 @@ function lines(items, o = {}) {
     });
   });
 
-  s.addText("La lista no está cerrada, pero ya no hay cajón de sastre: un candidato entra con estado y prioridad propios, o no entra.", {
+  s.addText("Los cuatro de prioridad alta son el alcance entero de la Fase 2 y siguen en desarrollo: el código está, el despliegue todavía no. La lista no está cerrada, pero no hay cajón de sastre.", {
     x: M, y: 6.05, w: CW, h: 0.5, margin: 0, valign: "top", fontFace: SANS, fontSize: 13, italic: true, color: TEAL, lineSpacing: 19,
   });
   foot(s);
-  s.addNotes("README §4.2: módulos futuros activables, cada uno con estado y prioridad. Trece filas, sin fila de backlog.");
+  s.addNotes("README §4.2: módulos activables, cada uno con estado y prioridad. Trece filas, sin fila de backlog. Los cuatro de prioridad alta se construyeron en la Fase 2 y están en desarrollo; los nueve restantes siguen por diseñar.");
 }
 
 // ═══ 12 · Arquitectura ════════════════════════════════════════════════════════
@@ -626,7 +632,7 @@ function lines(items, o = {}) {
   // Es el mismo criterio con el que el README redibujó su diagrama de 5.1.
   const mods = [
     ["Core", "Recursos / Assets · obligatorio", true],
-    ["Prioridad alta", "4 módulos · opcionales", false],
+    ["Prioridad alta", "4 módulos · construidos", true],
     ["Prioridad media", "3 módulos · opcionales", false],
     ["Prioridad baja", "6 módulos · opcionales", false],
   ];
@@ -651,7 +657,7 @@ function lines(items, o = {}) {
   card(s, { x: 4.4, y: 6.18, w: 4.53, h: 0.58, fill: "163A38", line: "2F5754", shadow: false });
   s.addText("PostgreSQL 16+ · RLS activado", { x: 4.4, y: 6.18, w: 4.53, h: 0.58, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 13, bold: true, color: "BFD3D0" });
   foot(s, true);
-  s.addNotes("README §5.1: visión de componentes. Los módulos punteados son opcionales y van agrupados por prioridad, como en el diagrama del README; el detalle de los trece está en la diapositiva anterior.");
+  s.addNotes("README §5.1: visión de componentes. Los módulos punteados siguen por diseñar; los de trazo continuo están construidos. El detalle de los trece está en la diapositiva anterior. La Fase 2 añadió las fronteras de paquete por módulo y la activación por hogar (ADR-010).");
 }
 
 // ═══ 13 · Event bus ═══════════════════════════════════════════════════════════
@@ -821,7 +827,7 @@ function lines(items, o = {}) {
     ["Migraciones", "Flyway", "SQL plano versionado, esquema y políticas juntos"],
     ["Comunicación BE", "Event bus in-process", "Puerto propio sobre Spring, sin dependencia añadida"],
     ["Comunicación FE ↔ BE", "API REST + JWT", "Spring Security; tokens acotados de préstamo"],
-    ["Contratos", "OpenAPI 3.0", "openapi.yaml es la fuente de verdad de la API"],
+    ["Contratos", "OpenAPI 3.0", "openapi.yaml, 98 operaciones, fuente de verdad"],
     ["Frontend", "React sobre Vite", "Mobile-first, de 375 px a ultrawide; WCAG 2.2 AA"],
     ["Testing", "JUnit 5 + Testcontainers", "Vitest y Playwright en el frontend"],
   ];
@@ -836,11 +842,11 @@ function lines(items, o = {}) {
   });
 
   card(s, { x: M, y: 6.05, w: CW, h: 0.62, fill: INK, shadow: false });
-  s.addText("Nueve ADR recogen el porqué y las alternativas descartadas: monolito modular · Spring Boot · Row-Level Security · Flyway · ficheros en disco · React + Vite · contrato como fuente de verdad · monorepo · correo saliente", {
+  s.addText("Once ADR recogen el porqué y lo descartado: monolito modular · Spring Boot · Row-Level Security · Flyway · ficheros en disco · React + Vite · contrato como fuente de verdad · monorepo · correo saliente · fronteras de módulo · comprobaciones periódicas y avisos", {
     x: M, y: 6.05, w: CW, h: 0.62, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 11, color: "CFE1DE",
   });
   foot(s);
-  s.addNotes("README §6 y ADR-001 a ADR-009.");
+  s.addNotes("README §6 y ADR-001 a ADR-011. Las dos últimas llegaron con la Fase 2: fronteras de módulo y activación por hogar, y programación de comprobaciones y entrega de avisos.");
 }
 
 // ═══ 17 · Testing ═════════════════════════════════════════════════════════════
@@ -884,40 +890,43 @@ function lines(items, o = {}) {
   const s = newSlide();
   head(s, "ESTADO ACTUAL", "Roadmap por fases");
 
+  // `done` decide el aspecto entero de la tarjeta. Antes lo decidía el índice
+  // —«las dos primeras están hechas»— y eso hay que reescribirlo cada vez que
+  // una fase se cierra; con un campo, cerrar una fase es cambiar dos valores.
   const fases = [
-    ["Fase 0", "Definición", "Arquitectura, stack, alcance del core y estrategia de testing", "Completada", TEAL, WHITE],
-    ["Fase 1", "Core MVP", "Assets, autenticación, API REST, event bus y cliente web completo del core", "En curso", TERRA, WHITE],
-    ["Fase 2", "Primer módulo", "Candidato a definir entre los cuatro de prioridad alta", "Pendiente", "C3D2CF", INK],
-    ["Fase 3", "Módulos adicionales", "Los nueve restantes, por orden de prioridad (sección 4.2)", "Pendiente", "C3D2CF", INK],
+    ["Fase 0", "Definición", "Arquitectura, stack, alcance del core y estrategia de testing", "Completada", TEAL, WHITE, true],
+    ["Fase 1", "Core MVP", "Assets, autenticación, API REST, event bus y cliente web completo del core", "Completada", TEAL, WHITE, true],
+    ["Fase 2", "Módulos activables", "Activación por hogar, plataforma de avisos y los cuatro módulos de prioridad alta", "Completada", TEAL, WHITE, true],
+    ["Fase 3", "Módulos adicionales", "Los nueve restantes, por orden de prioridad (sección 4.2)", "Pendiente", "C3D2CF", INK, false],
   ];
   const cw = 2.9, gap = 0.18, cy = 1.85, chh = 3.55;
   fases.forEach((f, i) => {
-    const x = M + i * (cw + gap);
-    card(s, { x, y: cy, w: cw, h: chh, fill: i < 2 ? TINT : WHITE, line: i < 2 ? undefined : "D3DFDC", shadow: i >= 2 ? false : undefined });
+    const x = M + i * (cw + gap), done = f[6];
+    card(s, { x, y: cy, w: cw, h: chh, fill: done ? TINT : WHITE, line: done ? undefined : "D3DFDC", shadow: done ? undefined : false });
     badge(s, x + 0.28, cy + 0.3, 0.56, String(i), f[4], f[5]);
     s.addText(f[0], { x: x + 1.0, y: cy + 0.32, w: cw - 1.3, h: 0.52, margin: 0, valign: "middle", fontFace: SANS, fontSize: 12, bold: true, charSpacing: 1, color: MUTED });
     s.addText(f[1], { x: x + 0.28, y: cy + 1.0, w: cw - 0.56, h: 0.8, margin: 0, valign: "top", fontFace: SERIF, fontSize: 18, bold: true, color: INK, lineSpacing: 23 });
     s.addText(f[2], { x: x + 0.28, y: cy + 1.85, w: cw - 0.56, h: 1.05, margin: 0, valign: "top", fontFace: SANS, fontSize: 12, color: MUTED, lineSpacing: 17 });
-    s.addShape(pres.ShapeType.roundRect, { x: x + 0.28, y: cy + 2.95, w: 1.55, h: 0.36, fill: { color: i === 0 ? TEAL : i === 1 ? TERRA : "E7EDEB" }, line: { color: i < 2 ? (i === 0 ? TEAL : TERRA) : "D3DFDC", width: 0.5 }, rectRadius: 0.18 });
-    s.addText(f[3], { x: x + 0.28, y: cy + 2.95, w: 1.55, h: 0.36, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 10.5, bold: true, color: i < 2 ? WHITE : MUTED });
+    s.addShape(pres.ShapeType.roundRect, { x: x + 0.28, y: cy + 2.95, w: 1.55, h: 0.36, fill: { color: done ? TEAL : "E7EDEB" }, line: { color: done ? TEAL : "D3DFDC", width: 0.5 }, rectRadius: 0.18 });
+    s.addText(f[3], { x: x + 0.28, y: cy + 2.95, w: 1.55, h: 0.36, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 10.5, bold: true, color: done ? WHITE : MUTED });
   });
 
-  s.addText("Criterio de validación de la Fase 1 (ADR-001): un recorrido vertical que atraviese frontend, API autenticada, aplicación, dominio y PostgreSQL, con pruebas en los tres niveles.", {
+  s.addText("Criterio de validación (ADR-001), cumplido en las dos fases entregadas: un recorrido vertical que atraviesa frontend, API autenticada, aplicación, dominio y PostgreSQL. Hoy son siete, en un navegador de verdad.", {
     x: M, y: 5.65, w: CW, h: 0.55, margin: 0, valign: "top", fontFace: SANS, fontSize: 13, italic: true, color: TEAL, lineSpacing: 19,
   });
   foot(s);
-  s.addNotes("README §8: roadmap y estado. Fase 0 cerrada el 2026-08-07; Fase 1 arrancada el 2026-08-10, con sus cinco hitos en docs/common/product/roadmap.md.");
+  s.addNotes("README §8: roadmap y estado. Fase 0 cerrada el 2026-08-07, Fase 1 el 2026-08-17 y Fase 2 el 2026-08-19. El detalle de cada una vive en su propio roadmap, en docs/common/product/.");
 }
 
 // ═══ 19 · Cierre ══════════════════════════════════════════════════════════════
 {
   const s = newSlide(true);
-  head(s, "SIGUIENTE PASO", "La Fase 1 está en marcha", true);
-  s.addText("Con la definición cerrada y el andamiaje en pie, lo que queda es construir: el core completo, entregado en hitos que atraviesan las capas en vertical.", {
+  head(s, "SIGUIENTE PASO", "El core y los cuatro primeros módulos, entregados", true);
+  s.addText("Lo que queda es la Fase 3: los nueve módulos restantes de la sección 4.2, sobre un mecanismo de activación que ya existe y una plataforma de avisos que ya entrega.", {
     x: M, y: 1.45, w: 9.5, h: 0.62, margin: 0, valign: "top", fontFace: SANS, fontSize: 15, color: "C4D4D1", lineSpacing: 21,
   });
 
-  s.addText("EL RECORRIDO VERTICAL QUE VALIDA LA FASE 1", {
+  s.addText("EL RECORRIDO VERTICAL QUE VALIDA CADA ENTREGA", {
     x: M, y: 2.35, w: CW, h: 0.3, margin: 0, valign: "middle", fontFace: SANS, fontSize: 11, bold: true, charSpacing: 2, color: TEALLT,
   });
   const chain = ["Frontend", "API autenticada", "Aplicación", "Dominio", "PostgreSQL"];
@@ -932,8 +941,8 @@ function lines(items, o = {}) {
   });
 
   const closing = [
-    ["Hito 0, ya cerrado", "Monorepo, integración continua, contrato saneado y el reparto del README a docs/, que la Fase 0 había aplazado a propósito."],
-    ["Módulos con prioridad alta", "Cuatro, todos por diseñar: proveedores y contactos de servicio, compras y lista de la compra, Warehouse y mantenimiento (CMMS)."],
+    ["Lo entregado", "El core completo y cuatro módulos, sobre activación por hogar y avisos programados. 98 operaciones en el contrato, 28 tablas con Row-Level Security y siete recorridos verticales."],
+    ["Lo que queda", "Los nueve módulos restantes, por orden de prioridad. Ninguno pide arquitectura nueva: el camino de un módulo está recorrido cuatro veces."],
   ];
   closing.forEach((c, i) => {
     const x = M + i * (5.85 + 0.43);
@@ -942,11 +951,11 @@ function lines(items, o = {}) {
     s.addText(c[1], { x: x + 0.38, y: 5.0, w: 5.1, h: 0.9, margin: 0, valign: "top", fontFace: SANS, fontSize: 12.5, color: "BFD3D0", lineSpacing: 18 });
   });
 
-  s.addText("Fuente: README.md · documento vivo, última actualización 2026-08-10", {
+  s.addText("Fuente: README.md · documento vivo, última actualización 2026-08-19", {
     x: M, y: 6.35, w: CW, h: 0.35, margin: 0, valign: "middle", fontFace: SANS, fontSize: 11, color: "7E9895",
   });
   foot(s, true);
-  s.addNotes("README §8, §9 y §11: cierre de la Fase 0 y arranque de la Fase 1.");
+  s.addNotes("README §8, §9 y §11: cierre de la Fase 2 y lo que queda para la Fase 3, que todavía no está planificada.");
 }
 
 const out = process.argv[2] || "DRP-resumen.pptx";

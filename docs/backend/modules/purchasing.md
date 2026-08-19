@@ -486,11 +486,24 @@ El Hito 3 tenía seis handlers que probar y añadió **cero**, ejercitándolos p
 API de verdad, que además es como corren en producción. Aquí se hace lo mismo.
 
 **El barrido de aislamiento** —autenticado como hogar A, ninguna operación
-devuelve ni modifica datos del hogar B— lo tiene asignado el **Hito 6**, que es
-donde el roadmap lo puso para toda la fase. **Se deja allí a propósito y se dice
-aquí para que no se dé por supuesto**: las diez operaciones de este módulo entran
-en ese barrido, junto con las siete de Proveedores y las diez de Warehouse, no en
-este hito.
+devuelve ni modifica datos del hogar B— lo tuvo asignado el **Hito 6**, que es
+donde el roadmap lo puso para toda la fase.
+
+> **Cerrado el 2026-08-19, en el Hito 6**, y aquí también destapó algo:
+> `POST /purchasing/purchases/{id}/receipt` **ignoraba en silencio** una
+> `lines[].itemId` que no fuera de esa compra. Respondía `200` y descartaba lo que
+> el cliente había dicho —cuánto entró, de quién es, dónde va—, que es la única
+> forma en que esta operación puede hacer lo contrario de lo que le piden sin
+> decirlo. Ahora responde `404`, que es lo que el contrato ya declaraba. No era
+> una fuga —del hogar de al lado no se movía nada— y por eso hacía falta el
+> barrido para verlo: una fuga se nota mirando el resultado y esto solo se nota
+> mirando el código.
+>
+> Las dos negativas con `409` de este módulo quedaron anotadas con su motivo:
+> `SHOPPING_ITEM_NOT_PENDING` dice lo mismo para una línea comprada que para una
+> que no existe, y `PURCHASE_SUPPLIER_UNKNOWN` es **la degradación escrita** del
+> puerto de dato maestro —distinguir «no existe» de «Proveedores está apagado»
+> delataría al vecino—.
 
 ## Operación
 
@@ -506,9 +519,11 @@ este hito.
   hace la compra semanal escribe filas para siempre. Son el **tercer y cuarto
   candidato** a la purga que la ADR-011 dejó anotada sin hito para
   `household_notices` y a la que el Hito 3 añadió el cuaderno de Warehouse. Su
-  sitio natural sigue siendo una comprobación más del mismo recorrido. **Volver a
-  medir la capacidad es del Hito 6** y aquí no se mide; queda dicho para que quien
-  lo haga sepa que ya son cuatro tablas y no una.
+  sitio natural sigue siendo una comprobación más del mismo recorrido. **Medido el
+  2026-08-19, en el Hito 6**: `shopping_list_items` es la segunda que más crece,
+  justo detrás del cuaderno de Warehouse, y `purchases` va muy por detrás —una
+  compra a la semana—. El criterio de retención de las cinco y su disparador están
+  en la [medición de capacidad](../operations/capacity-measurements.md).
 - **Recuperación.** Este módulo deriva parte de su estado de otro, así que sí
   existe el caso «se ha quedado desincronizado» —un hogar que tuvo Compras apagado
   mientras se le acababa el arroz—. La salida es la siembra, que es idempotente y
@@ -536,12 +551,32 @@ este hito.
   manda sobre `LOW_STOCK` y sobre `MANUAL`, que es orden suficiente para una lista
   de la compra doméstica. Un campo de prioridad por línea es lo que pedirá quien
   tenga cincuenta.
-- **Si `StockDepleted` debería llegar también sin mínimo declarado en las demás
-  reglas de Warehouse.** Este hito lo corrigió para el evento —ver el registro de
-  decisiones— porque sin ello «lo que llega a cero entra en la lista» era falso
-  para casi todos los artículos. Queda anotado que **el aviso de caducidad y el de
-  mínimo siguen exigiendo ficha con mínimo**, que es lo correcto para ellos.
-  Responsable: quien abra el Hito 6.
+- ~~**Si `StockDepleted` debería llegar también sin mínimo declarado en las demás
+  reglas de Warehouse.**~~ **Resuelta el 2026-08-19, al cerrar la fase: no, y las
+  demás reglas están bien como están — pero la premisa con la que se anotó era
+  medio falsa y se corrige aquí.**
+
+  Lo que este hito corrigió fue el **evento**: `StockDepleted` colgaba de la rama
+  de bajo mínimos y por tanto no se publicaba nunca para un artículo sin mínimo
+  declarado, que son casi todos. Al anotar la pregunta se dejó escrito que «el
+  aviso de caducidad y el de mínimo siguen exigiendo ficha con mínimo». **De las
+  dos afirmaciones solo una es cierta**, y comprobarlo en el código —que es lo que
+  el cierre de fase hizo en lugar de repetir la frase— da la respuesta entera:
+
+  - **El aviso de caducidad no exige ninguna ficha ni ningún mínimo.** Su consulta
+    entra por `warehouse_lots` y engancha la ficha del artículo y la del sitio con
+    `LEFT JOIN`, solo para resolver la antelación; sin ellas cae en los siete días
+    por omisión. Lo que ese aviso necesita es **un lote con fecha**, que es otra
+    cosa y no tiene nada que ver con el mínimo.
+  - **El aviso de mínimo sí lo exige, y no puede ser de otra manera**: «estar bajo
+    mínimos» sin un mínimo declarado no significa nada, porque no hay contra qué
+    comparar. No es una omisión que arreglar sino la definición de la regla.
+
+  Así que **nunca hubo una asimetría que corregir**. La diferencia real es otra, y
+  conviene dejarla escrita porque es la que explica por qué el evento sí era un
+  defecto: **cero es un umbral absoluto y no hace falta declararlo**; «poco» es un
+  umbral relativo y sí. `StockDepleted` colgaba del segundo cuando pertenecía al
+  primero.
 
 ## Referencias
 
@@ -569,4 +604,5 @@ este hito.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-19 | **El Hito 6 cierra los pendientes de esta ficha.** El barrido de aislamiento destapó que recibir una compra **ignoraba en silencio** una línea que no fuera suya —respondía `200` y descartaba lo que el cliente había dicho—, y ahora responde `404`. La **capacidad** está vuelta a medir: `shopping_list_items` es la segunda que más crece. Y la decisión abierta sobre `StockDepleted` queda **resuelta que no**, corrigiendo de paso la premisa con la que se anotó: el aviso de caducidad **no exige mínimo** —engancha las fichas con `LEFT JOIN` y lo que necesita es un lote con fecha—, así que nunca hubo asimetría. La diferencia real es que **cero es un umbral absoluto y «poco» es relativo**. | Equipo DRP |
 | 2026-08-19 | Creación, **antes de la primera línea de código** del módulo. Declara las diez operaciones, las dos tablas, las seis invariantes, los cinco códigos de error, los dos eventos consumidos y que **no publica ninguno**, y **la frontera contra Warehouse sin ambigüedad**: Warehouse detecta la falta y Compras decide qué se compra y cuándo. Resuelve la pregunta heredada de cómo se lee el dato maestro de otro módulo —**un puerto en plataforma que no nombra al módulo**— y las dos que este hito tenía asignadas: qué pasa al llegar a cero y si la presentación de compra necesita nombre. | Equipo DRP |

@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Responsable | Por decidir |
 | Ámbito | Toda la solución |
-| Última revisión | 2026-08-08 |
+| Última revisión | 2026-08-19 |
 | Procedimiento | [SKILL-001 · Presentación de resumen a partir del README](../skills/SKILL-001-readme-to-deck.md) |
 
 Este espacio reúne el material con el que DRP se presenta hacia fuera:
@@ -28,9 +28,18 @@ solución completa, igual que la visión de producto. Aplicando la
 
 | Pieza | Contenido |
 |---|---|
-| [`DRP-resumen.pptx`](DRP-resumen.pptx) | Presentación de 19 diapositivas que resume el README principal: objetivo, analogía ERP → DRP, core mínimo, modelo de dominio, módulos futuros, arquitectura, event bus, aislamiento multi-tenant, casos de uso, stack, testing y roadmap. Cada diapositiva lleva en sus notas la sección del README de la que procede. Refleja el estado del README a 2026-08-10 (Fase 1 en curso, con el Hito 0 cerrado). |
+| [`DRP-resumen.pptx`](DRP-resumen.pptx) | Presentación de 19 diapositivas que resume el README principal: objetivo, analogía ERP → DRP, core mínimo, modelo de dominio, módulos, arquitectura, event bus, aislamiento multi-tenant, casos de uso, stack, testing y roadmap. Cada diapositiva lleva en sus notas la sección del README de la que procede. **Refleja el estado del README a 2026-08-19**: Fases 1 y 2 cerradas, con el core completo y los cuatro módulos de prioridad alta construidos sobre la activación por hogar. |
 | [`assets/build-drp-resumen.js`](assets/build-drp-resumen.js) | Generador de la presentación anterior: es su fuente editable. La presentación **no se retoca a mano**, se regenera ejecutando este script. El procedimiento y su verificación están en [SKILL-001](../skills/SKILL-001-readme-to-deck.md). |
 | [`brand-guidelines-template.docx`](brand-guidelines-template.docx) | Plantilla en blanco de manual de marca (v1.0), en siete secciones: identidad, logo y sus variantes, paleta con HEX/RGB/CMYK, tipografía y jerarquía, iconografía, tono de voz y design tokens. Todo lo que aparece entre corchetes es un hueco por rellenar. |
+
+> **Este material no avisa cuando se queda atrás**, que es la razón de que
+> repasarlo entre en la lista de cierre de cada fase. Al cerrar la Fase 2 el deck
+> seguía diciendo «Fase 1 en curso», nueve ADR y cuatro módulos por diseñar, nueve
+> días después de que las tres cosas dejaran de ser verdad — y el `.pptx` se
+> generaba igual, sin un solo error. **Los cuatro datos que más rápido caducan**,
+> y que hay que repasar siempre, son **la fase en curso, el número de ADR, el de
+> operaciones del contrato y cuántos módulos hay construidos**. Están anotados
+> también en la cabecera del generador, que es donde los va a leer quien lo toque.
 
 La plantilla es la única pieza de aquí que no describe a DRP: es un **formulario**,
 no material derivado, así que no procede de ninguna versión del README ni se queda
