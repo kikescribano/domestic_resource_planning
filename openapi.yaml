@@ -2243,6 +2243,15 @@ paths:
       operationId: listStockLots
       tags: [warehouse]
       summary: Los lotes con caducidad
+      description: >
+        Los lotes vivos del hogar, del que antes caduca al que más tarda, que es
+        el orden en que hay que mirarlos.
+
+
+        Un lote responde a "de lo que hay, cuánto caduca cuándo", no a "cuánto
+        hay": la suma de los lotes de una existencia puede quedarse por debajo de
+        su cantidad, y eso es normal -- lo que no está en ningún lote es lo que
+        nadie se molestó en fechar.
       parameters:
         - name: assetId
           in: query

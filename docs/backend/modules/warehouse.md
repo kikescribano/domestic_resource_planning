@@ -6,7 +6,7 @@
 | Responsable | Equipo DRP |
 | Clave | `WAREHOUSE` |
 | Prefijo de ruta | `/api/v1/warehouse` |
-| Última revisión | 2026-08-18 |
+| Última revisión | 2026-08-19 |
 
 > **Esta ficha se escribió antes que la primera línea de código del módulo**, que
 > es la regla que el [catálogo](README.md) fija. En [Proveedores](suppliers.md)

@@ -302,3 +302,44 @@ estado anterior al hito —los procesos existen y no los invoca nadie— sin per
 ningún dato. La tabla de avisos y su bandeja quedan inertes, con lo que haya
 dentro. Lo que **no** es reversible barato es la mudanza del correo a plataforma,
 que es un renombrado de paquetes, y por eso va en un commit propio.
+
+## Posterior a esta decisión
+
+Esta ADR **no se reescribe**; lo que sigue enlaza hacia adelante lo que la ha
+alcanzado.
+
+- **Warehouse es su primer consumidor real**, en el Hito 3 de la Fase 2. Hasta
+  entonces el único que declaraba una `ScheduledCheck` era el módulo de prueba del
+  Hito 0, que existe justo para eso; el criterio de validación número 3 —«un hogar
+  con el módulo apagado no recibe su aviso y el de al lado sí»— se mide ahora
+  también sobre un módulo desplegado, con dos comprobaciones propias: caducidad
+  próxima y mínimo alcanzado, las dos con `CheckOwner.Module`.
+
+- **«Tiene que ser idempotente» no bastaba, y el Hito 3 tuvo que decidir qué
+  significa para un aviso.** Esta ADR pide que una comprobación sea idempotente
+  porque «producir el mismo aviso dos veces es la forma más rápida de que el
+  resumen diario se vuelva ilegible», pero no dice qué hacer cuando la **condición
+  sigue siendo cierta mañana**: un yogur caducado lo sigue estando treinta noches
+  seguidas, y una comprobación perfectamente idempotente dentro de una pasada
+  produciría treinta avisos en treinta pasadas. Los dos ejemplos que había no
+  servían de modelo — los tres procesos del core no repiten, y el módulo de prueba
+  repite **a propósito**, para poder contar pasadas.
+
+  La regla que Warehouse fija, y que los módulos siguientes heredan: **un aviso se
+  levanta cuando la condición empieza a ser cierta y no vuelve a levantarse
+  mientras siga siéndolo**, con el estado guardado en las tablas **del módulo** y
+  no consultando `household_notices` — que obligaría a un módulo a leer una tabla
+  de plataforma y a reconocer sus propios avisos por el texto. Una fase que
+  **avanza** sí es noticia nueva: un lote avisa al entrar en la ventana de
+  antelación y otra vez el día que caduca de verdad, y no darle la segunda dejaría
+  al hogar con un aviso de hace tres semanas como única advertencia. Y el estado
+  **se rearma solo**, porque si no un artículo avisaría una sola vez en toda su
+  vida. Está razonado en la sección 4.1.7 del
+  [registro de decisiones](../../product/decisions.md).
+
+- **La purga de `household_notices` sigue sin escribirse.** Esta ADR la dejó
+  anotada entre sus costes —«crece y nadie la poda»— con su sitio natural
+  señalado: una comprobación más de este mismo recorrido. El Hito 3 trae avisos y
+  **no la resuelve**, a propósito: sigue sin hito asignado. Y añade un segundo
+  candidato al mismo sitio, `warehouse_movements`, que es la primera tabla del
+  modelo que crece con lo que el hogar **hace** y no con lo que tiene.

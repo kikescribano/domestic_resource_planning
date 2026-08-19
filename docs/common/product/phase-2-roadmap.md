@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Ejecución de la Fase 2 |
-| Última revisión | 2026-08-18 |
+| Última revisión | 2026-08-19 |
 
 > El estado de **las fases** vive en la sección 8 del
 > [`README principal`](../../../README.md), y solo allí. Este documento baja al
@@ -399,25 +399,76 @@ explícitamente para que no se dé por supuesto. Lo que sí se comprueba ya es q
 un enlace no puede apuntar a una ubicación de otro hogar, porque esa es una
 regla del módulo y no del barrido.
 
-### Hito 3 — Warehouse · **Pendiente**
+### Hito 3 — Warehouse · **Completado (2026-08-19)**
 
 El módulo con más dominio de los cuatro y el que más habla con el core.
 
-- [ ] **Ficha del módulo**, con la frontera contra el core escrita sin ambigüedad:
-      el core mantiene **un contador**, y consumos, mínimos, caducidad y lotes son
-      de aquí.
-- [ ] **Dominio**: movimientos de existencias, stock mínimo por artículo,
-      caducidad y lotes.
-- [ ] **Consumo de eventos del core**: `ArticleCreated`, `AssetCreated`,
-      `AssetMoved`, `AssetQuantityChanged`, `AssetDeactivated` y `LocationCreated`,
-      todos por la base de handler del Hito 0.
-- [ ] **Su siembra al activarse**, recorriendo las existencias que el hogar ya
-      tenga: es la primera de verdad, y la que demuestra la regla.
-- [ ] **Sus avisos** —caducidad próxima, mínimo alcanzado— sobre la plataforma del
-      Hito 1, con su regla propia.
-- [ ] **Sus eventos publicados**, que son la materia prima del Hito 4.
-- [ ] **Resolver el peso y el volumen de un asset** (ver más abajo).
-- [ ] **Sus pantallas** bajo `/almacen`, y su recorrido vertical.
+- [x] **Ficha del módulo** en [`docs/backend/modules/warehouse.md`](../../backend/modules/warehouse.md),
+      escrita antes del código y en un commit propio, con la frontera contra el
+      core escrita sin ambigüedad: el core mantiene **un contador** —`quantity`,
+      en la `unit` que pone el artículo— y consumos, mínimos, caducidad y lotes
+      son de aquí. **Warehouse no lleva un segundo contador**: lo lee del core.
+- [x] **Dominio**: movimientos de existencias, stock mínimo por artículo,
+      caducidad y lotes, en cuatro tablas con `household_id`, RLS y `FORCE`. El
+      recuento del esquema sube de diecinueve a veintitrés y la lista de tablas
+      sin política no se toca.
+- [x] **Consumo de los seis eventos del core** por la base de handler del Hito 0,
+      con la prueba que este hito estrena: **un hogar con el módulo apagado no ve
+      ni una fila escrita**, y el de al lado sí.
+- [x] **Su siembra al activarse**, recorriendo artículos, sitios y las existencias
+      que el hogar ya tenga: es la primera de verdad, y **es idempotente porque
+      reactivar la ejecuta** —ver más abajo.
+- [x] **Sus dos avisos** —caducidad próxima y mínimo alcanzado— sobre la
+      plataforma del Hito 1, con su `ScheduledCheck` propia, leídos del Mailpit de
+      verdad, y **sin repetirse cada noche**.
+- [x] **Sus dos eventos publicados** —`StockBelowMinimum` y `StockDepleted`—, con
+      Compras declarado como consumidor previsto en la ficha.
+- [x] **Resuelto el peso y el volumen de un asset**: van al core y van en el
+      artículo. Ver más abajo.
+- [x] **Diez operaciones en el contrato** bajo `/api/v1/warehouse` con su
+      `operationId`, cinco códigos de error nuevos en `com.drp.platform.error`, y
+      sus pantallas bajo `/almacen` con recorrido vertical **añadido a la batería
+      existente**.
+
+#### Cómo quedó, y lo que hubo que decidir por el camino
+
+**El riesgo que este hito retira es el segundo de la tabla de alcance: un módulo
+que reacciona a lo que pasa en el core sin que el core lo sepa.** Seis de los
+trece eventos del catálogo tienen por fin un consumidor de verdad, y las dos
+capas del gate que Proveedores no podía enseñar están medidas: con el módulo
+apagado, ninguno de los seis handlers escribe una fila, y el recorrido nocturno
+no entra en ese hogar.
+
+Las once decisiones que la definición no preveía están anotadas con su
+alternativa descartada en [`decisions.md`](decisions.md). Las tres que
+condicionan a los dos módulos siguientes:
+
+- **Reactivar vuelve a sembrar, y por eso toda siembra tiene que ser
+  idempotente.** La ADR-010 dice lo contrario de lo que `ActivateModule` hace, y
+  nadie lo había notado porque la siembra de Proveedores está vacía. Se conserva
+  el código: un módulo que vuelve con el cuaderno de hace tres meses **miente en
+  silencio** sobre lo que hay en la despensa.
+- **Un aviso se levanta cuando la condición empieza a ser cierta y no se repite
+  mientras siga siéndolo.** Ninguno de los dos ejemplos previos servía de modelo
+  —el core no repite, el módulo de prueba repite a propósito—, y un yogur que
+  avisara treinta noches seguidas filtra el resumen diario entero.
+- **Un handler no comprueba si el módulo ya sembró: abre lo que necesite**,
+  compartiendo función con la siembra. Con eso, «aún no ha sembrado» deja de ser
+  un caso y los dos caminos no pueden divergir.
+
+Y **el `Combobox` se construye aquí** en lugar de aplazarse por tercera vez:
+llevaba pendiente desde el Hito 2 de la Fase 1, y buscar un artículo entre los
+cientos de una despensa no lo resuelve un `SelectField`.
+
+**Lo que este hito no hace, y dónde se hace.** El **barrido de aislamiento** de
+las diez operaciones nuevas se queda en el **Hito 6**, igual que las siete de
+Proveedores: se dice aquí explícitamente para que no se dé por supuesto. La
+**purga de `household_notices`** sigue sin hito asignado, y este hito no la
+resuelve pese a traer avisos —su sitio natural sigue siendo una comprobación más
+del mismo recorrido—. **Volver a medir la capacidad** también es del Hito 6, y
+este hito le deja un aviso escrito en la ficha: `warehouse_movements` es **la
+primera tabla del modelo que crece con lo que el hogar hace y no con lo que
+tiene**, así que es por donde hay que empezar a mirar.
 
 ### Hito 4 — Compras y lista de la compra · **Pendiente**
 
@@ -502,8 +553,8 @@ del alcance nuevo. Se resuelven en el hito que las toca y se anotan en
 
 | Pregunta | Hito | Por qué vence ahora |
 |---|---|---|
-| **Peso y volumen de un asset**, de los que depende que el aviso de capacidad de una ubicación sirva de algo | 3 | Su destinatario asignado era Warehouse, y Warehouse llega. Hoy el aviso solo cuenta unidades |
-| **Unidad de compra frente a unidad de consumo**, y su conversión | 3 y 4 | El core fija que la unidad la pone el artículo y que convertir es de Warehouse; Compras es quien lo necesita de verdad |
+| ~~**Peso y volumen de un asset**~~ — **resuelta el 2026-08-19: van al core, y van en `articles`**, porque el aviso de capacidad es una regla del core y una regla del core no puede depender de un módulo que se puede apagar | 3 | Su destinatario asignado era Warehouse, y Warehouse llegó. Resultó no ser suya |
+| ~~**Unidad de compra frente a unidad de consumo**~~ — **medio resuelta el 2026-08-19: la conversión ya está guardada y es del core** (`Article.packSize`); lo que falta es **nombrar** la presentación de compra, que es concepto de compra y nace en el Hito 4 | 3 y 4 | El core fija que la unidad la pone el artículo y que convertir es de Warehouse; Compras es quien lo necesita de verdad |
 | **Qué pasa cuando un consumible llega a cero**: si entra solo en la lista de la compra o hace falta decirlo | 4 | El catálogo de eventos lo da por hecho, y nadie ha decidido si es automático |
 | ~~**Qué ve un rol no administrador** en la pantalla de módulos~~ — **resuelta el 2026-08-18: el catálogo entero, con su estado y sin acciones** | 0 | Era una decisión de producto pequeña, y condicionaba la navegación |
 
@@ -536,6 +587,7 @@ conocido.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-19 | **Hito 3 completado**: el primer módulo que reacciona al core —seis de los trece eventos por la base de handler del Hito 0, con la prueba de que un hogar apagado no ve ni una fila escrita—, cuatro tablas con RLS y `FORCE` que suben el recuento de diecinueve a veintitrés, diez operaciones en el contrato, la primera siembra de verdad **e idempotente**, y los dos primeros avisos por fecha de un módulo, leídos del Mailpit real y sin repetirse cada noche. Se resuelven las dos preguntas heredadas: **peso y volumen van al core y van en el artículo** —con su propia migración `V11`, porque es un cambio del core— y la conversión de unidad de compra ya estaba guardada en `packSize`. Se construye el `Combobox` aplazado desde la Fase 1. Once decisiones que la definición no preveía |
 | 2026-08-18 | **Hito 2 completado**: el primer módulo de verdad recorre el camino entero —ficha antes del código, dominio, migración `V9` con RLS y `FORCE`, siete operaciones en el contrato, siembra vacía escrita igual, pantallas bajo `/proveedores` y recorrido vertical en la batería existente—. El gate tapa por fin una ruta que existe: `403` apagado, `200` encendido. `ErrorCode` y la familia de `DomainError` se mudan a plataforma, que era la deuda que la ADR-010 dejó con su condición de revisión, y con ella se retiran `UnknownModule` y `UnknownNotice`. Diez decisiones que la definición no preveía |
 | 2026-08-18 | **Hito 1 completado**: un solo recorrido periódico en `com.drp.platform`, hogar a hogar sin `BYPASSRLS` y saltándose los que tengan apagado el módulo que pide la comprobación; los tres procesos diarios del core pasan a ser comprobaciones y se ejecutan de verdad; `household_notices` con RLS y `FORCE`, tres operaciones en el contrato, bandeja en el cliente y resumen diario leído del Mailpit real. Correo y lista de hogares se mudan a plataforma en lugar de ensanchar la excepción de ArchUnit. ADR-011, y cuatro decisiones que la definición no preveía |
 | 2026-08-18 | **Hito 0 completado**: fronteras de módulo con ArchUnit medido en los dos sentidos, `household_modules` con RLS y `FORCE`, gate en las tres capas, tres operaciones en el contrato, navegación en dos grupos y ADR-010. Se resuelve la pregunta que este hito tenía asignada y quedan anotadas tres decisiones que la definición no preveía |

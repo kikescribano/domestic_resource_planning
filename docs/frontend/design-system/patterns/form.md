@@ -37,7 +37,7 @@ también el que el Hito 2 va a estirar en una dirección que todavía no ha vist
 | Formulario de una columna, con envío y errores | **Implementado**, en ocho formularios |
 | Operación corta sobre una fila existente | **Previsto**: no hay ninguna, y le falta el `Dialog` |
 | Confirmación destructiva | **Previsto**: no existe ninguna en la aplicación |
-| Campos que no son `<input>` | **Previsto**: ni `Select`, ni `Textarea`, ni numérico, ni `Combobox` |
+| Campos que no son `<input>` | **Parcial**: `SelectField` y `Combobox` existen —el segundo desde el Hito 3 de la Fase 2—; siguen faltando `Textarea` y el campo numérico con unidad |
 
 ## Contenido
 
@@ -128,7 +128,7 @@ existe todavía, y lo que hace falta para escribirlo es esto:
 
 | Operación | Campos | Lo que le falta al sistema |
 |---|---|---|
-| Entrada de consumible | Artículo, ubicación, propietario, cantidad | `Combobox` para el artículo, `Select` para ubicación y propietario, campo numérico con unidad |
+| Entrada de consumible | Artículo, ubicación, propietario, cantidad | `Combobox` para el artículo —ya existe desde el Hito 3 de la Fase 2, y esta pantalla todavía usa `SelectField`—, `Select` para ubicación y propietario, campo numérico con unidad |
 | Movimiento | Ubicación destino | Selector de ubicación **sobre un árbol**, no un desplegable plano (ver [`hierarchy.md`](hierarchy.md)) |
 | Fusión | Existencia destino | Un selector que solo ofrezca existencias del mismo artículo, y que deje ver qué ubicación y qué propietario sobreviven |
 | Ajuste de cantidad | Cantidad | Campo numérico. Y dejar claro que **sustituye, no suma** |

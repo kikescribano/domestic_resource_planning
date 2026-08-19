@@ -311,6 +311,40 @@ alcanzado.
   comprobaba sobre una ruta vacía. Desde el Hito 2 el recorrido vertical mide las
   dos mitades sobre `/api/v1/suppliers`: `403` apagado y `200` encendido.
 
+- **«Reactivar no vuelve a sembrar» dice lo contrario de lo que hace el
+  código, y lo que se conserva es el código.** La sección 6 de esta ADR escribe
+  «activar es idempotente, así que reactivar no vuelve a sembrar». Lo que
+  `ActivateModule` hace es ahorrarse la siembra **solo cuando el módulo ya estaba
+  `ACTIVE`**: pasar de `INACTIVE` a `ACTIVE` la ejecuta. Nadie lo había notado
+  porque la siembra de Proveedores está vacía, y lo destapó el **Hito 3 de la
+  Fase 2** al escribir la primera que lee algo.
+
+  **La frase es la que estaba mal.** Un hogar que apagó Warehouse tres meses se
+  perdió todos los eventos de ese periodo —el bus es in-process y no persiste
+  nada, que es la premisa de la que sale la sección 6 entera— así que un módulo
+  que no resembrara volvería con el cuaderno de hace tres meses y **nada lo
+  diría**: la pantalla enseñaría una lista corta y verosímil. La alternativa
+  considerada era **no resembrar y ofrecer una resincronización aparte**, con su
+  operación y su botón; se descartó porque pone la corrección detrás de que
+  alguien sepa que hace falta, y quien reactiva un módulo es justo quien no lo
+  sabe.
+
+  **La consecuencia para los módulos que vengan:** una siembra tiene que ser
+  idempotente **por construcción y no por cuidado**. En Warehouse lo garantizan
+  dos `ON CONFLICT DO NOTHING` sobre índices únicos y uno parcial que admite un
+  solo asiento de apertura por existencia; resembrar completa lo que falte y no
+  duplica nada. Lo que la reactivación **no** reconstruye es el histórico del
+  periodo apagado, que para ese módulo no ocurrió y no se inventa. El
+  razonamiento completo está en la sección 4.1.7 del
+  [registro de decisiones](../../product/decisions.md) y en la
+  [ficha de Warehouse](../../../backend/modules/warehouse.md).
+
+- **El gate del event bus tapa por fin handlers que existen.** El criterio de
+  validación número 2 de esta ADR se comprobaba con el módulo de prueba, que es
+  para lo que existe. Desde el Hito 3 lo mide también un módulo desplegado: con
+  Warehouse apagado, ninguno de los seis handlers que consume el core escribe una
+  fila, y el hogar de al lado —con el módulo encendido— sí las tiene.
+
 - **`ModuleScreen` envuelve a la pantalla del módulo en lugar de sustituirla.**
   La tercera capa del gate que esta ADR describe —«entrar a mano en una ruta
   apagada lleva a la pantalla que la ofrece»— sigue intacta y ahora convive con el
