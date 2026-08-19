@@ -44,6 +44,29 @@ interface FileStorage {
 
     /** Idempotente: borrar lo que ya no esta no es un error. */
     fun delete(key: String)
+
+    /**
+     * Borra **todo lo que cuelga de un prefijo**, y devuelve cuantos ficheros se
+     * llevo por delante.
+     *
+     * Existe por la baja de un hogar (ADR-012), que promete que no queda un solo
+     * byte suyo en disco. Con [delete] se podria hacer lo mismo recorriendo las
+     * filas de `files`, que es lo que hace `PurgeUnusedFiles`; **la diferencia
+     * es lo que queda fuera**. Ese recorrido borra exactamente lo que la base de
+     * datos conoce, y por tanto deja atras cualquier byte que ya fuera huerfano
+     * --una escritura que salio bien y cuya fila no llego a insertarse, una
+     * restauracion desalineada--. Por prefijo no queda nada, que es justo lo que
+     * ahi se afirma.
+     *
+     * Idempotente y tolerante con lo que no existe, como [delete]: un prefijo
+     * vacio no es un error, es un hogar que nunca subio nada.
+     *
+     * **No es una operacion de aislamiento.** El prefijo lo construye
+     * `StorageKeys` a partir del hogar del contexto y jamas de un dato del
+     * cliente; un prefijo recibido de fuera borraria el arbol del vecino sin que
+     * nada fallara.
+     */
+    fun deleteTree(prefix: String): Int
 }
 
 /**

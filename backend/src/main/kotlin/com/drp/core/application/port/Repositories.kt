@@ -97,6 +97,23 @@ interface TenantResolver {
      * firmado, para que la funcion no sea un oraculo prestamo-hogar (V6).
      */
     fun householdOfLoanToken(tokenHash: String): UUID?
+
+    /**
+     * En que hogares consta una identidad, **activa o no**.
+     *
+     * El quinto momento sin hogar conocido, y el unico que mira mas de uno a la
+     * vez: al purgar un hogar (ADR-012) hay que saber si la persona que vivia en
+     * el se queda sin ninguna pertenencia, y esa pregunta no cabe dentro del
+     * hogar que se esta borrando. Sin ella, el caso de uso solo ve lo suyo y
+     * daria por huerfano a quien sigue viviendo en otro hogar --y borrar su
+     * identidad arrastraria en cascada la pertenencia del de al lado.
+     *
+     * Cuenta tambien las **dadas de baja**, al contrario que
+     * [householdOfActiveMember]: la pregunta no es donde puede entrar, sino
+     * donde consta. Una pertenencia dada de baja sigue siendo historial de aquel
+     * hogar, y sus prestamos la referencian.
+     */
+    fun householdsOfIdentity(identityId: UUID): List<UUID>
 }
 
 interface HouseholdMemberRepository {

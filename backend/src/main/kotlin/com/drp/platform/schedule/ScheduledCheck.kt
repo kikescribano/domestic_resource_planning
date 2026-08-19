@@ -59,6 +59,27 @@ interface ScheduledCheck {
     val owner: CheckOwner
 
     /**
+     * Si esta comprobacion puede **hacer desaparecer el hogar en curso**.
+     *
+     * Las que lo declaran corren **al final** del recorrido de cada hogar, y de
+     * ahi que exista: hasta la baja de hogar (ADR-012) solo habia una asi
+     * --`PurgeUnverifiedHouseholds`-- y que fuera la ultima era un accidente del
+     * alfabeto, escrito en su propio comentario. Con dos, apoyarse en el alfabeto
+     * es una trampa para la tercera: basta que alguien la llame `CleanSomething`
+     * para que todo lo que venga detras corra sobre un hogar que ya no existe.
+     *
+     * Lo que corre detras no revienta --la politica de RLS no deja ver ninguna
+     * fila de un hogar borrado, asi que toda comprobacion encuentra cero-- pero
+     * tampoco hace nada util, y el resumen diario de ese hogar se entrega en
+     * vacio. Declararlo convierte un accidente en una regla.
+     *
+     * Por omision, `false`: la inmensa mayoria de las comprobaciones miran y
+     * anotan. Una que borre el hogar y no lo declare **se ordena como cualquier
+     * otra**, que es el unico coste de que esto tenga valor por omision.
+     */
+    val purgesHousehold: Boolean get() = false
+
+    /**
      * Mira el hogar actual y devuelve lo que haya que avisar.
      *
      * Devolver la lista vacia es el caso normal y no significa que no haya

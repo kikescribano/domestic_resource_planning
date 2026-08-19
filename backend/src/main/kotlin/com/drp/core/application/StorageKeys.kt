@@ -52,6 +52,23 @@ object StorageKeys {
     fun avatar(identityId: UUID): String = "$AVATAR/${shardOf(identityId)}/$identityId"
 
     /**
+     * Los prefijos bajo los que vive **todo** lo de un hogar, para borrarlo
+     * entero al darlo de baja (ADR-012).
+     *
+     * Son **dos y no uno**, y ese es el detalle que el dibujo de 5.8.1 no
+     * ensena: el troceado empieza por el tipo --`original/` y `thumbnail/`-- y
+     * el hogar viene despues, asi que no hay un solo directorio del hogar que
+     * borrar. Quien escriba la ruta a ojo desde el diagrama se dejara las
+     * miniaturas puestas, que es un fallo que no da ningun error.
+     *
+     * **El avatar no esta aqui, y es a proposito.** Vive fuera de los dos arboles
+     * porque una identidad no pertenece a ningun hogar; se lo lleva
+     * `CloseAccount` y no la baja del hogar.
+     */
+    fun householdTrees(householdId: UUID): List<String> =
+        listOf("$ORIGINAL/$householdId", "$THUMBNAIL/$householdId")
+
+    /**
      * Un avatar se guarda **siempre en WebP**, porque lo que se guarda es la
      * miniatura: se pinta a 40 px en una lista de personas y a poco mas en su
      * ficha, asi que conservar la foto entera seria guardar cien veces lo que se

@@ -27,9 +27,10 @@ import java.util.UUID
 
 /**
  * El barrido de aislamiento del contrato entero: las **treinta y ocho**
- * operaciones de la Fase 1 y las **cuarenta y cuatro** que trajo la Fase 2 --tres
+ * operaciones de la Fase 1, las **cuarenta y cuatro** que trajo la Fase 2 --tres
  * de activacion, tres de avisos, siete de Proveedores, diez de Warehouse, diez de
- * Compras y once de Mantenimiento--.
+ * Compras y once de Mantenimiento-- y las **cuatro** de la baja de hogar y el
+ * cierre de cuenta (ADR-012).
  *
  * No sustituye a las pruebas de recorrido de cada recurso ni a las de gate de
  * cada modulo: comprueba una sola cosa --la de la ADR-002-- sobre todas ellas y
@@ -62,14 +63,22 @@ import java.util.UUID
  * treinta y ocho de sus cincuenta y cuatro operaciones y dejo fuera las nueve de
  * autenticacion y las de identidad, que no hablan de hogares.
  *
- * De las cuarenta y cuatro nuevas, **cuarenta y una** entran por una de las cuatro
- * secciones. Las **tres restantes** --`activateModule`, `deactivateModule` y
- * `markAllNoticesRead`-- no aceptan ningun identificador del hogar A: la clave de
- * un modulo es global y las tres actuan sobre «lo mio». Pero lo que pueden romper
- * es real --escribir en el hogar equivocado-- y no se mide con un `404`, asi que
- * **entran por el cierre**: B las ejecuta durante el barrido y el retrato de A
- * tiene que seguir siendo el mismo al terminar. Estan por tanto cubiertas las
+ * De las cuarenta y cuatro de la Fase 2, **cuarenta y una** entran por una de las
+ * cuatro secciones. Las **tres restantes** --`activateModule`, `deactivateModule`
+ * y `markAllNoticesRead`-- no aceptan ningun identificador del hogar A: la clave
+ * de un modulo es global y las tres actuan sobre «lo mio». Pero lo que pueden
+ * romper es real --escribir en el hogar equivocado-- y no se mide con un `404`,
+ * asi que **entran por el cierre**: B las ejecuta durante el barrido y el retrato
+ * de A tiene que seguir siendo el mismo al terminar. Estan por tanto cubiertas las
  * cuarenta y cuatro, con dos instrumentos distintos y no con uno forzado.
+ *
+ * **Las cuatro de la baja de hogar caen todas en ese segundo grupo**, y con mas
+ * motivo que ninguna: ni `getCurrentHousehold`, ni las dos de la baja, ni
+ * `closeAccount` aceptan identificador --el sujeto lo pone el token--, y a la vez
+ * son las que mas dano harian escribiendo en el hogar equivocado. Se miden en su
+ * propia seccion, «la baja no cruza de hogar», con el mismo instrumento de
+ * asimetria que la activacion: B pide su baja y el hogar A tiene que seguir sin
+ * ninguna.
  *
  * Dos decisiones de metodo que sostienen todo lo demas:
  *
@@ -285,6 +294,10 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             // que cambiaria es este retrato y no ninguna respuesta.
             "/api/v1/modules",
             "/api/v1/notices",
+            // Y el estado del hogar, que es el instrumento de las cuatro
+            // operaciones de la baja: si la de B marcara el hogar equivocado, lo
+            // que cambiaria es este cuerpo y ninguna respuesta.
+            "/api/v1/households/current",
             "/api/v1/suppliers",
             "/api/v1/suppliers/$supA",
             "/api/v1/warehouse/stock",
@@ -1249,6 +1262,86 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     }
 
     // ------------------------------------------------------------------
+    // 3 ter. La baja del hogar y el cierre de cuenta, que tampoco tienen
+    //        identificador que atacar
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("pedir la baja es del hogar que la pide, y el de al lado no se entera")
+    fun `la baja no cruza de hogar`() {
+        val section = "baja"
+
+        // Las cuatro operaciones de la ADR-012 actuan sobre «lo mio»: el hogar y
+        // la identidad salen del token y no hay nada que nombrar. Lo que si
+        // pueden hacer mal --y seria lo mas caro del catalogo-- es marcar el hogar
+        // equivocado, y eso **solo se mide con asimetria**.
+
+        // Primero la lectura: cada uno ve el suyo, y solo el suyo.
+        val houseB = http.getJson(HOUSEHOLD, b.accessToken)
+        expectPresent("$section B ve su hogar", "\"id\":\"${b.householdId}\"", houseB)
+        expectAbsent("$section y no el de A", a.householdId, houseB)
+
+        // B pide la baja de su hogar.
+        expectStatus(
+            "$section B pide la baja",
+            HttpStatus.OK,
+            http.postJson("$HOUSEHOLD/closure", "", b.accessToken),
+        )
+        expectPresent(
+            "$section B la ve pedida",
+            "\"closure\":{",
+            http.getJson(HOUSEHOLD, b.accessToken),
+        )
+
+        // Y la mitad que de verdad se mide: A no tiene ninguna baja. Sin esta,
+        // marcar el hogar equivocado pasaria por bueno.
+        expectPresent(
+            "$section A sigue sin ninguna baja",
+            "\"closure\":null",
+            http.getJson(HOUSEHOLD, a.accessToken),
+        )
+        // Ni un aviso de baja en la bandeja de A, que es el otro rastro que deja.
+        expectAbsent(
+            "$section ni un aviso de baja en A",
+            "HOUSEHOLD_CLOSURE_REQUESTED",
+            http.getJson(NOTICES, a.accessToken),
+        )
+
+        // Cancelarla tampoco cruza: se devuelve el estado de B al que estaba, y A
+        // sigue sin nada que cancelar --responde 409 y no 200, que es lo que
+        // demostraria que la de B le habia llegado.
+        expectStatus(
+            "$section B la cancela",
+            HttpStatus.OK,
+            http.deleteJson("$HOUSEHOLD/closure", b.accessToken),
+        )
+        expectStatus(
+            "$section A no tiene ninguna que cancelar",
+            HttpStatus.CONFLICT,
+            http.deleteJson("$HOUSEHOLD/closure", a.accessToken),
+        )
+
+        // Y cerrar la cuenta. Los dos hogares tienen un solo administrador activo,
+        // asi que la regla del ultimo administrador lo impide en los dos --que es
+        // justo lo que hace segura esta comprobacion dentro del barrido: se
+        // recorre el camino entero, autorizacion incluida, sin dejar a ninguno de
+        // los dos hogares sin quien lo gobierne para las secciones que vienen
+        // detras.
+        expectStatus(
+            "$section B no puede cerrar su cuenta siendo el unico que administra",
+            HttpStatus.CONFLICT,
+            http.deleteJson("$USERS/me", b.accessToken),
+        )
+        expectAbsent(
+            "$section y las personas de A siguen todas activas",
+            "\"deactivatedAt\":\"",
+            http.getJson(USERS, a.accessToken),
+        )
+
+        endOfSection(section)
+    }
+
+    // ------------------------------------------------------------------
     // 4. Por unicidad
     // ------------------------------------------------------------------
 
@@ -1786,6 +1879,8 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
 
         // Las rutas de la Fase 2: plataforma y los cuatro modulos.
         const val MODULES_PATH = "/api/v1/modules"
+        const val HOUSEHOLD = "/api/v1/households/current"
+        const val USERS = "/api/v1/users"
         const val NOTICES = "/api/v1/notices"
         const val SUPPLIERS = "/api/v1/suppliers"
         const val WAREHOUSE_STOCK = "/api/v1/warehouse/stock"

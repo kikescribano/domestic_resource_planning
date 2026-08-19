@@ -155,6 +155,105 @@ paths:
         "429": { $ref: "#/components/responses/TooManyRequests" }
         default: { $ref: "#/components/responses/ServerError" }
 
+  /households/current:
+    get:
+      operationId: getCurrentHousehold
+      tags: [households]
+      summary: Estado del hogar de la sesion
+      description: >
+        El hogar del token. NO lleva identificador en la ruta: el hogar sale del
+        token y aceptarlo del cliente abriria la puerta que la ADR-002 cierra.
+
+
+        Es la PRIMERA LECTURA del hogar del contrato -- hasta la baja de hogar
+        solo se podia crear uno -- y existe sobre todo por `closure`: el aviso
+        persistente de la baja y la zona de peligro necesitan saber si el hogar
+        se esta dando de baja y en que fecha desaparece. No se resuelve con un
+        claim del token porque el access token vive quince minutos y se emite al
+        entrar, asi que un hogar marcado despues mentiria hasta la siguiente
+        renovacion.
+
+
+        La lee cualquier miembro: que la casa esta a punto de desaparecer no es
+        informacion reservada a quien administra.
+      responses:
+        "200":
+          description: El hogar de la sesion
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Household" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /households/current/closure:
+    post:
+      operationId: requestHouseholdClosure
+      tags: [households]
+      summary: Solicitar la baja del hogar (solo HOUSEHOLD_ADMIN)
+      description: >
+        Marca el hogar para su borrado con TREINTA DIAS DE GRACIA (ADR-012).
+        Durante la gracia el hogar funciona EXACTAMENTE IGUAL -- nada de solo
+        lectura, que castigaria a quien todavia puede cancelar -- y lo unico que
+        lo distingue es el aviso.
+
+
+        Levanta UN aviso en household_notices y no uno cada noche: un aviso no se
+        repite mientras la condicion siga siendo cierta, que es regla de la
+        ADR-011, y esta condicion va a ser cierta treinta dias seguidos.
+
+
+        Vencida la gracia, el borrado lo hace PurgeClosedHouseholds desde el
+        recorrido diario que ya existe: se lleva las filas de las veintidos
+        tablas que cuelgan del hogar, las de los cuatro modulos incluidas, y sus
+        ficheros en disco. Solicitarla NO borra nada.
+      responses:
+        "200":
+          description: Baja solicitada, con la fecha en la que el hogar desaparece
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Household" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            El hogar ya tiene una baja solicitada
+            (HOUSEHOLD_CLOSURE_ALREADY_REQUESTED). NO reinicia los treinta dias
+            en silencio: la fecha en la que el hogar desaparece es lo unico que
+            se le ha prometido a una persona.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+    delete:
+      operationId: cancelHouseholdClosure
+      tags: [households]
+      summary: Cancelar la baja del hogar (solo HOUSEHOLD_ADMIN)
+      description: >
+        Retira la marca y con ella el hogar sale de la cola de purga. NO hay nada
+        que restaurar: durante la gracia no se ha tocado un solo dato.
+
+
+        El aviso que se levanto al solicitarla se conserva, porque un aviso es el
+        texto que se escribio ese dia y no una vista de lo que ocurre hoy
+        (ADR-011).
+      responses:
+        "200":
+          description: Baja cancelada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Household" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: El hogar no tiene ninguna baja solicitada (HOUSEHOLD_CLOSURE_NOT_REQUESTED)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+
   /auth/verify-email:
     post:
       operationId: verifyEmail
@@ -1336,6 +1435,49 @@ paths:
               schema: { $ref: "#/components/schemas/UserPage" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /users/me:
+    delete:
+      operationId: closeAccount
+      tags: [users]
+      summary: Cerrar la cuenta propia
+      description: >
+        La baja de la IDENTIDAD, que es distinta de dejar un hogar (ver 4.1.4).
+        SIN identificador en la ruta y no es un atajo: DELETE /users/{id} ya
+        existe y significa otra cosa -- sacar a alguien del hogar, y solo puede
+        hacerlo quien administra --. Aqui el sujeto lo pone el token.
+
+
+        Hace cuatro cosas: marca deactivatedAt en la identidad, lo que impide
+        autenticarse EN CUALQUIER HOGAR; da de baja su pertenencia, con lo que
+        sus assets quedan SIN PROPIETARIO igual que en deactivateUser; revoca
+        todos sus refresh tokens; y BORRA SU AVATAR, que es lo unico del sistema
+        que retrata a una persona. Los ficheros del hogar se quedan: son del
+        hogar y no suyos.
+
+
+        LA DIRECCION ES DE UNA SOLA VIA: cerrar la cuenta no se lleva la casa por
+        delante. Se va la persona y el hogar sigue con quien quede. Al reves si
+        -- la baja del hogar puede dejar identidades sin ninguna pertenencia, y
+        esas las borra PurgeClosedHouseholds.
+      responses:
+        "204":
+          description: >
+            Cuenta cerrada. La sesion queda inservible: el cliente descarta sus
+            tokens y vuelve a la pantalla de entrar.
+        "409":
+          description: >
+            Es el unico HOUSEHOLD_ADMIN activo del hogar (USER_LAST_ADMIN), el
+            mismo codigo que deactivateUser porque es la misma regla. Un hogar
+            sin administrador no puede invitar, cambiar roles, encender modulos
+            ni pedir su propia baja. La salida: nombrar administrador a otra
+            persona, o pedir la baja del hogar.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
         default: { $ref: "#/components/responses/ServerError" }
 
   /users/me/avatar:
@@ -3448,6 +3590,8 @@ components:
             - FILE_IN_USE
             - FILE_TOO_LARGE
             - FILE_TYPE_NOT_ALLOWED
+            - HOUSEHOLD_CLOSURE_ALREADY_REQUESTED
+            - HOUSEHOLD_CLOSURE_NOT_REQUESTED
             - IDENTITY_ALREADY_MEMBER
             - INTAKE_QUANTITY_NOT_POSITIVE
             - INTERNAL_ERROR
@@ -3495,6 +3639,54 @@ components:
         details:
           type: object
           description: Contexto adicional del error; su forma depende del código
+
+    Household:
+      type: object
+      required: [id, name, timeZone, createdAt, updatedAt]
+      description: >
+        El hogar de la sesion. Lo que lo describe, mas la baja solicitada cuando
+        la hay.
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        timeZone:
+          type: string
+          description: Identificador IANA, p. ej. Europe/Madrid
+          example: Europe/Madrid
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        closure:
+          allOf:
+            - $ref: "#/components/schemas/HouseholdClosure"
+          nullable: true
+          description: >
+            Informada SOLO mientras corre el periodo de gracia. Nula es lo
+            normal, y es lo que el cliente mira para decidir si pinta el aviso
+            persistente de la baja.
+
+    HouseholdClosure:
+      type: object
+      required: [requestedAt, requestedBy, effectiveAt]
+      description: >
+        La baja solicitada de un hogar. Las tres van juntas o ninguna: media baja
+        no es un estado representable, y la base de datos lo defiende con un
+        CHECK.
+      properties:
+        requestedAt: { type: string, format: date-time }
+        requestedBy:
+          type: string
+          format: uuid
+          description: >
+            La PERTENENCIA de quien la pidio, como toda la autoria del contrato,
+            nunca la identidad.
+        effectiveAt:
+          type: string
+          format: date-time
+          description: >
+            El instante a partir del cual el recorrido diario puede borrar el
+            hogar. Es LA FECHA QUE SE LE PROMETIO A UNA PERSONA: se guarda en vez
+            de calcularse al leer, para que cambiar el plazo no mueva hacia atras
+            una fecha ya prometida.
 
     HouseholdModule:
       type: object

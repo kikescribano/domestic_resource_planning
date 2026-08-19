@@ -114,6 +114,34 @@ class FilesystemFileStorage(
     }
 
     /**
+     * Borra el subarbol entero, de las hojas hacia la raiz.
+     *
+     * El recorrido va en orden inverso --`sorted().reversed()` sobre las rutas--
+     * porque un directorio no se borra con algo dentro. Se cuentan solo los
+     * ficheros: lo que la baja de un hogar promete es que no queda un byte suyo,
+     * y un directorio vacio de mas no es un byte suyo.
+     *
+     * Tolera que el prefijo no exista, que es el caso de un hogar que nunca
+     * subio nada, y no se inventa un error por ello. Y pasa por [resolve] igual
+     * que cualquier clave: es la valla que impide que un prefijo se salga de la
+     * raiz --aqui con mas motivo que en ningun sitio, porque lo que se borra no
+     * es un fichero sino todo lo que cuelgue.
+     */
+    override fun deleteTree(prefix: String): Int {
+        val root = resolve(prefix)
+        if (!Files.isDirectory(root)) return 0
+
+        var files = 0
+        Files.walk(root).use { walk ->
+            walk.sorted().toList().reversed().forEach { path ->
+                if (Files.isRegularFile(path)) files++
+                Files.deleteIfExists(path)
+            }
+        }
+        return files
+    }
+
+    /**
      * La ultima valla contra una clave que se salga de la raiz.
      *
      * Hoy todas las claves las genera `StorageKeys` a partir de identificadores,

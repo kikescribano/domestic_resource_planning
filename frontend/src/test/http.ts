@@ -49,8 +49,28 @@ const CATALOGUE_WITHOUT_MODULES: Record<string, StubbedRoute> = {
   'GET /api/v1/modules': { status: 200, body: { items: [], page: 0, size: 0, total: 0 } },
 }
 
+/**
+ * Y lo mismo con el estado del hogar, por el mismo motivo: desde la baja de
+ * hogar (ADR-012) el shell lo pide en cuanto hay sesión, para decidir si pinta el
+ * aviso de la baja. Va de base **sin ninguna baja pedida**, que es el caso normal;
+ * cualquier prueba lo sustituye con la misma clave.
+ */
+const HOUSEHOLD_WITHOUT_CLOSURE: Record<string, StubbedRoute> = {
+  'GET /api/v1/households/current': {
+    status: 200,
+    body: {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Casa de prueba',
+      timeZone: 'Europe/Madrid',
+      createdAt: '2026-01-01T10:00:00Z',
+      updatedAt: '2026-01-01T10:00:00Z',
+      closure: null,
+    },
+  },
+}
+
 export function stubFetch(routes: Record<string, StubbedRoute>) {
-  const responses = { ...CATALOGUE_WITHOUT_MODULES, ...routes }
+  const responses = { ...CATALOGUE_WITHOUT_MODULES, ...HOUSEHOLD_WITHOUT_CLOSURE, ...routes }
   const calls: RecordedCall[] = []
 
   const implementation = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

@@ -42,6 +42,7 @@ class DailySweepTest : SpringIntegrationTest() {
 
     @Autowired private lateinit var sweep: DailySweep
     @Autowired private lateinit var http: TestRestTemplate
+    @Autowired private lateinit var checks: List<ScheduledCheck>
 
     private val mailpit = DrpMailpit.instance
 
@@ -100,6 +101,34 @@ class DailySweepTest : SpringIntegrationTest() {
         withClue("el hogar que se encendió no llegó a correr la suya") {
             http.checkCount(second.accessToken).shouldBe(1)
         }
+    }
+
+    @Test
+    @DisplayName("lo que puede borrar el hogar corre al final, y por delante manda el alfabeto")
+    fun `el orden pone las purgas al final`() {
+        // El orden del recorrido es `purgesHousehold` primero y el nombre despues,
+        // y las dos mitades importan.
+        val ordered = checks.sortedWith(compareBy({ it.purgesHousehold }, { it.name }))
+        val (harmless, purging) = ordered.partition { !it.purgesHousehold }
+
+        // **Las purgas, al final.** Hasta la baja de hogar (ADR-012) solo habia
+        // una comprobacion capaz de hacer desaparecer el hogar en curso y que
+        // fuera la ultima era un accidente del alfabeto; con dos, el alfabeto deja
+        // de bastar --`PurgeClosedHouseholds` caeria la segunda de cuatro-- y todo
+        // lo que corriera detras lo haria sobre un hogar que ya no existe.
+        withClue("las que purgan el hogar tienen que ir al final: ${ordered.map { it.name }}") {
+            ordered.takeLast(purging.size).map { it.name }.toSet()
+                .shouldBe(purging.map { it.name }.toSet())
+        }
+
+        // Las dos que hay declaradas, para que quitarle la marca a una lo rompa
+        // aqui y no en produccion.
+        purging.map { it.name }.toSet()
+            .shouldBe(setOf("PurgeClosedHouseholds", "PurgeUnverifiedHouseholds"))
+
+        // Y por delante, el alfabeto: dos pasadas hacen lo mismo en el mismo
+        // orden, que es lo unico que la ADR-011 pedia de esta linea.
+        harmless.map { it.name }.shouldBe(harmless.map { it.name }.sorted())
     }
 
     @Test
