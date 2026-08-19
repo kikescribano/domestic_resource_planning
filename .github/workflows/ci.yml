@@ -177,19 +177,47 @@ jobs:
         run: npm ci
         working-directory: frontend
 
-      # `--with-deps` es un `apt-get`, y ahi no hay nada que lo acote: el
-      # 2026-08-19 el mirror del runner --azure.archive.ubuntu.com-- dejo de
-      # responder, apt cayo al archivo de Ubuntu, bajo los InRelease y **se quedo
-      # parado 71 minutos** hasta que alguien cancelo el trabajo a mano. El tope
-      # no arregla la averia, que es de la infraestructura y no nuestra: lo que
-      # hace es que se note en diez minutos en vez de en setenta, y que el
-      # reintento sea una decision y no un rescate.
+      # El navegador pesa unos 170 MB y **no cambia entre ejecuciones**: lo que lo
+      # invalida es cambiar de version de Playwright, no tocar el codigo. Sin esto
+      # se bajaba entero cada vez, que es lo que hacia lento este trabajo.
       #
-      # Diez y no menos porque la descarga del navegador va debajo del mismo paso
-      # y en un dia malo tarda de verdad; el tope tiene que dejar pasar lo lento y
-      # cortar lo colgado, que no son lo mismo.
+      # La clave cuelga del `package-lock.json` y no de la version de Playwright
+      # sola, y es una eleccion con coste: cambiar **cualquier** dependencia del
+      # frontend invalida tambien el navegador y obliga a bajarlo otra vez.
+      # Se acepta a proposito, porque el fallo contrario es mucho peor: una clave
+      # demasiado estable sirve un binario que no corresponde a la version de
+      # Playwright instalada, y eso no se manifiesta como una descarga de mas sino
+      # como un navegador que no arranca por una razon que no se parece a la causa.
+      - name: Cachear el navegador
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      # **Sin `--with-deps`, y ese es el cambio que de verdad importa.** Esa opcion
+      # es lo unico que traia un `apt-get` a este trabajo, y el 2026-08-19 fue
+      # exactamente donde se colgo: el mirror del runner
+      # --azure.archive.ubuntu.com-- dejo de responder, apt cayo al archivo de
+      # Ubuntu, bajo los InRelease y **se quedo parado 71 minutos** hasta que
+      # alguien cancelo el trabajo a mano. La imagen de `ubuntu-latest` ya trae las
+      # bibliotecas que Chromium necesita --viene con Chrome instalado-- asi que
+      # instalarlas otra vez era pagar un `apt-get` por nada.
+      #
+      # Si algun dia la imagen deja de traerlas, el sintoma **no** vuelve a ser un
+      # cuelgue: es el navegador fallando al arrancar en el paso siguiente, que se
+      # ve en segundos y dice cual falta. Cambiar un cuelgue de setenta minutos por
+      # un fallo legible es la mitad del motivo de quitarlo.
+      #
+      # El paso se ejecuta igual con la cache caliente: `playwright install`
+      # comprueba lo que hay y sale en el acto si ya esta. Es mas simple que
+      # condicionarlo al acierto de la cache, y ademas se cura solo si la cache
+      # llega a medias.
+      #
+      # El tope de diez minutos se queda aunque ya no haya apt: la descarga sigue
+      # ahi el dia que la cache falle, y tiene que **dejar pasar lo lento y cortar
+      # lo colgado**, que no son lo mismo.
       - name: Instalar el navegador
-        run: npx playwright install chromium --with-deps
+        run: npx playwright install chromium
         working-directory: frontend
         timeout-minutes: 10
 
