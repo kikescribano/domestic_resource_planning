@@ -23,13 +23,18 @@ hogar y la plataforma de avisos, en siete hitos. **Ese documento es el que hay q
 leer para arrancar un hito**, y el que hay que actualizar al cerrarlo. La decisión
 de producto que faltaba —qué módulos— está tomada y no hay que volver a abrirla.
 
-**Sus Hitos 0 y 1 están cerrados (2026-08-18)** y con ellos los tres huecos que
-la planificación había destapado. El backend ya está empaquetado por módulos:
+**En qué hito va la fase lo dice ese documento y solo ese**: aquí se decía, y se
+quedó viejo a los dos días. Lo que sí conviene tener presente antes de tocar nada
+es lo que los hitos ya cerrados dejaron montado, porque condiciona todo lo que
+venga.
+
+Los tres huecos que la planificación había destapado están cerrados. El backend
+está empaquetado por módulos:
 
 ```text
 com.drp.platform.*      Bus, TenantContext, paginación y la activación de módulos
 com.drp.core.*          El core, con su reparto en capas intacto
-com.drp.module.<key>.*  Un árbol por módulo — hoy solo su declaración
+com.drp.module.<key>.*  Un árbol por módulo, con su propio domain/application/adapter
 com.drp                 DrpApplication y config: quien cablea todo
 ```
 

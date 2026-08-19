@@ -33,23 +33,22 @@ import { Button, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primiti
  * Un módulo del catálogo que no esté en este mapa se activa igual y no aparece
  * en la navegación: es lo que le pasa al módulo de prueba del backend, que no
  * tiene pantalla ninguna.
+ *
+ * **El campo `milestone` ya no existe, y su retirada es una decisión del Hito
+ * 5.** Era la promesa autoprogramada que el Hito 0 dejó en las cuatro entradas
+ * —«sus pantallas llegan en el Hito N»— y que cada módulo fue perdiendo al
+ * construir la suya: Proveedores en el 2, Almacén en el 3, Compras en el 4 y
+ * Mantenimiento aquí. Con la última cumplida el campo se queda **opcional y sin
+ * un solo módulo que lo rellene**, que es una invitación a que alguien lo vuelva
+ * a rellenar con la promesa siguiente en lugar de escribirla donde se planifica.
+ * Un módulo futuro sin pantalla no lo necesita: `ModuleScreen` sabe decir la
+ * verdad sin nombrar un hito.
  */
-export const MODULE_SCREENS: Record<string, { path: string; label: string; milestone?: string }> = {
-  // Sin `milestone`: **este ya tiene pantalla**. El campo era la promesa
-  // autoprogramada de «sus pantallas llegan en el Hito 2» y este es ese hito; se
-  // retira en lugar de dejarlo apuntando al pasado, que es como una promesa
-  // cumplida se convierte en documentación falsa.
+export const MODULE_SCREENS: Record<string, { path: string; label: string }> = {
   SUPPLIERS: { path: '/proveedores', label: 'Proveedores' },
-  // Sin `milestone` desde el Hito 3, por lo mismo que Proveedores lo perdió en
-  // el 2: era la promesa autoprogramada de «sus pantallas llegan en el Hito 3»,
-  // y este es ese hito.
   WAREHOUSE: { path: '/almacen', label: 'Almacén' },
-  // Sin `milestone` desde el Hito 4, por lo mismo que los otros dos lo
-  // perdieron en el 2 y en el 3: era la promesa autoprogramada de «sus pantallas
-  // llegan en el Hito 4», y este es ese hito. Una promesa cumplida que se deja
-  // escrita se convierte en documentación falsa.
   PURCHASING: { path: '/compras', label: 'Compras' },
-  MAINTENANCE: { path: '/mantenimiento', label: 'Mantenimiento', milestone: 'Hito 5' },
+  MAINTENANCE: { path: '/mantenimiento', label: 'Mantenimiento' },
 }
 
 /** El catálogo del hogar, compartido por todo lo que necesita saber qué está activo. */
@@ -177,14 +176,19 @@ function ModuleRow({ module, canDecide }: { module: HouseholdModule; canDecide: 
  * **solo** en la rama activa, y que ninguna pantalla de módulo tenga que
  * acordarse de comprobar nada.
  *
- * Sin hijos sigue sirviendo, y es lo que les pasa a los tres módulos que aún no
- * tienen pantalla: dice la verdad —está encendido y todavía no hay nada— en lugar
- * de fingir una lista vacía.
+ * **Los hijos son obligatorios desde el Hito 5**, y eso es una decisión de ese
+ * hito. Hasta entonces esta clase sabía además pintar «encendido y todavía sin
+ * pantalla», que es lo que necesitaban los módulos declarados antes de tener la
+ * suya; cerrado el cuarto, esa rama dejó de ser alcanzable por ninguna ruta y se
+ * retira en lugar de quedarse como código muerto con una prueba de andamio. Un
+ * módulo futuro sin pantalla **no necesita ruta**: basta con no estar en
+ * `MODULE_SCREENS`, y entonces se enciende igual y no aparece en la navegación —
+ * que es justo lo que le pasa hoy al módulo de prueba del backend.
  *
  * No se llama a la API del módulo para averiguarlo: el catálogo ya está en la
  * caché de la sesión, así que la decisión no cuesta ninguna petición.
  */
-export function ModuleScreen({ moduleKey, children }: { moduleKey: string; children?: ReactNode }) {
+export function ModuleScreen({ moduleKey, children }: { moduleKey: string; children: ReactNode }) {
   const { isAdmin } = useSession()
   const session = useAuthenticatedSession()
   const queryClient = useQueryClient()
@@ -198,7 +202,6 @@ export function ModuleScreen({ moduleKey, children }: { moduleKey: string; child
   if (modules.isPending) return <Spinner label="Comprobando los módulos del hogar…" />
 
   const module = modules.data?.items.find((candidate) => candidate.key === moduleKey)
-  const screen = MODULE_SCREENS[moduleKey]
 
   if (!module) {
     return (
@@ -247,22 +250,8 @@ export function ModuleScreen({ moduleKey, children }: { moduleKey: string; child
     )
   }
 
-  // Encendido y con pantalla: el guardián se aparta y la pinta. No añade
+  // Encendido: el guardián se aparta y pinta la pantalla del módulo. No añade
   // cabecera propia --la pone la pantalla-- porque dos `h1` en el mismo
   // documento dejan la jerarquía de encabezados mal.
-  if (children) return <>{children}</>
-
-  return (
-    <>
-      <PageHeading title={module.name} />
-      {/* El módulo está encendido y todavía no tiene pantalla: su dominio llega
-          con su hito, y hasta entonces esto dice la verdad en lugar de fingir
-          una lista vacía. El reparto está en `phase-2-roadmap.md`. */}
-      <Notice tone="info" title="Encendido, y todavía sin nada que enseñar">
-        Este módulo está activo en tu hogar. Sus pantallas llegan en el{' '}
-        {screen?.milestone ?? 'hito que le toca'} de la Fase 2; mientras tanto no
-        hay nada que ver aquí.
-      </Notice>
-    </>
-  )
+  return <>{children}</>
 }

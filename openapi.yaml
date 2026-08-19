@@ -101,6 +101,30 @@ tags:
       consumibles del core, que SUMA sobre la existencia de esa ubicación. Es el
       cierre del ciclo. Ficha completa en docs/backend/modules/purchasing.md.
 
+  - name: maintenance
+    description: >
+      Mantenimiento (Fase 2, Hito 5): qué hay que revisar de las máquinas de la
+      casa, cada cuánto, cuándo toca la próxima vez y qué se hizo la última.
+      Módulo, así que todo lo que cuelga de /maintenance responde 403
+      MODULE_INACTIVE mientras el hogar no lo tenga encendido.
+
+
+      LA FRONTERA CONTRA EL PLANIFICADOR DE TAREAS, que su ficha escribe sin
+      ambigüedad y POR ADELANTADO, porque ese módulo no existe todavía: DE CMMS ES
+      EL CUÁNDO Y DEL PLANIFICADOR ES EL QUIÉN LO HACE. Un plan es una REGLA sobre
+      una máquina --no tiene responsable, no tiene día y no se completa-- mientras
+      que una tarea es un ENCARGO --tiene las tres cosas--. Por eso ninguna
+      operación de aquí asigna nada a nadie y no hay ningún recurso que represente
+      una ocurrencia futura: lo que hay es nextDueOn, UNA fecha por plan. El día
+      que exista el planificador, lo que preguntará es GET /maintenance/plans con
+      dueWithinDays, no una copia del calendario.
+
+
+      Y LA FRONTERA CONTRA EL CORE: aquí SOLO SE LEE. Ninguna operación invoca un
+      caso de uso del core ni escribe en sus tablas, al contrario que warehouse
+      --que mueve un contador-- y purchasing --que crea existencias--. Ficha
+      completa en docs/backend/modules/maintenance.md.
+
 security:
   - bearerAuth: []
 
@@ -2856,6 +2880,426 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         default: { $ref: "#/components/responses/ServerError" }
 
+  /maintenance/machines:
+    get:
+      operationId: listMaintenanceMachines
+      tags: [maintenance]
+      summary: Las máquinas que el módulo vigila
+      description: >
+        Los assets DURABLE vivos del hogar, con cuántos planes tienen y cuál es su
+        próxima fecha prevista. Un consumible no aparece: un paquete de arroz no se
+        revisa, y esa es la otra mitad de la frontera con warehouse -- allí los
+        consumibles, aquí lo duradero, sin una sola fila en común.
+
+
+        La ficha de cada máquina la abre el módulo solo: al sembrarse y al llegar
+        AssetCreated. NO HAY OPERACIÓN DE CREARLA, y no es un olvido -- una máquina
+        entra en el radar porque existe en el core, no porque alguien la dé de alta
+        aquí.
+
+
+        El nombre sale de assets --o de su artículo-- al leer, y no se guarda en
+        ninguna tabla de este módulo.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Busca en el nombre de la máquina, normalizado
+          schema: { type: string }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+      responses:
+        "200":
+          description: Las máquinas en mantenimiento
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaintenanceMachinePage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /maintenance/machines/{assetId}:
+    parameters:
+      - name: assetId
+        in: path
+        required: true
+        description: El identificador DEL ASSET, no el de la ficha -- la ficha no la crea nadie
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getMaintenanceMachine
+      tags: [maintenance]
+      summary: La ficha de una máquina, con sus planes y su historia reciente
+      description: >
+        Lo que cuelga de la máquina y no de ninguno de sus planes: su nota, su
+        manual y el resumen de lo que se le ha hecho. Los planes vienen solo los
+        vivos, y las intervenciones las diez últimas -- el histórico entero tiene
+        su propia operación.
+
+
+        El manual es un PUNTERO a un documento del core y no una copia: se abre y
+        se descarga por /documents, que es de quien es.
+      responses:
+        "200":
+          description: La ficha de la máquina
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaintenanceMachineDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+    patch:
+      operationId: updateMaintenanceMachine
+      tags: [maintenance]
+      summary: La nota de una máquina y cuál de sus documentos es su manual
+      description: >
+        Misma semántica de PATCH que el resto del contrato: un campo ausente no se
+        toca y un campo a nulo se borra.
+
+
+        manualDocumentId EXISTE POR UN MOTIVO QUE SE OLVIDA: el handler de
+        DocumentAttached deja apuntado EL ÚLTIMO manual adjuntado, que es la
+        semántica normal de un manual de referencia pero puede no ser el bueno
+        --alguien sube el manual de otro modelo--. Sin esta operación esa elección
+        no tendría corrección posible desde la pantalla. El documento tiene que
+        colgar de ESTA máquina; si no, responde 400.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MaintenanceMachinePatch" }
+      responses:
+        "200":
+          description: La ficha actualizada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaintenanceMachineDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /maintenance/plans:
+    get:
+      operationId: listMaintenancePlans
+      tags: [maintenance]
+      summary: Los planes de mantenimiento del hogar
+      description: >
+        Ordenados por la próxima fecha prevista, que es la pregunta que se hace
+        quien entra: qué toca antes.
+
+
+        dueWithinDays ES LO QUE EL PLANIFICADOR DE TAREAS PREGUNTARÁ EL DÍA QUE
+        EXISTA, en lugar de copiarse el calendario de este módulo. Va como filtro
+        del servidor y no de la pantalla por eso, además de por lo obvio: filtrarlo
+        en el cliente obligaría a traerse los planes del hogar entero.
+
+
+        Por omisión solo los vivos. Un plan cancelado conserva su histórico y se
+        pide nombrándolo.
+      parameters:
+        - name: assetId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: q
+          in: query
+          required: false
+          description: Busca en el nombre del plan, normalizado
+          schema: { type: string }
+        - name: dueWithinDays
+          in: query
+          required: false
+          description: >
+            Solo los que tocan dentro de N días. NO PONE SUELO: lo que ya se pasó
+            sigue apareciendo, que es justo lo que hay que decir
+          schema: { type: integer, minimum: 0 }
+        - name: includeCancelled
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+      responses:
+        "200":
+          description: Los planes de mantenimiento
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaintenancePlanPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        default: { $ref: "#/components/responses/ServerError" }
+    post:
+      operationId: createMaintenancePlan
+      tags: [maintenance]
+      summary: Crear un plan de mantenimiento
+      description: >
+        UN PLAN CUELGA DE UN ASSET DURABLE VIVO. Ni de un consumible --que no se
+        revisa-- ni de uno dado de baja: 409 MAINTENANCE_ASSET_NOT_ELIGIBLE.
+
+
+        EL PERIODO VA EN MESES Y NO EN DÍAS, y no es comodidad: sumar meses conserva
+        el día del mes, mientras que una revisión anual de 365 días se desplaza un
+        día cada año bisiesto y a los veinte años cae en una fecha que nadie eligió.
+
+
+        leadDays es opcional y cae en QUINCE. Lo que no cabe es una antelación más
+        larga que el propio periodo, que dejaría el plan permanentemente a punto de
+        tocar: 409 MAINTENANCE_LEAD_EXCEEDS_INTERVAL.
+
+
+        supplierId ES OPCIONAL Y SE GUARDA SIN SU NOMBRE, al revés que en una
+        intervención: un plan es una REGLA VIVA y tiene que decir el nombre de hoy
+        --a esa persona es a quien hay que llamar el mes que viene--, así que se
+        resuelve al leer por el puerto de plataforma. Si no se puede leer --no
+        existe, o Proveedores está apagado-- responde 409
+        MAINTENANCE_SUPPLIER_UNKNOWN y no distingue los dos casos, por lo mismo que
+        purchasing: distinguirlos obligaría a este módulo a saber qué módulos tiene
+        encendidos el hogar.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MaintenancePlanInput" }
+      responses:
+        "201":
+          description: El plan recién creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaintenancePlan" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: >
+            El asset no es una máquina viva (MAINTENANCE_ASSET_NOT_ELIGIBLE); ya hay
+            un plan vivo con ese nombre en esa máquina
+            (MAINTENANCE_PLAN_DUPLICATE); la antelación no cabe en el periodo
+            (MAINTENANCE_LEAD_EXCEEDS_INTERVAL); o no se puede leer ese servicio
+            técnico (MAINTENANCE_SUPPLIER_UNKNOWN)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /maintenance/plans/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getMaintenancePlan
+      tags: [maintenance]
+      summary: Un plan con su máquina, su servicio técnico y su historia
+      description: >
+        supplier viene RESUELTO AL LEER por el puerto de plataforma, no copiado. Es
+        lo que hace que un contacto RETIRADO siga siendo legible -- la garantía que
+        la ficha de Proveedores declaró por adelantado y para este caso exacto: un
+        plan que apunte a quien ya no se llama tiene que poder decir a quién
+        apuntaba. Nulo si no hay, si ya no existe o si Proveedores está apagado, sin
+        que el cliente pueda ni deba distinguir los tres casos.
+
+
+        El estado del aviso --en qué fase avisó y para qué fecha-- NO SALE AQUÍ: es
+        el estado interno con el que el módulo se acuerda de no repetirse, no algo
+        sobre lo que el cliente decida nada.
+      responses:
+        "200":
+          description: El plan con su detalle
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaintenancePlanDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+    patch:
+      operationId: updateMaintenancePlan
+      tags: [maintenance]
+      summary: Cambiar un plan
+      description: >
+        Misma semántica de PATCH que el resto del contrato, con una asimetría
+        deliberada: intervalMonths y nextDueOn SE PUEDEN CAMBIAR Y NO SE PUEDEN
+        VACIAR --un plan sin cada-cuánto o sin próxima fecha no es un plan--
+        mientras que supplierId SÍ se puede vaciar, porque dejar de llamar a nadie
+        es una decisión legítima.
+
+
+        MOVER LA FECHA REARMA EL AVISO, y no hay ningún campo que lo pida: el estado
+        del aviso cuelga de la próxima fecha prevista, así que en cuanto cambia deja
+        de valer sola. Es lo que impide que un camino se olvide de limpiarla y deje
+        un plan que no vuelve a avisar nunca.
+
+
+        Un plan cancelado no se modifica: 409 MAINTENANCE_PLAN_CANCELLED.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MaintenancePlanPatch" }
+      responses:
+        "200":
+          description: El plan actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaintenancePlan" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            El plan está cancelado (MAINTENANCE_PLAN_CANCELLED); ya hay otro vivo
+            con ese nombre en esa máquina (MAINTENANCE_PLAN_DUPLICATE); la
+            antelación no cabe en el periodo (MAINTENANCE_LEAD_EXCEEDS_INTERVAL); o
+            no se puede leer ese servicio técnico (MAINTENANCE_SUPPLIER_UNKNOWN)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/ServerError" }
+    delete:
+      operationId: cancelMaintenancePlan
+      tags: [maintenance]
+      summary: Cancelar un plan
+      description: >
+        ES BAJA LÓGICA Y NO BORRADO, igual que la retirada de un contacto de
+        servicio: el plan deja de vigilarse y CONSERVA SU HISTÓRICO -- que la
+        caldera se revisó tres veces siguió siendo cierto después de tirarla.
+
+
+        Cancelar dos veces no es un error. Y cancelar LIBERA SU NOMBRE, porque el
+        índice de nombre único es parcial: volver a crear el mismo plan es la salida
+        que este contrato deja para reactivarlo.
+      responses:
+        "204": { description: Plan cancelado }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /maintenance/interventions:
+    get:
+      operationId: listMaintenanceInterventions
+      tags: [maintenance]
+      summary: El histórico de intervenciones
+      description: >
+        De la más reciente a la más antigua. Es un LIBRO: se escribe y no se toca,
+        así que no hay operación de modificar ni de borrar.
+      parameters:
+        - name: assetId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: planId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+      responses:
+        "200":
+          description: El histórico
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaintenanceInterventionPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        default: { $ref: "#/components/responses/ServerError" }
+    post:
+      operationId: registerMaintenanceIntervention
+      tags: [maintenance]
+      summary: Registrar lo que se hizo
+      description: >
+        ES LO QUE REARMA EL CICLO, y la operación por la que existe este módulo. Si
+        la intervención cumple un plan, LE AVANZA LA PRÓXIMA FECHA y con ello vuelve
+        a armar su aviso.
+
+
+        LA PRÓXIMA SE CUENTA DESDE LO QUE SE HIZO Y NO DESDE LA QUE TOCABA: si la
+        revisión anual se hizo con dos meses de retraso, la siguiente es un año
+        después de la real. Contarla desde la teórica arrastraría el retraso para
+        siempre y acabaría pidiendo dos revisiones el mismo año.
+
+
+        planId ES OPCIONAL: una correctiva nunca cuelga de un plan, y una preventiva
+        puede no colgar tampoco --cambiar el filtro sin tener plan escrito es un
+        caso normal, y exigirlo obligaría a inventarse un plan para poder apuntar
+        algo ya hecho.
+
+
+        supplierId SE GUARDA CON SU NOMBRE COPIADO, al revés que en un plan: una
+        intervención es HISTORIA, y que aquel día vino aquel servicio técnico siguió
+        siendo cierto aunque después se retire o el hogar apague Proveedores.
+
+
+        Una intervención NO PUEDE SER DEL FUTURO: adelantaría la fecha sobre algo
+        que no ha pasado (400).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MaintenanceInterventionInput" }
+      responses:
+        "201":
+          description: Lo que se acaba de apuntar
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaintenanceIntervention" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            El asset no es una máquina viva (MAINTENANCE_ASSET_NOT_ELIGIBLE); el
+            plan está cancelado (MAINTENANCE_PLAN_CANCELLED); o no se puede leer ese
+            servicio técnico (MAINTENANCE_SUPPLIER_UNKNOWN)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /maintenance/suppliers:
+    get:
+      operationId: listMaintenanceSuppliers
+      tags: [maintenance]
+      summary: A quién se puede llamar
+      description: >
+        La vista de CMMS sobre el dato maestro de Proveedores, leída por un puerto
+        de plataforma y no por la API del otro módulo. Es la misma operación que
+        purchasing publica sobre su propio prefijo, y por el mismo motivo: CUELGA DE
+        /maintenance Y NO DE /suppliers, así que un hogar con Mantenimiento
+        encendido y Proveedores apagado recibe 200 CON LA LISTA VACÍA en lugar del
+        403 MODULE_INACTIVE que le daría la ruta del otro módulo.
+
+
+        NO FILTRA POR CATEGORÍA, y esa es la decisión de este hito como SEGUNDO
+        consumidor del puerto: de las catorce categorías de Proveedores casi todas
+        son servicios técnicos --fontanería, electricidad, calderas,
+        electrodomésticos, carpintería, cerrajería, vehículo...-- así que recortar
+        la lista escondería justo al contacto que hace falta. Lo que sí hacía falta
+        --distinguirlos de un vistazo-- ya cabe en detail, con el que el cliente
+        AGRUPA el selector. Ensanchar el puerto habría hecho que plataforma
+        aprendiera qué es una categoría de servicio y cuáles son válidas.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: A quién se llama. Vacía si Proveedores está apagado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MaintenanceSupplier" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        default: { $ref: "#/components/responses/ServerError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -3016,6 +3460,11 @@ components:
             - LOCATION_DUPLICATE
             - LOCATION_HAS_ASSETS
             - LOCATION_HAS_CHILDREN
+            - MAINTENANCE_ASSET_NOT_ELIGIBLE
+            - MAINTENANCE_LEAD_EXCEEDS_INTERVAL
+            - MAINTENANCE_PLAN_CANCELLED
+            - MAINTENANCE_PLAN_DUPLICATE
+            - MAINTENANCE_SUPPLIER_UNKNOWN
             - MERGE_ARTICLE_MISMATCH
             - MERGE_ASSET_DEACTIVATED
             - MERGE_NOT_CONSUMABLE
@@ -4761,3 +5210,258 @@ components:
           description: >
             El IDENTIFICADOR de la categoría de servicio, no su rótulo: el texto que
             se lee en pantalla es un dato en castellano y lo pone el cliente
+
+    MaintenanceMachine:
+      type: object
+      required: [assetId, name, planCount]
+      description: >
+        Una máquina del hogar tal y como CMMS la ve. El nombre sale del core --del
+        asset, o de su artículo-- al leer, y no se guarda en ninguna tabla de este
+        módulo: dos copias del mismo nombre acaban diciendo cosas distintas el día
+        que alguien renombre el asset.
+      properties:
+        assetId: { type: string, format: uuid }
+        name: { type: string, description: Del core }
+        manualDocumentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Cuál de los documentos de esta máquina es el manual. Lo apunta el
+            handler de DocumentAttached y se corrige con el PATCH
+        notes: { type: string, nullable: true }
+        planCount: { type: integer, description: Cuántos planes vivos tiene }
+        nextDueOn:
+          type: string
+          format: date
+          nullable: true
+          description: La más próxima de sus fechas previstas. Nula si no tiene ningún plan vivo
+
+    MaintenanceMachinePage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/MaintenanceMachine" }
+
+    MaintenanceMachineDetail:
+      type: object
+      required: [machine, plans, interventions]
+      properties:
+        machine: { $ref: "#/components/schemas/MaintenanceMachine" }
+        plans:
+          type: array
+          items: { $ref: "#/components/schemas/MaintenancePlan" }
+        interventions:
+          type: array
+          description: Las diez últimas. El histórico entero tiene su operación
+          items: { $ref: "#/components/schemas/MaintenanceIntervention" }
+
+    MaintenanceMachinePatch:
+      type: object
+      description: Un campo ausente no se toca; un campo a nulo se borra
+      properties:
+        manualDocumentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tiene que colgar de ESTA máquina. A nulo, la máquina se queda sin manual
+        notes: { type: string, nullable: true }
+
+    MaintenancePlan:
+      type: object
+      required: [id, assetId, name, intervalMonths, leadDays, nextDueOn, createdAt, updatedAt]
+      description: >
+        Una REGLA RECURRENTE sobre una máquina. No lleva responsable ni día
+        concreto, y eso es la frontera contra el planificador de tareas escrita en
+        el propio esquema: un plan es una regla y una tarea es un encargo.
+      properties:
+        id: { type: string, format: uuid }
+        assetId: { type: string, format: uuid }
+        name: { type: string, example: Revisión anual }
+        intervalMonths:
+          type: integer
+          minimum: 1
+          maximum: 120
+          description: Cada cuántos meses toca. En meses y no en días, para que el aniversario no se desplace
+        leadDays:
+          type: integer
+          minimum: 0
+          maximum: 365
+          description: Con cuánta antelación avisar. Tiene que caber dentro del periodo
+        nextDueOn:
+          type: string
+          format: date
+          description: >
+            Cuándo toca la próxima. Se guarda y no se calcula al leer, porque de
+            ella cuelga el estado del aviso
+        lastPerformedOn: { type: string, format: date, nullable: true }
+        supplierId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            El servicio técnico. SIN su nombre al lado: un plan es una regla viva y
+            tiene que decir el nombre de hoy, así que se resuelve al leer
+        notes: { type: string, nullable: true }
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Baja lógica. El plan deja de vigilarse y conserva su histórico
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    MaintenancePlanPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/MaintenancePlan" }
+
+    MaintenancePlanDetail:
+      type: object
+      required: [plan, machineName, interventions]
+      properties:
+        plan: { $ref: "#/components/schemas/MaintenancePlan" }
+        machineName: { type: string, description: Del core }
+        supplier:
+          allOf:
+            - $ref: "#/components/schemas/MaintenanceSupplier"
+          nullable: true
+          description: >
+            Resuelto al leer por el puerto de plataforma. Un contacto RETIRADO
+            SIGUE SALIENDO AQUÍ -- un plan que apunte a quien ya no se llama tiene
+            que poder decir a quién apuntaba -- aunque deje de ofrecerse en
+            /maintenance/suppliers. Nulo si no hay, si ya no existe o si Proveedores
+            está apagado
+        interventions:
+          type: array
+          items: { $ref: "#/components/schemas/MaintenanceIntervention" }
+
+    MaintenancePlanInput:
+      type: object
+      required: [assetId, name, intervalMonths, nextDueOn]
+      properties:
+        assetId:
+          type: string
+          format: uuid
+          description: Un asset DURABLE vivo. Un consumible no se revisa
+        name: { type: string, maxLength: 160, example: Revisión anual }
+        intervalMonths: { type: integer, minimum: 1, maximum: 120 }
+        leadDays:
+          type: integer
+          minimum: 0
+          maximum: 365
+          default: 15
+          description: Opcional. Tiene que caber dentro del periodo
+        nextDueOn: { type: string, format: date }
+        supplierId: { type: string, format: uuid, nullable: true }
+        notes: { type: string, nullable: true }
+
+    MaintenancePlanPatch:
+      type: object
+      description: >
+        Un campo ausente no se toca. intervalMonths y nextDueOn no admiten nulo --un
+        plan sin cada-cuánto o sin próxima fecha no es un plan-- y supplierId sí.
+      properties:
+        name: { type: string, maxLength: 160 }
+        intervalMonths: { type: integer, minimum: 1, maximum: 120 }
+        leadDays: { type: integer, minimum: 0, maximum: 365 }
+        nextDueOn:
+          type: string
+          format: date
+          description: Moverla REARMA el aviso, sin que haga falta pedirlo
+        supplierId: { type: string, format: uuid, nullable: true }
+        notes: { type: string, nullable: true }
+
+    InterventionKind:
+      type: string
+      description: >
+        PREVENTIVE cumple un plan --o al menos lo parece: cambiar el filtro también
+        lo es sin plan escrito--; CORRECTIVE arregla algo que se ha roto y nunca
+        cuelga de un plan.
+      enum: [PREVENTIVE, CORRECTIVE]
+
+    MaintenanceIntervention:
+      type: object
+      required: [id, assetId, kind, performedOn, summary, createdAt]
+      description: >
+        Lo que se hizo, y cuándo. Es un LIBRO: se escribe y no se toca, así que no
+        lleva updatedAt ni tiene operación de modificar.
+      properties:
+        id: { type: string, format: uuid }
+        assetId: { type: string, format: uuid }
+        planId:
+          type: string
+          format: uuid
+          nullable: true
+          description: El plan que cumple, si cumple alguno
+        kind: { $ref: "#/components/schemas/InterventionKind" }
+        performedOn: { type: string, format: date }
+        summary: { type: string, example: Revisada y limpiada }
+        supplierId: { type: string, format: uuid, nullable: true }
+        supplier:
+          type: string
+          nullable: true
+          description: >
+            EL NOMBRE DE AQUEL DÍA, copiado al registrar. Al revés que en un plan,
+            porque una intervención es historia: sigue siendo cierto aunque el
+            contacto se retire o el hogar apague Proveedores
+        notes: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    MaintenanceInterventionPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/MaintenanceIntervention" }
+
+    MaintenanceInterventionInput:
+      type: object
+      required: [assetId, kind, performedOn, summary]
+      properties:
+        assetId: { type: string, format: uuid }
+        planId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Opcional. Solo una PREVENTIVE puede colgar de un plan, y hacerlo es lo
+            que AVANZA su próxima fecha
+        kind: { $ref: "#/components/schemas/InterventionKind" }
+        performedOn:
+          type: string
+          format: date
+          description: No puede ser del futuro
+        summary: { type: string, maxLength: 500 }
+        supplierId: { type: string, format: uuid, nullable: true }
+        notes: { type: string, nullable: true }
+
+    MaintenanceSupplier:
+      type: object
+      required: [id, name]
+      description: >
+        Lo mínimo que el puerto de dato maestro deja pasar, igual que en
+        purchasing. Ni teléfono ni correo: los datos personales de terceros se
+        quedan en Proveedores
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        detail:
+          type: string
+          nullable: true
+          description: >
+            El IDENTIFICADOR de la categoría de servicio, no su rótulo. Es con lo
+            que el cliente AGRUPA el selector, y la razón de que este módulo NO
+            haya tenido que ensanchar el puerto

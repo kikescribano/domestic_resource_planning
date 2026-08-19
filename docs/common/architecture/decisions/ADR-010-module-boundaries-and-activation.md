@@ -349,3 +349,40 @@ alcanzado.
   La tercera capa del gate que esta ADR describe —«entrar a mano en una ruta
   apagada lleva a la pantalla que la ofrece»— sigue intacta y ahora convive con el
   contenido real del módulo, que solo se monta en la rama activa.
+
+- **El puerto en plataforma aguanta al segundo consumidor sin ensancharse.** La
+  condición de revisión de esta ADR —«un módulo necesita saber de otro más allá
+  de lo que el bus entrega; si el caso es legítimo, lo que hace falta es un
+  puerto en plataforma, no una excepción»— se estrenó en el **Hito 4** con un
+  solo consumidor delante, que es la peor forma de saber si un puerto está bien
+  dimensionado. El **Hito 5** trae el segundo, CMMS, y con él la primera ocasión
+  real de ensancharlo: necesitaba —o eso parecía— filtrar el dato maestro por
+  categoría para ofrecer solo servicios técnicos.
+
+  **No se ensancha**, y el motivo importa más que la decisión: filtrar habría
+  sido la funcionalidad equivocada —de las catorce categorías de Proveedores casi
+  todas son servicios técnicos, así que recortar la lista escondería justo al
+  contacto que hace falta— y lo que sí hacía falta, distinguirlos de un vistazo,
+  **ya cabía en lo que el puerto entrega**: el `detail` con el que el cliente
+  agrupa. Ensancharlo habría hecho que plataforma aprendiera qué es una categoría
+  de servicio y cuáles son válidas, que es el residuo que la mudanza de
+  `ErrorCode` dejó anotado para vigilar. **La cuarta regla de ArchUnit sigue
+  verde y la lista de excepciones de la tercera sigue teniendo un solo nombre.**
+
+  El disparador de revisarlo queda escrito: **el día que un consumidor necesite
+  del dato maestro ajeno algo que no se pueda decidir mirando la entrada
+  completa** —un filtro que el dueño tenga que resolver en su consulta porque
+  traerlo entero no cabe—, ensanchar deja de ser vocabulario prestado y pasa a
+  ser necesidad.
+
+- **La tercera capa del gate ya no necesita saber pintar nada.** Esta ADR
+  describe que «entrar a mano en la ruta de un módulo apagado lleva a la pantalla
+  que la ofrece», y el Hito 2 hizo que `ModuleScreen` **envolviera** a la pantalla
+  del módulo en lugar de sustituirla. Cerrado el **Hito 5**, los cuatro módulos
+  tienen pantalla, así que la rama de «encendido y todavía sin nada que enseñar»
+  —que existía para los declarados antes de tener la suya— dejó de ser alcanzable
+  y se retiró, junto con el campo del cliente que nombraba el hito en que
+  llegaría. **La mitad de apagado sigue intacta**, que es la que esta ADR
+  describe. Un módulo futuro sin pantalla no necesita ruta: sin entrada en el mapa
+  del cliente se enciende igual y no aparece en la navegación, que es lo que le
+  pasa hoy al módulo de prueba.

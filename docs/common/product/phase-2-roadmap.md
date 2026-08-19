@@ -563,19 +563,106 @@ medir la capacidad** también es del Hito 6.
 > garantiza sigue en pie y es lo que había que declarar: **si hubiera que
 > pararlo, este es el único sitio donde el trabajo entregado se sostiene solo.**
 
-### Hito 5 — Mantenimiento (CMMS) · **Pendiente**
+### Hito 5 — Mantenimiento (CMMS) · **Completado (2026-08-19)**
 
-- [ ] **Ficha del módulo**, con la frontera contra el planificador de tareas —que
-      no existe todavía— escrita por adelantado.
-- [ ] **Dominio**: planes de mantenimiento preventivo sobre un asset `DURABLE`,
-      intervenciones correctivas, e histórico.
-- [ ] **Consumo de `AssetCreated`, `AssetDeactivated` y `DocumentAttached`**, que
-      es el ejemplo con el que el README explica el bus desde la Fase 0: dar de
-      alta la caldera genera su plan, y el manual adjunto queda enlazado en él.
-- [ ] **Su siembra al activarse**, sobre los `DURABLE` que el hogar ya tenga.
-- [ ] **Lectura de Proveedores** para el servicio técnico asignado a un plan.
-- [ ] **Sus avisos de revisión** sobre la plataforma del Hito 1.
-- [ ] **Sus pantallas** bajo `/mantenimiento`, y su recorrido vertical.
+El mayor de los cuatro, y **el último**: cerrado este hito, los cuatro módulos de
+prioridad alta de la sección 4.2 están construidos.
+
+- [x] **Ficha del módulo** en [`docs/backend/modules/maintenance.md`](../../backend/modules/maintenance.md),
+      escrita antes del código y en un commit propio, con **la frontera contra el
+      planificador de tareas escrita por adelantado y sin ambigüedad** aunque ese
+      módulo no exista: **de CMMS es el cuándo y del planificador el quién lo
+      hace**. Un plan es una regla sobre una máquina; una tarea, un encargo con
+      responsable y día.
+- [x] **Dominio**: planes de mantenimiento preventivo sobre un asset `DURABLE`,
+      intervenciones correctivas e histórico, en tres tablas con `household_id`,
+      RLS y `FORCE`. El recuento del esquema sube de veinticinco a veintiocho y la
+      lista de tablas sin política no se toca.
+- [x] **Su migración `V13`**, que deja el esquema completo desde una base vacía,
+      políticas incluidas.
+- [x] **Consumo de `AssetCreated`, `AssetDeactivated` y `DocumentAttached`** por
+      la base de handler del Hito 0, **con el agregado de la tercera leído del
+      `payload` y no del `aggregateId`**, y con la prueba de que un hogar con el
+      módulo apagado no ve ni una fila escrita y el de al lado sí.
+- [x] **Lectura de Proveedores por el puerto de plataforma, sin ensancharlo**, y
+      funcionando con ese módulo apagado. De paso, las dos mitades de la garantía
+      que Proveedores declaró por adelantado quedan por fin ejercitadas.
+- [x] **Su siembra al activarse**, sobre los `DURABLE` que el hogar ya tenga:
+      **abre la ficha de cada máquina y no crea ningún plan**, e idempotente por
+      índice y no por comprobación previa.
+- [x] **Sus avisos de revisión** sobre la plataforma del Hito 1, leídos del
+      Mailpit de verdad, sin repetirse cada noche y **volviéndose a armar al
+      registrar la intervención**.
+- [x] **Once operaciones en el contrato** bajo `/api/v1/maintenance` con su
+      `operationId` —el contrato pasa de ochenta y siete a noventa y ocho—, cinco
+      códigos de error nuevos en `com.drp.platform.error`, y sus pantallas bajo
+      `/mantenimiento` con recorrido vertical **añadido a la batería existente**,
+      que pasa de cinco recorridos a seis.
+
+#### Cómo quedó, y lo que hubo que decidir por el camino
+
+**Este hito no retira ningún riesgo arquitectónico, porque los cuatro estaban
+retirados desde el Hito 4** — y eso era exactamente lo que el punto de corte
+declaraba. Lo que trae es el cuarto módulo de prioridad alta y **tres primeras
+veces que ningún hito anterior podía traer**:
+
+- **Una frontera escrita sin el otro lado delante.** Warehouse escribió la suya
+  contra el core y Compras contra Warehouse, los dos con quien contrastarla.
+  Aquí el interlocutor —el planificador de tareas— no existe, y el catálogo de
+  eventos ya le había asignado dos trabajos. La línea queda clavada con **tres
+  consecuencias cumplidas en código**: ninguna tabla lleva responsable, no hay
+  ninguna fila por ocurrencia futura y este módulo no consume `UserDeactivated`.
+- **La prueba de verdad del puerto de dato maestro**, que se diseñó con un solo
+  consumidor delante. **No se ensancha**, y el motivo está escrito con su
+  disparador de revisión.
+- **Un aviso periódico que se rearma**, que es la vuelta que Warehouse no tuvo
+  que dar: allí el rearme era reponer por encima del mínimo y aquí es un gesto de
+  una persona.
+
+Las decisiones que la definición no preveía están anotadas con su alternativa
+descartada en [`decisions.md`](decisions.md). Las cuatro que más lejos llegan:
+
+- **La siembra abre la ficha de cada máquina y no crea ningún plan**, y con eso
+  se corrige el catálogo de eventos de 5.2.3: «genera un plan de mantenimiento
+  por defecto» se escribió en la Fase 0 como ejemplo del bus, no como decisión de
+  producto, y no se sostiene — **por defecto ¿de qué?** Una caldera pide revisión
+  anual y una silla no pide nada, y el core no modela de qué clase es cada
+  máquina.
+- **Un aviso periódico cuelga de la próxima fecha prevista y no del plan.** Con
+  una marca suelta, cada camino que mueve la fecha tendría que acordarse de
+  limpiarla, y el que se olvidara dejaría un plan que **no vuelve a avisar
+  nunca** — un síntoma que solo se descubre dos años después.
+- **`DocumentAttached` es el único evento del catálogo cuyo agregado no es la
+  cosa que ha cambiado.** Copiar el patrón de los dos hitos anteriores habría
+  enlazado el manual a una máquina inexistente **sin fallar**.
+- **El campo `milestone` de `MODULE_SCREENS` se retira**, y con él la rama de
+  `ModuleScreen` sin hijos: era la última de las cuatro promesas autoprogramadas
+  del Hito 0, y un campo opcional que ningún módulo rellena es una invitación a
+  volver a rellenarlo.
+
+Y **el recorrido vertical volvió a encontrar lo que solo se ve en un navegador**,
+como en el Hito 4: **recargar la pestaña devolvía al login con la sesión viva en
+el servidor**. El refresh token es de un solo uso y rota, pero con `StrictMode` el
+efecto de reanudación se monta dos veces y lanzaba dos renovaciones con el mismo
+token. No era un defecto de este hito y llevaba cinco recorridos sin aparecer,
+porque solo pasaba a veces.
+
+**Lo que este hito no hace, y dónde se hace.** El **barrido de aislamiento** de
+las once operaciones nuevas se queda en el **Hito 6**, igual que las siete de
+Proveedores, las diez de Warehouse y las diez de Compras: se dice aquí
+explícitamente para que no se dé por supuesto, que es lo que han hecho los tres
+hitos anteriores. La **purga de `household_notices`** sigue sin hito asignado, y
+este hito le añade un **quinto candidato al mismo sitio**,
+`maintenance_interventions`, que como el cuaderno de Warehouse y las dos tablas
+de Compras crece con lo que el hogar *hace* y no con lo que *tiene* — aunque es el
+menos urgente de los cinco, porque una casa registra unas pocas intervenciones al
+año y no varias al día. **Volver a medir la capacidad** también es del Hito 6.
+
+> **Los cuatro módulos de prioridad alta están construidos, y con esto la Fase 2
+> solo tiene pendiente su cierre.** Lo que queda del alcance —«los cuatro módulos
+> de prioridad alta sobre el mecanismo de activación y la plataforma de avisos»—
+> está entero: el mecanismo (Hito 0), la plataforma (Hito 1) y los cuatro módulos
+> (Hitos 2 a 5). El Hito 6 no añade producto: consolida.
 
 ### Hito 6 — Cierre de la fase · **Pendiente**
 
@@ -584,20 +671,68 @@ criterio de accesibilidad que no había cubierto, y seis documentos del frontend
 quedaron diciendo «esto llega en el Hito 4» hasta que una sesión posterior volvió
 a por ellos.
 
+**Y ahora la lista está completa delante**, que es lo que este hito no tenía hasta
+cerrar el 5. Lo que le queda, con las cifras reales:
+
 - [ ] **Barrido de aislamiento sobre las operaciones nuevas**, con la misma forma
       que el de la Fase 1: autenticado como hogar A, ninguna operación de ningún
       módulo devuelve ni modifica datos del hogar B, ni por identificador directo.
+      Hoy `TenantIsolationSweepTest` cubre **las treinta y ocho operaciones de la
+      Fase 1 y ninguna de plataforma ni de módulo**, y lo que falta son **cuarenta
+      y una**: las tres de la activación (Hito 0), las tres de avisos (Hito 1),
+      las siete de Proveedores, las diez de Warehouse, las diez de Compras y las
+      once de Mantenimiento. Los cuatro hitos de módulo lo dejaron aquí a
+      propósito y lo dijeron cada uno en su ficha.
 - [ ] **Auditoría de accesibilidad completa** de las pantallas nuevas: teclado,
       foco visible en cada parada, reflujo de 320 px a ultrawide y axe en los dos
-      modos. No basta con axe.
+      modos. No basta con axe. Son **seis pantallas** —módulos, avisos,
+      proveedores, almacén, compras y mantenimiento— y la batería tiene ya seis
+      recorridos que las tocan; lo que falta es la pasada sistemática, no la
+      primera visita.
 - [ ] **Barrido de las promesas aplazadas**: buscar en la documentación toda frase
       del tipo «lo hará el hito siguiente» y cerrarla o convertirla en tarea con
-      destinatario.
+      destinatario. **Las cuatro de `MODULE_SCREENS` ya están cerradas** —cada
+      módulo perdió la suya al construir su pantalla, y el campo se retiró con la
+      última—, así que lo que queda son las de la documentación.
 - [ ] **Volver a medir la capacidad**, porque cuatro módulos cambian el consumo de
-      disco por hogar, que es lo que decidió el VPS.
+      disco por hogar, que es lo que decidió el VPS. **Por dónde empezar está
+      dicho**: las cuatro tablas que crecen con lo que el hogar *hace* y no con lo
+      que *tiene* —`warehouse_movements`, `shopping_list_items`, `purchases` y
+      `maintenance_interventions`—, más `household_notices`, que la ADR-011 dejó
+      anotada entre sus costes.
+- [ ] **Decidir de quién es la purga de esas cinco tablas**, que sigue sin hito
+      asignado desde el Hito 1 y ya no puede seguir aplazándose sin decir por qué:
+      su sitio natural sigue siendo una comprobación más del recorrido diario, y
+      es el único punto de la fase que ha ido creciendo hito a hito sin
+      destinatario.
+- [ ] **Resolver las decisiones abiertas que dejaron los cuatro módulos con
+      «quien abra el Hito 6» como responsable**, que son las que solo se pueden
+      contestar mirando datos reales: si la categoría de servicio de Proveedores
+      tiene que pasar a catálogo por hogar, si el consumo de Warehouse debe
+      repartirse entre lotes, si `StockDepleted` debería llegar también sin mínimo
+      declarado en sus demás reglas, y si el plan de CMMS debe poder colgar de una
+      ubicación. **Y una que es de dos módulos a la vez**: la antelación del aviso
+      por hogar, que Warehouse y Mantenimiento dejaron abierta por separado y que
+      conviene resolver junta — dos tablas de configuración de dos módulos para lo
+      mismo serían la señal de que lo que falta es una de plataforma.
+- [ ] **Decidir qué se hace con la prueba del reloj del enrolamiento**, que es la
+      única de la suite que mide tiempos y **ya ha fallado dos veces en la CI sin
+      que nada hubiera cambiado en el código**: la primera por un umbral absoluto
+      de 60 ms —que se cambió por una proporción— y la segunda el 2026-08-19, en
+      la comparación contra el coste de un hash, durante el Hito 5. Lo que mide
+      importa —que la rama «ese correo ya existe» pague el hash igual, que es la
+      única forma conocida de reabrir la fuga— así que **no se relaja sin más**;
+      lo que hay que decidir es si esa propiedad se comprueba mejor de otra
+      manera que cronometrando en un runner compartido.
 - [ ] **Actualizar el deck de marketing**, que no avisa cuando se queda atrás.
 - [ ] **README**: sección 4.2 con los cuatro módulos en su estado real, sección 8
       con la fase cerrada, sección 10 con su fila de historial.
+
+> **El Hito 6 no añade producto: consolida.** Los cuatro riesgos de la tabla de
+> alcance están retirados desde el Hito 4 y los cuatro módulos construidos desde
+> el 5, así que lo que queda es lo que la Fase 1 aprendió que no se cierra solo.
+> Es además el único hito de la fase que **no se puede ejecutar antes que los
+> demás**, y por eso el punto de corte lo dejó fuera del corte.
 
 ## Criterio de aceptación
 
@@ -619,7 +754,7 @@ Las dos últimas filas son lo que la Fase 2 añade.
 ## Preguntas que esta fase tiene que resolver
 
 Dos vienen heredadas con destinatario asignado y **vencen aquí**; las otras nacen
-del alcance nuevo. Se resuelven en el hito que las toca y se anotan en
+del alcance nuevo. **Las cinco están resueltas.** Se resuelven en el hito que las toca y se anotan en
 [`decisions.md`](decisions.md), no aquí.
 
 | Pregunta | Hito | Por qué vence ahora |
@@ -628,6 +763,7 @@ del alcance nuevo. Se resuelven en el hito que las toca y se anotan en
 | ~~**Unidad de compra frente a unidad de consumo**~~ — **resuelta del todo el 2026-08-19**: la conversión ya estaba guardada y es del core (`Article.packSize`), y **la presentación de compra no necesita nombre propio** — se compone con `packSize` y `unit` en lugar de guardarse, porque un texto libre sería una segunda fuente de verdad que puede contradecir al envase | 3 y 4 | El core fija que la unidad la pone el artículo y que convertir es de Warehouse; Compras es quien lo necesita de verdad |
 | ~~**Qué pasa cuando un consumible llega a cero**~~ — **resuelta el 2026-08-19: entra solo en la lista, sin que nadie lo diga**, porque quedarse sin algo es el disparador canónico de una lista de la compra y descartar una línea es un clic. Al escribirlo se destapó que `StockDepleted` **no se publicaba nunca sin mínimo declarado**, y se corrigió en Warehouse, que es de quien es | 4 | El catálogo de eventos lo da por hecho, y nadie ha decidido si es automático |
 | ~~**Qué ve un rol no administrador** en la pantalla de módulos~~ — **resuelta el 2026-08-18: el catálogo entero, con su estado y sin acciones** | 0 | Era una decisión de producto pequeña, y condicionaba la navegación |
+| ~~**Si el puerto de dato maestro basta cuando llega el segundo consumidor**~~ — **resuelta el 2026-08-19: no se ensancha**. Filtrar por categoría sería la funcionalidad equivocada —de las catorce de Proveedores casi todas son servicios técnicos, así que recortar escondería justo al contacto que hace falta— y lo que sí hacía falta, distinguirlos de un vistazo, ya cabe en el `detail` que el puerto entrega. El disparador de revisarlo queda escrito | 5 | El puerto se diseñó **con un solo consumidor delante** en el Hito 4, y CMMS es el segundo: es la primera ocasión real de comprobarlo |
 
 Y una que **no vence en esta fase** y conviene no confundir: el traspaso del
 recordatorio de devolución al módulo de préstamos avanzados, único traspaso
@@ -658,6 +794,7 @@ conocido.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-19 | **Hito 5 completado, y con él los cuatro módulos de prioridad alta**: Mantenimiento (CMMS) llega con tres tablas que suben el recuento de veinticinco a veintiocho, once operaciones que llevan el contrato a noventa y ocho, y el sexto recorrido vertical de la batería. Es el único módulo cuya frontera principal se ha escrito **sin el otro lado delante** —**de CMMS es el cuándo y del planificador de tareas el quién lo hace**—, con sus tres consecuencias cumplidas en código: ninguna tabla lleva responsable, no hay ocurrencias materializadas y no consume `UserDeactivated`. Es también **la prueba de verdad del puerto de dato maestro**, que **no se ensancha** —filtrar por categoría escondería justo al contacto que hace falta— y que de paso ejercita por fin la garantía que Proveedores declaró por adelantado: un contacto retirado sigue siendo legible por su identificador. Y el primero cuyo **aviso por fecha se rearma**, colgado de la próxima fecha prevista y no del plan. Se corrige el catálogo de eventos de 5.2.3 —`AssetCreated` abre la **ficha** de la máquina y no un plan por defecto, que no se sostiene— y se retira la última promesa autoprogramada del Hito 0, el campo `milestone`. El recorrido vertical vuelve a encontrar lo que solo se ve en un navegador: **recargar devolvía al login con la sesión viva en el servidor**. Doce decisiones que la definición no preveía |
 | 2026-08-19 | **Hito 4 completado**: el módulo que cierra el ciclo de la reposición y **retira el riesgo arquitectónico principal de la fase** —dos módulos que se hablan sin depender uno de que el otro esté activo—, con las dos mitades medidas y un tercer hogar con los dos encendidos como comparación. Vence la pregunta heredada de **cómo lee un módulo el dato maestro de otro**: un puerto en plataforma que **no nombra a ningún módulo**, con la degradación puesta en plataforma y la lista de excepciones de ArchUnit intacta. Compras es además **el primero que escribe en el core** —recibir invoca la entrada de consumibles, que crea existencias, y eso deja asiento en el cuaderno de Warehouse—. Dos tablas con RLS y `FORCE` que suben el recuento de veintitrés a veinticinco, diez operaciones en el contrato, siembra desde los consumibles a cero del core, y un arreglo en Warehouse que su primer consumidor destapó: `StockDepleted` no se publicaba sin mínimo declarado. **Con esto los cuatro riesgos están retirados**, y se declara el punto de corte: la fase no se parte y sigue con CMMS |
 | 2026-08-19 | **Hito 3 completado**: el primer módulo que reacciona al core —seis de los trece eventos por la base de handler del Hito 0, con la prueba de que un hogar apagado no ve ni una fila escrita—, cuatro tablas con RLS y `FORCE` que suben el recuento de diecinueve a veintitrés, diez operaciones en el contrato, la primera siembra de verdad **e idempotente**, y los dos primeros avisos por fecha de un módulo, leídos del Mailpit real y sin repetirse cada noche. Se resuelven las dos preguntas heredadas: **peso y volumen van al core y van en el artículo** —con su propia migración `V11`, porque es un cambio del core— y la conversión de unidad de compra ya estaba guardada en `packSize`. Se construye el `Combobox` aplazado desde la Fase 1. Once decisiones que la definición no preveía |
 | 2026-08-18 | **Hito 2 completado**: el primer módulo de verdad recorre el camino entero —ficha antes del código, dominio, migración `V9` con RLS y `FORCE`, siete operaciones en el contrato, siembra vacía escrita igual, pantallas bajo `/proveedores` y recorrido vertical en la batería existente—. El gate tapa por fin una ruta que existe: `403` apagado, `200` encendido. `ErrorCode` y la familia de `DomainError` se mudan a plataforma, que era la deuda que la ADR-010 dejó con su condición de revisión, y con ella se retiran `UnknownModule` y `UnknownNotice`. Diez decisiones que la definición no preveía |

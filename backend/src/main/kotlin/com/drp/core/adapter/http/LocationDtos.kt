@@ -189,6 +189,21 @@ class JsonPatch(private val body: JsonNode) {
             )
         }
 
+    /**
+     * Un entero que se puede cambiar **pero no vaciar**, como el periodo de un plan
+     * de mantenimiento: un plan sin cada-cuanto no es un plan.
+     *
+     * Es el hermano de [requiredDecimal] y la contraparte de [integer], que existe
+     * para lo contrario --la antelacion de Warehouse, donde nulo significa «usa la
+     * de mas arriba en la cadena».
+     */
+    fun requiredInteger(field: String): Patch<Int> =
+        if (!has(field)) Patch.Absent else Patch.Set(rawText(field).toInt())
+
+    /** Una fecha que se puede cambiar pero no vaciar, como la proxima revision de un plan. */
+    fun requiredDate(field: String): Patch<LocalDate> =
+        if (!has(field)) Patch.Absent else Patch.Set(LocalDate.parse(rawText(field)))
+
     inline fun <reified E : Enum<E>> enum(field: String): Patch<E> =
         if (!has(field)) Patch.Absent else Patch.Set(enumValueOf(rawText(field)))
 

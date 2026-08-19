@@ -394,6 +394,119 @@ export interface PurchasingSupplier {
   detail: string | null
 }
 
+/**
+ * Una máquina del hogar, tal y como Mantenimiento la ve.
+ *
+ * `name` **sale del core** —del asset, o de su artículo— y no se guarda en
+ * ninguna tabla del módulo: dos copias del mismo nombre acaban diciendo cosas
+ * distintas el día que alguien renombre el asset.
+ *
+ * La ficha de cada máquina la abre el módulo solo, al sembrarse y al llegar
+ * `AssetCreated`. **No hay operación de crearla**, y no es un olvido: una máquina
+ * entra en el radar porque existe en el core.
+ */
+export interface MaintenanceMachine {
+  assetId: string
+  name: string
+  manualDocumentId: string | null
+  notes: string | null
+  planCount: number
+  nextDueOn: string | null
+}
+
+export interface MaintenanceMachineDetail {
+  machine: MaintenanceMachine
+  plans: MaintenancePlan[]
+  interventions: MaintenanceIntervention[]
+}
+
+/**
+ * Una **regla recurrente** sobre una máquina.
+ *
+ * Fíjate en lo que no lleva: ni responsable ni día concreto. Eso es la frontera
+ * contra el planificador de tareas escrita en el propio tipo — **de aquí es el
+ * cuándo, de allí el quién lo hace**. Un plan es una regla; una tarea, un
+ * encargo.
+ *
+ * `supplierId` viene **sin nombre al lado**, al revés que en una intervención: un
+ * plan es una regla viva y tiene que decir el nombre de hoy, así que el servidor
+ * lo resuelve al leer la ficha del plan.
+ */
+export interface MaintenancePlan {
+  id: string
+  assetId: string
+  name: string
+  /** Cada cuántos meses toca. En meses y no en días, para que el aniversario no se desplace. */
+  intervalMonths: number
+  leadDays: number
+  nextDueOn: string
+  lastPerformedOn: string | null
+  supplierId: string | null
+  notes: string | null
+  cancelledAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface MaintenancePlanDetail {
+  plan: MaintenancePlan
+  machineName: string
+  /**
+   * Resuelto al leer, no copiado. **Un contacto retirado sigue saliendo aquí** —un
+   * plan que apunte a quien ya no se llama tiene que poder decir a quién
+   * apuntaba— aunque deje de ofrecerse en el selector. Nulo si no hay, si ya no
+   * existe o si el módulo de proveedores está apagado, sin que se puedan
+   * distinguir los tres casos.
+   */
+  supplier: MaintenanceSupplier | null
+  interventions: MaintenanceIntervention[]
+}
+
+export type InterventionKind = 'PREVENTIVE' | 'CORRECTIVE'
+
+/** Cómo se lee cada clase en pantalla. Los identificadores van en inglés; esto es dato. */
+export const INTERVENTION_KIND_LABELS: Record<InterventionKind, string> = {
+  PREVENTIVE: 'Preventiva',
+  CORRECTIVE: 'Correctiva',
+}
+
+/**
+ * Lo que se hizo, y cuándo. Es un **libro**: se escribe y no se toca, así que no
+ * lleva `updatedAt` ni hay forma de modificarla.
+ *
+ * `supplier` es **el nombre de aquel día**, copiado al registrarla: una
+ * intervención es historia y siguió siendo cierta aunque el contacto se retire o
+ * el hogar apague proveedores.
+ */
+export interface MaintenanceIntervention {
+  id: string
+  assetId: string
+  planId: string | null
+  kind: InterventionKind
+  performedOn: string
+  summary: string
+  supplierId: string | null
+  supplier: string | null
+  notes: string | null
+  createdAt: string
+}
+
+/**
+ * A quién se puede llamar, leído del módulo de proveedores por un puerto del
+ * servidor.
+ *
+ * `detail` trae el **identificador** de la categoría de servicio y no su rótulo,
+ * y es con lo que esta pantalla **agrupa** el selector —el mapa está en
+ * `SERVICE_CATEGORY_LABELS`—. Es también la razón de que el puerto no se haya
+ * ensanchado: filtrar por categoría en el servidor escondería justo al contacto
+ * que hace falta.
+ */
+export interface MaintenanceSupplier {
+  id: string
+  name: string
+  detail: string | null
+}
+
 export type MovementKind =
   | 'OPENING'
   | 'INTAKE'
@@ -1337,6 +1450,90 @@ export const api = {
   // devuelve **lista vacía y no 403**: la degradación la pone el servidor.
   listPurchasingSuppliers: (accessToken: string, q?: string) =>
     request<PurchasingSupplier[]>(`/purchasing/suppliers${queryString({ q })}`, { accessToken }),
+
+  // --- Mantenimiento --------------------------------------------------------
+  // Todo lo que cuelga de /maintenance responde 403 MODULE_INACTIVE mientras el
+  // hogar no lo tenga encendido. La pantalla no lo comprueba: la envuelve
+  // `ModuleScreen`.
+
+  // Las máquinas que el módulo vigila: los DURABLE vivos. **No hay operación de
+  // crear una ficha**: la abre el servidor al sembrarse y al llegar `AssetCreated`.
+  listMaintenanceMachines: (accessToken: string, q?: string) =>
+    request<Page<MaintenanceMachine>>(`/maintenance/machines${queryString({ q, size: 200 })}`, { accessToken }),
+
+  // Por el identificador **del asset**, no por el de la ficha.
+  getMaintenanceMachine: (assetId: string, accessToken: string) =>
+    request<MaintenanceMachineDetail>(`/maintenance/machines/${assetId}`, { accessToken }),
+
+  updateMaintenanceMachine: (assetId: string, body: Record<string, unknown>, accessToken: string) =>
+    request<MaintenanceMachineDetail>(`/maintenance/machines/${assetId}`, {
+      method: 'PATCH',
+      body,
+      accessToken,
+    }),
+
+  // `dueWithinDays` no pone suelo: lo que ya se pasó sigue apareciendo, que es
+  // justo lo que hay que decir.
+  listMaintenancePlans: (
+    accessToken: string,
+    filters: { assetId?: string; q?: string; dueWithinDays?: number; includeCancelled?: boolean } = {},
+  ) =>
+    request<Page<MaintenancePlan>>(`/maintenance/plans${queryString({ ...filters, size: 200 })}`, {
+      accessToken,
+    }),
+
+  getMaintenancePlan: (id: string, accessToken: string) =>
+    request<MaintenancePlanDetail>(`/maintenance/plans/${id}`, { accessToken }),
+
+  createMaintenancePlan: (
+    body: {
+      assetId: string
+      name: string
+      intervalMonths: number
+      leadDays?: number
+      nextDueOn: string
+      supplierId?: string
+      notes?: string
+    },
+    accessToken: string,
+  ) => request<MaintenancePlan>('/maintenance/plans', { method: 'POST', body, accessToken }),
+
+  // Mover `nextDueOn` **rearma el aviso** sin que haga falta pedirlo: el estado
+  // del aviso cuelga de la fecha prevista y no del plan.
+  updateMaintenancePlan: (id: string, body: Record<string, unknown>, accessToken: string) =>
+    request<MaintenancePlan>(`/maintenance/plans/${id}`, { method: 'PATCH', body, accessToken }),
+
+  // Baja lógica: el plan deja de vigilarse y conserva su histórico.
+  cancelMaintenancePlan: (id: string, accessToken: string) =>
+    request<void>(`/maintenance/plans/${id}`, { method: 'DELETE', accessToken }),
+
+  listMaintenanceInterventions: (
+    accessToken: string,
+    filters: { assetId?: string; planId?: string } = {},
+  ) =>
+    request<Page<MaintenanceIntervention>>(
+      `/maintenance/interventions${queryString({ ...filters, size: 200 })}`,
+      { accessToken },
+    ),
+
+  // **Lo que rearma el ciclo**: si cumple un plan, le avanza la próxima fecha.
+  registerMaintenanceIntervention: (
+    body: {
+      assetId: string
+      planId?: string
+      kind: InterventionKind
+      performedOn: string
+      summary: string
+      supplierId?: string
+      notes?: string
+    },
+    accessToken: string,
+  ) => request<MaintenanceIntervention>('/maintenance/interventions', { method: 'POST', body, accessToken }),
+
+  // Cuelga de /maintenance y no de /suppliers, así que con proveedores apagado
+  // devuelve **lista vacía y no 403**: la degradación la pone el servidor.
+  listMaintenanceSuppliers: (accessToken: string, q?: string) =>
+    request<MaintenanceSupplier[]>(`/maintenance/suppliers${queryString({ q })}`, { accessToken }),
 
   // --- Categorías -----------------------------------------------------------
   listCategories: (accessToken: string, includeRetired = false) =>
