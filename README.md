@@ -425,6 +425,101 @@ El precio aceptado es que **el sistema de ficheros no tiene Row-Level Security**
 | Repositorio y construcción | Monorepo: `backend/`, `frontend/`, `docs/` y el contrato en la raíz | Gradle con Kotlin DSL y Vite; integración continua en GitHub Actions (ver ADR-008) |
 | Testing | JUnit 5 + Testcontainers + aserciones de Kotest (BE); Vitest + Testing Library y Playwright (FE) | Toda prueba que toque la base de datos se ejecuta con un usuario sujeto a RLS (ver 7 y ADR-008) |
 
+### 6.1 Entorno local de pruebas
+
+Levantar DRP en una máquina son **tres piezas y un orden**, y el orden importa:
+saltárselo no da un error claro sino un backend que arranca y se muere solo.
+
+| Pieza | Qué es | Dónde escucha |
+|---|---|---|
+| [`compose.yaml`](compose.yaml) | PostgreSQL, Mailpit y nginx | 5432, 1025/8025, 8090/8091 |
+| Backend | Spring Boot, con Gradle | 8080 |
+| Frontend | Vite en modo desarrollo | 5173 |
+
+**La aplicación se usa por http://localhost:5173**, no por el 8080: el servidor de
+desarrollo hace de proxy de `/api` hacia el backend, así que el cliente no tiene
+que saber nada de CORS ni de dominios. nginx solo interviene en la entrega de
+ficheros y en desarrollo no hace falta pasar por él (ver 5.8.4).
+
+#### Arranque
+
+**1. Los contenedores, y esperar a que PostgreSQL esté sano.**
+
+```bash
+docker compose up -d && docker compose ps
+```
+
+No sigas hasta ver `healthy`. El backend no espera ni reintenta: si arranca antes,
+falla al abrir la conexión y el proceso muere, y el síntoma —un 8080 que no
+responde— no se parece a la causa.
+
+**2. El backend**, con el mismo lanzador que usa Playwright, que resuelve el
+wrapper de Gradle que toca en cada plataforma:
+
+```bash
+node ./frontend/e2e/start-backend.mjs
+```
+
+Está vivo cuando un endpoint autenticado contesta **401**, que es la respuesta
+correcta sin token. Esperar un 200 exigiría inventarse una sesión:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/api/v1/loans
+```
+
+**3. El frontend.**
+
+```bash
+npm --prefix frontend run dev
+```
+
+#### Con qué se entra: el hogar de demostración
+
+Un arranque en limpio **no tiene ningún usuario sembrado**, y montar a mano algo
+que enseñe la aplicación entera son bastantes minutos en cada arranque. Para eso
+está [`scripts/seed-demo-data.sql`](scripts/seed-demo-data.sql): un piso con
+trastero, cuatro personas, catorce meses de histórico y **los cuatro módulos de
+4.2 encendidos**, cargado de una sentada. Necesita la base ya migrada, es decir,
+el backend arrancado al menos una vez:
+
+```bash
+docker compose exec -T -e PGPASSWORD=drp_app postgres psql -U drp_app -d drp -v ON_ERROR_STOP=1 < scripts/seed-demo-data.sql
+```
+
+Se entra en `/entrar` con `marta@hogar-serrano.test` y `DemoDRP2026Local`. Es
+**idempotente** y solo toca su propio hogar, así que recargarlo devuelve el
+entorno a un estado conocido después de haber trasteado. Lo que trae, las otras
+tres cuentas y por qué se ejecuta como `drp_app` —sujeto a RLS, como cualquier
+petición— están en
+[`demo-dataset.md`](docs/backend/operations/demo-dataset.md).
+
+El otro camino es el recorrido real, y el que hay que hacer para probarlo: dar de
+alta un hogar en `/crear-hogar`. **No sirve hasta verificar el correo**, que no
+sale a Internet porque lo recoge **Mailpit, en http://localhost:8025**.
+
+#### Apagado
+
+Lo que se levanta para comprobar algo se apaga en cuanto la comprobación está
+hecha:
+
+```bash
+docker compose down && rm -rf .data
+```
+
+`.data/` es el volcado de PostgreSQL que crea el arranque y se regenera solo.
+
+> **Esto es para desarrollar, no para probar.** La batería no necesita nada de
+> aquí: las pruebas de integración levantan su propio PostgreSQL con
+> Testcontainers y lo destruyen al terminar, y el recorrido vertical arranca por
+> su cuenta el backend y Vite —de este entorno solo le hacen falta PostgreSQL y
+> Mailpit— (ver 7).
+
+El procedimiento completo, con los escollos ya medidos —otro worktree que se
+lleva los puertos y hace que el backend escriba en la base equivocada, los
+daemons de Gradle que sobreviven tres horas, o el `Enter` que no envía un
+formulario cuando el navegador va dirigido por herramientas— vive en la skill
+[`run-local`](.claude/skills/run-local/SKILL.md).
+
 ---
 
 ## 7. Estrategia de testing
@@ -677,6 +772,7 @@ está organizado y en qué estado va— y el detalle vive por ámbito:
 | Fecha | Cambio |
 |---|---|
 | 2026-08-20 | **Cierre de huecos, Hito 0 completado**: DRP aprende a **olvidar**. Llega la **baja de un hogar** con **treinta días de gracia** —un `HOUSEHOLD_ADMIN` la pide, el hogar queda marcado y **funciona exactamente igual** hasta que vence, porque dejarlo de solo lectura castigaría justo a quien todavía puede cancelar— y el **cierre de cuenta**, que activa por fin la regla que 4.1.4 llevaba escrita desde la Fase 1 sin nada a lo que engancharse. Formalizado en la [ADR-012](docs/common/architecture/decisions/ADR-012-data-erasure-household-closure-and-account-closure.md). La purga es **una `ScheduledCheck` más** del recorrido que ya existía, no un recorrido nuevo, y **se demuestra tabla por tabla** con un hogar lleno y los cuatro módulos encendidos: la cascada estaba probada desde la Fase 1 pero **con hogares vacíos**, así que lo único demostrado era que funciona donde no hay nada que arrastrar. Los ficheros se borran **por prefijo y no recorriendo `files`** —es lo único que permite afirmar que no queda un byte, porque recorrer las filas deja fuera lo que ya fuera huérfano— y son **dos** prefijos, que es el detalle que el dibujo de 5.8.1 no enseña. Se resuelve la pregunta que el plan asignó a este hito: **la identidad sin ninguna pertenencia se borra de verdad**, porque conservarla retiene datos personales de quien ya no puede entrar y **le quita el correo para siempre**; y «sin ninguna pertenencia» significa ninguna, no ninguna activa, lo que obliga a una **función acotada más** en `drp_resolver`. Se decide además que **el único administrador activo no puede cerrar su cuenta**, con el mismo `USER_LAST_ADMIN` de siempre. El orden del recorrido diario deja de ser **un accidente del alfabeto**: cada comprobación declara si puede purgar el hogar y las que pueden corren al final. Cuatro operaciones nuevas en el contrato —que pasa de 98 a **102**—, la migración `V14`, y en pantalla una **zona de peligro con confirmación escrita y no un botón**. Se cierran de paso dos promesas ajenas: la de `PurgeUnverifiedHouseholds` sobre el directorio del hogar, y el criterio de retención de cuatro de las cinco tablas sin techo. Y el recorrido vertical vuelve a encontrar lo suyo: **añadir dos pantallas a la auditoría sistemática agotó el limitador de frecuencia** —20 peticiones por IP cada cinco minutos, y cada recarga reanuda la sesión con un refresco—, de modo que las últimas pantallas aterrizaban en la pantalla de entrar y el síntoma —«el tabulador no encuentra el salto al contenido»— no se parecía en nada a la causa. Se resuelve donde ya estaba resuelto para la batería de integración: holgándolo **solo** en el arranque del backend de las pruebas, porque lo que se comprueba del limitador tiene su propia prueba con sus propios valores. Seis decisiones que la definición no preveía (ver 4.1.7) |
+| 2026-08-20 | **El entorno local, en la sección 6.1, y un hogar de demostración que se carga con un comando.** Levantar DRP eran tres piezas y un orden que solo vivían en la skill [`run-local`](.claude/skills/run-local/SKILL.md); ahora el README los cuenta en su sitio, junto al stack, y la skill conserva los escollos medidos. Con el arranque venía un hueco que costaba minutos en cada sesión: un arranque en limpio **no tiene ningún usuario sembrado**, así que ver la aplicación exigía dar de alta un hogar y teclear datos hasta que algo enseñara algo. [`scripts/seed-demo-data.sql`](scripts/seed-demo-data.sql) lo sustituye por un comando: un piso con trastero, cuatro personas, catorce meses de histórico y los cuatro módulos de 4.2 encendidos, con **los estados que solo se alcanzan usando la aplicación durante meses** —artículos bajo mínimos con su línea en la lista de la compra, lotes caducados, un plan de mantenimiento pasado de fecha y un préstamo vencido que sigue ocupando su asset—. Tres decisiones lo sostienen: corre como `drp_app` y no como el propietario del esquema, de modo que **está sujeto a RLS y solo puede sembrar lo que la aplicación podría haber escrito** (ADR-003); los identificadores son deterministas, derivados del nombre natural de cada fila, así que recargar reconstruye el mismo hogar; y no hay ni una fecha absoluta, porque un juego de datos con fechas fijas envejece y a los seis meses enseña una despensa entera caducada. Termina con **cuatro comprobaciones que abortan la transacción entera** si el fichero se contradice, que es lo que impide que enseñe una pantalla que el uso normal no puede producir. Detalle en [`demo-dataset.md`](docs/backend/operations/demo-dataset.md) |
 | 2026-08-20 | **Dos presentaciones sobre la plantilla de Slidesgo, y la skill que las hace**: [`DRP-comercial-minitheme.pptx`](docs/common/marketing/presentations/DRP-comercial-minitheme.pptx) y [`DRP-tecnico-minitheme.pptx`](docs/common/marketing/presentations/DRP-tecnico-minitheme.pptx), de dieciocho diapositivas cada una, con sus generadores versionados al lado. La decisión que las define es **no imitar la plantilla sino partir de ella**: un deck es una selección de sus diapositivas con el texto sustituido, y así viajan las ilustraciones, la textura y —lo que no se puede reproducir— **las tipografías incrustadas en el fichero**, que son 1,8 de sus 2,3 MB. Eso las separa de las de SKILL-001, que toman de la misma plantilla decisiones de diseño y no diapositivas, y por eso **el sufijo `-minitheme` marca la familia**: hay dos comerciales y no se pisan. La licencia de la plantilla queda **ejecutable y no recordada**: se descargó con cuenta gratuita, que exige conservar la diapositiva de agradecimiento, y tanto el generador como el verificador fallan si no está. La skill [`marketing-deck`](.claude/skills/marketing-deck/SKILL.md) recoge el catálogo de composiciones, el procedimiento y **siete trampas medidas**, entre ellas dos que no dan error y se ven solo en el render: la plantilla deja escrito cuánto encogió la letra para *su* texto —y aparecen dos tarjetas iguales con dos tamaños— y varios párrafos del relleno son enlaces cuyo verde y subrayado viven en el run. Una tercera no se ve en ninguna parte: el índice de la plantilla enlaza a sus diapositivas de recursos, que se quedaban dentro del fichero sin salir en la presentación, tres megabytes de GIF invisible. La verificación mide el encaje **calibrándose contra el relleno original**, porque las fuentes van incrustadas como EOT comprimido y no hay forma de leerlas |
 | 2026-08-19 | **Presentación comercial de DRP.** El material de marketing pasa de una pieza a dos, y la nueva —[`DRP-comercial.pptx`](docs/common/marketing/presentations/DRP-comercial.pptx), dieciséis diapositivas— está dirigida a **quien no conoce el proyecto ni lee este documento**: inversión, colaboradores y primeros hogares piloto. Sale del mismo procedimiento que la de resumen, generada desde un script y verificada con `preview-pptx.py`, y no de una plantilla rellenada a mano. Tres cosas la definen. **Traduce en lugar de citar**: el aislamiento en dos capas se cuenta como «los datos de cada hogar están separados de los de los demás, con dos barreras y no una», y ni un término de arquitectura, stack o testing aparece en el texto visible. **No afirma de más**: la sección 4.2 dice que no hay despliegue, ni hogar real, ni nadie usando esto, y el deck lo declara en tres diapositivas distintas —una cifra de «0 hogares usándolo» incluida— en vez de esquivarlo; la escena de «un día con DRP» va marcada como ilustrativa en la propia diapositiva. Y **lleva créditos**: la dirección visual se tomó de la plantilla de Slidesgo de `references/`, descargada con cuenta gratuita, cuya licencia exige conservar la diapositiva de agradecimiento en cualquier derivado que salga fuera — así que va dentro, con mención a Freepik y Flaticon, y no se retira. Las dos presentaciones se mudan a `presentations/`, que cumplía por fin la condición que su propio índice tenía escrita. [SKILL-001](docs/common/skills/SKILL-001-readme-to-deck.md) sube a **1.1.0** con la variante comercial: mismo procedimiento, distinta selección, distinto tono y la obligación de créditos, más tres trampas medidas —la caja envolvente de una forma girada, la codificación con la que hay que invocar el validador en Windows, y el repaso de los cuatro datos que caducan ascendido a **paso cero** de la verificación—. El QA visual encontró cinco defectos que no se veían leyendo el script, entre ellos un distintivo de estado tapando la última línea de cinco tarjetas y un recuento de fases equivocado, «dos de tres» donde son **tres de cuatro** porque la Fase 0 también está cerrada |
 | 2026-08-19 | **Planificado el cierre de los cuatro huecos** que las Fases 1 y 2 dejaron abiertos a propósito ([`open-gaps-roadmap.md`](docs/common/product/open-gaps-roadmap.md), 8.4): la **baja de un hogar** con el borrado de sus ficheros —y la del avatar al cerrar la cuenta dentro, porque resultó ser la misma pregunta—, la **conversión de HEIC**, el **Transactional Outbox** de 5.2.2 y los **cuatro atributos propuestos**. Seis hitos, un pull request cada uno, y **cuatro ADR nuevas** que se escribirán en el hito que las estrene. La decisión de encaje es propia y se razona: **es un bloque entre fases y no una fase** —no avanza el producto, salda lo que las dos primeras dejaron a deber—, y va **antes** que la Fase 3 porque tres de los cuatro se encarecen con cada módulo nuevo. Se toman ocho decisiones de planificación (ver 4.1.7), y dos merecen leerse: **la baja del hogar puede activar la de la identidad y nunca al revés** —`identities` no lleva `household_id`, así que borrar un hogar no puede borrar una persona— y **los cuatro atributos entran retirando el criterio que los dejaba fuera**, que era «hasta que haya un caso de uso que lo pida» y hoy bloquea: CMMS llegó y no quiso el estado de conservación, y el destinatario de la condición en préstamo es un módulo de prioridad Baja. **HEIC no se decide al planificar**: se le exigen dos medidas delante —el peso real del decodificador wasm sobre los 402 kB del bundle y el coste en servidor con los números del runner— porque la dirección que salga arrastra o un megabyte en el cliente o una enmienda de 5.8.3. El **análisis antivirus sigue fuera**, con su motivo intacto |
