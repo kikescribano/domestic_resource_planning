@@ -715,6 +715,15 @@ cerrar el 5. Lo que le queda, con las cifras reales:
       por hogar, que Warehouse y Mantenimiento dejaron abierta por separado y que
       conviene resolver junta — dos tablas de configuración de dos módulos para lo
       mismo serían la señal de que lo que falta es una de plataforma.
+- [ ] **Decidir qué se hace con la prueba del reloj del enrolamiento**, que es la
+      única de la suite que mide tiempos y **ya ha fallado dos veces en la CI sin
+      que nada hubiera cambiado en el código**: la primera por un umbral absoluto
+      de 60 ms —que se cambió por una proporción— y la segunda el 2026-08-19, en
+      la comparación contra el coste de un hash, durante el Hito 5. Lo que mide
+      importa —que la rama «ese correo ya existe» pague el hash igual, que es la
+      única forma conocida de reabrir la fuga— así que **no se relaja sin más**;
+      lo que hay que decidir es si esa propiedad se comprueba mejor de otra
+      manera que cronometrando en un runner compartido.
 - [ ] **Actualizar el deck de marketing**, que no avisa cuando se queda atrás.
 - [ ] **README**: sección 4.2 con los cuatro módulos en su estado real, sección 8
       con la fase cerrada, sección 10 con su fila de historial.
