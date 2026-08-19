@@ -46,7 +46,7 @@ diapositiva a diapositiva, y el diff de lo que cambió es legible.
 
 ## Salidas
 
-- El `.pptx`, junto al material de [`marketing/`](../marketing/README.md).
+- El `.pptx`, en [`marketing/presentations/`](../marketing/README.md).
 - El script generador **versionado en el repositorio**: es la fuente editable del
   binario, y sin él la presentación deja de ser regenerable.
 - Los renders de QA, que son desechables y no se versionan.
@@ -116,11 +116,11 @@ otro elemento, no.
 ## Ejemplo
 
 ```bash
-node docs/common/marketing/assets/build-drp-resumen.js docs/common/marketing/DRP-resumen.pptx
+node docs/common/marketing/assets/build-drp-resumen.js docs/common/marketing/presentations/DRP-resumen.pptx
 ```
 
 ```bash
-python docs/common/skills/assets/preview-pptx.py docs/common/marketing/DRP-resumen.pptx qa/
+python docs/common/skills/assets/preview-pptx.py docs/common/marketing/presentations/DRP-resumen.pptx qa/
 ```
 
 ## Historial

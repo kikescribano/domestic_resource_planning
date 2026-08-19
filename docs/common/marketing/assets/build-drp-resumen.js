@@ -6,7 +6,7 @@
  * ../../skills/SKILL-001-readme-to-deck.md.
  *
  *   npm install pptxgenjs
- *   node build-drp-resumen.js ../DRP-resumen.pptx
+ *   node build-drp-resumen.js ../presentations/DRP-resumen.pptx
  *
  * Refleja el estado del README a 2026-08-19: **Fase 1 (core) y Fase 2 (módulos
  * activables) cerradas**. Al cambiar el README de forma sustantiva, actualiza el

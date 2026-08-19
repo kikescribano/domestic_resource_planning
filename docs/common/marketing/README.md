@@ -28,7 +28,7 @@ solución completa, igual que la visión de producto. Aplicando la
 
 | Pieza | Contenido |
 |---|---|
-| [`DRP-resumen.pptx`](DRP-resumen.pptx) | Presentación de 19 diapositivas que resume el README principal: objetivo, analogía ERP → DRP, core mínimo, modelo de dominio, módulos, arquitectura, event bus, aislamiento multi-tenant, casos de uso, stack, testing y roadmap. Cada diapositiva lleva en sus notas la sección del README de la que procede. **Refleja el estado del README a 2026-08-19**: Fases 1 y 2 cerradas, con el core completo y los cuatro módulos de prioridad alta construidos sobre la activación por hogar. |
+| [`presentations/DRP-resumen.pptx`](presentations/DRP-resumen.pptx) | Presentación de 19 diapositivas que resume el README principal: objetivo, analogía ERP → DRP, core mínimo, modelo de dominio, módulos, arquitectura, event bus, aislamiento multi-tenant, casos de uso, stack, testing y roadmap. Cada diapositiva lleva en sus notas la sección del README de la que procede. **Refleja el estado del README a 2026-08-19**: Fases 1 y 2 cerradas, con el core completo y los cuatro módulos de prioridad alta construidos sobre la activación por hogar. |
 | [`assets/build-drp-resumen.js`](assets/build-drp-resumen.js) | Generador de la presentación anterior: es su fuente editable. La presentación **no se retoca a mano**, se regenera ejecutando este script. El procedimiento y su verificación están en [SKILL-001](../skills/SKILL-001-readme-to-deck.md). |
 | [`brand-guidelines-template.docx`](brand-guidelines-template.docx) | Plantilla en blanco de manual de marca (v1.0), en siete secciones: identidad, logo y sus variantes, paleta con HEX/RGB/CMYK, tipografía y jerarquía, iconografía, tono de voz y design tokens. Todo lo que aparece entre corchetes es un hueco por rellenar. |
 | [`references/pitch-deck-minitheme-slidesgo.pptx`](references/pitch-deck-minitheme-slidesgo.pptx) | Plantilla comercial de [Slidesgo](https://slidesgo.com) —«Pitch Deck Minitheme»—, 42 diapositivas con contenido de relleno en inglés, dos patrones y veintitrés diseños. **Es material de referencia, no una pieza de DRP**: está aquí como **dirección visual de la que tomar ideas para `DRP-resumen.pptx`**, que se sigue generando desde su script. No se rellena, no se entrega y no describe el producto. Ver más abajo: tiene condiciones de licencia y no encaja tal cual. |
@@ -82,13 +82,13 @@ que hay que saber antes de tocarla:
 |---|---|
 | `messaging.md` | Slogan, propuesta de valor, descripción corta y larga, y tono con el que se habla del producto. |
 | `brand/` | Logo y sus variantes (color, monocromo, versión reducida), paleta, tipografías y usos prohibidos: los huecos que define la plantilla, ya resueltos y con los archivos al lado. |
-| `presentations/` | Presentaciones adicionales cuando haya más de una: comercial, técnica, demo. Mientras solo exista la de resumen, se queda en la raíz de esta carpeta. |
 | `screenshots/` | Capturas del producto para material divulgativo, con la versión a la que corresponden. |
 
-Y una carpeta que ya existe, con una sola pieza dentro:
+Y dos carpetas que ya existen:
 
 | Carpeta | Contenido |
 |---|---|
+| `presentations/` | **Las presentaciones entregables**, una por destinatario. Vivió como «contenido previsto» mientras solo había una, porque una carpeta con un único fichero dentro no ordena nada; la condición que declaraba —«cuando haya más de una»— se cumplió al llegar la comercial, y las dos se mudaron aquí a la vez. Su fuente editable **no** vive aquí, sino en `assets/`, que es donde están los generadores. |
 | `references/` | **Material de terceros del que se toman ideas**, no material propio: plantillas, decks ajenos que sirvan de referencia visual, guías de estilo de fuera. Lo que entra aquí no se entrega ni se rellena, y **lleva siempre escrita su licencia** en el índice de arriba — que es la mitad del motivo de que tenga carpeta propia en vez de mezclarse con lo nuestro. |
 
 ## Convenciones
