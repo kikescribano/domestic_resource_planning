@@ -187,14 +187,33 @@ describe('entrar a mano en la ruta de un módulo', () => {
   })
 
   /**
-   * La otra mitad del guardián, que sigue haciendo falta: tres de los cuatro
-   * módulos no tienen pantalla todavía, y darle hijos a uno no puede dejar a los
-   * demás enseñando una lista vacía que no existe.
+   * **El cuarto módulo, que cierra la serie.** Con este, los cuatro de la Fase 2
+   * tienen pantalla y el guardián los envuelve a todos: la rama de «encendido y
+   * todavía sin nada que enseñar» que el Hito 0 necesitó dejó de ser alcanzable
+   * y se retiró con ella el campo `milestone`, que había quedado opcional y sin
+   * un solo módulo que lo rellenase.
+   *
+   * Un módulo futuro sin pantalla **no necesita ruta**: sin entrada en
+   * `MODULE_SCREENS` se enciende igual y no aparece en la navegación, que es lo
+   * que le pasa hoy al módulo de prueba del backend.
    */
-  it('encendido y sin pantalla todavía, dice la verdad en vez de fingir una lista', async () => {
-    await resumeAt('/mantenimiento', { 'GET /api/v1/modules': catalogue('MAINTENANCE') })
+  it('encendido, el guardián se aparta y monta la pantalla del módulo', async () => {
+    await resumeAt('/mantenimiento', {
+      'GET /api/v1/modules': catalogue('MAINTENANCE'),
+      'GET /api/v1/maintenance/machines?size=200': {
+        status: 200,
+        body: { items: [], page: 0, size: 200, total: 0 },
+      },
+      'GET /api/v1/maintenance/plans?size=200': {
+        status: 200,
+        body: { items: [], page: 0, size: 200, total: 0 },
+      },
+      'GET /api/v1/maintenance/suppliers': { status: 200, body: [] },
+    })
 
-    expect(await screen.findByText(/todavía sin nada que enseñar/)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Mantenimiento' })).toBeInTheDocument()
+    // Y ya no queda ni rastro de la promesa autoprogramada del Hito 0.
+    expect(screen.queryByText(/todavía sin nada que enseñar/)).not.toBeInTheDocument()
   })
 
   it('apagado y sin administrar, dice a quién pedírselo y no ofrece el botón', async () => {

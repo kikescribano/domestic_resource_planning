@@ -610,6 +610,117 @@ test.describe('recorrido vertical', () => {
     // que en móvil vive dentro de «Más».
     await checkTouchTargets(page)
   })
+
+  test('el módulo Mantenimiento: la máquina que ya había, su plan, y la fecha que avanza al registrarlo', async ({
+    page,
+  }) => {
+    const email = `mantenimiento-${Date.now()}@example.test`
+    const password = 'el gato duerme en el sofa'
+
+    await page.goto('/crear-hogar')
+    await page.getByLabel('Nombre del hogar').fill('Casa del Mantenimiento')
+    await page.getByLabel('Tu nombre').fill('Kike')
+    await page.getByLabel('Correo').fill(email)
+    await page.getByLabel('Contraseña', { exact: true }).fill(password)
+    await page.getByRole('button', { name: /crear/i }).click()
+    await page.goto(await linkFromEmail(email))
+    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+
+    // --- 1. Una caldera, ANTES de encender el módulo -----------------------
+    // Es lo que hace que la siembra tenga algo que leer: un módulo activado hoy
+    // no vio el `AssetCreated` de hace un mes, así que se siembra desde el
+    // estado del core y no reproduciendo eventos.
+    await navigateTo(page, 'Inventario', '/inventario')
+    // Por el enlace de la pantalla y no con `page.goto`: una recarga a estas
+    // alturas puede pillar en vuelo la rotacion del refresh token --el que
+    // dispara la primera consulta del inventario-- y reanudar con uno ya gastado,
+    // que devuelve al login. Navegar dentro de la SPA no recarga nada.
+    await page.getByRole('link', { name: 'Dar de alta' }).click()
+    await page.waitForURL('**/inventario/nuevo')
+    await page.getByLabel('Nombre').fill('Caldera')
+    await page.getByLabel('Categoría').selectOption({ label: 'Herramientas' })
+    await page.getByRole('button', { name: 'Dar de alta' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Caldera' })).toBeVisible()
+
+    // --- 2. Encender el módulo, con el teclado ------------------------------
+    await navigateTo(page, 'Módulos del hogar', '/modulos')
+    const encender = page.getByRole('button', { name: /^Encender Mantenimiento/ })
+    await startKeyboardAtTop(page, encender)
+    await tabTo(page, encender, 'encender Mantenimiento')
+    await page.keyboard.press('Enter')
+
+    // --- 3. La máquina que la siembra encontró, y SIN ningún plan -----------
+    // Es la decisión de este hito hecha pantalla: el catálogo de eventos daba
+    // por hecho un «plan por defecto» que no se sostiene —una caldera pide
+    // revisión anual y una silla no pide nada—, así que lo que se abre es la
+    // ficha y el plan lo pone quien sabe si su caldera es de gas.
+    await navigateTo(page, 'Mantenimiento', '/mantenimiento')
+    await expect(page.getByRole('heading', { level: 1, name: 'Mantenimiento' })).toBeVisible()
+
+    await page.getByRole('tab', { name: 'Las máquinas' }).click()
+    // `exact` porque los dos párrafos de arriba explican el módulo con una
+    // caldera de ejemplo: para una persona son texto corrido y para una búsqueda
+    // por subcadena, tres coincidencias.
+    await expect(page.getByText('Caldera', { exact: true })).toBeVisible()
+    await expect(page.getByText('Sin planes')).toBeVisible()
+
+    // --- 4. Con Proveedores apagado, no hay a quién llamar ------------------
+    // Y la pantalla no lo explica ni falla: el servidor devolvió una lista vacía
+    // en lugar de un 403, así que aquí simplemente no hay campo.
+    await page.getByRole('tab', { name: 'Qué toca' }).click()
+    await expect(page.getByLabel('A quién se llama')).toHaveCount(0)
+    await checkAccessibility(page, 'mantenimiento, recién encendido')
+
+    // --- 5. El plan, con el teclado ----------------------------------------
+    const maquina = page.getByRole('combobox', { name: 'Qué máquina' })
+    await startKeyboardAtTop(page, maquina)
+    await tabTo(page, maquina, 'elegir la máquina')
+    await expectFocusRing(page, 'elegir la máquina')
+    await maquina.fill('Caldera')
+    // **Esperar a que la sugerencia esté antes de elegirla con Enter**: las
+    // opciones salen de una consulta al servidor, y con la lista todavía vacía
+    // `Enter` no elige nada y llega al formulario, que se enviaría sin máquina.
+    await expect(page.getByRole('option', { name: /^Caldera/ })).toBeVisible()
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Enter')
+
+    await page.getByLabel('Qué se revisa').fill('Revisión anual')
+    await page.getByLabel('Cada cuántos meses').fill('12')
+    // Dentro de la ventana de antelación por omisión del módulo, que son quince
+    // días: así el plan nace ya en «Toca pronto» y se puede ver el estado.
+    await page.getByLabel('Cuándo toca la próxima').fill(inDays(5))
+    await page.getByRole('button', { name: 'Crear plan' }).click()
+
+    await expect(page.getByText('Revisión anual')).toBeVisible()
+    // Con etiqueta y no solo con color, que es la regla 4 de la dirección visual.
+    await expect(page.getByText('Toca pronto')).toBeVisible()
+
+    // --- 6. Registrarlo: la fecha avanza y el aviso se rearma --------------
+    // **Es lo que este módulo existe para hacer.** En el almacén el rearme era
+    // reponer por encima del mínimo, un hecho que ocurre solo; aquí es un gesto
+    // de una persona, y esta es la mitad que ninguna prueba de backend enseña en
+    // pantalla.
+    await page.getByRole('button', { name: 'Ya está hecho' }).click()
+    await page.getByLabel('Qué se hizo').fill('Revisada y limpiada')
+    await page.getByRole('button', { name: 'Apuntarlo' }).click()
+
+    // La próxima se cuenta desde LO QUE SE HIZO —hoy— y no desde la que tocaba,
+    // así que el plan sale de la ventana y vuelve a estar al día.
+    await expect(page.getByText('Al día')).toBeVisible()
+    await expect(page.getByText(/La última vez fue el/)).toBeVisible()
+
+    // Y queda en el cuaderno, que no se toca.
+    await page.getByRole('tab', { name: 'El histórico' }).click()
+    await expect(page.getByText('Revisada y limpiada')).toBeVisible()
+    await expect(page.getByText('Preventiva')).toBeVisible()
+
+    // --- 7. Y lo que solo se mide en un navegador ---------------------------
+    await checkAccessibility(page, 'mantenimiento, con su plan y su histórico')
+    await checkReflow(page, 'mantenimiento')
+    // La parada nueva no roba sitio en el pulgar: entra en el grupo de módulos,
+    // que en móvil vive dentro de «Más».
+    await checkTouchTargets(page)
+  })
 })
 
 /**

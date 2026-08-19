@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from './App'
@@ -290,5 +291,67 @@ describe('personas del hogar', () => {
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Enviar la invitación' })).not.toBeInTheDocument()
     })
+  })
+})
+
+/**
+ * **El defecto que encontró el recorrido vertical del Hito 5**, y que solo se ve
+ * recargando.
+ *
+ * El refresh token es de un solo uso y rota en cada renovación --lo dice
+ * `RefreshSession` en el backend: «en cuanto el legítimo lo use, el del atacante
+ * ya no vale»--. Con `StrictMode`, React monta el efecto de reanudación, lo
+ * limpia y lo vuelve a montar, así que se lanzaban **dos renovaciones con el
+ * mismo token**: la primera lo rotaba y su resultado se descartaba, y la segunda
+ * recibía un `401` sobre un token ya gastado y **borraba lo guardado**. El
+ * síntoma era el peor posible: recargar la pestaña devolvía al login con la
+ * sesión viva en el servidor, y solo pasaba a veces.
+ *
+ * Esta prueba lo fija por donde duele, y con las dos condiciones que hacen falta
+ * para que mida algo: **un segundo intento con el mismo token responde 401**
+ --que es exactamente lo que hace el servidor-- y el montaje va envuelto en
+ * `StrictMode`, que es como se monta de verdad. Sin lo segundo la prueba pasa
+ * igual con el defecto puesto, porque las demás montan `App` a pelo y el efecto
+ * corre una sola vez.
+ */
+describe('reanudar la sesión al recargar', () => {
+  it('no gasta el refresh token dos veces, aunque el efecto se monte dos', async () => {
+    localStorage.setItem('drp.refreshToken', 'refresh-de-mentira')
+    goTo('/')
+
+    let attempts = 0
+    const { calls } = stubFetch({
+      // La forma de función existe justo para esto: la misma ruta contesta
+      // distinto la primera vez y las siguientes.
+      'POST /api/v1/auth/refresh': () => {
+        attempts += 1
+        return attempts === 1
+          ? { status: 200, body: fakeTokenPair() }
+          : { status: 401, body: { code: 'UNAUTHORIZED', message: 'Refresh token no válido' } }
+      },
+      'GET /api/v1/assets?includeDecommissioned=false&size=200': {
+        status: 200,
+        body: { items: [], page: 0, size: 200, total: 0 },
+      },
+    })
+
+    // Envuelto como en `main.tsx`, que es lo único que reproduce el montaje
+    // doble del efecto de reanudación.
+    render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    )
+
+    // Se entra, que es lo que fallaba: con dos renovaciones, la segunda tumbaba
+    // la sesión que la primera acababa de establecer.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Tu hogar' })).toBeInTheDocument()
+    expect(localStorage.getItem('drp.refreshToken')).not.toBeNull()
+
+    // Y la causa, medida y no supuesta: **una sola llamada**. Sin esto, la prueba
+    // pasaría igual el día que alguien arregle el síntoma sin arreglar el
+    // consumo doble.
+    const refreshes = calls.filter((call) => call.url.endsWith('/auth/refresh'))
+    expect(refreshes).toHaveLength(1)
   })
 })

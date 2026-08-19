@@ -151,6 +151,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    * Sin esto, el refresh token se escribía en `localStorage` y **no se leía
    * nunca**: recargar la pestaña echaba de la aplicación aunque la sesión
    * siguiera viva en el servidor.
+   *
+   * La renovación va por [resumeOnce] y no por `api.refresh` directamente, y ese
+   * detalle es lo único que impide que recargar eche de la aplicación. Ver su
+   * comentario.
    */
   useEffect(() => {
     if (!isResuming) return
@@ -162,8 +166,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    api
-      .refresh(stored)
+    resumeOnce(stored)
       .then((tokens) => {
         if (!cancelled) signIn(tokens)
       })
@@ -216,6 +219,36 @@ export function useAuthenticatedSession(): Session {
   const { session } = useSession()
   if (!session) throw new Error('Esta pantalla exige sesión iniciada')
   return session
+}
+
+/**
+ * La reanudación en vuelo, **compartida entre montajes de la misma carga de
+ * página**.
+ *
+ * Existe por un defecto que solo se ve recargando, y que encontró el recorrido
+ * vertical del Hito 5 de la Fase 2: **el refresh token es de un solo uso y rota
+ * en cada renovación** (`RefreshSession` lo dice: «en cuanto el legítimo lo use,
+ * el del atacante ya no vale»). Con `StrictMode`, React monta el efecto, lo
+ * limpia y lo vuelve a montar, así que se lanzaban **dos renovaciones con el
+ * mismo token**: la primera lo rotaba y su resultado se descartaba —su closure
+ * ya estaba cancelada— y la segunda recibía un `401` sobre un token ya gastado y
+ * **borraba lo guardado**. El síntoma era el peor posible: recargar la pestaña
+ * devolvía al login con la sesión viva en el servidor, y solo pasaba a veces.
+ *
+ * Compartiendo la promesa, los dos montajes esperan a **la misma** renovación y
+ * el token se gasta una vez. Se suelta al terminar para que la siguiente carga
+ * —y la siguiente prueba, que comparte el módulo— empiece limpia.
+ *
+ * No basta con no cancelar el primer efecto: el problema no es de quién atiende
+ * la respuesta sino de **cuántas veces se gasta el token**.
+ */
+let resumeAttempt: Promise<TokenPair> | null = null
+
+function resumeOnce(refreshToken: string): Promise<TokenPair> {
+  resumeAttempt ??= api.refresh(refreshToken).finally(() => {
+    resumeAttempt = null
+  })
+  return resumeAttempt
 }
 
 /** Lo que quedó guardado de una visita anterior, para intentar reanudar. */

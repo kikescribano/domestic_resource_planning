@@ -17,6 +17,7 @@ import { CatalogPage } from './routes/catalog'
 import { AccountPage, HomePage, MorePage, RequireSession, UsersPage } from './routes/household'
 import { ExternalLoanPage, LoansPage } from './routes/loans'
 import { LocationsPage } from './routes/locations'
+import { MaintenancePage } from './routes/maintenance'
 import { ModuleScreen, ModulesPage } from './routes/modules'
 import { NoticesPage } from './routes/notices'
 import { PurchasingPage } from './routes/purchasing'
@@ -113,10 +114,11 @@ export function App() {
                   llevar a la pantalla que la ofrece, no a un 404. El nombre va
                   en castellano igual que las rutas públicas, y no coincide con
                   el prefijo del contrato, que es `/api/v1/suppliers`. */}
-              {/* Tres de los cuatro ya tienen pantalla: el guardián la
-                  **envuelve** en lugar de sustituirla, y conserva la mitad de
-                  apagado, que es la tercera capa del gate. Mantenimiento sigue
-                  sin hijos hasta su hito. */}
+              {/* **Los cuatro tienen ya pantalla**: el guardián la envuelve en
+                  lugar de sustituirla, y conserva la mitad de apagado, que es la
+                  tercera capa del gate. Con Mantenimiento se cierra la última de
+                  las cuatro promesas autoprogramadas que el Hito 0 dejó escritas
+                  en `MODULE_SCREENS`. */}
               <Route
                 path="/proveedores"
                 element={
@@ -141,7 +143,14 @@ export function App() {
                   </ModuleScreen>
                 }
               />
-              <Route path="/mantenimiento" element={<ModuleScreen moduleKey="MAINTENANCE" />} />
+              <Route
+                path="/mantenimiento"
+                element={
+                  <ModuleScreen moduleKey="MAINTENANCE">
+                    <MaintenancePage />
+                  </ModuleScreen>
+                }
+              />
             </Route>
           </Routes>
         </SessionProvider>
