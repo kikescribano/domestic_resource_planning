@@ -129,6 +129,16 @@ interface WarehouseRepository {
     /** El nombre del articulo, tambien del core y por lo mismo. */
     fun articleName(articleId: UUID): String?
 
+    /**
+     * El nombre del sitio, del core igual que el del articulo.
+     *
+     * Existe por la misma razon que [articleName] y no por simetria: **es como se
+     * comprueba que el sitio existe en este hogar** antes de abrirle ficha. RLS
+     * hace el resto --el de otro hogar no se ve-- asi que devolver nulo significa
+     * las dos cosas a la vez, que es justo lo que el contrato quiere responder.
+     */
+    fun locationName(locationId: UUID): String?
+
     /** Los identificadores que la siembra necesita recorrer, del core. */
     fun liveArticleIds(): List<UUID>
 

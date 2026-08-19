@@ -339,6 +339,14 @@ class UpdateWarehouseArticle(
 
     @Transactional
     fun handle(session: SessionClaims, articleId: UUID, patch: WarehouseArticlePatch): WarehouseArticle {
+        // **El artículo del core, primero.** Abrir ficha inserta una fila que
+        // apunta a `articles`, así que con un identificador que no existe en este
+        // hogar la clave ajena revienta antes de llegar al `ResourceNotFound` de
+        // abajo y el cliente recibe un `500` donde el contrato declara `404`. Y no
+        // es un caso raro: es lo que pasa con **cualquier** identificador de otro
+        // hogar, que RLS deja invisible pero nombrable.
+        warehouse.articleName(articleId) ?: throw ResourceNotFound("Ese artículo no existe en este hogar")
+
         // Se abre si no estaba: un hogar puede fijar el minimo de un articulo que
         // nacio antes de encender el modulo y que la siembra ya abrio, pero
         // tambien de uno que llegue por un camino que aun no exista. Abrir aqui
@@ -388,6 +396,11 @@ class UpdateWarehouseLocation(
 
     @Transactional
     fun handle(session: SessionClaims, locationId: UUID, patch: WarehouseLocationPatch): WarehouseLocation {
+        // El sitio del core, primero, por el mismo motivo que en la ficha del
+        // artículo: sin esto la clave ajena responde `500` a un identificador de
+        // otro hogar.
+        warehouse.locationName(locationId) ?: throw ResourceNotFound("Ese sitio no existe en este hogar")
+
         stock.openLocationFile(locationId, session.memberId)
         val current = warehouse.findLocationFile(locationId)
             ?: throw ResourceNotFound("Ese sitio no existe en este hogar")

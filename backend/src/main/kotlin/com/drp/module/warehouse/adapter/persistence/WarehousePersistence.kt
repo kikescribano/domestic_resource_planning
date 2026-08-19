@@ -375,6 +375,9 @@ class JdbcWarehouseRepository(
     override fun articleName(articleId: UUID): String? =
         jdbc.queryForList("SELECT name FROM articles WHERE id = ?", String::class.java, articleId).firstOrNull()
 
+    override fun locationName(locationId: UUID): String? =
+        jdbc.queryForList("SELECT name FROM locations WHERE id = ?", String::class.java, locationId).firstOrNull()
+
     override fun liveArticleIds(): List<UUID> =
         jdbc.queryForList("SELECT id FROM articles WHERE retired_at IS NULL", UUID::class.java)
 

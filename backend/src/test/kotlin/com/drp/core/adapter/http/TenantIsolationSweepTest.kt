@@ -1,5 +1,6 @@
 package com.drp.core.adapter.http
 
+import com.drp.platform.schedule.DailySweep
 import com.drp.test.SpringIntegrationTest
 import com.drp.test.TestHousehold
 import com.drp.test.deleteJson
@@ -21,14 +22,18 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import java.time.LocalDate
 import java.util.UUID
 
 /**
- * El barrido de aislamiento de las **treinta y ocho** operaciones de los Hitos
- * 2, 3 y 4.
+ * El barrido de aislamiento del contrato entero: las **treinta y ocho**
+ * operaciones de la Fase 1 y las **cuarenta y cuatro** que trajo la Fase 2 --tres
+ * de activacion, tres de avisos, siete de Proveedores, diez de Warehouse, diez de
+ * Compras y once de Mantenimiento--.
  *
- * No sustituye a las pruebas de recorrido de cada recurso: comprueba una sola
- * cosa --la de la ADR-002-- sobre todas ellas y de forma sistematica.
+ * No sustituye a las pruebas de recorrido de cada recurso ni a las de gate de
+ * cada modulo: comprueba una sola cosa --la de la ADR-002-- sobre todas ellas y
+ * de forma sistematica.
  *
  * > Autenticado como hogar A, ninguna operacion devuelve ni modifica datos del
  * > hogar B, ni siquiera por identificador directo.
@@ -47,6 +52,25 @@ import java.util.UUID
  * 4. Por **unicidad**: si el `409` de nombre duplicado cruzase de hogar, bastaria
  *    intentar crear para averiguar que hay en el de al lado sin leer una fila.
  *
+ * ## Que operacion entra, y con que criterio
+ *
+ * Entra la que **puede nombrar o devolver algo del hogar A**, que son las cuatro
+ * formas de arriba. Queda fuera la que no acepta ningun identificador --ni en la
+ * ruta, ni en el cuerpo, ni en un filtro-- y no devuelve ninguna fila del hogar:
+ * sin nada que nombrar no tiene por donde cruzar, y meterla igual seria una
+ * prueba que **no puede fallar**. Es el mismo criterio con el que la Fase 1 cubrio
+ * treinta y ocho de sus cincuenta y cuatro operaciones y dejo fuera las nueve de
+ * autenticacion y las de identidad, que no hablan de hogares.
+ *
+ * De las cuarenta y cuatro nuevas, **cuarenta y una** entran por una de las cuatro
+ * secciones. Las **tres restantes** --`activateModule`, `deactivateModule` y
+ * `markAllNoticesRead`-- no aceptan ningun identificador del hogar A: la clave de
+ * un modulo es global y las tres actuan sobre «lo mio». Pero lo que pueden romper
+ * es real --escribir en el hogar equivocado-- y no se mide con un `404`, asi que
+ * **entran por el cierre**: B las ejecuta durante el barrido y el retrato de A
+ * tiene que seguir siendo el mismo al terminar. Estan por tanto cubiertas las
+ * cuarenta y cuatro, con dos instrumentos distintos y no con uno forzado.
+ *
  * Dos decisiones de metodo que sostienen todo lo demas:
  *
  * - **Cada comprobacion negativa lleva su control positivo.** El mismo cuerpo,
@@ -57,12 +81,33 @@ import java.util.UUID
  *
  * Las desviaciones se **registran** en lugar de cortar la ejecucion en la
  * primera: un barrido que se para en la primera no dice cuantas hay.
+ *
+ * ## Por que crece esta clase y no nace una por modulo
+ *
+ * **No estrena contexto de Spring, y aqui eso decide el diseno.** Una clase de
+ * barrido por modulo serian cuatro clases mas; con la misma configuracion que
+ * esta compartirian contexto, pero cada una tendria que sembrar sus dos hogares
+ * enteros --el barrido de un modulo necesita el core debajo-- y ninguna podria
+ * cruzar de modulo, que es justo donde estan las referencias interesantes: el
+ * `supplierId` de un plan de CMMS, el `articleId` del core en una linea de la
+ * lista de la compra. Creciendo aqui, el `@TestInstance(PER_CLASS)` con los dos
+ * hogares sembrados **una vez** sigue valiendo, el contexto sigue siendo el
+ * compartido por las treinta y nueve clases de la suite y el reparto por forma de
+ * ataque --que es lo que se olvida en una operacion nueva-- se conserva.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class TenantIsolationSweepTest : SpringIntegrationTest() {
 
     @Autowired private lateinit var http: TestRestTemplate
+
+    /**
+     * El recorrido diario, **invocado a mano**: es el unico camino por el que
+     * nace un aviso, y sin un aviso de A la seccion de avisos no tendria nada que
+     * atacar. Es el mismo metodo que invoca el `@Scheduled`, que en toda la suite
+     * esta apagado.
+     */
+    @Autowired private lateinit var sweep: DailySweep
 
     private lateinit var a: TestHousehold
     private lateinit var b: TestHousehold
@@ -82,6 +127,16 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     private lateinit var loanA: String
     private lateinit var lentAssetA: String
 
+    /** Lo que el hogar A tiene **en los cuatro modulos**, con los cuatro encendidos. */
+    private lateinit var supA: String
+    private lateinit var linkA: String
+    private lateinit var lotA: String
+    private lateinit var itemA: String
+    private lateinit var purchaseA: String
+    private lateinit var planA: String
+    private lateinit var interventionA: String
+    private lateinit var noticeA: String
+
     /** Lo propio de B, con lo que se construyen los controles positivos. */
     private lateinit var catB: String
     private lateinit var catB2: String
@@ -94,6 +149,16 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     private lateinit var stockB: String
     private lateinit var fileB: String
     private lateinit var lendableB: String
+    private lateinit var docB: String
+
+    /** Y lo propio de B en los cuatro modulos, con lo que se hacen los controles positivos. */
+    private lateinit var supB: String
+    private lateinit var supB2: String
+    private lateinit var linkB: String
+    private lateinit var lotB: String
+    private lateinit var itemB: String
+    private lateinit var purchaseB: String
+    private lateinit var planB: String
 
     /** El estado de A antes de que B lo intente, para comprobar que sigue igual. */
     private val snapshotOfA = mutableMapOf<String, String>()
@@ -141,6 +206,10 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         fileA = a.uploadImage()
         fileB = b.uploadImage()
         docA = a.attachDocument(durA, a.uploadImage())
+        // B necesita el suyo desde el Hito 5 de la Fase 2: `manualDocumentId` de
+        // una maquina de CMMS es una referencia del cuerpo, y sin documento propio
+        // su control positivo no existiria.
+        docB = b.attachDocument(durB, b.uploadImage())
 
         // Los prestamos del Hito 4. El de A queda ABIERTO a proposito: es el
         // estado en el que un intento ajeno puede hacer dano de verdad --darlo
@@ -150,6 +219,49 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         // Y B necesita un DURABLE libre para su control positivo, porque el suyo
         // de siempre lo usan otras secciones.
         lendableB = b.createAsset("""{"name":"PrestableDeB","type":"DURABLE","categoryId":"$catB"}""")
+
+        // -----------------------------------------------------------------
+        // Los cuatro modulos de la Fase 2, encendidos en los dos hogares
+        // -----------------------------------------------------------------
+        //
+        // **Encendidos en los dos y no en uno.** Con el modulo apagado en B, toda
+        // ruta de modulo responderia `403 MODULE_INACTIVE` y el barrido pasaria
+        // entero sin haber medido el aislamiento: el gate taparia la pregunta. Lo
+        // que aqui se comprueba es lo contrario --que **con el modulo encendido**
+        // sigue sin poderse alcanzar al vecino--, que es la unica configuracion en
+        // la que la respuesta significa algo.
+        listOf(a, b).forEach { home -> MODULES.forEach { home.activateModule(it) } }
+
+        supA = a.createSupplier("FontaneroDeA", "PLUMBING")
+        supB = b.createSupplier("FontaneroDeB", "PLUMBING")
+        supB2 = b.createSupplier("ElectricistaDeB", "ELECTRICITY")
+        linkA = a.linkSupplier(supA, """{"locationId":"$locA"}""")
+        linkB = b.linkSupplier(supB, """{"locationId":"$locB"}""")
+
+        // Los lotes caducan pronto **a proposito**: es lo que hace que la pasada
+        // diaria levante un aviso, y sin aviso de A la seccion de avisos no
+        // tendria identificador que atacar.
+        lotA = a.createLot(stockA, "LOTE-DE-A")
+        lotB = b.createLot(stockB, "LOTE-DE-B")
+
+        itemA = a.addShoppingItem("""{"articleId":"$artA","quantity":2}""")
+        itemB = b.addShoppingItem("""{"articleId":"$artB","quantity":2}""")
+        // Uno aparte por hogar para la compra, porque crear una compra se lleva
+        // sus lineas a `IN_PURCHASE` y dejaria sin sujeto las comprobaciones de la
+        // lista.
+        purchaseA = a.createPurchase(a.addShoppingItem("""{"name":"CompraDeA","quantity":1}"""), supA)
+        purchaseB = b.createPurchase(b.addShoppingItem("""{"name":"CompraDeB","quantity":1}"""), supB)
+
+        planA = a.createPlan(durA, "RevisionDeA")
+        planB = b.createPlan(durB, "RevisionDeB")
+        interventionA = a.registerIntervention(durA, "ArregloDeA")
+
+        // La pasada diaria, que es el unico camino por el que nace un aviso. Se
+        // ejecuta **antes del retrato** para que el de A entre en el con su estado
+        // de no leido, que es lo que `markAllNoticesRead` de B no puede cambiar.
+        sweep.run()
+        noticeA = a.firstNotice()
+        b.firstNotice()
 
         listOf(
             "/api/v1/categories?includeRetired=true",
@@ -166,6 +278,21 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             "/api/v1/documents",
             "/api/v1/loans",
             "/api/v1/loans/$loanA",
+            // Las de la Fase 2. `/modules` y `/notices` no estan aqui por
+            // simetria: son **el unico instrumento** que mide las tres operaciones
+            // sin identificador que atacar --activar, desactivar y marcar todo
+            // leido--. Si alguna de las tres escribiera en el hogar equivocado, lo
+            // que cambiaria es este retrato y no ninguna respuesta.
+            "/api/v1/modules",
+            "/api/v1/notices",
+            "/api/v1/suppliers",
+            "/api/v1/suppliers/$supA",
+            "/api/v1/warehouse/stock",
+            "/api/v1/warehouse/lots",
+            "/api/v1/purchasing/list",
+            "/api/v1/purchasing/purchases/$purchaseA",
+            "/api/v1/maintenance/plans/$planA",
+            "/api/v1/maintenance/interventions",
         ).forEach { snapshotOfA[it] = http.getJson(it, a.accessToken).body!! }
 
         // Los ficheros no entran en el retrato: sus dos URL van firmadas y la
@@ -179,14 +306,14 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("las veinte operaciones con identificador en la ruta responden 404 ante uno de otro hogar")
+    @DisplayName("las cuarenta y dos operaciones con identificador en la ruta se niegan ante uno de otro hogar")
     fun `barrido por identificador del recurso`() {
         val section = "ruta"
 
         operationsWithPathId().forEach { (name, call) ->
             // 404 y no 403: el contrato no puede distinguir "no existe" de
             // "existe pero no es tuyo" sin convertir el identificador en oraculo.
-            expectStatus("$section $name con identificador de A", HttpStatus.NOT_FOUND, call(foreignIdFor(name)))
+            expectStatus("$section $name con identificador de A", refusalOf(name), call(foreignIdFor(name)))
         }
 
         // Las tres combinaciones de la fusion, que es la unica operacion con dos
@@ -205,6 +332,27 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             "$section POST /assets/{origen de A}/merge con destino de A",
             HttpStatus.NOT_FOUND,
             http.postJson("$ASSETS/$stockA/merge", """{"targetAssetId":"$stockA2"}""", b.accessToken),
+        )
+
+        // Y las tres del desenlace de un proveedor, que es la otra operacion con
+        // **dos identificadores en la ruta**. Las tres combinaciones importan
+        // porque el enlace se resuelve por el par: bastaria resolver el segundo
+        // sin comprobar que cuelga del primero para que el proveedor de B sirviera
+        // de llave contra el enlace de A.
+        expectStatus(
+            "$section DELETE /suppliers/{de A}/links/{de A}",
+            HttpStatus.NOT_FOUND,
+            http.deleteJson("$SUPPLIERS/$supA/links/$linkA", b.accessToken),
+        )
+        expectStatus(
+            "$section DELETE /suppliers/{de B}/links/{de A}",
+            HttpStatus.NOT_FOUND,
+            http.deleteJson("$SUPPLIERS/$supB/links/$linkA", b.accessToken),
+        )
+        expectStatus(
+            "$section DELETE /suppliers/{de A}/links/{de B}",
+            HttpStatus.NOT_FOUND,
+            http.deleteJson("$SUPPLIERS/$supA/links/$linkB", b.accessToken),
         )
 
         // Un 404 que ademas hubiera modificado algo seria peor que un 200: cada
@@ -234,6 +382,29 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         expectQuantity("$section la segunda existencia de A conserva su cantidad", stockA2, "500", a)
         expectQuantity("$section la existencia de B tampoco se toco", stockB, "300", b)
 
+        // Y lo mismo con lo de los cuatro modulos, que es donde estan las
+        // operaciones que **escriben en el core**: consumir de una existencia y
+        // recibir una compra. Que respondan 404 no basta --importa que no hayan
+        // hecho nada por el camino--.
+        expectPresent(
+            "$section el proveedor de A sigue vigente",
+            "\"retiredAt\":null",
+            http.getJson("$SUPPLIERS/$supA", a.accessToken),
+        )
+        expectPresent("$section el enlace de A sigue puesto", linkA, http.getJson("$SUPPLIERS/$supA", a.accessToken))
+        expectPresent("$section el lote de A sigue vivo", lotA, http.getJson(LOTS, a.accessToken))
+        expectPresent("$section la linea de A sigue en su lista", itemA, http.getJson(SHOPPING_LIST, a.accessToken))
+        expectPresent(
+            "$section la compra de A sigue abierta",
+            "\"status\":\"OPEN\"",
+            http.getJson("$PURCHASES/$purchaseA", a.accessToken),
+        )
+        expectPresent(
+            "$section el plan de A sigue vivo",
+            "\"cancelledAt\":null",
+            http.getJson("$PLANS/$planA", a.accessToken),
+        )
+
         endOfSection(section)
     }
 
@@ -253,8 +424,9 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             if (foreign.statusCode != unknown.statusCode) {
                 deviations += "$section $name -> ajeno ${foreign.statusCode.value()} frente a inexistente " +
                     "${unknown.statusCode.value()}: el identificador delata. Cuerpo ajeno: ${foreign.body}"
-            } else if (foreign.statusCode != HttpStatus.NOT_FOUND) {
-                deviations += "$section $name -> ${foreign.statusCode.value()} en vez de 404; cuerpo: ${foreign.body}"
+            } else if (foreign.statusCode != refusalOf(name)) {
+                deviations += "$section $name -> ${foreign.statusCode.value()} en vez de " +
+                    "${refusalOf(name).value()}; cuerpo: ${foreign.body}"
             }
         }
 
@@ -555,6 +727,246 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             )
         }
 
+        // ------------------------------------------------------------------
+        // Y las de los cuatro modulos de la Fase 2
+        // ------------------------------------------------------------------
+        //
+        // Aqui esta la mitad interesante del barrido de esta fase, y es la que una
+        // clase por modulo no podria escribir: **casi todas cruzan la frontera**.
+        // El destino de un enlace de Proveedores es del core; el `assetId` de un
+        // lote es una existencia del core; el `supplierId` de un plan de CMMS es
+        // de otro modulo, y llega por un puerto de plataforma que tiene su propia
+        // forma de decir «no existe».
+
+        // --- Proveedores: el destino polimorfico del enlace, exactamente uno de
+        // los dos. Las dos mitades van sobre el proveedor **propio** de B.
+        bothWays("POST /suppliers/{propio}/links assetId", own = freshDurableB(), foreign = durA, ok = CREATED) { id ->
+            http.postJson("$SUPPLIERS/$supB2/links", """{"assetId":"$id"}""", b.accessToken)
+        }
+        bothWays(
+            "POST /suppliers/{propio}/links locationId",
+            own = freshLocationB(),
+            foreign = locA,
+            ok = CREATED,
+        ) { id ->
+            http.postJson("$SUPPLIERS/$supB2/links", """{"locationId":"$id"}""", b.accessToken)
+        }
+
+        // --- Warehouse: el lote cuelga de una existencia del core. Se niega con
+        // el mismo `409 STOCK_ITEM_NOT_TRACKED` que el consumo, y por lo mismo:
+        // este modulo no distingue «no existe» de «no la sigo».
+        bothWays(
+            "POST /warehouse/lots assetId",
+            own = stockB,
+            foreign = stockA,
+            ok = CREATED,
+            expectedForForeign = HttpStatus.CONFLICT,
+        ) { id ->
+            http.postJson(
+                LOTS,
+                """{"assetId":"$id","lotCode":"Sonda${short()}",
+                    "expiresOn":"${LocalDate.now().plusMonths(6)}","quantity":1}""",
+                b.accessToken,
+            )
+        }
+
+        // --- Compras: el articulo del core en una linea de la lista, y las tres
+        // referencias del recibo. `itemIds` es la unica del barrido que viaja
+        // **dentro de un array**, que es la forma que mas facil es dejar sin
+        // resolver: el bucle valida elemento a elemento o no valida ninguno.
+        bothWays("POST /purchasing/list articleId", own = freshArticleB(), foreign = artA, ok = CREATED) { id ->
+            http.postJson(SHOPPING_LIST, """{"articleId":"$id","quantity":1}""", b.accessToken)
+        }
+        bothWays("PATCH /purchasing/list articleId", own = freshArticleB(), foreign = artA, ok = OK) { id ->
+            http.patchJson("$SHOPPING_LIST/${freshShoppingItemB()}", """{"articleId":"$id"}""", b.accessToken)
+        }
+        // Las dos de crear una compra se niegan con `409`, y las dos por decision
+        // del modulo y no por descuido. `itemIds` responde «ninguna de esas lineas
+        // esta disponible», que es la misma frase para una linea ya comprada y
+        // para una que no existe. Y `supplierId` responde «o ese sitio no existe,
+        // o Proveedores esta apagado», que es **la degradacion escrita**: el
+        // puerto de dato maestro devuelve vacio con el modulo dueno apagado, y
+        // distinguir los dos casos delataria que el vecino tiene Proveedores.
+        bothWays(
+            "POST /purchasing/purchases itemIds",
+            own = freshShoppingItemB(),
+            foreign = itemA,
+            ok = CREATED,
+            expectedForForeign = HttpStatus.CONFLICT,
+        ) { id ->
+            http.postJson(PURCHASES, """{"itemIds":["$id"]}""", b.accessToken)
+        }
+        bothWays(
+            "POST /purchasing/purchases supplierId",
+            own = supB,
+            foreign = supA,
+            ok = CREATED,
+            expectedForForeign = HttpStatus.CONFLICT,
+        ) { id ->
+            http.postJson(
+                PURCHASES,
+                """{"supplierId":"$id","itemIds":["${freshShoppingItemB()}"]}""",
+                b.accessToken,
+            )
+        }
+        // El recibo, con sus tres referencias. Se prepara una compra propia por
+        // caso porque recibir la cierra, y una compra cerrada ya no admite otro
+        // recibo: sin esto, el control positivo del segundo caso fallaria por una
+        // razon que no es la que se mide.
+        // `lines.itemId` no cabe en `bothWays` porque su control positivo depende
+        // de la compra que la propia llamada crea --la linea tiene que ser de esa
+        // compra--, asi que el par se escribe a mano con la misma forma.
+        val foreignLineTarget = freshPurchaseB()
+        expectStatus(
+            "ref POST /purchasing/purchases/{propia}/receipt lines.itemId con linea de A",
+            HttpStatus.NOT_FOUND,
+            http.postJson(
+                "$PURCHASES/$foreignLineTarget/receipt",
+                """{"lines":[{"itemId":"$itemA","quantity":1}]}""",
+                b.accessToken,
+            ),
+        )
+        expectStatus(
+            "ref POST /purchasing/purchases/{propia}/receipt lines.itemId control positivo",
+            HttpStatus.OK,
+            http.postJson(
+                "$PURCHASES/$foreignLineTarget/receipt",
+                """{"lines":[{"itemId":"${lineOf(foreignLineTarget)}","quantity":1}]}""",
+                b.accessToken,
+            ),
+        )
+        // `ownerId` y `locationId` **solo se resuelven si la linea puede entrar en
+        // el inventario**, y para eso tiene que llevar articulo: una linea de
+        // texto suelto se compra y ahi acaba. La primera version de estas dos
+        // sondas usaba lineas sueltas y pasaba sin haber ejecutado la
+        // comprobacion, que es la forma exacta de escribir una prueba que no puede
+        // fallar. Se niegan con `400`: lo que falta no es el recurso de la ruta
+        // sino un campo del cuerpo, igual que las dos pertenencias de un prestamo.
+        bothWays(
+            "POST /purchasing/purchases/{propia}/receipt lines.ownerId",
+            own = b.memberId,
+            foreign = a.memberId,
+            ok = OK,
+            expectedForForeign = HttpStatus.BAD_REQUEST,
+        ) { id ->
+            val purchase = freshStockablePurchaseB()
+            http.postJson(
+                "$PURCHASES/$purchase/receipt",
+                """{"lines":[{"itemId":"${lineOf(purchase)}","ownerId":"$id"}]}""",
+                b.accessToken,
+            )
+        }
+        bothWays(
+            "POST /purchasing/purchases/{propia}/receipt lines.locationId",
+            own = locB,
+            foreign = locA,
+            ok = OK,
+            expectedForForeign = HttpStatus.BAD_REQUEST,
+        ) { id ->
+            val purchase = freshStockablePurchaseB()
+            http.postJson(
+                "$PURCHASES/$purchase/receipt",
+                """{"lines":[{"itemId":"${lineOf(purchase)}","locationId":"$id"}]}""",
+                b.accessToken,
+            )
+        }
+
+        // --- Mantenimiento: el documento del core en la ficha de la maquina, y
+        // **el proveedor de otro modulo** en las tres operaciones que lo aceptan.
+        // Esa ultima es la que llega por `MasterDataDirectory`: el puerto pide por
+        // la clave del modulo dueno y resuelve dentro del hogar actual, asi que un
+        // identificador de A tiene que salir de ahi como inexistente.
+        bothWays(
+            "PATCH /maintenance/machines manualDocumentId",
+            own = docB,
+            foreign = docA,
+            ok = OK,
+            expectedForForeign = HttpStatus.BAD_REQUEST,
+        ) { id ->
+            http.patchJson("$MACHINES/$durB", """{"manualDocumentId":"$id"}""", b.accessToken)
+        }
+        // Las cuatro de asset y de proveedor se niegan con `409` y con codigo
+        // propio: «Mantenimiento solo vigila cosas duraderas que sigan en casa» y
+        // «no se puede leer ese servicio tecnico». La segunda es otra vez la
+        // degradacion del puerto de dato maestro, escrita para que no distinga
+        // entre «no existe» y «Proveedores esta apagado».
+        bothWays(
+            "POST /maintenance/plans assetId",
+            own = freshDurableB(),
+            foreign = durA,
+            ok = CREATED,
+            expectedForForeign = HttpStatus.CONFLICT,
+        ) { id ->
+            http.postJson(
+                PLANS,
+                """{"assetId":"$id","name":"Sonda${short()}","intervalMonths":12,
+                    "nextDueOn":"${LocalDate.now().plusDays(30)}"}""",
+                b.accessToken,
+            )
+        }
+        bothWays(
+            "POST /maintenance/plans supplierId",
+            own = supB,
+            foreign = supA,
+            ok = CREATED,
+            expectedForForeign = HttpStatus.CONFLICT,
+        ) { id ->
+            http.postJson(
+                PLANS,
+                """{"assetId":"${freshDurableB()}","name":"Sonda${short()}","intervalMonths":12,
+                    "nextDueOn":"${LocalDate.now().plusDays(30)}","supplierId":"$id"}""",
+                b.accessToken,
+            )
+        }
+        bothWays(
+            "PATCH /maintenance/plans supplierId",
+            own = supB2,
+            foreign = supA,
+            ok = OK,
+            expectedForForeign = HttpStatus.CONFLICT,
+        ) { id ->
+            http.patchJson("$PLANS/$planB", """{"supplierId":"$id"}""", b.accessToken)
+        }
+        bothWays(
+            "POST /maintenance/interventions assetId",
+            own = freshDurableB(),
+            foreign = durA,
+            ok = CREATED,
+            expectedForForeign = HttpStatus.CONFLICT,
+        ) { id ->
+            http.postJson(
+                INTERVENTIONS,
+                """{"assetId":"$id","kind":"CORRECTIVE","performedOn":"${LocalDate.now()}",
+                    "summary":"Sonda${short()}"}""",
+                b.accessToken,
+            )
+        }
+        // El plan de una intervencion preventiva: es la referencia cuyo fallo
+        // **avanzaria la fecha prevista del plan de otro hogar**, que es de las
+        // pocas escrituras cruzadas que nadie notaria hasta dos anos despues.
+        bothWays("POST /maintenance/interventions planId", own = planB, foreign = planA, ok = CREATED) { id ->
+            http.postJson(
+                INTERVENTIONS,
+                """{"assetId":"$durB","planId":"$id","kind":"PREVENTIVE",
+                    "performedOn":"${LocalDate.now()}","summary":"Sonda${short()}"}""",
+                b.accessToken,
+            )
+        }
+        bothWays(
+            "POST /maintenance/interventions supplierId",
+            own = supB,
+            foreign = supA,
+            ok = CREATED,
+            expectedForForeign = HttpStatus.CONFLICT,
+        ) { id ->
+            http.postJson(
+                INTERVENTIONS,
+                """{"assetId":"${freshDurableB()}","kind":"CORRECTIVE","performedOn":"${LocalDate.now()}",
+                    "summary":"Sonda${short()}","supplierId":"$id"}""",
+                b.accessToken,
+            )
+        }
+
         endOfSection("ref")
     }
 
@@ -563,7 +975,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("los seis listados no devuelven nada de otro hogar, ni filtrando por sus identificadores")
+    @DisplayName("los veinte listados no devuelven nada de otro hogar, ni filtrando por sus identificadores")
     fun `barrido de listados`() {
         val section = "listado"
 
@@ -656,6 +1068,183 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             http.getJson("$LOANS?status=ACTIVE", b.accessToken),
         )
 
+        // ------------------------------------------------------------------
+        // Los catorce listados de la Fase 2
+        // ------------------------------------------------------------------
+
+        // Plataforma. La bandeja de avisos es el listado de la fase con el
+        // contenido mas delicado: un aviso lleva escrito en el titulo **que le
+        // pasa al hogar** --que se le caduca, que se le acaba, que le toca una
+        // revision-- asi que una fuga aqui no filtra un identificador sino una
+        // frase legible.
+        expectAbsent("$section GET /notices", noticeA, http.getJson(NOTICES, b.accessToken))
+        expectAbsent(
+            "$section GET /notices?unreadOnly=true",
+            noticeA,
+            http.getJson("$NOTICES?unreadOnly=true", b.accessToken),
+        )
+
+        // Proveedores, con el filtro de texto libre --el nombre de un fontanero es
+        // adivinable-- y el de categoria.
+        expectAbsent("$section GET /suppliers", supA, http.getJson(SUPPLIERS, b.accessToken))
+        expectAbsent(
+            "$section GET /suppliers?includeRetired=true",
+            supA,
+            http.getJson("$SUPPLIERS?includeRetired=true", b.accessToken),
+        )
+        expectAbsent(
+            "$section GET /suppliers?q con el nombre del de A",
+            supA,
+            http.getJson("$SUPPLIERS?q=FontaneroDeA", b.accessToken),
+        )
+        expectAbsent(
+            "$section GET /suppliers?serviceCategory=PLUMBING",
+            supA,
+            http.getJson("$SUPPLIERS?serviceCategory=PLUMBING", b.accessToken),
+        )
+
+        // Warehouse: cuatro listados y cuatro filtros por identificador, tres de
+        // ellos **del core**. `locationId` es el que mas tienta: preguntar por la
+        // cocina de A diria que hay en ella.
+        expectAbsent("$section GET /warehouse/stock", stockA, http.getJson(WAREHOUSE_STOCK, b.accessToken))
+        expectEmpty(
+            "$section GET /warehouse/stock?locationId de A",
+            http.getJson("$WAREHOUSE_STOCK?locationId=$locA", b.accessToken),
+        )
+        expectAbsent("$section GET /warehouse/movements", stockA, http.getJson(MOVEMENTS, b.accessToken))
+        expectEmpty(
+            "$section GET /warehouse/movements?assetId de A",
+            http.getJson("$MOVEMENTS?assetId=$stockA", b.accessToken),
+        )
+        expectEmpty(
+            "$section GET /warehouse/movements?articleId de A",
+            http.getJson("$MOVEMENTS?articleId=$artA", b.accessToken),
+        )
+        expectAbsent("$section GET /warehouse/lots", lotA, http.getJson(LOTS, b.accessToken))
+        expectEmpty("$section GET /warehouse/lots?assetId de A", http.getJson("$LOTS?assetId=$stockA", b.accessToken))
+
+        // Compras. El listado de proveedores es especial y por eso va aqui y no
+        // con los de Proveedores: **no lo sirve ese modulo** sino el puerto de
+        // dato maestro de plataforma, que es un camino distinto al repositorio y
+        // podria filtrar por su cuenta.
+        expectAbsent("$section GET /purchasing/list", itemA, http.getJson(SHOPPING_LIST, b.accessToken))
+        expectAbsent(
+            "$section GET /purchasing/list?status=NEEDED",
+            itemA,
+            http.getJson("$SHOPPING_LIST?status=NEEDED", b.accessToken),
+        )
+        expectAbsent("$section GET /purchasing/purchases", purchaseA, http.getJson(PURCHASES, b.accessToken))
+        expectAbsent(
+            "$section GET /purchasing/purchases?status=OPEN",
+            purchaseA,
+            http.getJson("$PURCHASES?status=OPEN", b.accessToken),
+        )
+        expectAbsent(
+            "$section GET /purchasing/suppliers por el puerto de dato maestro",
+            supA,
+            http.getJson(PURCHASING_SUPPLIERS, b.accessToken),
+        )
+        expectAbsent(
+            "$section GET /purchasing/suppliers?q con el nombre del de A",
+            supA,
+            http.getJson("$PURCHASING_SUPPLIERS?q=FontaneroDeA", b.accessToken),
+        )
+
+        // Mantenimiento. El de maquinas se sirve de los `DURABLE` del core, asi
+        // que lo que no puede aparecer es el asset de A.
+        expectAbsent("$section GET /maintenance/machines", durA, http.getJson(MACHINES, b.accessToken))
+        expectAbsent(
+            "$section GET /maintenance/machines?q con el nombre del de A",
+            durA,
+            http.getJson("$MACHINES?q=TaladroDeA", b.accessToken),
+        )
+        expectAbsent("$section GET /maintenance/plans", planA, http.getJson(PLANS, b.accessToken))
+        expectEmpty("$section GET /maintenance/plans?assetId de A", http.getJson("$PLANS?assetId=$durA", b.accessToken))
+        expectAbsent(
+            "$section GET /maintenance/plans?includeCancelled=true",
+            planA,
+            http.getJson("$PLANS?includeCancelled=true", b.accessToken),
+        )
+        expectAbsent(
+            "$section GET /maintenance/interventions",
+            interventionA,
+            http.getJson(INTERVENTIONS, b.accessToken),
+        )
+        expectEmpty(
+            "$section GET /maintenance/interventions?assetId de A",
+            http.getJson("$INTERVENTIONS?assetId=$durA", b.accessToken),
+        )
+        expectEmpty(
+            "$section GET /maintenance/interventions?planId de A",
+            http.getJson("$INTERVENTIONS?planId=$planA", b.accessToken),
+        )
+        expectAbsent(
+            "$section GET /maintenance/suppliers por el puerto de dato maestro",
+            supA,
+            http.getJson(MAINTENANCE_SUPPLIERS, b.accessToken),
+        )
+
+        endOfSection(section)
+    }
+
+    // ------------------------------------------------------------------
+    // 3 bis. El estado de activacion, que no tiene identificador que atacar
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("encender y apagar un modulo es del hogar que lo hace, y no se ve desde el de al lado")
+    fun `la activacion no cruza de hogar`() {
+        val section = "activacion"
+
+        // Las tres operaciones de la activacion son las unicas del catalogo que no
+        // aceptan ningun identificador del hogar de al lado: la clave de un modulo
+        // es global. Lo que si pueden hacer mal es escribir en el hogar
+        // equivocado, y eso **solo se mide con asimetria**: B apaga uno de los
+        // cuatro y A tiene que seguir viendolo encendido.
+        expectStatus(
+            "$section B apaga Mantenimiento",
+            HttpStatus.OK,
+            http.deleteJson("$MODULES_PATH/MAINTENANCE/activation", b.accessToken),
+        )
+
+        val forB = http.getJson(MODULES_PATH, b.accessToken)
+        expectPresent("$section B ve Mantenimiento apagado", "\"status\":\"INACTIVE\"", forB)
+        // Y la otra mitad, que es la que de verdad se mide: el catalogo de A no se
+        // ha enterado. Sin esta, apagarlo para todo el mundo pasaria por bueno.
+        expectPresent("$section A sigue viendo los cuatro encendidos", "\"status\":\"ACTIVE\"", http.getJson(MODULES_PATH, a.accessToken))
+        expectAbsent("$section el catalogo de A no trae ningun INACTIVE", "INACTIVE", http.getJson(MODULES_PATH, a.accessToken))
+        // Y las rutas de A siguen respondiendo, que es el gate mirado desde el otro
+        // lado: el `403 MODULE_INACTIVE` de B no puede alcanzar a A.
+        expectStatus("$section las rutas de A siguen abiertas", HttpStatus.OK, http.getJson(PLANS, a.accessToken))
+        expectStatus(
+            "$section y las de B responden 403 con el suyo apagado",
+            HttpStatus.FORBIDDEN,
+            http.getJson(PLANS, b.accessToken),
+        )
+
+        // Se devuelve al estado en el que estaba: las demas secciones lo necesitan
+        // encendido, y reactivar vuelve a sembrar --que es idempotente a proposito.
+        expectStatus(
+            "$section B lo vuelve a encender",
+            HttpStatus.OK,
+            http.postJson("$MODULES_PATH/MAINTENANCE/activation", "", b.accessToken),
+        )
+        expectStatus("$section y sus rutas vuelven", HttpStatus.OK, http.getJson(PLANS, b.accessToken))
+
+        // Marcar todo leido es la tercera sin identificador, y se mide igual: B lo
+        // hace y el aviso de A tiene que seguir sin leer. El retrato del cierre lo
+        // vuelve a comprobar sobre el cuerpo entero.
+        expectStatus(
+            "$section B marca todo leido",
+            HttpStatus.NO_CONTENT,
+            http.postJson("$NOTICES/read", "", b.accessToken),
+        )
+        expectAbsent(
+            "$section el aviso de A sigue sin leer",
+            "\"readAt\":\"",
+            http.getJson("$NOTICES?unreadOnly=true", a.accessToken),
+        )
+
         endOfSection(section)
     }
 
@@ -695,6 +1284,42 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             http.postJson(LOCATIONS, """{"name":"CasaDeA","type":"HOUSE"}""", b.accessToken),
         )
 
+        // Los tres indices unicos que la Fase 2 anadio. Dos llevan `household_id`
+        // dentro y el tercero **no**: el de lotes es `(asset_id, lot_code,
+        // expires_on)`, y se sostiene porque el asset ya es del hogar. Esa es
+        // justamente la forma que hay que medir en lugar de leer, porque el dia
+        // que un indice de modulo cuelgue de algo que no lo sea, el 409 pasaria a
+        // ser un oraculo sin que ninguna otra prueba lo notara.
+        expectStatus(
+            "$section POST /suppliers con el nombre del proveedor de A",
+            HttpStatus.CREATED,
+            http.postJson(
+                SUPPLIERS,
+                """{"name":"FontaneroDeA","serviceCategory":"PLUMBING","phone":"600000000"}""",
+                b.accessToken,
+            ),
+        )
+        expectStatus(
+            "$section POST /warehouse/lots con el codigo y la fecha del lote de A",
+            HttpStatus.CREATED,
+            http.postJson(
+                LOTS,
+                """{"assetId":"$stockB","lotCode":"LOTE-DE-A",
+                    "expiresOn":"${LocalDate.now().plusDays(1)}","quantity":1}""",
+                b.accessToken,
+            ),
+        )
+        expectStatus(
+            "$section POST /maintenance/plans con el nombre del plan de A",
+            HttpStatus.CREATED,
+            http.postJson(
+                PLANS,
+                """{"assetId":"${freshDurableB()}","name":"RevisionDeA","intervalMonths":12,
+                    "nextDueOn":"${LocalDate.now().plusDays(30)}"}""",
+                b.accessToken,
+            ),
+        )
+
         endOfSection(section)
     }
 
@@ -717,7 +1342,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         println(
             """
 
-            ================ BARRIDO DE AISLAMIENTO DE LOS HITOS 2 Y 3 ================
+            ========== BARRIDO DE AISLAMIENTO DE LAS 98 OPERACIONES DEL CONTRATO ==========
             Comprobaciones ejecutadas: ${checks.size}
             Desviaciones: ${deviations.size}
 
@@ -738,9 +1363,10 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     // ------------------------------------------------------------------
 
     /**
-     * Las dieciocho operaciones con identificador en la ruta, cada una como una
-     * llamada que solo espera el identificador. Es lo que permite ejecutarlas dos
-     * veces --con el de A y con uno inventado-- sin repetir el cuerpo.
+     * Las **cuarenta y dos** operaciones con identificador en la ruta --veinte de
+     * la Fase 1 y veintidos de la Fase 2--, cada una como una llamada que solo
+     * espera el identificador. Es lo que permite ejecutarlas dos veces --con el de
+     * A y con uno inventado-- sin repetir el cuerpo.
      */
     private fun operationsWithPathId(): List<Pair<String, (String) -> ResponseEntity<String>>> = listOf(
         "PATCH /categories/{id}" to { id ->
@@ -778,10 +1404,119 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         // que daria por devuelto el prestamo de otro hogar.
         "GET /loans/{id}" to { id -> http.getJson("$LOANS/$id", b.accessToken) },
         "POST /loans/{id}/return" to { id -> http.postJson("$LOANS/$id/return", "", b.accessToken) },
+
+        // --- Y las veintidos de la Fase 2 con identificador en la ruta.
+        //
+        // Una de plataforma: marcar leido un aviso ajeno diria que existe, y de
+        // que clase es, sin devolver una sola fila.
+        "POST /notices/{id}/read" to { id -> http.postJson("$NOTICES/$id/read", "", b.accessToken) },
+
+        // Proveedores. La de enlaces va aqui con cuerpo **propio**: lo que se
+        // ataca es el identificador de la ruta y no la referencia --esa tiene su
+        // seccion--, y sin cuerpo valido el 404 podria venir de la forma.
+        "GET /suppliers/{id}" to { id -> http.getJson("$SUPPLIERS/$id", b.accessToken) },
+        "PATCH /suppliers/{id}" to { id ->
+            http.patchJson("$SUPPLIERS/$id", """{"notes":"sonda"}""", b.accessToken)
+        },
+        "DELETE /suppliers/{id}" to { id -> http.deleteJson("$SUPPLIERS/$id", b.accessToken) },
+        "POST /suppliers/{id}/links" to { id ->
+            http.postJson("$SUPPLIERS/$id/links", """{"assetId":"$durB"}""", b.accessToken)
+        },
+
+        // Warehouse. Las dos de existencia van sobre el **asset del core**, que es
+        // la clave de este modulo: no lleva un segundo contador, lo lee del core.
+        // El consumo es ademas de las pocas que **escriben en el core**, asi que un
+        // fallo aqui no filtraria un dato sino que moveria la despensa del vecino.
+        "GET /warehouse/stock/{assetId}" to { id -> http.getJson("$WAREHOUSE_STOCK/$id", b.accessToken) },
+        "POST /warehouse/stock/{assetId}/consumptions" to { id ->
+            http.postJson("$WAREHOUSE_STOCK/$id/consumptions", """{"quantity":1}""", b.accessToken)
+        },
+        "PATCH /warehouse/lots/{lotId}" to { id ->
+            http.patchJson("$LOTS/$id", """{"quantity":1}""", b.accessToken)
+        },
+        "DELETE /warehouse/lots/{lotId}" to { id -> http.deleteJson("$LOTS/$id", b.accessToken) },
+        // Estas dos llevan en la ruta un identificador **del core** y no del
+        // modulo: la ficha de almacen de un articulo y la de un sitio. Es la forma
+        // que mas facil es dejar sin resolver, porque la fila que se escribe es
+        // propia y solo el identificador viene de fuera.
+        "PATCH /warehouse/articles/{articleId}" to { id ->
+            http.patchJson("$WAREHOUSE_ARTICLES/$id", """{"minimumQuantity":5}""", b.accessToken)
+        },
+        "PATCH /warehouse/locations/{locationId}" to { id ->
+            http.patchJson("$WAREHOUSE_LOCATIONS/$id", """{"expiryLeadDays":9}""", b.accessToken)
+        },
+
+        // Compras.
+        "PATCH /purchasing/list/{id}" to { id ->
+            http.patchJson("$SHOPPING_LIST/$id", """{"quantity":9}""", b.accessToken)
+        },
+        "DELETE /purchasing/list/{id}" to { id -> http.deleteJson("$SHOPPING_LIST/$id", b.accessToken) },
+        "GET /purchasing/purchases/{id}" to { id -> http.getJson("$PURCHASES/$id", b.accessToken) },
+        "DELETE /purchasing/purchases/{id}" to { id -> http.deleteJson("$PURCHASES/$id", b.accessToken) },
+        // Recibir es la otra que escribe en el core --da entrada de consumibles--,
+        // y ademas cierra la compra: un fallo aqui daria por recibida la compra de
+        // otro hogar y le crearia existencias.
+        "POST /purchasing/purchases/{id}/receipt" to { id ->
+            http.postJson("$PURCHASES/$id/receipt", """{"lines":[]}""", b.accessToken)
+        },
+
+        // Mantenimiento. Las dos de maquina van sobre el asset del core, igual que
+        // las de existencia de Warehouse.
+        "GET /maintenance/machines/{assetId}" to { id -> http.getJson("$MACHINES/$id", b.accessToken) },
+        "PATCH /maintenance/machines/{assetId}" to { id ->
+            http.patchJson("$MACHINES/$id", """{"notes":"sonda"}""", b.accessToken)
+        },
+        "GET /maintenance/plans/{id}" to { id -> http.getJson("$PLANS/$id", b.accessToken) },
+        "PATCH /maintenance/plans/{id}" to { id ->
+            http.patchJson("$PLANS/$id", """{"notes":"sonda"}""", b.accessToken)
+        },
+        "DELETE /maintenance/plans/{id}" to { id -> http.deleteJson("$PLANS/$id", b.accessToken) },
     )
 
-    /** El recurso de A que le toca a cada operacion, por su ruta. */
+    /**
+     * Con que codigo se niega cada operacion, **segun lo que declara el
+     * contrato** y no segun lo que seria bonito.
+     *
+     * Casi todas responden `404`, y ese es el caso por omision. Tres de Warehouse
+     * no lo declaran siquiera: para ellas «esa existencia no la sigo» es un `409`
+     * con codigo propio, y **eso es correcto y ademas es mejor** --no distingue
+     * «no existe» de «existe y no es consumible viva», asi que dice todavia menos
+     * que un `404`--. Lo que el barrido exige no es un numero concreto sino las
+     * dos cosas que de verdad importan: que **se niegue**, y que se niegue
+     * **igual** ante un identificador ajeno que ante uno inventado.
+     *
+     * Fijarlo aqui en vez de aflojar la comprobacion es lo que hace que un cambio
+     * de codigo tenga que pasar por esta tabla: si manana la de consumos empezara
+     * a responder `404` para lo ajeno y `409` para lo inexistente, la seccion del
+     * oraculo lo cazaria; si respondiera `404` para las dos, esta lista lo
+     * obligaria a decidirlo aqui y de paso a tocar el contrato.
+     */
+    private fun refusalOf(operation: String): HttpStatus = when (operation) {
+        "POST /warehouse/stock/{assetId}/consumptions" -> HttpStatus.CONFLICT
+        else -> HttpStatus.NOT_FOUND
+    }
+
+    /**
+     * El recurso de A que le toca a cada operacion, por su ruta.
+     *
+     * **Las de modulo se resuelven primero**, y el orden no es cosmetico: dos de
+     * Warehouse llevan en la ruta los mismos segmentos que el core, /articles y
+     * /locations. Con el orden al reves atacarian con el articulo y el sitio de A
+     * --que resulta ser lo correcto-- pero por casualidad y no por decision, y el
+     * dia que un modulo publique algo bajo /loans o /files la casualidad dejaria
+     * de salir bien sin que nadie lo notara.
+     */
     private fun foreignIdFor(operation: String): String = when {
+        operation.contains("/notices") -> noticeA
+        operation.contains("/suppliers") -> supA
+        operation.contains("/warehouse/stock") -> stockA
+        operation.contains("/warehouse/lots") -> lotA
+        operation.contains("/warehouse/articles") -> artA
+        operation.contains("/warehouse/locations") -> locA
+        operation.contains("/purchasing/list") -> itemA
+        operation.contains("/purchasing/purchases") -> purchaseA
+        operation.contains("/maintenance/machines") -> durA
+        operation.contains("/maintenance/plans") -> planA
         operation.contains("/categories") -> catA
         operation.contains("/articles") -> artA
         operation.contains("/locations") -> locA
@@ -900,6 +1635,35 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
 
     private fun freshLocationB() = b.createLocation("""{"name":"Sonda${short()}","type":"ROOM"}""")
 
+    /**
+     * Una linea suelta de B, **sin articulo**: con el, el indice de una sola linea
+     * viva por articulo haria que la segunda sonda chocase con la primera y el
+     * control positivo fallaria por una razon que no es la que se mide.
+     */
+    private fun freshShoppingItemB() = b.addShoppingItem("""{"name":"Sonda${short()}","quantity":1}""")
+
+    /** Una compra abierta de B con una linea dentro, que es el minimo que admite. */
+    private fun freshPurchaseB() = b.createPurchase(freshShoppingItemB(), supB)
+
+    /**
+     * Lo mismo, pero con **articulo** en la linea: es la unica forma en que
+     * recibir llega a dar entrada de consumible, y por tanto la unica en que
+     * `ownerId` y `locationId` se llegan a resolver.
+     */
+    private fun freshStockablePurchaseB() = b.createPurchase(
+        b.addShoppingItem("""{"articleId":"${freshArticleB()}","quantity":1}"""),
+        supB,
+    )
+
+    /** La linea que lleva dentro una compra, leida de la propia compra. */
+    private fun lineOf(purchaseId: String): String {
+        val body = http.getJson("$PURCHASES/$purchaseId", b.accessToken).body.orEmpty()
+        val lines = body.substringAfter(""""lines":[""", "")
+        return checkNotNull(Regex("""\"id\":\"([0-9a-f-]{36})\"""").find(lines)?.groupValues?.get(1)) {
+            "La compra $purchaseId no traia ninguna linea: $body"
+        }
+    }
+
     private fun freshDurableB() =
         b.createAsset("""{"name":"Sonda${short()}","type":"DURABLE","categoryId":"$catB"}""")
 
@@ -958,6 +1722,57 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         return response.body!!.extract("id")
     }
 
+    // --- Los cuatro modulos de la Fase 2 -------------------------------------
+
+    private fun TestHousehold.activateModule(key: String) {
+        val response = http.postJson("$MODULES_PATH/$key/activation", "", accessToken)
+        check(response.statusCode == HttpStatus.OK) {
+            "No se pudo encender $key: ${response.statusCode} ${response.body}"
+        }
+    }
+
+    /**
+     * Un contacto de servicio. Lleva telefono porque el modulo exige **al menos
+     * una via de contacto**: sin ella responde `409 SUPPLIER_CONTACT_REQUIRED`.
+     */
+    private fun TestHousehold.createSupplier(name: String, category: String): String =
+        created(SUPPLIERS, """{"name":"$name","serviceCategory":"$category","phone":"600000000"}""")
+
+    private fun TestHousehold.linkSupplier(supplierId: String, target: String): String =
+        created("$SUPPLIERS/$supplierId/links", target)
+
+    /**
+     * Un lote que caduca **manana**, que es lo que hace que la pasada diaria
+     * levante el aviso del que este barrido saca su `noticeA`.
+     */
+    private fun TestHousehold.createLot(assetId: String, code: String): String = created(
+        LOTS,
+        """{"assetId":"$assetId","lotCode":"$code","expiresOn":"${LocalDate.now().plusDays(1)}","quantity":10}""",
+    )
+
+    private fun TestHousehold.addShoppingItem(body: String): String = created(SHOPPING_LIST, body)
+
+    private fun TestHousehold.createPurchase(itemId: String, supplierId: String): String =
+        created(PURCHASES, """{"supplierId":"$supplierId","itemIds":["$itemId"]}""")
+
+    private fun TestHousehold.createPlan(assetId: String, name: String): String = created(
+        PLANS,
+        """{"assetId":"$assetId","name":"$name","intervalMonths":12,
+            "nextDueOn":"${LocalDate.now().plusDays(30)}"}""",
+    )
+
+    private fun TestHousehold.registerIntervention(assetId: String, summary: String): String = created(
+        INTERVENTIONS,
+        """{"assetId":"$assetId","kind":"CORRECTIVE","performedOn":"${LocalDate.now()}","summary":"$summary"}""",
+    )
+
+    /** El primer aviso del hogar, que la pasada diaria acaba de escribirle. */
+    private fun TestHousehold.firstNotice(): String {
+        val body = http.getJson(NOTICES, accessToken).body.orEmpty()
+        val id = Regex("\"id\":\"([0-9a-f-]{36})\"").find(body)?.groupValues?.get(1)
+        return checkNotNull(id) { "La pasada diaria no dejo ningun aviso al hogar: $body" }
+    }
+
     private companion object {
         const val CATEGORIES = "/api/v1/categories"
         const val ARTICLES = "/api/v1/articles"
@@ -968,6 +1783,26 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         const val DOCUMENTS = "/api/v1/documents"
         const val STORAGE = "/api/v1/storage"
         const val LOANS = "/api/v1/loans"
+
+        // Las rutas de la Fase 2: plataforma y los cuatro modulos.
+        const val MODULES_PATH = "/api/v1/modules"
+        const val NOTICES = "/api/v1/notices"
+        const val SUPPLIERS = "/api/v1/suppliers"
+        const val WAREHOUSE_STOCK = "/api/v1/warehouse/stock"
+        const val MOVEMENTS = "/api/v1/warehouse/movements"
+        const val LOTS = "/api/v1/warehouse/lots"
+        const val WAREHOUSE_ARTICLES = "/api/v1/warehouse/articles"
+        const val WAREHOUSE_LOCATIONS = "/api/v1/warehouse/locations"
+        const val SHOPPING_LIST = "/api/v1/purchasing/list"
+        const val PURCHASES = "/api/v1/purchasing/purchases"
+        const val PURCHASING_SUPPLIERS = "/api/v1/purchasing/suppliers"
+        const val MACHINES = "/api/v1/maintenance/machines"
+        const val PLANS = "/api/v1/maintenance/plans"
+        const val INTERVENTIONS = "/api/v1/maintenance/interventions"
+        const val MAINTENANCE_SUPPLIERS = "/api/v1/maintenance/suppliers"
+
+        /** El catalogo desplegado, en el orden en que la fase los construyo. */
+        val MODULES = listOf("SUPPLIERS", "WAREHOUSE", "PURCHASING", "MAINTENANCE")
 
         val OK = setOf(HttpStatus.OK)
         val CREATED = setOf(HttpStatus.CREATED)

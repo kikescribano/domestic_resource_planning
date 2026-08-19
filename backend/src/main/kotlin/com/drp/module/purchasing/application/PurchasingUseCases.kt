@@ -492,6 +492,22 @@ class ReceivePurchase(
         }
 
         val said = command.lines.associateBy { it.itemId }
+
+        // **Lo que se diga tiene que ser de esta compra.** `said` se consulta por
+        // identificador de linea, asi que uno que no este dentro no se consulta
+        // nunca: la instruccion del cliente --cuanta cantidad, de quien, donde--
+        // se descartaba en silencio y la respuesta era `200`. Es la unica forma en
+        // que esta operacion puede hacer lo contrario de lo que le piden sin
+        // decirlo, y el contrato ya declara el `404` que le corresponde.
+        //
+        // Lo descubrio el barrido de aislamiento del Hito 6, atacando con la linea
+        // de otro hogar: no habia fuga --de A no se movio nada-- pero tampoco
+        // habia negativa, y las dos cosas se distinguen solo mirando el codigo.
+        val own = lines.mapTo(mutableSetOf()) { it.item.id }
+        said.keys.firstOrNull { it !in own }?.let {
+            throw ResourceNotFound("Esa línea no es de esta compra")
+        }
+
         val destinations = lines
             .filter { it.item.status == ItemStatus.IN_PURCHASE && it.item.isStockable }
             .associate { it.item.id to resolve(session, it, said[it.item.id]) }
