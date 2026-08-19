@@ -9,8 +9,8 @@ package com.drp.platform.error
  * existe para que anadir uno obligue a tocar tambien el contrato.
  *
  * Estan los cuatro hitos de la Fase 1 --enrolamiento; catalogo, ubicaciones y
- * assets; ficheros y documentos; y prestamos-- y, desde la Fase 2, los del primer
- * modulo con reglas de negocio.
+ * assets; ficheros y documentos; y prestamos-- y, desde la Fase 2, los de los
+ * modulos con reglas de negocio: Proveedores en el Hito 2 y Warehouse en el 3.
  *
  * **Esto vivia en `com.drp.core.domain` y se mudo aqui en el Hito 2 de la Fase
  * 2**, que es el dia que la [ADR-010] nombraba en su condicion de revision. El
@@ -67,6 +67,11 @@ enum class ErrorCode {
     MERGE_NOT_CONSUMABLE,
     MERGE_SAME_ASSET,
     RESET_TOKEN_INVALID,
+    STOCK_CONSUMPTION_EXCEEDS_QUANTITY,
+    STOCK_CONSUMPTION_NOT_POSITIVE,
+    STOCK_ITEM_NOT_TRACKED,
+    STOCK_LOT_DUPLICATE,
+    STOCK_LOT_EXCEEDS_QUANTITY,
     STORAGE_QUOTA_EXCEEDED,
     SUPPLIER_CONTACT_REQUIRED,
     SUPPLIER_DUPLICATE,

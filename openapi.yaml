@@ -68,6 +68,20 @@ tags:
       diferencia con el core y no un detalle: estas operaciones existen o no
       según lo que ese hogar haya decidido. Su ficha completa está en
       docs/backend/modules/suppliers.md.
+  - name: warehouse
+    description: >
+      Almacén (Fase 2, Hito 3): qué hay, cuánto queda y cuándo se acaba o se
+      estropea. Módulo, así que todo lo que cuelga de /warehouse responde 403
+      MODULE_INACTIVE mientras el hogar no lo tenga encendido.
+
+
+      LA FRONTERA CON EL CORE, que su ficha escribe sin ambigüedad: el core
+      mantiene UN CONTADOR -- quantity, en la unit que pone el artículo -- y
+      consumos, mínimos, caducidad y lotes son de este módulo. Warehouse no lleva
+      un segundo contador: la quantity que devuelven sus operaciones sale de
+      assets, y cambiarla es invocar al core (POST
+      /warehouse/stock/{assetId}/consumptions acaba en un cambio de cantidad del
+      core). Ficha completa en docs/backend/modules/warehouse.md.
 
 security:
   - bearerAuth: []
@@ -2045,6 +2059,388 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         default: { $ref: "#/components/responses/ServerError" }
 
+  /warehouse/stock:
+    get:
+      operationId: listWarehouseStock
+      tags: [warehouse]
+      summary: Las existencias que el almacén vigila
+      description: >
+        Las existencias vivas de CONSUMIBLE del hogar, con lo que Warehouse
+        añade sobre cada una: su mínimo, si está por debajo, cuándo caduca lo
+        más próximo y cuántos lotes tiene.
+
+
+        La quantity que se devuelve es LA DEL CORE, leída de assets. Warehouse
+        no lleva un segundo contador -- el core mantiene uno y este módulo
+        guarda consumos, mínimos, caducidad y lotes. Que el cliente reciba una
+        sola cifra es porque solo hay una, no porque se hayan reconciliado dos.
+
+
+        belowMinimum y expiringWithinDays son las dos preguntas que este módulo
+        existe para responder, así que se filtran en el servidor: hacerlo en el
+        cliente obligaría a traerse la despensa entera para descartar casi todo.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Busca en el nombre del artículo, normalizado (sin mayúsculas ni acentos)
+          schema: { type: string }
+        - name: locationId
+          in: query
+          required: false
+          description: Solo lo que está en ese sitio del core
+          schema: { type: string, format: uuid }
+        - name: belowMinimum
+          in: query
+          required: false
+          description: Solo lo que está en su mínimo o por debajo. Un artículo sin mínimo nunca aparece
+          schema: { type: boolean, default: false }
+        - name: expiringWithinDays
+          in: query
+          required: false
+          description: Solo lo que tenga algún lote vivo que caduque dentro de tantos días
+          schema: { type: integer, minimum: 0 }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: Existencias del hogar
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StockItemPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /warehouse/stock/{assetId}:
+    parameters:
+      - name: assetId
+        in: path
+        required: true
+        description: El asset del CORE, no un identificador propio de Warehouse
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getWarehouseStockItem
+      tags: [warehouse]
+      summary: Una existencia con sus lotes y sus últimos movimientos
+      description: >
+        Devuelve además la antelación de aviso que le aplica, resuelta por la
+        cadena sitio -> artículo -> siete días. El sitio manda sobre el artículo
+        porque es lo que gobierna de verdad: el mismo yogur aguanta distinto
+        dentro de la nevera que fuera.
+      responses:
+        "200":
+          description: La existencia, con lo que Warehouse sabe de ella
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StockItemDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /warehouse/stock/{assetId}/consumptions:
+    parameters:
+      - name: assetId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: recordStockConsumption
+      tags: [warehouse]
+      summary: Apuntar lo que se ha gastado
+      description: >
+        ES UN DELTA, no un absoluto, y esa es la diferencia entera con
+        PATCH /assets/{id}, que sustituye la cantidad. La pregunta que se hace
+        una persona en la cocina es "me he gastado 200 g", no "quedan 800":
+        convertir una en la otra es de Warehouse, porque el core mantiene el
+        contador y no tiene por qué saber de consumos.
+
+
+        Responde 204 y no la existencia actualizada: el asiento del cuaderno lo
+        escribe el manejador del evento que esto provoca, así que devolver aquí
+        la existencia obligaría a leerla otra vez para incluir un cuaderno que
+        puede estar escribiéndose.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity:
+                  type: number
+                  exclusiveMinimum: true
+                  minimum: 0
+                  description: Lo consumido, en la unidad del artículo
+      responses:
+        "204": { description: Consumo apuntado }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: >
+            No es una existencia viva de consumible (STOCK_ITEM_NOT_TRACKED),
+            lo consumido no es positivo (STOCK_CONSUMPTION_NOT_POSITIVE) o pasa
+            de lo que hay (STOCK_CONSUMPTION_EXCEEDS_QUANTITY)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /warehouse/movements:
+    get:
+      operationId: listStockMovements
+      tags: [warehouse]
+      summary: El cuaderno de movimientos
+      description: >
+        Un asiento por cada cambio de cantidad o de sitio de una existencia. NO
+        SE MODIFICA NUNCA: se escribe y se queda, que es lo que lo convierte en
+        un libro y no en una vista -- si el arroz se acaba mañana, el apunte de
+        que ayer entraron 900 g siguió siendo cierto.
+
+
+        Lo escribe siempre el manejador del evento del core y nunca una
+        operación de Warehouse, que es lo que garantiza que un consumo apuntado
+        desde el almacén y uno hecho con el PATCH del core produzcan el mismo
+        asiento.
+      parameters:
+        - name: assetId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: articleId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: Movimientos, de lo más reciente a lo más antiguo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StockMovementPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /warehouse/lots:
+    get:
+      operationId: listStockLots
+      tags: [warehouse]
+      summary: Los lotes con caducidad
+      parameters:
+        - name: assetId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: includeConsumed
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: Lotes del hogar, del que antes caduca al que más tarda
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StockLotPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        default: { $ref: "#/components/responses/ServerError" }
+    post:
+      operationId: registerStockLot
+      tags: [warehouse]
+      summary: Dar de alta un lote sobre una existencia
+      description: >
+        La cantidad de un lote es LA ÚNICA que Warehouse guarda, y no es un
+        segundo contador: responde a otra pregunta -- de los 900 g que hay, 400
+        son del lote que caduca en marzo.
+
+
+        Los lotes de una existencia PUEDEN SUMAR MENOS que su cantidad, y es
+        normal: lo que no está en ningún lote es lo que nadie se molestó en
+        fechar. Lo que no pueden es pasarse (STOCK_LOT_EXCEEDS_QUANTITY), porque
+        entonces el módulo estaría afirmando que hay más de lo que el core dice
+        que hay.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StockLotInput" }
+      responses:
+        "201":
+          description: Lote dado de alta
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StockLot" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: >
+            No es una existencia viva de consumible (STOCK_ITEM_NOT_TRACKED),
+            ya hay un lote vivo con ese código y esa fecha (STOCK_LOT_DUPLICATE)
+            o los lotes sumarían más de lo que hay (STOCK_LOT_EXCEEDS_QUANTITY)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /warehouse/lots/{lotId}:
+    parameters:
+      - name: lotId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateStockLot
+      tags: [warehouse]
+      summary: Corregir un lote
+      description: >
+        Semántica de PATCH del contrato: ausente no se toca, presente a nulo se
+        borra. expiresOn y quantity no admiten nulo -- un lote sin fecha o sin
+        cantidad no es un lote.
+
+
+        Cambiar la fecha VUELVE A ARMAR EL AVISO: un lote que ya avisó con la
+        fecha equivocada tiene que poder volver a avisar con la buena.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StockLotPatch" }
+      responses:
+        "200":
+          description: Lote corregido
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StockLot" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Los lotes sumarían más de lo que hay (STOCK_LOT_EXCEEDS_QUANTITY)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/ServerError" }
+    delete:
+      operationId: discardStockLot
+      tags: [warehouse]
+      summary: Dar el lote por consumido
+      description: >
+        NO TOCA EL CONTADOR DEL CORE, y esa distinción es de este módulo: marcar
+        un lote dice "de lo que hay, esto ya no es de este lote", y gastarlo de
+        verdad es POST /warehouse/stock/{assetId}/consumptions. Juntar las dos
+        cosas obligaría a decidir si tirar un lote caducado descuenta o no, y esa
+        pregunta de producto no la ha hecho nadie.
+
+
+        Descartar dos veces no es un error: lo que el cliente pidió ya se
+        cumple.
+      responses:
+        "204": { description: Lote dado por consumido }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /warehouse/articles/{articleId}:
+    parameters:
+      - name: articleId
+        in: path
+        required: true
+        description: El artículo del CORE. Warehouse no tiene artículos propios
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateWarehouseArticle
+      tags: [warehouse]
+      summary: Fijar el mínimo y la antelación de aviso de un artículo
+      description: >
+        Es un PATCH sobre un recurso que puede no existir todavía y QUE SE CREA
+        AL TOCARLO: la ficha del módulo sobre un artículo no es algo que el
+        usuario dé de alta, sino algo que existe en cuanto el artículo existe.
+        De ahí que no haya un POST que la cree.
+
+
+        minimumQuantity a nulo DEJA DE VIGILAR el artículo y limpia el estado que
+        colgaba de él -- uno que ya no se vigila no puede quedarse marcado como
+        bajo mínimos para siempre. expiryLeadDays a nulo no es cero: nulo
+        significa "usa la del sitio, o la del módulo", y cero significa "avísame
+        el mismo día".
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WarehouseArticlePatch" }
+      responses:
+        "200":
+          description: La ficha del artículo en el almacén
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WarehouseArticle" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /warehouse/locations/{locationId}:
+    parameters:
+      - name: locationId
+        in: path
+        required: true
+        description: La ubicación del CORE
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateWarehouseLocation
+      tags: [warehouse]
+      summary: La antelación de aviso de un sitio
+      description: >
+        "En la nevera avísame con tres días y en la despensa con treinta" es una
+        regla DEL SITIO, y el core no tiene dónde ponerla: su Location describe
+        el contenedor, no cómo se vigila lo que hay dentro. Manda sobre la del
+        artículo porque es lo que gobierna de verdad.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WarehouseLocationPatch" }
+      responses:
+        "200":
+          description: La ficha del sitio en el almacén
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WarehouseLocation" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2212,6 +2608,11 @@ components:
             - MODULE_INACTIVE
             - RATE_LIMITED
             - RESET_TOKEN_INVALID
+            - STOCK_CONSUMPTION_EXCEEDS_QUANTITY
+            - STOCK_CONSUMPTION_NOT_POSITIVE
+            - STOCK_ITEM_NOT_TRACKED
+            - STOCK_LOT_DUPLICATE
+            - STOCK_LOT_EXCEEDS_QUANTITY
             - STORAGE_QUOTA_EXCEEDED
             - SUPPLIER_CONTACT_REQUIRED
             - SUPPLIER_DUPLICATE
@@ -3474,6 +3875,250 @@ components:
         links:
           type: array
           items: { $ref: "#/components/schemas/SupplierLink" }
+
+
+    StockItem:
+      type: object
+      required: [assetId, articleId, article, unit, quantity, belowMinimum, lotCount]
+      description: >
+        Una existencia vista por el almacén.
+
+
+        La quantity es LA DEL CORE, leída de assets al responder. Warehouse no
+        lleva un segundo contador: el core mantiene uno, y este módulo guarda
+        consumos, mínimos, caducidad y lotes. Lo que este esquema añade sobre un
+        Asset es exactamente lo que es del módulo.
+      properties:
+        assetId:
+          type: string
+          format: uuid
+          description: El asset del CORE. Warehouse no tiene identificador propio de existencia
+        articleId: { type: string, format: uuid }
+        article:
+          type: string
+          description: Nombre del artículo, resuelto del core para lectura
+        unit: { $ref: "#/components/schemas/MeasurementUnit" }
+        locationId: { type: string, format: uuid, nullable: true }
+        location: { type: string, nullable: true }
+        quantity:
+          type: number
+          description: Del core. Ver la descripción del esquema
+        minimumQuantity:
+          type: number
+          nullable: true
+          description: Nulo significa que este hogar no vigila ese artículo
+        belowMinimum:
+          type: boolean
+          description: >
+            Estar EN el mínimo ya cuenta: tener justo lo último es momento de
+            reponer.
+        nearestExpiry:
+          type: string
+          format: date
+          nullable: true
+          description: La caducidad más próxima de sus lotes vivos
+        lotCount:
+          type: integer
+          description: Cuántos lotes vivos tiene. Pueden cubrir menos que la cantidad
+
+    StockItemDetail:
+      type: object
+      required: [item, lots, movements]
+      properties:
+        item: { $ref: "#/components/schemas/StockItem" }
+        expiryLeadDays:
+          type: integer
+          nullable: true
+          description: >
+            La antelación que le aplica, resuelta por la cadena sitio ->
+            artículo. Nulo significa que ninguno de los dos la fija y vale la del
+            módulo.
+        lots:
+          type: array
+          items: { $ref: "#/components/schemas/StockLot" }
+        movements:
+          type: array
+          description: Los últimos movimientos. El cuaderno entero tiene su operación
+          items: { $ref: "#/components/schemas/StockMovement" }
+
+    StockItemPage:
+      type: object
+      required: [items, page, size, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/StockItem" }
+        page: { type: integer }
+        size: { type: integer }
+        total: { type: integer, format: int64 }
+
+    MovementKind:
+      type: string
+      description: >
+        Por qué se movió. INTAKE, ADJUSTMENT, MERGE y DECOMMISSION son los cuatro
+        motivos del core, con el mismo nombre a propósito: renombrarlos daría dos
+        vocabularios para el mismo hecho. OPENING es lo que había el día que el
+        módulo se encendió -- no lo cuenta ningún evento porque pasó antes-- y
+        RELOCATION es un movimiento que no cambia ninguna cantidad.
+      enum: [OPENING, INTAKE, ADJUSTMENT, MERGE, DECOMMISSION, RELOCATION]
+
+    StockMovement:
+      type: object
+      required: [id, assetId, kind, occurredAt]
+      description: >
+        Un asiento del cuaderno. No se modifica nunca, así que no lleva
+        updatedAt ni updatedBy.
+      properties:
+        id: { type: string, format: uuid }
+        assetId: { type: string, format: uuid }
+        articleId: { type: string, format: uuid, nullable: true }
+        locationId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Puede apuntar a un sitio ya borrado: DELETE /locations/{id} borra la
+            fila de verdad y el cuaderno no se reescribe.
+        location:
+          type: string
+          nullable: true
+          description: >
+            El nombre que tenía ESE DÍA, guardado con el asiento. Es lo único que
+            sigue diciendo dónde pasó aquello cuando el sitio ya no existe --
+            mismo criterio que un aviso, que lleva su texto dentro.
+        kind: { $ref: "#/components/schemas/MovementKind" }
+        previousQuantity:
+          type: number
+          nullable: true
+          description: Nulo en una RELOCATION, que no cambia ninguna cantidad
+        quantity: { type: number, nullable: true }
+        delta:
+          type: number
+          nullable: true
+          description: Lo que entró o salió. Derivado, no guardado por separado
+        occurredAt: { type: string, format: date-time }
+
+    StockMovementPage:
+      type: object
+      required: [items, page, size, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/StockMovement" }
+        page: { type: integer }
+        size: { type: integer }
+        total: { type: integer, format: int64 }
+
+    StockLotInput:
+      type: object
+      required: [assetId, expiresOn, quantity]
+      properties:
+        assetId:
+          type: string
+          format: uuid
+          description: La existencia del core sobre la que va el lote
+        lotCode:
+          type: string
+          description: >
+            Opcional: la mitad de lo que hay en una despensa no lo lleva a la
+            vista. Dos lotes SIN código y con la misma fecha sobre la misma
+            existencia chocan igual.
+        expiresOn: { type: string, format: date }
+        quantity:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+          description: Cuánto de lo que hay es de este lote
+
+    StockLot:
+      allOf:
+        - $ref: "#/components/schemas/StockLotInput"
+        - type: object
+          required: [id, articleId]
+          properties:
+            id: { type: string, format: uuid }
+            articleId: { type: string, format: uuid }
+            consumedAt:
+              type: string
+              format: date-time
+              nullable: true
+              description: Informado si el lote se dio por consumido. No toca el contador del core
+
+    StockLotPatch:
+      type: object
+      description: >
+        Todos los campos son opcionales; solo se aplica lo que llegue. expiresOn
+        y quantity no admiten nulo.
+      properties:
+        lotCode: { type: string, nullable: true }
+        expiresOn: { type: string, format: date }
+        quantity:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+
+    StockLotPage:
+      type: object
+      required: [items, page, size, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/StockLot" }
+        page: { type: integer }
+        size: { type: integer }
+        total: { type: integer, format: int64 }
+
+    WarehouseArticlePatch:
+      type: object
+      description: >
+        Todos los campos son opcionales; solo se aplica lo que llegue, y el nulo
+        borra.
+      properties:
+        minimumQuantity:
+          type: number
+          minimum: 0
+          nullable: true
+          description: Nulo deja de vigilar el artículo y limpia su estado de bajo mínimos
+        expiryLeadDays:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: >
+            Nulo NO es cero: nulo significa "usa la del sitio, o la del módulo",
+            y cero significa "avísame el mismo día".
+
+    WarehouseArticle:
+      type: object
+      required: [articleId]
+      description: La ficha del almacén sobre un artículo del core. No duplica nada suyo
+      properties:
+        articleId: { type: string, format: uuid }
+        minimumQuantity: { type: number, nullable: true }
+        expiryLeadDays: { type: integer, nullable: true }
+        lowStockSince:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            DESDE CUÁNDO está por debajo del mínimo, y no un booleano. Un booleano
+            se puede calcular al vuelo y por eso no sirve: sin fecha de entrada, la
+            comprobación nocturna no distingue "acaba de caer" de "lleva tres
+            semanas caído" y avisaría las treinta noches.
+
+    WarehouseLocationPatch:
+      type: object
+      properties:
+        expiryLeadDays: { type: integer, minimum: 0, nullable: true }
+        notes: { type: string, nullable: true }
+
+    WarehouseLocation:
+      type: object
+      required: [locationId]
+      description: La ficha del almacén sobre un sitio del core
+      properties:
+        locationId: { type: string, format: uuid }
+        expiryLeadDays: { type: integer, nullable: true }
+        notes: { type: string, nullable: true }
 
     SupplierPage:
       allOf:
