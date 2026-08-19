@@ -44,7 +44,11 @@ export const MODULE_SCREENS: Record<string, { path: string; label: string; miles
   // el 2: era la promesa autoprogramada de «sus pantallas llegan en el Hito 3»,
   // y este es ese hito.
   WAREHOUSE: { path: '/almacen', label: 'Almacén' },
-  PURCHASING: { path: '/compras', label: 'Compras', milestone: 'Hito 4' },
+  // Sin `milestone` desde el Hito 4, por lo mismo que los otros dos lo
+  // perdieron en el 2 y en el 3: era la promesa autoprogramada de «sus pantallas
+  // llegan en el Hito 4», y este es ese hito. Una promesa cumplida que se deja
+  // escrita se convierte en documentación falsa.
+  PURCHASING: { path: '/compras', label: 'Compras' },
   MAINTENANCE: { path: '/mantenimiento', label: 'Mantenimiento', milestone: 'Hito 5' },
 }
 

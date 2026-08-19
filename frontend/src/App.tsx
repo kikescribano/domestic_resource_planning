@@ -19,6 +19,7 @@ import { ExternalLoanPage, LoansPage } from './routes/loans'
 import { LocationsPage } from './routes/locations'
 import { ModuleScreen, ModulesPage } from './routes/modules'
 import { NoticesPage } from './routes/notices'
+import { PurchasingPage } from './routes/purchasing'
 import { StoragePage } from './routes/storage'
 import { SuppliersPage } from './routes/suppliers'
 import { WarehousePage } from './routes/warehouse'
@@ -112,10 +113,10 @@ export function App() {
                   llevar a la pantalla que la ofrece, no a un 404. El nombre va
                   en castellano igual que las rutas públicas, y no coincide con
                   el prefijo del contrato, que es `/api/v1/suppliers`. */}
-              {/* Proveedores ya tiene pantalla: el guardián la **envuelve** en
-                  lugar de sustituirla, y conserva la mitad de apagado, que es
-                  la tercera capa del gate. Los otros tres siguen sin hijos
-                  hasta su hito. */}
+              {/* Tres de los cuatro ya tienen pantalla: el guardián la
+                  **envuelve** en lugar de sustituirla, y conserva la mitad de
+                  apagado, que es la tercera capa del gate. Mantenimiento sigue
+                  sin hijos hasta su hito. */}
               <Route
                 path="/proveedores"
                 element={
@@ -132,7 +133,14 @@ export function App() {
                   </ModuleScreen>
                 }
               />
-              <Route path="/compras" element={<ModuleScreen moduleKey="PURCHASING" />} />
+              <Route
+                path="/compras"
+                element={
+                  <ModuleScreen moduleKey="PURCHASING">
+                    <PurchasingPage />
+                  </ModuleScreen>
+                }
+              />
               <Route path="/mantenimiento" element={<ModuleScreen moduleKey="MAINTENANCE" />} />
             </Route>
           </Routes>

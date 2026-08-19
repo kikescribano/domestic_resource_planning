@@ -475,6 +475,141 @@ test.describe('recorrido vertical', () => {
     // que en móvil vive dentro de «Más».
     await checkTouchTargets(page)
   })
+
+  /**
+   * El recorrido del módulo que **cierra el ciclo**, y con él el riesgo
+   * arquitectónico principal de la fase: dos módulos que se hablan sin depender
+   * uno de que el otro esté activo.
+   *
+   * Va aquí y no en una suite propia a propósito, igual que los dos anteriores:
+   * la batería del recorrido vertical es una y los módulos se añaden a ella.
+   *
+   * Lo que solo se puede ver aquí son cuatro cosas:
+   *
+   *  1. Que **la lista sirve con el almacén apagado**: se apunta a mano, con el
+   *     teclado y con su anillo de foco. Es la mitad de la frontera que ninguna
+   *     prueba de backend enseña en pantalla.
+   *  2. Que **con Proveedores apagado el selector de dónde se compra no está**, y
+   *     la pantalla no explica nada ni falla: la degradación la puso el servidor.
+   *  3. Que **el ciclo se cierra de verdad**: recibir la compra suma sobre la
+   *     existencia que ya había, y **la misma cifra** se lee en el inventario del
+   *     core, que es lo único que demuestra que no se ha creado una segunda.
+   *  4. Que todo eso pasa axe en los dos modos, refluye y no roba sitio en el
+   *     pulgar.
+   *
+   * **La siembra no se mide aquí y sí en la batería del backend**, que es donde
+   * cabe: enseñarla exige dejar un consumible a cero antes de encender el módulo,
+   * y lo que eso probaría de más en un navegador —que la lista pinta una línea—
+   * ya lo prueban los pasos de abajo.
+   */
+  test('el módulo Compras: sembrarlo con lo que falta, apuntar a mano y cerrar el ciclo al recibir', async ({
+    page,
+  }) => {
+    const email = `compras-${Date.now()}@example.test`
+    const password = 'el gato duerme en el sofa'
+
+    await page.goto('/crear-hogar')
+    await page.getByLabel('Nombre del hogar').fill('Casa de las Compras')
+    await page.getByLabel('Tu nombre').fill('Kike')
+    await page.getByLabel('Correo').fill(email)
+    await page.getByLabel('Contraseña', { exact: true }).fill(password)
+    await page.getByRole('button', { name: /crear/i }).click()
+    await page.goto(await linkFromEmail(email))
+    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+
+    // --- 1. Una despensa con algo agotado, ANTES de encender el módulo ------
+    await navigateTo(page, 'Sitios', '/ubicaciones')
+    await page.getByLabel('Nombre').fill('Despensa')
+    await page.getByLabel('Tipo').selectOption({ label: 'Habitación' })
+    await page.getByRole('button', { name: 'Crear ubicación' }).click()
+    await expect(
+      page.getByRole('tree', { name: 'Ubicaciones del hogar' }).getByText('Despensa'),
+    ).toBeVisible()
+
+    await navigateTo(page, 'Catálogo', '/catalogo')
+    await page.getByLabel('Nombre del artículo').fill('Sal')
+    await page.getByLabel('Categoría').selectOption({ label: 'Alimentación' })
+    await page.getByLabel('Unidad', { exact: true }).selectOption('GRAM')
+    await page.getByRole('button', { name: 'Crear artículo' }).click()
+    await expect(page.getByText('Sal')).toBeVisible()
+
+    await page.goto('/inventario/entrada')
+    await page.getByLabel('Artículo').selectOption({ label: 'Sal' })
+    await page.getByLabel('Dónde se guarda').selectOption({ label: 'Despensa' })
+    await page.getByLabel(/Cantidad que entra/).fill('500')
+    await page.getByRole('button', { name: 'Dar entrada' }).click()
+    await expect(page.getByText('Primera existencia creada')).toBeVisible()
+
+    // --- 2. Encender el módulo, con el teclado ------------------------------
+    await navigateTo(page, 'Módulos del hogar', '/modulos')
+    const encender = page.getByRole('button', { name: /^Encender Compras/ })
+    await startKeyboardAtTop(page, encender)
+    await tabTo(page, encender, 'encender Compras')
+    await page.keyboard.press('Enter')
+
+    // --- 3. La lista, y lo que la siembra pudo leer -------------------------
+    await navigateTo(page, 'Compras', '/compras')
+    await expect(page.getByRole('heading', { level: 1, name: 'Compras' })).toBeVisible()
+
+    // --- 4. Con Proveedores apagado, no hay dónde elegir --------------------
+    // Y la pantalla no lo explica ni falla: el servidor devolvió una lista vacía
+    // en lugar de un 403, así que aquí simplemente no hay campo.
+    await expect(page.getByLabel('Dónde vas a comprar')).toHaveCount(0)
+    await checkAccessibility(page, 'compras, recién encendido')
+
+    // --- 5. Apuntar a mano, que es lo que sirve sin el almacén --------------
+    // Es la mitad de la frontera que ninguna prueba de backend enseña en
+    // pantalla: sin ese módulo nadie detecta la falta, y la lista se llena así.
+    const apuntar = page.getByRole('combobox', { name: 'Qué hace falta' })
+    await startKeyboardAtTop(page, apuntar)
+    await tabTo(page, apuntar, 'apuntar en la lista de la compra')
+    await expectFocusRing(page, 'apuntar en la lista de la compra')
+    await apuntar.fill('Sal')
+    // **Esperar a que la sugerencia esté antes de elegirla con Enter**, y no es
+    // ceremonia: las opciones salen de una consulta al servidor, y con la lista
+    // todavía vacía `Enter` no elige nada --no hay opción resaltada-- y llega al
+    // formulario, que se envía con el texto suelto en lugar de con el artículo.
+    // El síntoma es una línea que se compra y no entra en el inventario, que no
+    // se parece nada a la causa.
+    await expect(page.getByRole('option', { name: /^Sal/ })).toBeVisible()
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Enter')
+    await page.getByLabel('Cuánta', { exact: true }).fill('250')
+    await page.getByRole('button', { name: 'Apuntar' }).click()
+    await expect(page.getByText('Apuntado a mano')).toBeVisible()
+
+    // --- 6. Abrir la compra con lo que se lleva -----------------------------
+    await page.getByRole('checkbox').first().check()
+    await page.getByRole('button', { name: /^Me llevo/ }).click()
+
+    await page.getByRole('tab', { name: 'Las compras' }).click()
+    await page.getByRole('button', { name: /Sin decir dónde/ }).click()
+
+    // --- 7. Recibirla: el ciclo se cierra -----------------------------------
+    // Sin decir dónde, va donde ese artículo ya estaba —que es lo que impide que
+    // la despensa acabe con dos sales.
+    await page.getByRole('button', { name: 'Ya está en casa' }).click()
+    // `exact` porque «en el inventario» aparece también en el párrafo de arriba y
+    // en el aviso de las líneas de texto suelto. Lo que se busca es la etiqueta
+    // de estado, que dice exactamente esto y solo aparece cuando la línea acabó
+    // en una existencia del core.
+    await expect(page.getByText('En el inventario', { exact: true })).toBeVisible()
+
+    // Y **la misma existencia** en el inventario del core, con los 500 que había
+    // más los 250 que acaban de entrar. Esta es la vuelta entera cerrada:
+    // pantalla, API del módulo, caso de uso del CORE que suma sobre la existencia
+    // de esa ubicación, y de vuelta.
+    await navigateTo(page, 'Inventario', '/inventario')
+    await expect(page.getByText('750')).toBeVisible()
+
+    // --- 8. Y lo que solo se mide en un navegador ---------------------------
+    await navigateTo(page, 'Compras', '/compras')
+    await checkAccessibility(page, 'compras, con una compra recibida')
+    await checkReflow(page, 'compras')
+    // La parada nueva no roba sitio en el pulgar: entra en el grupo de módulos,
+    // que en móvil vive dentro de «Más».
+    await checkTouchTargets(page)
+  })
 })
 
 /**
