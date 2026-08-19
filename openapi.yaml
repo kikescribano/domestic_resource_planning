@@ -2929,6 +2929,15 @@ paths:
       operationId: getMaintenanceMachine
       tags: [maintenance]
       summary: La ficha de una máquina, con sus planes y su historia reciente
+      description: >
+        Lo que cuelga de la máquina y no de ninguno de sus planes: su nota, su
+        manual y el resumen de lo que se le ha hecho. Los planes vienen solo los
+        vivos, y las intervenciones las diez últimas -- el histórico entero tiene
+        su propia operación.
+
+
+        El manual es un PUNTERO a un documento del core y no una copia: se abre y
+        se descarga por /documents, que es de quien es.
       responses:
         "200":
           description: La ficha de la máquina

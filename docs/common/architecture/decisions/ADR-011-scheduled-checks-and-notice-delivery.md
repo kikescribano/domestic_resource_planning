@@ -343,3 +343,34 @@ alcanzado.
   **no la resuelve**, a propósito: sigue sin hito asignado. Y añade un segundo
   candidato al mismo sitio, `warehouse_movements`, que es la primera tabla del
   modelo que crece con lo que el hogar **hace** y no con lo que tiene.
+
+- **CMMS es el ejemplo con el que esta ADR se justifica, y es el primero cuyo
+  aviso hay que volver a armar.** El Hito 5 de la Fase 2 lo construye, y ahí
+  aparece la vuelta que la regla de Warehouse —«un aviso se levanta cuando la
+  condición empieza a ser cierta y no vuelve a levantarse mientras siga
+  siéndolo»— no tenía que dar: **una revisión es periódica**. Hecha la de este
+  año, la del que viene tiene que volver a armarse, y en Warehouse el rearme era
+  reponer por encima del mínimo —un hecho que ocurre solo— mientras que aquí es
+  **registrar la intervención**, que es un gesto de una persona.
+
+  Lo que ese hito decide, y que los módulos con regla de fecha que vengan
+  heredan: **el estado del aviso cuelga de la próxima fecha prevista y no de la
+  regla**. Un plan guarda en qué fase avisó **y para qué fecha**, y solo se calla
+  cuando esa fecha sigue siendo la que toca. La alternativa —una sola marca que
+  hubiera que borrar al registrar la intervención— se descarta porque **hay más
+  de un camino que mueve la fecha**: además de la intervención, cambiar el
+  periodo y corregirla a mano. Con una marca suelta cada camino tiene que
+  acordarse de limpiarla, y el que se olvide deja una regla que **no vuelve a
+  avisar nunca** — el peor síntoma que puede tener un aviso, porque solo se
+  descubre el día que la caldera lleva dos años sin revisar. Está razonado en la
+  sección 4.1.7 del [registro de decisiones](../../product/decisions.md) y en la
+  [ficha de CMMS](../../../backend/modules/maintenance.md).
+
+- **La purga sigue sin escribirse, y ya son cinco tablas.** Esta ADR la dejó
+  anotada entre sus costes para `household_notices`; el Hito 3 añadió
+  `warehouse_movements`, el Hito 4 `shopping_list_items` y `purchases`, y el Hito
+  5 `maintenance_interventions`. Las cinco crecen con lo que el hogar **hace** y
+  no con lo que tiene, y su sitio natural sigue siendo el que esta ADR señaló:
+  una comprobación más de este mismo recorrido. **Cerrado el Hito 5 es el único
+  punto de la fase que ha crecido hito a hito sin destinatario**, así que el
+  cierre de la fase tiene que decidirlo o decir por qué no.
