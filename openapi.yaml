@@ -83,6 +83,24 @@ tags:
       /warehouse/stock/{assetId}/consumptions acaba en un cambio de cantidad del
       core). Ficha completa en docs/backend/modules/warehouse.md.
 
+  - name: purchasing
+    description: >
+      Compras y lista de la compra (Fase 2, Hito 4): qué falta, qué está pedido y
+      qué ha entrado en casa. Módulo, así que todo lo que cuelga de /purchasing
+      responde 403 MODULE_INACTIVE mientras el hogar no lo tenga encendido.
+
+
+      LA FRONTERA CON WAREHOUSE, que su ficha escribe sin ambigüedad: WAREHOUSE
+      DETECTA LA FALTA Y COMPRAS DECIDE QUÉ SE COMPRA Y CUÁNDO. Ninguna operación
+      de aquí mira existencias ni mínimos. Con Warehouse apagado la lista deja de
+      llenarse sola y se llena con POST /purchasing/list, que existe por eso.
+
+
+      Y LA FRONTERA CON EL CORE: recibir una compra (POST
+      /purchasing/purchases/{id}/receipt) acaba invocando la entrada de
+      consumibles del core, que SUMA sobre la existencia de esa ubicación. Es el
+      cierre del ciclo. Ficha completa en docs/backend/modules/purchasing.md.
+
 security:
   - bearerAuth: []
 
@@ -2450,6 +2468,394 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         default: { $ref: "#/components/responses/ServerError" }
 
+  /purchasing/list:
+    get:
+      operationId: listShoppingList
+      tags: [purchasing]
+      summary: La lista de la compra del hogar
+      description: >
+        Lo que hace falta, ordenado por lo urgente que es la noticia: primero lo
+        que se ha acabado (DEPLETED), luego lo que bajó del mínimo (LOW_STOCK) y
+        por último lo que alguien apuntó a mano (MANUAL).
+
+
+        Por omisión devuelve LAS DOS MITADES DE "me queda por comprar" -- lo que
+        hace falta y lo que ya va en una compra abierta -- porque esa es una sola
+        pregunta y no dos. Lo comprado y lo descartado se piden nombrándolos.
+
+
+        El nombre, la unidad y packLabel salen del artículo del CORE y no se
+        guardan en ninguna tabla de este módulo: una línea de texto suelto no los
+        tiene y devuelve solo su nombre.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Repetible. Omitido significa NEEDED e IN_PURCHASE
+          schema:
+            type: array
+            items: { $ref: "#/components/schemas/ShoppingItemStatus" }
+        - name: q
+          in: query
+          required: false
+          description: Busca en el nombre del artículo o en el de la línea, normalizado
+          schema: { type: string }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: La lista de la compra
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShoppingItemPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        default: { $ref: "#/components/responses/ServerError" }
+    post:
+      operationId: addShoppingListItem
+      tags: [purchasing]
+      summary: Apuntar algo en la lista
+      description: >
+        ES LA OPERACIÓN QUE HACE QUE LA LISTA SIRVA CON WAREHOUSE APAGADO, y por
+        eso no es una comodidad sino parte de la frontera entre los dos módulos:
+        sin Warehouse nadie detecta la falta, y una lista que solo se llenara sola
+        estaría vacía en la mitad de los hogares.
+
+
+        Una línea apunta a un ARTÍCULO del core O lleva un NOMBRE suelto, nunca
+        las dos cosas y nunca ninguna. El nombre suelto -- "pilas AA" -- es un
+        caso normal y no degradado; lo único que no puede hacer es dar entrada en
+        el inventario al recibir la compra, porque inventarle una categoría y una
+        unidad sería decidir por el hogar. Se le asigna un artículo con el PATCH
+        cuando alguien quiera eso.
+
+
+        La cantidad es OPCIONAL: "hace falta arroz" es una línea completa.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShoppingItemInput" }
+      responses:
+        "201":
+          description: La línea recién apuntada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShoppingItem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Ese artículo ya está en la lista (SHOPPING_ITEM_DUPLICATE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /purchasing/list/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateShoppingListItem
+      tags: [purchasing]
+      summary: Cambiar una línea de la lista
+      description: >
+        Misma semántica de PATCH que el resto del contrato: un campo ausente no se
+        toca y un campo a nulo se borra. Aquí esa diferencia decide algo real --
+        quantity a nulo deja la línea en "hace falta, sin decir cuánto".
+
+
+        articleId SÍ se puede cambiar y NO se puede vaciar, y esa asimetría es
+        deliberada: asignarle un artículo a una línea de texto suelto es la forma
+        de que "pilas AA" acabe entrando en el inventario, mientras que quitárselo
+        la dejaría sin nombre, porque el nombre es del artículo. Asignarlo borra
+        el nombre suelto.
+
+
+        Solo se cambian las líneas vivas: lo comprado o lo descartado responde 409
+        SHOPPING_ITEM_NOT_PENDING.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShoppingItemPatch" }
+      responses:
+        "200":
+          description: La línea actualizada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShoppingItem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            La línea ya no está viva (SHOPPING_ITEM_NOT_PENDING) o ese artículo ya
+            está en la lista (SHOPPING_ITEM_DUPLICATE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/ServerError" }
+    delete:
+      operationId: dismissShoppingListItem
+      tags: [purchasing]
+      summary: Descartar una línea sin comprarla
+      description: >
+        ES BAJA LÓGICA Y NO BORRADO, igual que la retirada de un contacto de
+        servicio: que el hogar haya descartado "sal" tres veces es un dato sobre
+        lo que no quiere comprar, y borrar la fila dejaría que el mismo evento de
+        Warehouse la volviera a meter al minuto siguiente.
+
+
+        Descartar dos veces no es un error. Lo que ya entró en casa no se
+        descarta: responde 409 SHOPPING_ITEM_NOT_PENDING.
+      responses:
+        "204": { description: Descartada }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Lo que ya se compró no se descarta (SHOPPING_ITEM_NOT_PENDING)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /purchasing/purchases:
+    get:
+      operationId: listPurchases
+      tags: [purchasing]
+      summary: Las compras del hogar
+      description: >
+        De la más reciente a la más antigua. supplier es EL NOMBRE DE AQUEL DÍA,
+        copiado al abrir la compra y no vuelto a mirar: una compra es historia, y
+        además es lo único que se puede pintar cuando Proveedores está apagado.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/PurchaseStatus" }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: Las compras del hogar
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchasePage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        default: { $ref: "#/components/responses/ServerError" }
+    post:
+      operationId: createPurchase
+      tags: [purchasing]
+      summary: Abrir una compra con lo que se lleva
+      description: >
+        Las líneas que se lleva pasan a IN_PURCHASE y dejan de ofrecerse para otra
+        compra. Solo entran las que estén en NEEDED; si ninguna lo está, responde
+        409 SHOPPING_ITEM_NOT_PENDING en lugar de robárselas a la compra en la que
+        ya iban.
+
+
+        supplierId es OPCIONAL y se valida contra Proveedores a través de un
+        puerto de plataforma. Si ese módulo está apagado, o si ese identificador
+        no existe, responde 409 PURCHASE_SUPPLIER_UNKNOWN -- Y NO DISTINGUE LOS
+        DOS CASOS a propósito: distinguirlos obligaría a Compras a saber qué
+        módulos tiene encendidos el hogar. UNA COMPRA SIN PROVEEDOR ES UNA COMPRA
+        VÁLIDA ("fui al mercado"), que es lo que hace que la degradación no
+        recorte ninguna funcionalidad.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PurchaseInput" }
+      responses:
+        "201":
+          description: La compra abierta, con sus líneas
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: >
+            Compra sin líneas (PURCHASE_EMPTY), ninguna línea disponible
+            (SHOPPING_ITEM_NOT_PENDING) o no se puede leer el proveedor
+            (PURCHASE_SUPPLIER_UNKNOWN)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /purchasing/purchases/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getPurchase
+      tags: [purchasing]
+      summary: Una compra con sus líneas
+      responses:
+        "200":
+          description: La compra y lo que lleva
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        default: { $ref: "#/components/responses/ServerError" }
+    delete:
+      operationId: cancelPurchase
+      tags: [purchasing]
+      summary: Anular una compra
+      description: >
+        SUS LÍNEAS VUELVEN A LA LISTA en NEEDED, que es lo único que puede pasar:
+        lo que hacía falta sigue haciendo falta, y dejarlas colgando de una compra
+        anulada las escondería sin que nadie hubiera decidido no comprarlas. Quien
+        no las quiera las descarta, que es otra operación y otra intención.
+
+
+        Anular dos veces no es un error. Una compra ya recibida responde 409
+        PURCHASE_NOT_OPEN: lo que entró en casa no se deshace desde aquí.
+      responses:
+        "204": { description: "Anulada, y sus líneas de vuelta en la lista" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Esa compra ya se recibió (PURCHASE_NOT_OPEN)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /purchasing/purchases/{id}/receipt:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: receivePurchase
+      tags: [purchasing]
+      summary: Recibir la compra -- el cierre del ciclo
+      description: >
+        LA COMPRA HA LLEGADO A CASA, y esto es lo que cierra el ciclo de la
+        reposición: cada línea CON ARTÍCULO acaba invocando la entrada de
+        consumibles del core, que SUMA sobre la existencia de esa ubicación en
+        lugar de crear una segunda. Y como el core publica al hacerlo, recibir una
+        compra deja además un asiento en el cuaderno de Warehouse si ese módulo
+        está encendido -- sin que ninguno de los dos módulos sepa del otro.
+
+
+        Es un sub-recurso con POST y no un PATCH de estado, por lo mismo que la
+        activación de un módulo: recibir no es cambiar un campo sino un acto con
+        su propio cuerpo.
+
+
+        LOS TRES CAMPOS DE CADA LÍNEA SON OPCIONALES, y sus tres omisiones son la
+        decisión de producto de este módulo: la lista dice "hace falta arroz" y no
+        "de quién es y en qué balda va", así que eso se decide AL RECIBIR.
+        quantity cae en la que la línea apuntaba; ownerId, en quien recibe la
+        compra; y locationId, EN DONDE ESE ARTÍCULO YA VIVE si vive en un solo
+        sitio -- lo último no es una comodidad, porque la entrada del core busca
+        la existencia por artículo Y ubicación y sin eso la despensa acabaría con
+        dos arroces.
+
+
+        Una línea de TEXTO SUELTO se marca comprada y ahí acaba: no entra en el
+        inventario. Si una línea con artículo no tiene cantidad ni la trae el
+        cuerpo, responde 400 antes de dar ni una entrada -- el cierre no cabe en
+        una transacción, así que un fallo a mitad no se puede deshacer y lo único
+        que queda es no empezar.
+
+
+        RECIBIR DOS VECES NO DA ENTRADA DOS VECES: cada línea se reclama con un
+        cambio de estado condicional antes de darle entrada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReceiptInput" }
+      responses:
+        "200":
+          description: La compra cerrada, con lo que acabó en cada existencia
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            Esa compra ya se cerró o se anuló (PURCHASE_NOT_OPEN) o no tiene nada
+            que recibir (PURCHASE_EMPTY)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /purchasing/suppliers:
+    get:
+      operationId: listPurchasingSuppliers
+      tags: [purchasing]
+      summary: Dónde se puede comprar
+      description: >
+        La vista de Compras sobre el dato maestro de Proveedores, leída por un
+        puerto de plataforma y no por la API del otro módulo.
+
+
+        CUELGA DE /purchasing Y NO DE /suppliers, y esa es la mitad visible de la
+        decisión: un hogar con Compras encendido y Proveedores apagado recibe 200
+        CON LA LISTA VACÍA en lugar del 403 MODULE_INACTIVE que le daría la ruta
+        del otro módulo. Que la degradación sea del servidor y no del cliente es
+        lo que impide que cada consumidor futuro tenga que acordarse de ella.
+
+
+        Devuelve LO MÍNIMO que el puerto deja pasar -- quién es y cómo se llama --
+        y ni teléfono ni correo: los datos personales de terceros se quedan en
+        Proveedores. detail trae el IDENTIFICADOR de la categoría de servicio y no
+        su rótulo, porque el texto que se lee en pantalla es un dato en castellano
+        y lo pone el cliente.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Dónde se compra. Vacía si Proveedores está apagado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PurchasingSupplier" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        default: { $ref: "#/components/responses/ServerError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2615,8 +3021,13 @@ components:
             - MERGE_NOT_CONSUMABLE
             - MERGE_SAME_ASSET
             - MODULE_INACTIVE
+            - PURCHASE_EMPTY
+            - PURCHASE_NOT_OPEN
+            - PURCHASE_SUPPLIER_UNKNOWN
             - RATE_LIMITED
             - RESET_TOKEN_INVALID
+            - SHOPPING_ITEM_DUPLICATE
+            - SHOPPING_ITEM_NOT_PENDING
             - STOCK_CONSUMPTION_EXCEEDS_QUANTITY
             - STOCK_CONSUMPTION_NOT_POSITIVE
             - STOCK_ITEM_NOT_TRACKED
@@ -4138,3 +4549,215 @@ components:
             items:
               type: array
               items: { $ref: "#/components/schemas/Supplier" }
+
+    ShoppingItemOrigin:
+      type: string
+      description: >
+        Por qué entró la línea. EL ORDEN NO ES ALFABÉTICO Y NO ES CASUAL: es el que
+        decide qué noticia manda cuando el mismo artículo vuelve a dar señal, y el
+        que ordena la lista. Acabarse es más fuerte que bajar del mínimo, y las dos
+        más que haberlo apuntado a mano -- que ya estaba dicho.
+
+
+        MANUAL es EL ÚNICO QUE EXISTE CON WAREHOUSE APAGADO, y está bien que así
+        sea: sin ese módulo nadie está detectando la falta.
+      enum: [MANUAL, LOW_STOCK, DEPLETED]
+
+    ShoppingItemStatus:
+      type: string
+      description: >
+        NEEDED hace falta, IN_PURCHASE va en una compra abierta, BOUGHT ya entró en
+        casa, DISMISSED se descartó sin comprar. Los dos primeros son los vivos:
+        son los que cuentan para la regla de una sola línea por artículo.
+      enum: [NEEDED, IN_PURCHASE, BOUGHT, DISMISSED]
+
+    PurchaseStatus:
+      type: string
+      enum: [OPEN, RECEIVED, CANCELLED]
+
+    ShoppingItem:
+      type: object
+      required: [id, name, origin, status, createdAt, updatedAt]
+      description: >
+        Una línea de la lista. name es el del artículo del CORE cuando lo tiene, y
+        el nombre suelto cuando no: siempre hay uno, y nunca hay dos.
+      properties:
+        id: { type: string, format: uuid }
+        articleId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Del core. Nulo en una línea de texto suelto, que no entra en el inventario
+        name: { type: string }
+        unit:
+          type: string
+          nullable: true
+          description: La del artículo, del core. Nula en una línea de texto suelto
+        packLabel:
+          type: string
+          nullable: true
+          description: >
+            "6 UNIT", "5 LITER" -- LA PRESENTACIÓN DE COMPRA, COMPUESTA Y NO
+            GUARDADA a partir del packSize y la unit del artículo. Es la respuesta
+            de este módulo a si esa presentación necesita nombre propio: no, porque
+            un texto libre sería una segunda fuente de verdad que puede contradecir
+            al envase. Nulo si el artículo no declara envase, que es lo normal
+        quantity:
+          type: number
+          nullable: true
+          description: Cuánta hace falta. NULO ES LEGÍTIMO -- "hace falta arroz" es una línea completa
+        origin: { $ref: "#/components/schemas/ShoppingItemOrigin" }
+        status: { $ref: "#/components/schemas/ShoppingItemStatus" }
+        note: { type: string, nullable: true }
+        purchaseId: { type: string, format: uuid, nullable: true }
+        receivedAssetId:
+          type: string
+          format: uuid
+          nullable: true
+          description: La existencia del core que resultó al recibirla. La traza de que el ciclo se cerró
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ShoppingItemPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/ShoppingItem" }
+
+    ShoppingItemInput:
+      type: object
+      description: articleId O name, nunca los dos y nunca ninguno
+      properties:
+        articleId: { type: string, format: uuid }
+        name: { type: string, maxLength: 120 }
+        quantity: { type: number, exclusiveMinimum: true, minimum: 0 }
+        note: { type: string, maxLength: 500 }
+
+    ShoppingItemPatch:
+      type: object
+      description: >
+        Ausente no se toca, presente a nulo se borra. articleId se puede cambiar y
+        NO vaciar: asignarlo es lo que convierte una línea de texto suelto en una
+        que sí puede entrar en el inventario
+      properties:
+        articleId: { type: string, format: uuid }
+        quantity: { type: number, nullable: true }
+        note: { type: string, nullable: true }
+
+    Purchase:
+      type: object
+      required: [id, status, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        supplierId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            De Proveedores, SIN CLAVE AJENA hacia su tabla: una clave ajena entre
+            dos módulos sería una dependencia de esquema que nada vigila
+        supplier:
+          type: string
+          nullable: true
+          description: >
+            EL NOMBRE DE AQUEL DÍA, copiado al abrir la compra. Es lo único que se
+            puede pintar con Proveedores apagado, y además lo correcto: una compra
+            es historia
+        status: { $ref: "#/components/schemas/PurchaseStatus" }
+        note: { type: string, nullable: true }
+        receivedAt: { type: string, format: date-time, nullable: true }
+        cancelledAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    PurchasePage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Purchase" }
+
+    PurchaseDetail:
+      type: object
+      required: [purchase, lines]
+      description: Una compra con sus líneas, que es como se lee siempre -- sola no dice nada
+      properties:
+        purchase: { $ref: "#/components/schemas/Purchase" }
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/ShoppingItem" }
+
+    PurchaseInput:
+      type: object
+      required: [itemIds]
+      properties:
+        supplierId:
+          type: string
+          format: uuid
+          description: >
+            Opcional. Se valida contra Proveedores por un puerto de plataforma; si
+            ese módulo está apagado responde igual que ante un identificador que no
+            existe
+        note: { type: string, maxLength: 500 }
+        itemIds:
+          type: array
+          minItems: 1
+          items: { type: string, format: uuid }
+
+    ReceiptInput:
+      type: object
+      required: [lines]
+      description: >
+        Puede ir con la lista vacía si todas las líneas ya traían cantidad: lo que
+        no se diga cae en su valor por omisión
+      properties:
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/ReceiptLine" }
+
+    ReceiptLine:
+      type: object
+      required: [itemId]
+      description: >
+        Los tres campos opcionales son la decisión de producto del módulo: cuánta
+        entró, de quién es y dónde va se deciden AL RECIBIR y no al apuntar
+      properties:
+        itemId: { type: string, format: uuid }
+        quantity:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+          description: Por omisión, la que la línea apuntaba
+        ownerId:
+          type: string
+          format: uuid
+          description: Por omisión, quien recibe la compra
+        locationId:
+          type: string
+          format: uuid
+          description: >
+            Por omisión, DONDE ESE ARTÍCULO YA VIVE si vive en un solo sitio. No es
+            comodidad: la entrada del core busca la existencia por artículo Y
+            ubicación, así que sin esto la despensa acabaría con dos arroces
+
+    PurchasingSupplier:
+      type: object
+      required: [id, name]
+      description: >
+        Lo mínimo que el puerto de dato maestro deja pasar. Ni teléfono ni correo:
+        los datos personales de terceros se quedan en Proveedores
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        detail:
+          type: string
+          nullable: true
+          description: >
+            El IDENTIFICADOR de la categoría de servicio, no su rótulo: el texto que
+            se lee en pantalla es un dato en castellano y lo pone el cliente

@@ -83,7 +83,7 @@ class StockSynchronizer(
                 createdBy = null,
             ),
         )
-        refreshMinimum(articleId)
+        refreshArticle(articleId, quantity - previous)
     }
 
     /**
@@ -147,19 +147,22 @@ class StockSynchronizer(
                 createdBy = null,
             ),
         )
-        refreshMinimum(articleId)
+        refreshArticle(articleId, facts.quantity ?: BigDecimal.ZERO)
     }
 
     /** Una existencia que causa baja deja de tener lotes que vigilar. */
     fun closeStockItem(assetId: UUID) {
         val facts = warehouse.coreStockFacts(assetId)
         warehouse.consumeLotsOf(assetId, clock.instant())
-        facts?.articleId?.let { refreshMinimum(it) }
+        // Sin delta: la baja con resto ya publico su `AssetQuantityChanged` con
+        // motivo DECOMMISSION, y es esa rama la que ve el cruce a cero. Pasar uno
+        // aqui lo contaria dos veces.
+        facts?.articleId?.let { refreshArticle(it) }
     }
 
     /**
-     * Recalcula si un articulo entra o sale de bajo minimos, y **publica solo en
-     * el cruce**.
+     * Recalcula lo que hay que contar de un articulo, y **publica solo en el
+     * cruce**: que se ha acabado, y que ha entrado o salido de bajo minimos.
      *
      * El estado con fecha --`lowStockSince`-- es lo que hace posibles las dos
      * cosas a la vez: publicar una vez para Compras y avisar una vez en el
@@ -169,20 +172,39 @@ class StockSynchronizer(
      * Salir de bajo minimos **borra tambien la marca de avisado**, que es lo que
      * vuelve a armar el aviso para la proxima caida. Sin eso, un articulo avisaria
      * una sola vez en toda su vida.
+     *
+     * @param delta cuanto acaba de cambiar la existencia que provoco esto, o nulo
+     *   si eso no se sabe. Es lo que permite detectar **el cruce a cero sin
+     *   guardar un estado nuevo**: el total de antes es el de ahora menos esto.
      */
-    fun refreshMinimum(articleId: UUID) {
+    fun refreshArticle(articleId: UUID, delta: BigDecimal? = null) {
         val file = warehouse.findArticleFile(articleId) ?: return
-        val minimum = file.minimumQuantity ?: return
 
         val total = warehouse.totalOf(articleId)
-        val below = total <= minimum
         val now = clock.instant()
+
+        // **Se ha acabado, y para esto no hace falta que el hogar haya fijado
+        // ningun minimo.** Hasta el Hito 4 esto colgaba de la rama de bajo
+        // minimos, asi que `StockDepleted` no se publicaba nunca para un articulo
+        // sin ficha de minimo --que son casi todos--, al contrario de lo que la
+        // ficha de este modulo declara y de lo que dice el comentario de
+        // `WarehouseEvents.stockDepleted`. Lo destapo Compras al ser el primer
+        // consumidor: «lo que llega a cero entra en la lista» era falso para casi
+        // todo lo que hay en una despensa.
+        //
+        // El cruce se deduce del delta y **no necesita una columna nueva**: si el
+        // total de ahora es cero y el de antes no lo era, acaba de acabarse.
+        if (delta != null && total.signum() == 0 && (total - delta).signum() > 0) {
+            events.stockDepleted(articleId, unitOf(articleId))
+        }
+
+        val minimum = file.minimumQuantity ?: return
+        val below = total <= minimum
 
         when {
             below && !file.isLowOnStock -> {
                 warehouse.saveArticleFile(file.copy(lowStockSince = now, updatedAt = now))
                 events.stockBelowMinimum(articleId, total, minimum, unitOf(articleId))
-                if (total.signum() == 0) events.stockDepleted(articleId, unitOf(articleId))
             }
 
             !below && file.isLowOnStock ->

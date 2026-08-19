@@ -374,7 +374,7 @@ class UpdateWarehouseArticle(
         // Fijar un minimo por primera vez tiene que decidir **ya** si el articulo
         // esta por debajo, y no esperar a la noche: quien lo fija lo hace mirando
         // la despensa y espera que la pantalla le de la razon en el acto.
-        stock.refreshMinimum(articleId)
+        stock.refreshArticle(articleId)
         return warehouse.findArticleFile(articleId) ?: saved
     }
 }

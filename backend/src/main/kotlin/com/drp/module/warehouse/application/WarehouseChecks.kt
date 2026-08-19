@@ -141,7 +141,7 @@ class WarehouseMinimumStockCheck(
         // el estado, y luego para mirar quien ha quedado caido y sin decir. Pedirla
         // dos veces daria dos consultas para responder lo mismo.
         val watched = warehouse.totalsForWatchedArticles()
-        watched.forEach { stock.refreshMinimum(it.articleId) }
+        watched.forEach { stock.refreshArticle(it.articleId) }
 
         return watched.mapNotNull { total ->
             val file = warehouse.findArticleFile(total.articleId) ?: return@mapNotNull null
