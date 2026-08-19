@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Identidad, pertenencia, roles y credenciales |
-| Última revisión | 2026-08-10 |
+| Última revisión | 2026-08-20 |
 
 > Trasladado desde la sección 4.1.4 del [`README principal`](../../../README.md) al iniciar la Fase 1. **Los números de sección se conservan**: hay más de cien referencias cruzadas del tipo «ver 4.1.1» repartidas por el repositorio, y renumerarlas las rompería todas.
 

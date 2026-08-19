@@ -1,7 +1,7 @@
 # ADR-012: Supresión de datos — baja de hogar y cierre de cuenta
 
 - Estado: accepted
-- Fecha: 2026-08-19
+- Fecha: 2026-08-20
 - Responsables: Equipo DRP
 - Ámbito: common
 - Sustituye: Ninguna

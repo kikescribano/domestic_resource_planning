@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Comandos y queries del core |
-| Última revisión | 2026-08-17 |
+| Última revisión | 2026-08-20 |
 
 > Trasladado desde la sección 5.7 del [`README principal`](../../../../README.md) al iniciar la Fase 1. **Los números de sección se conservan**: hay más de cien referencias cruzadas del tipo «ver 4.1.1» repartidas por el repositorio, y renumerarlas las rompería todas.
 

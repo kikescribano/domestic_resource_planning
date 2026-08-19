@@ -5,7 +5,7 @@
 | Estado | **Implementado** — ficha escrita antes que el componente |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-19 |
+| Última revisión | 2026-08-20 |
 
 > **Esta ficha se escribió antes de que existiera el componente**, como las de
 > [`loan-external-page.md`](loan-external-page.md) y
@@ -208,5 +208,5 @@ Dos cosas que la implementación decidió y esta ficha no había fijado:
 
 | Fecha | Cambio |
 |---|---|
-| 2026-08-19 | Se crea, **antes que el componente**, al construir la baja de hogar y el cierre de cuenta (Hito 0 del cierre de huecos) |
-| 2026-08-19 | Pasa a **implementada** el mismo día: se corrigen los dos tokens de color que la ficha había inventado, y se anotan las dos decisiones que la construcción trajo —el `div` en lugar del `form`, y que cancelar no lleva fricción— |
+| 2026-08-20 | Se crea, **antes que el componente**, al construir la baja de hogar y el cierre de cuenta (Hito 0 del cierre de huecos) |
+| 2026-08-20 | Pasa a **implementada** el mismo día: se corrigen los dos tokens de color que la ficha había inventado, y se anotan las dos decisiones que la construcción trajo —el `div` en lugar del `form`, y que cancelar no lleva fricción— |

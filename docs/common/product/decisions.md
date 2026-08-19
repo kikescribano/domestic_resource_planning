@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Registro vivo de decisiones de diseno del core |
-| Última revisión | 2026-08-19 |
+| Última revisión | 2026-08-20 |
 
 > Trasladado desde la sección 4.1.7 del [`README principal`](../../../README.md) al iniciar la Fase 1. **Los números de sección se conservan**: hay más de cien referencias cruzadas del tipo «ver 4.1.1» repartidas por el repositorio, y renumerarlas las rompería todas.
 
@@ -380,7 +380,7 @@ Las cuatro primeras son las que la definición dejaba abiertas y este hito tení
 
 - **HEIC no se decide al planificar.** El plan asigna la decisión a un hito que la cierre **con una ADR nueva y con dos medidas delante**: el peso real del decodificador wasm sobre el bundle —402 kB de referencia, así que un megabyte no es un incremento sino un cambio de categoría— y el coste en servidor con los números del runner de la CI, donde recodificar una foto de 12 MP ya cuesta 776 ms de mediana. Se descartó **elegir dirección ahora**: sin esas dos cifras la elección es una opinión, y la que salga arrastra una enmienda de 5.8.3 —que asigna la conversión al frontend— o un megabyte en el cliente. Ninguna de las dos se paga por corazonada.
 
-**Decisiones tomadas al construir la baja de hogar y el cierre de cuenta (2026-08-19).** Salen del Hito 0 del cierre de huecos y su porqué entero, con las alternativas descartadas, está en la [ADR-012](../architecture/decisions/ADR-012-data-erasure-household-closure-and-account-closure.md).
+**Decisiones tomadas al construir la baja de hogar y el cierre de cuenta (2026-08-20).** Salen del Hito 0 del cierre de huecos y su porqué entero, con las alternativas descartadas, está en la [ADR-012](../architecture/decisions/ADR-012-data-erasure-household-closure-and-account-closure.md).
 
 - **La identidad que se queda sin ninguna pertenencia se borra de verdad, no se da de baja.** Es la pregunta que el plan dejó asignada a este hito. Conservarla retiene nombre, correo y teléfono —en la única tabla del modelo con datos personales **fuera de RLS**— de alguien que ya no puede entrar en ningún sitio; y **no libera su correo**, porque el índice único dejó de ser parcial por baja, así que esa persona no podría volver a registrarse nunca. Borrarla es además lo que `PurgeUnverifiedHouseholds` ya hace, y aquí tampoco queda nada que la referencie: sus pertenencias se fueron con el hogar y sus tokens cuelgan de ella en cascada. Se descartó la **baja lógica**, que deja una fila que nadie puede volver a usar ni volver a borrar, a cambio de un historial que ya no existe en ningún sitio.
 

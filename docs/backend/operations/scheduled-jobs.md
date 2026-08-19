@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Backend Kotlin |
-| Última revisión | 2026-08-18 |
+| Última revisión | 2026-08-20 |
 
 La decisión y su porqué están en la
 [ADR-011](../../common/architecture/decisions/ADR-011-scheduled-checks-and-notice-delivery.md).

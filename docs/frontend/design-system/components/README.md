@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-18 |
+| Última revisión | 2026-08-20 |
 
 ## Propósito
 
