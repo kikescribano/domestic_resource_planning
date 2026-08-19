@@ -206,6 +206,13 @@ verdad y necesita **PostgreSQL y Mailpit**; nginx no, porque la entrega directa 
 lo que 5.8.4 describe para desarrollo. La prueba de nginx es del backend y levanta
 el suyo con la misma plantilla del `compose.yaml`.
 
+Y **no montes un hogar a mano para mirar algo**: hay uno de demostración con
+catorce meses de histórico para el core y los cuatro módulos en
+[`scripts/seed-demo-data.sql`](scripts/seed-demo-data.sql), que se carga con un
+comando, es idempotente y solo toca su propio hogar. Cómo se lanza y qué trae,
+en [`demo-dataset.md`](docs/backend/operations/demo-dataset.md); el arranque
+entero, en la skill `run-local`.
+
 **Deja la máquina como la encontraste.** Lo que se arranca para comprobar algo
 se apaga en cuanto la comprobación está hecha:
 
