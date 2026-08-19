@@ -8,6 +8,14 @@ directorio `skills/`.
 Si una skill tiene una implementación ejecutable en otra ubicación, aquí se
 mantiene el catálogo y el contrato de uso, no una copia divergente.
 
+Por eso el [`catálogo`](catalog.md) tiene filas de dos formas. Unas apuntan a un
+`SKILL-NNN-*.md` de este directorio, que es donde vive la definición. Otras
+apuntan **fuera**, a una skill invocable de [`.claude/skills/`](../../../.claude/skills/):
+esas ya se documentan a sí mismas junto a su código, y duplicar aquí su
+definición sería garantizar que las dos versiones acaben diciendo cosas
+distintas. Lo que no cambia es que **el identificador y el estado se llevan
+aquí**.
+
 ## Contenido mínimo de una skill
 
 - Propósito y resultado observable.

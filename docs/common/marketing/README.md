@@ -5,8 +5,8 @@
 | Estado | Borrador |
 | Responsable | Por decidir |
 | Ámbito | Toda la solución |
-| Última revisión | 2026-08-19 |
-| Procedimiento | [SKILL-001 · Presentaciones a partir del README](../skills/SKILL-001-readme-to-deck.md) |
+| Última revisión | 2026-08-20 |
+| Procedimiento | [SKILL-001 · Presentaciones a partir del README](../skills/SKILL-001-readme-to-deck.md) y [SKILL-002 · Presentaciones sobre la plantilla de Slidesgo](../../../.claude/skills/marketing-deck/SKILL.md) |
 
 Este espacio reúne el material con el que DRP se presenta hacia fuera:
 presentaciones, identidad visual, mensajes y cualquier pieza pensada para
@@ -32,8 +32,19 @@ solución completa, igual que la visión de producto. Aplicando la
 | [`assets/build-drp-resumen.js`](assets/build-drp-resumen.js) | Generador de la presentación anterior: es su fuente editable. La presentación **no se retoca a mano**, se regenera ejecutando este script. El procedimiento y su verificación están en [SKILL-001](../skills/SKILL-001-readme-to-deck.md). |
 | [`presentations/DRP-comercial.pptx`](presentations/DRP-comercial.pptx) | Presentación comercial de 16 diapositivas, dirigida a quien **no conoce el proyecto, no lee el repositorio y no quiere tecnicismos**: inversión, colaboradores y primeros hogares piloto. Recorre el arco de un pitch —problema, idea, cómo funciona, qué resuelve hoy, un día con DRP, los módulos en tres oleadas, avisos, aislamiento contado en llano, dónde está el proyecto, qué falta y qué se busca—, y de las secciones de arquitectura, stack y testing **no toma nada** salvo esa única diapositiva de confianza. Cada diapositiva lleva en sus notas la sección del README de la que procede. **Refleja el estado del README a 2026-08-19**: Fases 1 y 2 cerradas, cuatro de trece módulos construidos y **ningún despliegue**, que la propia presentación declara en tres sitios distintos en vez de esquivarlo. Su última diapositiva es **la de agradecimiento de [Slidesgo](https://slidesgo.com)**, con mención a Freepik y Flaticon: no es decorativa, la exige la licencia de la plantilla de `references/` de la que se tomó la dirección visual, y **no se retira**. |
 | [`assets/build-drp-comercial.js`](assets/build-drp-comercial.js) | Generador de la presentación comercial. Comparte paleta, tipografías y lienzo con el de resumen para que las dos piezas se reconozcan como del mismo producto; lo que no comparte es el reparto de diapositivas, que es justo lo que distingue a un destinatario de otro. Deja **el bloque de contacto de la penúltima diapositiva sin rellenar a propósito**: se completa aquí, en el script, antes de cada envío, porque inventarlo sería exactamente lo que la variante comercial de [SKILL-001](../skills/SKILL-001-readme-to-deck.md) prohíbe. |
+| [`presentations/DRP-comercial-minitheme.pptx`](presentations/DRP-comercial-minitheme.pptx) | **La misma intención que la anterior en otro lenguaje visual**: 18 diapositivas para quien no conoce el producto —el problema, la idea, qué trae el core, cómo entra un módulo, los cuatro construidos, el catálogo entero, las cifras y el camino—, esta vez **con el aspecto de la plantilla de Slidesgo**, porque no se imita sino que se parte de ella. Refleja el estado del README a 2026-08-19. |
+| [`presentations/DRP-tecnico-minitheme.pptx`](presentations/DRP-tecnico-minitheme.pptx) | Presentación de 18 diapositivas sobre **cómo está construido**: capas, paquetes del backend, las cuatro fronteras de ArchUnit, el aislamiento en dos capas, las cifras del contrato, el stack con sus ADR y los tres niveles de la batería de pruebas. Es la única pieza de aquí dirigida a quien sí quiere tecnicismos. Misma plantilla y mismo estado. |
+| [`assets/build-drp-comercial-minitheme.py`](assets/build-drp-comercial-minitheme.py) y [`assets/build-drp-tecnico-minitheme.py`](assets/build-drp-tecnico-minitheme.py) | Generadores de las dos anteriores: son su fuente editable. No se retocan los `.pptx`, se corrige el generador y se vuelve a ejecutar. Procedimiento, catálogo de composiciones y verificación en la skill [`marketing-deck`](../../../.claude/skills/marketing-deck/SKILL.md). |
 | [`brand-guidelines-template.docx`](brand-guidelines-template.docx) | Plantilla en blanco de manual de marca (v1.0), en siete secciones: identidad, logo y sus variantes, paleta con HEX/RGB/CMYK, tipografía y jerarquía, iconografía, tono de voz y design tokens. Todo lo que aparece entre corchetes es un hueco por rellenar. |
-| [`references/pitch-deck-minitheme-slidesgo.pptx`](references/pitch-deck-minitheme-slidesgo.pptx) | Plantilla comercial de [Slidesgo](https://slidesgo.com) —«Pitch Deck Minitheme»—, 42 diapositivas con contenido de relleno en inglés, dos patrones y veintitrés diseños. **Es material de referencia, no una pieza de DRP**: está aquí como **dirección visual de la que tomar ideas para las presentaciones de `presentations/`**, que se siguen generando desde sus scripts. No se rellena, no se entrega y no describe el producto. Ver más abajo: tiene condiciones de licencia y no encaja tal cual. |
+| [`references/pitch-deck-minitheme-slidesgo.pptx`](references/pitch-deck-minitheme-slidesgo.pptx) | Plantilla comercial de [Slidesgo](https://slidesgo.com) —«Pitch Deck Minitheme»—, 42 diapositivas con contenido de relleno en inglés, dos patrones y veintitrés diseños. **Es material de terceros, no una pieza de DRP**: no se rellena en sitio y no describe el producto. Cumple dos papeles distintos, y conviene no confundirlos: es **dirección visual** de la que toman ideas las piezas de SKILL-001, y es **el fichero de partida** del que salen las dos de sufijo `-minitheme`. Ver más abajo: tiene condiciones de licencia. |
+
+**Hay dos presentaciones comerciales, y es a propósito.** Dicen lo mismo y no se
+parecen en nada: una lleva el aspecto propio de DRP —el mismo del deck de
+resumen, para que las piezas de dentro se reconozcan entre ellas— y la otra, el
+de la plantilla de Slidesgo. Se elige por el destinatario y no por el gusto del
+día, y **si las dos se contradicen manda el README**, como todo lo de esta
+carpeta. Lo que no se hace es dejar que una envejezca mientras se actualiza la
+otra: caducan a la vez porque salen del mismo sitio.
 
 > **Este material no avisa cuando se queda atrás**, que es la razón de que
 > repasarlo entre en la lista de cierre de cada fase. Al cerrar la Fase 2 el deck
@@ -45,9 +56,9 @@ solución completa, igual que la visión de producto. Aplicando la
 > también en la cabecera de cada generador, que es donde los va a leer quien lo
 > toque.
 >
-> **Ahora son dos las piezas que caducan a la vez, y no caducan igual de caro.** La
-> de resumen se lee dentro del proyecto, donde alguien la contradice; la comercial
-> se envía, y una vez enviada ya no se corrige.
+> **Ahora son cuatro las piezas que caducan a la vez, y no caducan igual de caro.**
+> La de resumen se lee dentro del proyecto, donde alguien la contradice; las
+> comerciales se envían, y una vez enviadas ya no se corrigen.
 
 **Dos piezas de aquí no describen a DRP, y no lo hacen por motivos distintos.**
 
@@ -58,33 +69,45 @@ assets que salgan de rellenarla —logo, paleta, tipografías— van a `brand/`,
 sí quedan sujetos a las convenciones de más abajo.
 
 La plantilla de Slidesgo es otra cosa: **material de terceros que entra, no
-material nuestro que sale.** Está aquí como dirección visual de la que tomar ideas
-para las presentaciones de DRP, y por eso vive en `references/` y no en `assets/` —esa
+material nuestro que sale.** De ella salen las presentaciones de DRP, unas veces
+como ideas y otras como diapositivas, y por eso vive en `references/` y no en
+`assets/` —esa
 carpeta significa «la fuente editable de lo nuestro», y confundir las dos acaba en
 que alguien busque ahí el generador de un fichero que no genera nada—. Tres cosas
 que hay que saber antes de tocarla:
 
-- **No encaja tal cual, y es medible.** Su lienzo es de **10 × 5,62 pulgadas** y el
-  del deck de DRP es de **13,3**. Es exactamente la trampa que
-  [SKILL-001](../skills/SKILL-001-readme-to-deck.md) tiene documentada en primer
-  lugar: lo que cae fuera del lienzo se escribe igual, simplemente no se ve. Así
-  que **lo que se toma prestado son decisiones de diseño —retícula, jerarquía,
-  uso del color—, no diapositivas**, y se llevan al generador a mano.
-- **Lleva atribución obligatoria, y ya se ha cobrado.** Se descargó con cuenta
-  gratuita, y esa licencia permite modificarla y usarla con fines comerciales pero
-  **exige conservar la diapositiva de agradecimiento** en cualquier presentación
-  derivada; prohíbe sublicenciarla, venderla o alquilarla. Los recursos que trae
-  dentro son de Freepik y Flaticon. Aquí quedó escrito que si algún día una
-  presentación de DRP salía fuera, esa diapositiva iría dentro:
-  **`DRP-comercial.pptx` es esa presentación, y su diapositiva 16 es esa
-  diapositiva.** No se retira mientras el deck se entregue — o se pasa a cuenta
-  premium, que es lo que levanta la condición. El deck de resumen no la lleva
-  porque no sale de aquí; el día que salga, la lleva.
+- **Sirve de dos maneras, y no se mezclan.** Para las piezas de
+  [SKILL-001](../skills/SKILL-001-readme-to-deck.md) —la de resumen y la
+  comercial— es solo **dirección visual** —retícula, jerarquía, uso del color—,
+  que se lleva a su generador a mano: **sus diapositivas no se copian**, porque
+  el lienzo de la plantilla es de **10 × 5,62 pulgadas** y el de esos decks es de
+  **13,3**, y lo que cae fuera se escribe igual, simplemente no se ve (esa skill
+  lo tiene documentado en primer lugar). Para las dos de sufijo `-minitheme` es
+  el **fichero de partida**: se seleccionan sus diapositivas y se les sustituye
+  el texto, conservando su lienzo y con él las ilustraciones, la textura y las
+  tipografías incrustadas (ver la skill
+  [`marketing-deck`](../../../.claude/skills/marketing-deck/SKILL.md)).
+- **Lleva atribución obligatoria, y ya se ha cobrado tres veces.** Se descargó con
+  cuenta gratuita, y esa licencia permite modificarla y usarla con fines
+  comerciales pero **exige conservar la diapositiva de agradecimiento** en
+  cualquier presentación derivada; prohíbe sublicenciarla, venderla o alquilarla.
+  Los recursos que trae dentro son de Freepik y Flaticon. Aquí quedó escrito que
+  si algún día una presentación de DRP salía fuera, esa diapositiva iría dentro:
+  **la 16 de `DRP-comercial.pptx` es esa diapositiva**, y las dos de sufijo
+  `-minitheme` la llevan también — estas últimas **no por acordarse**, sino
+  porque su generador falla al guardar si no está y el verificador vuelve a
+  comprobarlo sobre el fichero escrito. No se retira mientras los decks se
+  entreguen; la otra salida es pasar a cuenta premium, que es lo que levanta la
+  condición. El deck de resumen no la lleva porque no sale de aquí; el día que
+  salga, la lleva.
 - **Pesa 13,4 MB**, que la convierte en **el fichero más grande del repositorio con
-  diferencia**: veintidós veces el siguiente, que es el propio deck. Se anota
-  porque un binario de ese tamaño en la historia de git no se quita después sin
-  reescribirla, así que la siguiente que se añada merece la pregunta de si hace
-  falta versionarla o basta con enlazarla.
+  diferencia**: casi seis veces el siguiente, que son las dos presentaciones que
+  parten de ella. Se anota porque un binario de ese tamaño en la historia de git no se
+  quita después sin reescribirla, así que la siguiente que se añada merece la
+  pregunta de si hace falta versionarla o basta con enlazarla. De los 13,4 MB, a
+  cada deck derivado le llegan **2,3**: se queda con las diapositivas que usa y
+  con las tipografías incrustadas, que son 1,8 MB y son justo lo que no se puede
+  reproducir de otra manera.
 
 ## Contenido previsto
 
