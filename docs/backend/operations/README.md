@@ -21,6 +21,12 @@ Este directorio documentará cómo ejecutar y mantener el backend en cada entorn
   desplegar, y qué mirar cuando algo no pasa. Llega con el Hito 1 de la Fase 2,
   que es cuando los tres procesos diarios pasaron a ejecutarse de verdad.
 
+- [`demo-dataset.md`](demo-dataset.md): el juego de datos de demostración —un
+  hogar de cuatro personas con vivienda, trastero y catorce meses de histórico
+  para el core y los cuatro módulos—, cómo se carga, qué trae y las tres
+  decisiones del script. Sirve para ver la aplicación entera sin teclear nada en
+  cada arranque local.
+
 ## Contenido previsto
 
 - Requisitos y arranque local reproducible.

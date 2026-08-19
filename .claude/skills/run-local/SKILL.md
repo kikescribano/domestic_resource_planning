@@ -1,6 +1,6 @@
 ---
 name: run-local
-description: Arranca y para DRP en local — PostgreSQL, Mailpit y nginx con compose, el backend de Spring Boot y el servidor de desarrollo de Vite — con el orden que hay que respetar y los escollos ya medidos. Úsala siempre que haya que levantar la aplicación, verla en el navegador, probar un cambio a mano, entrar con un usuario, dar de alta un hogar, leer un correo de verificación, o apagar y limpiar lo que se levantó. También cuando alguien pida «ejecuta el proyecto», «lánzalo en local», «quiero probarlo», «déjamelo corriendo» o «apaga lo que has arrancado», aunque no nombre Docker ni ningún servicio.
+description: Arranca y para DRP en local — PostgreSQL, Mailpit y nginx con compose, el backend de Spring Boot y el servidor de desarrollo de Vite — con el orden que hay que respetar y los escollos ya medidos. Úsala siempre que haya que levantar la aplicación, verla en el navegador, probar un cambio a mano, entrar con un usuario, dar de alta un hogar, cargar el juego de datos de demostración, leer un correo de verificación, o apagar y limpiar lo que se levantó. También cuando alguien pida «ejecuta el proyecto», «lánzalo en local», «quiero probarlo», «déjamelo corriendo» o «apaga lo que has arrancado», aunque no nombre Docker ni ningún servicio.
 ---
 
 # Arrancar y parar DRP en local
@@ -61,11 +61,34 @@ Si arrancas desde un agente con herramientas de previsualización, hay un
 [`.claude/launch.json`](../../launch.json) con las dos configuraciones —
 `drp-backend` y `drp-frontend`— para no repetir estos comandos a mano.
 
-## Entrar: no hay ningún usuario sembrado
+## Entrar: el atajo es cargar el hogar de demostración
 
-Un arranque en limpio no tiene con qué iniciar sesión. Se da de alta un hogar en
-`/crear-hogar` y **el hogar no sirve hasta verificar el correo**, que no sale a
-Internet: lo recoge Mailpit.
+Un arranque en limpio no tiene con qué iniciar sesión, y montar a mano algo que
+enseñe la aplicación entera son bastantes minutos. Para eso está
+[`scripts/seed-demo-data.sql`](../../../scripts/seed-demo-data.sql): un hogar de
+cuatro personas con vivienda, trastero, despensa, préstamos, proveedores y
+catorce meses de histórico para el core y **los cuatro módulos encendidos**.
+
+Necesita la base ya migrada, es decir, el backend arrancado al menos una vez:
+
+```bash
+docker compose exec -T -e PGPASSWORD=drp_app postgres psql -U drp_app -d drp -v ON_ERROR_STOP=1 < scripts/seed-demo-data.sql
+```
+
+Se entra en `/entrar` con `marta@hogar-serrano.test` y `DemoDRP2026Local`; las
+otras tres cuentas y el detalle de lo que trae están en
+[`docs/backend/operations/demo-dataset.md`](../../../docs/backend/operations/demo-dataset.md).
+Es **idempotente** —borra su propio hogar antes de reconstruirlo, y solo el
+suyo—, así que recargarlo devuelve el entorno a un estado conocido después de
+haber trasteado.
+
+Los cuatro correos están verificados, así que ese camino no pasa por Mailpit.
+Para recorrerlo de verdad, o para probar el alta desde cero, sigue lo de abajo.
+
+## Entrar dando de alta un hogar
+
+Se da de alta en `/crear-hogar` y **el hogar no sirve hasta verificar el
+correo**, que no sale a Internet: lo recoge Mailpit.
 
 ```bash
 python .claude/skills/run-local/scripts/mailpit-link.py alguien@casa.test
