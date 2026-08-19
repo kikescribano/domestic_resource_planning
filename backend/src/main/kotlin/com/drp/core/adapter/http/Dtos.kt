@@ -4,6 +4,7 @@ import com.drp.core.application.TokenPair
 import com.drp.platform.page.Page
 import com.drp.core.application.usecase.HouseholdUser
 import com.drp.core.domain.catalog.Category
+import com.drp.core.domain.household.Household
 import com.drp.core.domain.household.MemberRole
 import com.drp.core.domain.invitation.Invitation
 import jakarta.validation.Valid
@@ -49,6 +50,50 @@ data class TokenPairResponse(
         fun of(pair: TokenPair) = TokenPairResponse(pair.accessToken, pair.refreshToken, pair.expiresIn)
     }
 }
+
+/**
+ * El estado del hogar (`GET /households/current`).
+ *
+ * Es la primera lectura del hogar que tiene el contrato: hasta la baja de hogar
+ * solo se podia crear uno. Devuelve lo que lo describe --nombre y zona horaria--
+ * y, sobre todo, [closure], que es lo que la zona de peligro y el aviso
+ * persistente del frontend necesitan saber.
+ */
+data class HouseholdResponse(
+    val id: UUID,
+    val name: String,
+    val timeZone: String,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+    /** Informada solo mientras corre el periodo de gracia. Nula es lo normal. */
+    val closure: HouseholdClosureResponse?,
+) {
+    companion object {
+        fun of(household: Household) = HouseholdResponse(
+            id = household.id,
+            name = household.name,
+            timeZone = household.timeZone.id,
+            createdAt = household.createdAt,
+            updatedAt = household.updatedAt,
+            closure = household.closure?.let {
+                HouseholdClosureResponse(it.requestedAt, it.requestedBy, it.effectiveAt)
+            },
+        )
+    }
+}
+
+/**
+ * La baja solicitada.
+ *
+ * `effectiveAt` es **la fecha que se le prometio a una persona**, y viaja como
+ * instante para que el cliente la pinte en la zona de quien mira. `requestedBy`
+ * apunta a la **pertenencia**, como toda la autoria del contrato.
+ */
+data class HouseholdClosureResponse(
+    val requestedAt: Instant,
+    val requestedBy: UUID,
+    val effectiveAt: Instant,
+)
 
 data class TokenInput(@field:NotBlank val token: String)
 

@@ -30,3 +30,4 @@ Usa [`ADR-template.md`](ADR-template.md) para crear una entrada.
 | [ADR-009](ADR-009-outbound-email.md) | Envío de correo saliente | accepted | — |
 | [ADR-010](ADR-010-module-boundaries-and-activation.md) | Fronteras de módulo y activación por hogar | accepted | — |
 | [ADR-011](ADR-011-scheduled-checks-and-notice-delivery.md) | Programación de comprobaciones y entrega de avisos | accepted | — |
+| [ADR-012](ADR-012-data-erasure-household-closure-and-account-closure.md) | Supresión de datos: baja de hogar y cierre de cuenta | accepted | — |

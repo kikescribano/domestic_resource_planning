@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-18 |
+| Última revisión | 2026-08-20 |
 
 ## Propósito
 
@@ -67,11 +67,12 @@ con sus siete puntos. No se reordena ni se recorta.
 | `FileGallery` | [`file-gallery.md`](file-gallery.md) | **Implementado** | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
 | `Avatar` | [`avatar.md`](avatar.md) | **Implementado** | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
 | `QuotaMeter` | Sin ficha | **Implementado** en el Hito 3 | [`files.tsx`](../../../../frontend/src/ui/files.tsx) |
+| `DangerZone` | [`danger-zone.md`](danger-zone.md) | **Implementado** — ficha escrita antes que el componente, cierre de huecos Hito 0 | [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) |
 | `LoanExternalPage` | [`loan-external-page.md`](loan-external-page.md) | **Implementado** como `ExternalLoanPage` | [`routes/loans.tsx`](../../../../frontend/src/routes/loans.tsx) |
 | `SuppliersPage` | [`suppliers-page.md`](suppliers-page.md) | **Implementada** — ficha escrita antes que la pantalla, Fase 2 Hito 2 | [`routes/suppliers.tsx`](../../../../frontend/src/routes/suppliers.tsx) |
 
-**Trece componentes reutilizables —nueve en `primitives.tsx` y cuatro en
-`files.tsx`— más dos pantallas, y once de las quince filas tienen ficha**:
+**Catorce componentes reutilizables —diez en `primitives.tsx` y cuatro en
+`files.tsx`— más dos pantallas, y doce de las dieciséis filas tienen ficha**:
 `SelectField`, `PageHeading` y `EmptyState` entraron con el Hito 2 sin la suya, y
 `QuotaMeter` con el Hito 3, documentado como variante dentro de la ficha de
 `UploadField` y acabando en pieza aparte.
@@ -83,6 +84,13 @@ por qué aun así es componente y no patrón. Es también la cuarta ficha escrit
 **antes** que su implementación, y la que mejor demuestra para qué sirve hacerlo:
 encontró un hueco del contrato cuando no había código, y dejó escrita una regla de
 anuncios que al cerrar la fase delató un defecto real.
+
+`DangerZone` es la **quinta ficha escrita antes que su componente**, y la primera
+de una pieza que no es una pantalla entera. Llegó con la baja de hogar y el cierre
+de cuenta ([ADR-012](../../../common/architecture/decisions/ADR-012-data-erasure-household-closure-and-account-closure.md)),
+que son las dos primeras operaciones del producto que borran datos para siempre:
+todo lo demás que el sistema llama «baja» es lógico, y por eso le bastaba un
+`Button` de variante `danger`.
 
 `SuppliersPage` está aquí por lo mismo y por una razón más: es **la pantalla de un
 módulo**, así que no se monta sola sino dentro de su guardián, y eso es parte de

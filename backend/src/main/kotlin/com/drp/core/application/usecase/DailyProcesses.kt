@@ -8,6 +8,7 @@ import com.drp.core.application.port.HouseholdRepository
 import com.drp.core.application.port.IdentityRepository
 import com.drp.core.application.port.LoanRepository
 import com.drp.core.application.port.StoredFileRepository
+import com.drp.core.application.port.TenantResolver
 import com.drp.core.domain.loan.LoanStatus
 import com.drp.platform.notice.NoticeDraft
 import com.drp.platform.page.Pagination
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.util.UUID
 
 /**
  * Las tres comprobaciones diarias del core.
@@ -49,11 +51,13 @@ import java.time.Instant
  * Es idempotente: solo mira lo que ya sobra.
  *
  * **No produce ningun aviso**, y no podria: el destinatario de ese aviso seria un
- * hogar que acaba de dejar de existir. Es ademas la unica comprobacion que puede
- * hacer desaparecer el hogar en curso, y por eso conviene saber que el recorrido
- * ordena las comprobaciones por nombre --esta va la ultima de las tres-- y que lo
- * que corriera detras no encontraria nada, porque el borrado se lleva en cascada
- * todo lo suyo.
+ * hogar que acaba de dejar de existir.
+ *
+ * Y por eso declara `purgesHousehold`: el recorrido pone al final lo que puede
+ * hacer desaparecer el hogar en curso. Hasta la baja de hogar (ADR-012) esta era
+ * la unica asi y que fuera la ultima de las tres era **un accidente del
+ * alfabeto**; con [PurgeClosedHouseholds] al lado ya no lo es, y lo que corriera
+ * detras encontraria cero filas de un hogar que acaba de dejar de existir.
  */
 @Service
 class PurgeUnverifiedHouseholds(
@@ -67,6 +71,7 @@ class PurgeUnverifiedHouseholds(
 
     override val name: String = "PurgeUnverifiedHouseholds"
     override val owner: CheckOwner = CheckOwner.Core
+    override val purgesHousehold: Boolean = true
 
     override fun check(): List<NoticeDraft> {
         val cutoff = clock.instant().minus(RETENTION)
@@ -273,5 +278,140 @@ class MarkOverdueLoans(
 
     private companion object {
         const val KIND = "LOANS_OVERDUE"
+    }
+}
+
+/**
+ * Borra los hogares cuya baja ya ha vencido (`PurgeClosedHouseholds`, ADR-012).
+ *
+ * Es **el segundo borrado real del core**, y el unico que se lleva por delante
+ * datos de un hogar que llevaba tiempo usandose: assets, ubicaciones, prestamos,
+ * documentos, las filas de los cuatro modulos y **sus ficheros en disco**. Por
+ * eso no ocurre cuando alguien lo pide sino treinta dias despues, y por eso hasta
+ * el ultimo minuto se puede cancelar.
+ *
+ * No es un recorrido nuevo: es **una comprobacion mas** del que la ADR-011 ya
+ * puso en pie, con `CheckOwner.Core` --el core no se apaga, asi que un hogar se
+ * borra igual sin ningun modulo encendido-- y con `purgesHousehold`, que la manda
+ * al final de la pasada de cada hogar.
+ *
+ * Es idempotente: solo mira lo que ya vencio, y lo que borra deja de existir.
+ *
+ * **No produce ningun aviso**, por el mismo motivo que
+ * [PurgeUnverifiedHouseholds]: el destinatario seria un hogar que acaba de dejar
+ * de existir. El aviso que si hay es el de la solicitud, y lo levanta
+ * `RequestHouseholdClosure` **una vez** en lugar de repetirlo cada noche durante
+ * treinta dias.
+ *
+ * ## El orden, que es lo unico delicado
+ *
+ * **Los bytes primero y las filas despues**, que es el criterio que
+ * [PurgeUnusedFiles] dejo escrito y que aqui se reutiliza en lugar de inventar
+ * otro. La consecuencia de fallar a mitad es un hogar cuyas filas de `files`
+ * apuntan a bytes que ya no estan; se cura sola, porque el hogar sigue marcado y
+ * la pasada de manana vuelve a intentarlo entero.
+ *
+ * ## Por prefijo y no recorriendo `files`
+ *
+ * El puerto no sabia borrar arboles y ahora si (`FileStorage.deleteTree`), y esa
+ * es una decision con dos caminos posibles:
+ *
+ * - **Recorrer las filas de `files`** es lo que hace [PurgeUnusedFiles], y borra
+ *   exactamente lo que la base de datos conoce. Deja fuera cualquier byte que ya
+ *   fuera huerfano.
+ * - **Borrar por prefijo** no deja nada, que es literalmente lo que la baja de un
+ *   hogar promete: ni un byte suyo en disco.
+ *
+ * Gana el prefijo porque el objetivo lo decide. Y son **dos** prefijos
+ * --`original/` y `thumbnail/`--, no uno: el troceado empieza por el tipo y el
+ * hogar viene despues, asi que no existe «el directorio del hogar».
+ *
+ * ## Y las identidades, que es donde esta el nudo de verdad
+ *
+ * `identities` **no cuelga del hogar** --una persona no pertenece a uno-- asi que
+ * la cascada no la toca. Borrar el hogar deja a sus miembros con una pertenencia
+ * menos, y a quien no tenga ninguna otra, sin ninguna.
+ *
+ * **Una identidad sin ninguna pertenencia se borra de verdad**, con su avatar.
+ * Conservarla retendria nombre, correo y telefono --en la unica tabla del modelo
+ * con datos personales fuera de RLS-- de alguien que ya no puede entrar en ningun
+ * sitio, y ademas **no liberaria su correo**: el indice unico dejo de ser parcial
+ * por baja, asi que esa persona no podria volver a registrarse nunca. Ver la
+ * ADR-012.
+ *
+ * **La pregunta «le queda alguna pertenencia» no cabe dentro del hogar que se
+ * esta borrando**, y por eso se le pide al [TenantResolver], que es el unico
+ * punto del core que mira fuera y que solo devuelve identificadores. Sin eso, el
+ * caso de uso daria por huerfano a quien vive en otro hogar, y borrar su
+ * identidad arrastraria en cascada la pertenencia del hogar de al lado --con sus
+ * prestamos apuntandola.
+ */
+@Service
+class PurgeClosedHouseholds(
+    private val households: HouseholdRepository,
+    private val members: HouseholdMemberRepository,
+    private val identities: IdentityRepository,
+    private val tenants: TenantResolver,
+    private val storage: FileStorage,
+    private val clock: Clock,
+) : ScheduledCheck {
+
+    private val log = LoggerFactory.getLogger(javaClass)
+
+    override val name: String = "PurgeClosedHouseholds"
+    override val owner: CheckOwner = CheckOwner.Core
+    override val purgesHousehold: Boolean = true
+
+    override fun check(): List<NoticeDraft> {
+        val household = households.findCurrent() ?: return emptyList()
+        if (!household.isPurgeable(clock.instant())) return emptyList()
+
+        // Quien se queda sin nada. Se resuelve **antes** de borrar: despues, ni
+        // las pertenencias existen ni la politica dejaria verlas.
+        val orphaned = orphanedIdentities(household.id)
+
+        // Los bytes primero. Los dos arboles del hogar, y los avatares de quien
+        // se va con el --que viven fuera de esos arboles, porque una identidad no
+        // pertenece a ningun hogar.
+        var files = 0
+        StorageKeys.householdTrees(household.id).forEach { files += storage.deleteTree(it) }
+        orphaned.forEach { identity -> identity.avatar?.let { storage.delete(it.storageKey) } }
+
+        // Y las filas despues. El hogar arrastra en cascada las veintidos tablas
+        // que llevan `household_id`, las de los cuatro modulos incluidas; las
+        // identidades no cuelgan de el y se borran aparte.
+        households.deleteCurrent()
+        orphaned.forEach { identities.delete(it.id) }
+
+        log.info(
+            "Purgado el hogar {} al vencer su baja: {} ficheros y {} identidades sin ninguna pertenencia",
+            household.id,
+            files,
+            orphaned.size,
+        )
+        return emptyList()
+    }
+
+    /**
+     * Las identidades de este hogar a las que **no les queda ningun otro**.
+     *
+     * `householdsOfIdentity` cuenta tambien las pertenencias dadas de baja: la
+     * pregunta no es donde puede entrar esa persona, sino donde consta. Alguien
+     * que dejo el hogar A y hoy vive en B tiene fila en los dos, y borrar su
+     * identidad al purgar B se llevaria en cascada su rastro en A.
+     */
+    private fun orphanedIdentities(householdId: UUID) = members
+        .list(includeDeactivated = true, Pagination(0, MAX_MEMBERS_PER_HOUSEHOLD))
+        .items
+        .mapNotNull { identities.findById(it.identityId) }
+        .distinctBy { it.id }
+        .filter { identity -> tenants.householdsOfIdentity(identity.id).none { it != householdId } }
+
+    private companion object {
+        /**
+         * Holgura y no una pagina de verdad: un hogar domestico tiene unidades de
+         * miembros, y aqui hacen falta todos de una vez para no dejarse a nadie.
+         */
+        const val MAX_MEMBERS_PER_HOUSEHOLD = 500
     }
 }

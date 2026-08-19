@@ -2,10 +2,10 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Planificado, sin empezar |
+| Estado | En curso — Hito 0 cerrado |
 | Responsable | Equipo DRP |
 | Ámbito | Los cuatro huecos que las Fases 1 y 2 dejaron abiertos a propósito |
-| Última revisión | 2026-08-19 |
+| Última revisión | 2026-08-20 |
 
 > El estado de **las fases** vive en la sección 8 del
 > [`README principal`](../../../README.md), y solo allí. Este documento baja al
@@ -167,9 +167,16 @@ Y para recorrer la lista hay que poder leerla, que es el paso que la Fase 1 ya
 resolvió una vez: hay **tres funciones `SECURITY DEFINER`** en el rol
 `drp_resolver` que devuelven **solo identificadores de hogar** —ni un dato, ni una
 fila, ni un correo— y tras las cuales el caso de uso vuelve a trabajar bajo la
-política. La dirección propuesta para el Hito 1 es **una cuarta**, que devuelva
+política. La dirección propuesta para el Hito 1 es **una más**, que devuelva
 los hogares con entregas pendientes: así el relay no recorre en vacío mil hogares
 cada pocos segundos para encontrar el que tiene una fila.
+
+> **Ojo al número, que ha cambiado.** El Hito 0 añadió
+> `list_households_for_identity` —«en qué hogares consta esta persona», que es lo
+> que la baja de hogar necesita para saber si alguien se queda sin ninguna
+> pertenencia— así que la del outbox no será la cuarta. Lo que no cambia es el
+> criterio de admisión: **solo identificadores de hogar**, pregunta cerrada, y de
+> `drp_resolver`.
 
 ### `ModuleEventHandler` hay que volver a mirarlo, no dejarlo estar
 
@@ -339,7 +346,7 @@ texto de encima, con lo que el usuario acaba sin el color que eligió.
 
 ## Hitos
 
-### Hito 0 — Baja de hogar y cierre de cuenta · **Pendiente**
+### Hito 0 — Baja de hogar y cierre de cuenta · **Hecho** (2026-08-20)
 
 El primero porque es el que borra datos personales, y porque cierra un criterio
 que otro documento dejó colgando del suyo: la retención de las cinco tablas que
@@ -347,43 +354,43 @@ crecen sin techo se resuelve, según
 [`capacity-measurements.md`](../../backend/operations/capacity-measurements.md),
 «con la baja del hogar».
 
-- [ ] **ADR-012 — Supresión de datos: baja de hogar y cierre de cuenta**: el
+- [x] **ADR-012 — Supresión de datos: baja de hogar y cierre de cuenta**: el
       periodo de gracia y su duración, la purga desde el recorrido diario que ya
       existe, el orden bytes → filas, y la frontera entre hogar e identidad. Con su
       criterio de validación y de reversión, como toda ADR.
-- [ ] **Migración `V14`**: la marca de baja en `households` —cuándo se pidió, quién
+- [x] **Migración `V14`**: la marca de baja en `households` —cuándo se pidió, quién
       la pidió y cuándo vence la gracia—, con la autoría apuntando a la
       pertenencia, como en todo el modelo.
-- [ ] **`RequestHouseholdClosure` y `CancelHouseholdClosure`**, solo
+- [x] **`RequestHouseholdClosure` y `CancelHouseholdClosure`**, solo
       `HOUSEHOLD_ADMIN`. Pedir la baja levanta **un** aviso en `household_notices`
       y no uno cada noche: un aviso no se repite mientras la condición siga siendo
       cierta, que es regla de la ADR-011.
-- [ ] **`CloseAccount`**, autenticado y sobre la propia identidad: marca
+- [x] **`CloseAccount`**, autenticado y sobre la propia identidad: marca
       `deactivatedAt`, revoca sus refresh tokens y **borra el avatar**. Es la regla
       de 4.1.4 que llevaba escrita desde la Fase 1 sin nada a lo que engancharse.
-- [ ] **`PurgeClosedHouseholds`**, una `ScheduledCheck` más con `CheckOwner.Core`.
+- [x] **`PurgeClosedHouseholds`**, una `ScheduledCheck` más con `CheckOwner.Core`.
       No hay recorrido nuevo: entra en `DailySweep` como las tres que ya están.
-- [ ] **El borrado del árbol de ficheros del hogar** detrás del puerto
+- [x] **El borrado del árbol de ficheros del hogar** detrás del puerto
       `FileStorage`, con el criterio de `PurgeUnusedFiles`: los bytes primero y las
       filas después.
-- [ ] **Qué se lleva la cascada, comprobado tabla por tabla** y no confiando en las
+- [x] **Qué se lleva la cascada, comprobado tabla por tabla** y no confiando en las
       claves ajenas: las **veintitrés que llevan `household_id`**, las de los cuatro
       módulos incluidas, y aparte las **cinco que no lo llevan** (5.6), que son
       exactamente donde está el nudo. Una tabla que se quede fuera no da ningún
       error — deja filas de un hogar que pidió marcharse.
-- [ ] **Cuatro operaciones en el contrato**, con su `operationId`: solicitar la
+- [x] **Cuatro operaciones en el contrato**, con su `operationId`: solicitar la
       baja, cancelarla, verla en el estado del hogar y cerrar la cuenta.
-- [ ] **Frontend**: la zona de peligro en la pantalla del hogar, con confirmación
+- [x] **Frontend**: la zona de peligro en la pantalla del hogar, con confirmación
       escrita y no con un botón; el aviso persistente mientras dura la gracia, con
       la fecha en la que el hogar desaparece; y cerrar la cuenta desde la pantalla
       de la persona.
-- [ ] **Recorrido vertical**: solicitar la baja, ver el aviso, cancelarla y
+- [x] **Recorrido vertical**: solicitar la baja, ver el aviso, cancelarla y
       comprobar que todo sigue. La purga se demuestra en la batería del backend,
       que es donde se puede mover el reloj — y con ficheros de verdad en disco,
       porque el objetivo es justamente que no quede ninguno.
-- [ ] **Barrido de aislamiento**: las operaciones nuevas entran en
+- [x] **Barrido de aislamiento**: las operaciones nuevas entran en
       `TenantIsolationSweepTest` con el criterio de inclusión de su cabecera.
-- [ ] **Los documentos que este hito cierra**: 4.1.4 (las dos bajas), 5.7 (los tres
+- [x] **Los documentos que este hito cierra**: 4.1.4 (las dos bajas), 5.7 (los tres
       casos de uso nuevos y la promesa autoprogramada de
       `PurgeUnverifiedHouseholds`), 5.6, el criterio de retención de
       [`capacity-measurements.md`](../../backend/operations/capacity-measurements.md)
@@ -504,7 +511,9 @@ enseñaron que lo que se deja para «al final de otro hito» no se cierra:
       dentro y con el criterio de retención al día.
 - [ ] **La lista de pantallas de la auditoría de accesibilidad**, que se llama
       `PHASE_TWO_SCREENS` y ya no contiene solo pantallas de la Fase 2: o se
-      renombra, o deja de describir lo que contiene.
+      renombra, o deja de describir lo que contiene. **El Hito 0 lo agravó a
+      propósito**, metiendo en ella «Tu hogar» y «Tu cuenta», que son del core:
+      el nombre ya es directamente falso.
 - [ ] **Los punteros hacia adelante** de [`roadmap.md`](roadmap.md) y
       [`phase-2-roadmap.md`](phase-2-roadmap.md), que pasan de «hay un plan» a «está
       hecho», sin reescribir lo que aquellas fases dejaron dicho.
@@ -542,7 +551,7 @@ no aquí.
 
 | Pregunta | Hito | Por qué vence ahí |
 |---|---|---|
-| **La identidad que se queda sin ninguna pertenencia: ¿baja lógica o borrado real?** Conservarla retiene datos personales de alguien que ya no puede entrar y **no libera su correo** —el índice único dejó de ser parcial por baja—, así que esa persona no puede volver nunca. Borrarla es lo que `PurgeUnverifiedHouseholds` ya hace, pero allí no había nada que conservar | 0 | Es lo que la baja de hogar produce, y sin respuesta no se puede escribir su purga |
+| ~~**La identidad que se queda sin ninguna pertenencia: ¿baja lógica o borrado real?**~~ **Resuelta (2026-08-20): borrado real**, en la [ADR-012](../architecture/decisions/ADR-012-data-erasure-household-closure-and-account-closure.md) y en [`decisions.md`](decisions.md). Conservarla retiene datos personales de alguien que ya no puede entrar y **no libera su correo** —el índice único dejó de ser parcial por baja—, así que esa persona no puede volver nunca. Borrarla es lo que `PurgeUnverifiedHouseholds` ya hace, pero allí no había nada que conservar | 0 | Es lo que la baja de hogar produce, y sin respuesta no se puede escribir su purga |
 | **¿El outbox es el único camino de entrega, o convive con la entrega in-process?** Un solo camino deja una sola semántica que razonar y añade la latencia del relay; convivir entrega al instante y obliga a decidir qué significa una fila que el otro camino ya entregó | 1 | De ello depende si `AFTER_COMMIT` sigue significando algo en `ModuleEventHandler` |
 | **¿La fila entregada se borra o se conserva?** Borrarla deja el outbox sin crecimiento; conservarla da un registro de lo publicado y convierte `event_outbox` en la **sexta** tabla sin techo, con su criterio de retención | 1 | La medición de capacidad distingue lo que crece con lo que el hogar tiene de lo que crece con lo que hace, y esto es lo segundo |
 | **HEIC: ¿cliente o servidor?** Con las dos medidas delante, y no antes | 2 | Es la decisión del hito, y su ADR no se puede escribir sin ella |
@@ -573,4 +582,5 @@ no aquí.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | **Hito 0 cerrado**: la baja de hogar con treinta días de gracia, el cierre de cuenta con su avatar y `PurgeClosedHouseholds` dentro del recorrido que ya existía. Con ellos, la **ADR-012**, la migración `V14` —tres columnas y una función acotada más—, cuatro operaciones en el contrato y la zona de peligro con confirmación escrita. Se resuelve la pregunta que el plan le había asignado —la identidad huérfana **se borra de verdad**— y se deciden otras cinco por el camino, entre ellas la del último administrador. Se cierran de paso dos promesas ajenas: la de `PurgeUnverifiedHouseholds` sobre el directorio del hogar y el criterio de retención de cuatro de las cinco tablas sin techo. La auditoría sistemática destapó además que **el limitador de frecuencia no daba para dos pantallas más**, con un síntoma que no se parecía a la causa |
 | 2026-08-19 | Se crea al planificar el cierre de los cuatro huecos que las Fases 1 y 2 dejaron abiertos a propósito: seis hitos, cuatro ADR nuevas, cinco preguntas con su hito asignado y las cuatro decisiones de arranque tomadas antes de empezar. Se decide **dónde encaja**: un bloque entre fases, ni un hito 0 de la Fase 3 ni una fase numerada |

@@ -49,6 +49,11 @@ class HouseholdEntity(
     var timeZone: String,
     var createdAt: Instant,
     var updatedAt: Instant,
+    // La baja solicitada (ADR-012). Las tres juntas o ninguna, con su CHECK en
+    // la V14: media baja no es un estado que deba poder representarse.
+    var closureRequestedAt: Instant? = null,
+    var closureRequestedBy: UUID? = null,
+    var closureEffectiveAt: Instant? = null,
 )
 
 @Entity

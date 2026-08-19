@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Identidad, pertenencia, roles y credenciales |
-| Última revisión | 2026-08-10 |
+| Última revisión | 2026-08-20 |
 
 > Trasladado desde la sección 4.1.4 del [`README principal`](../../../README.md) al iniciar la Fase 1. **Los números de sección se conservan**: hay más de cien referencias cruzadas del tipo «ver 4.1.1» repartidas por el repositorio, y renumerarlas las rompería todas.
 
@@ -152,7 +152,17 @@ La regla se aplica en los **cuatro** puntos donde se fija una contraseña: al cr
 Son dos operaciones distintas, y la separación entre identidad y pertenencia es lo que permite distinguirlas:
 
 - **Dejar el hogar** marca `deactivatedAt` en la **pertenencia**. La persona deja de ver ese hogar, pero su identidad sigue existiendo. La fila permanece porque los préstamos y el historial la referencian.
-- **Cerrar la cuenta** marca `deactivatedAt` en la **identidad**, revoca sus refresh tokens, le impide autenticarse en cualquier hogar y **borra su avatar**: es lo único del sistema que retrata a una persona, y la fila que se conserva por historial no necesita su cara. Los ficheros del hogar se quedan, porque son del hogar y no suyos.
+- **Cerrar la cuenta** (`CloseAccount`) marca `deactivatedAt` en la **identidad**, **da de baja también su pertenencia**, revoca sus refresh tokens, le impide autenticarse en cualquier hogar y **borra su avatar**: es lo único del sistema que retrata a una persona, y la fila que se conserva por historial no necesita su cara. Los ficheros del hogar se quedan, porque son del hogar y no suyos.
+
+> **Lo de la pertenencia se añadió al implementarlo** (Hito 0 del cierre de huecos, [ADR-012](../architecture/decisions/ADR-012-data-erasure-household-closure-and-account-closure.md)), y no es un detalle: sin ello la persona seguiría apareciendo activa en el hogar y contaría como administradora de un sitio en el que no puede entrar nunca más. Sus assets quedan **sin propietario**, exactamente igual que al darla de baja alguien más.
+>
+> Y **el único administrador activo no puede cerrar su cuenta**, con el mismo `USER_LAST_ADMIN` que ya impide quitarle el rol o darlo de baja, porque es la misma regla: un hogar sin administrador no puede invitar, cambiar roles, encender módulos ni pedir su propia baja. La salida está en sus manos — nombrar administradora a otra persona, o dar de baja el hogar.
+
+**Y una tercera baja, que es la del hogar entero.**
+
+`RequestHouseholdClosure` la solicita —solo `HOUSEHOLD_ADMIN`— y a partir de ahí corren **treinta días de gracia** en los que el hogar funciona exactamente igual; lo único que lo distingue es un aviso con la fecha en la que desaparecerá. `CancelHouseholdClosure` la retira mientras tanto, sin nada que restaurar. Vencido el plazo, el recorrido diario borra el hogar entero: sus filas, las de todos los módulos y **sus ficheros en disco**.
+
+**La dirección entre las dos es de una sola vía**: la baja del hogar puede activar la de una identidad —a quien se quede sin ninguna pertenencia—, y **cerrar una cuenta nunca se lleva la casa por delante**. Una identidad que se quede sin ninguna pertenencia **se borra de verdad**, con su avatar: conservarla retendría datos personales de quien ya no puede entrar en ningún sitio y, como el índice único del correo no es parcial por baja, le impediría volver a registrarse para siempre. El porqué entero, con sus alternativas descartadas, está en la [ADR-012](../architecture/decisions/ADR-012-data-erasure-household-closure-and-account-closure.md).
 
 Al dejar un hogar, sus assets **quedan sin propietario**, no se reasignan solos. Aparecen en un listado de huérfanos (`ListAssets` con el filtro correspondiente, ver 5.7) y se reasignan cuando el hogar decida. La alternativa —exigir el destino de todo lo suyo en el mismo gesto— convierte una baja en un inventario completo, y con cuarenta cosas a su nombre eso significa que la baja no se hace.
 

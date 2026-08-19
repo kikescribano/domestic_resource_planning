@@ -35,6 +35,7 @@ import com.drp.core.domain.file.DocumentTarget
 import com.drp.core.domain.file.StoredContentType
 import com.drp.core.domain.file.StoredFile
 import com.drp.core.domain.household.Household
+import com.drp.core.domain.household.HouseholdClosure
 import com.drp.core.domain.household.HouseholdMember
 import com.drp.core.domain.household.MemberRole
 import com.drp.core.domain.identity.Avatar
@@ -77,6 +78,9 @@ class HouseholdRepositoryAdapter(
                 timeZone = household.timeZone.id,
                 createdAt = household.createdAt,
                 updatedAt = household.updatedAt,
+                closureRequestedAt = household.closure?.requestedAt,
+                closureRequestedBy = household.closure?.requestedBy,
+                closureEffectiveAt = household.closure?.effectiveAt,
             ),
         ).toDomain()
 
@@ -112,6 +116,7 @@ class HouseholdRepositoryAdapter(
         timeZone = ZoneId.of(timeZone),
         createdAt = createdAt,
         updatedAt = updatedAt,
+        closure = HouseholdClosure.from(closureRequestedAt, closureRequestedBy, closureEffectiveAt),
     )
 }
 
@@ -155,6 +160,13 @@ class SqlTenantResolver(private val jdbc: JdbcTemplate) : TenantResolver, Househ
             { rows, _ -> rows.getObject(1, UUID::class.java) },
             tokenHash,
         ).firstOrNull()
+
+    /**
+     * `SELECT * FROM` y no `SELECT f(?)` porque devuelve un conjunto y no un
+     * valor, igual que `list_household_ids()`.
+     */
+    override fun householdsOfIdentity(identityId: UUID): List<UUID> =
+        jdbc.queryForList("SELECT * FROM list_households_for_identity(?)", UUID::class.java, identityId)
 }
 
 @Repository

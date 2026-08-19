@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Backend Kotlin |
-| Última revisión | 2026-08-18 |
+| Última revisión | 2026-08-20 |
 
 La decisión y su porqué están en la
 [ADR-011](../../common/architecture/decisions/ADR-011-scheduled-checks-and-notice-delivery.md).
@@ -22,15 +22,23 @@ resumen diario si hay algo pendiente.
 |---|---|---|
 | `MarkOverdueLoans` | Core | Pasa a `OVERDUE` los préstamos `ACTIVE` con la fecha superada, publica `LoanOverdue` y deja un aviso |
 | `PurgeUnusedFiles` | Core | Desenlaza del disco lo borrado hace más de 24 h, lo subido y nunca adjuntado, y las reservas cortadas a medias |
+| `PurgeClosedHouseholds` | Core | **Borra** el hogar cuya baja ha vencido: sus filas, las de los cuatro módulos, sus ficheros en disco y la identidad de quien se quede sin ninguna pertenencia ([ADR-012](../../common/architecture/decisions/ADR-012-data-erasure-household-closure-and-account-closure.md)) |
 | `PurgeUnverifiedHouseholds` | Core | **Borra** los hogares sin verificar de más de siete días, con su identidad |
 
 Las del core corren en **todos** los hogares: el core no se apaga. Las que traiga
 un módulo corren solo donde ese módulo esté encendido.
 
-El orden es alfabético por nombre de comprobación, para que dos pasadas hagan lo
-mismo en el mismo orden. Cada una va en su propia transacción y con su propio
-`catch`: **un hogar que falle no corta la pasada**, deja una línea de error y el
-recorrido sigue.
+El orden es **lo que puede borrar el hogar al final, y el alfabeto por delante**.
+Cada comprobación declara `purgesHousehold`, y el recorrido ordena por esa clave
+primero y por el nombre después, de modo que dos pasadas siguen haciendo lo mismo
+en el mismo orden. Hasta la [ADR-012](../../common/architecture/decisions/ADR-012-data-erasure-household-closure-and-account-closure.md)
+solo había una comprobación capaz de hacer desaparecer el hogar en curso y que
+fuera la última era **un accidente del alfabeto**; con dos ya no basta —
+`PurgeClosedHouseholds` caería la segunda de cuatro— y lo que corriera detrás lo
+haría sobre un hogar que acaba de dejar de existir.
+
+Cada una va en su propia transacción y con su propio `catch`: **un hogar que falle
+no corta la pasada**, deja una línea de error y el recorrido sigue.
 
 ## Configuración
 
@@ -89,3 +97,9 @@ Recorrido diario: 42 hogares, 3 avisos nuevos, 2 resúmenes entregados
 de un hogar doméstico son filas de texto corto y no es urgente, pero es una purga
 que alguien tendrá que escribir, y su sitio natural es una comprobación más de
 este mismo recorrido. Queda anotado en las consecuencias de la ADR-011.
+
+Lo que sí se cerró es **la otra mitad del criterio**: las cuatro tablas que son
+historial del hogar —movimientos, lista de la compra, compras e intervenciones—
+no se purgan por antigüedad, sino que **se retiran con el hogar**, y desde la
+ADR-012 eso ya no es una promesa sino `PurgeClosedHouseholds`. El detalle está en
+[`capacity-measurements.md`](capacity-measurements.md).

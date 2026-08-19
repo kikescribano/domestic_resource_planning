@@ -4,11 +4,14 @@ import com.drp.core.application.port.SessionClaims
 import com.drp.core.application.usecase.AcceptInvitation
 import com.drp.core.application.usecase.AcceptInvitationCommand
 import com.drp.core.application.usecase.ChangePassword
+import com.drp.core.application.usecase.CancelHouseholdClosure
 import com.drp.core.application.usecase.ChangeUserRole
+import com.drp.core.application.usecase.CloseAccount
 import com.drp.core.application.usecase.CreateHousehold
 import com.drp.core.application.usecase.CreateHouseholdCommand
 import com.drp.core.application.usecase.DeactivateUser
 import com.drp.core.application.usecase.DeleteIdentityAvatar
+import com.drp.core.application.usecase.GetCurrentHousehold
 import com.drp.core.application.usecase.HouseholdUser
 import com.drp.core.application.usecase.InviteUser
 import com.drp.core.application.usecase.InviteUserCommand
@@ -17,6 +20,7 @@ import com.drp.core.application.usecase.ListUsers
 import com.drp.core.application.usecase.Login
 import com.drp.core.application.usecase.LoginCommand
 import com.drp.core.application.usecase.RefreshSession
+import com.drp.core.application.usecase.RequestHouseholdClosure
 import com.drp.core.application.usecase.RequestPasswordReset
 import com.drp.core.application.usecase.ResendVerification
 import com.drp.core.application.usecase.ResetPassword
@@ -60,7 +64,12 @@ import org.springframework.web.multipart.MultipartHttpServletRequest
 
 @RestController
 @RequestMapping("/api/v1/households")
-class HouseholdController(private val createHousehold: CreateHousehold) {
+class HouseholdController(
+    private val createHousehold: CreateHousehold,
+    private val getCurrentHousehold: GetCurrentHousehold,
+    private val requestClosure: RequestHouseholdClosure,
+    private val cancelClosure: CancelHouseholdClosure,
+) {
 
     /**
      * `202` siempre, sin cuerpo y exista o no ya ese correo. Contestar otra cosa
@@ -79,6 +88,31 @@ class HouseholdController(private val createHousehold: CreateHousehold) {
             ),
         )
     }
+
+    /**
+     * El hogar del token. **No lleva identificador en la ruta** por lo mismo que
+     * ningun otro recurso: el hogar sale del token y aceptarlo del cliente seria
+     * abrir justo la puerta que la ADR-002 cierra.
+     *
+     * La lee cualquier miembro: que la casa esta a punto de desaparecer no es
+     * informacion reservada a quien administra.
+     */
+    @GetMapping("/current")
+    fun current(): HouseholdResponse = HouseholdResponse.of(getCurrentHousehold.handle())
+
+    /** Solo `HOUSEHOLD_ADMIN`: es la supresion irreversible de la casa entera. */
+    @PostMapping("/current/closure")
+    @PreAuthorize("hasRole('HOUSEHOLD_ADMIN')")
+    fun requestClosure(@AuthenticationPrincipal session: SessionClaims): HouseholdResponse =
+        HouseholdResponse.of(requestClosure.handle(session))
+
+    /**
+     * Cancelarla es un `DELETE` sobre la baja y no un `POST /cancel`: lo que
+     * desaparece es la solicitud, que es un recurso con su sitio en la ruta.
+     */
+    @DeleteMapping("/current/closure")
+    @PreAuthorize("hasRole('HOUSEHOLD_ADMIN')")
+    fun cancelClosure(): HouseholdResponse = HouseholdResponse.of(cancelClosure.handle())
 }
 
 @RestController
@@ -175,6 +209,7 @@ class UserController(
     private val listUsers: ListUsers,
     private val changeUserRole: ChangeUserRole,
     private val deactivateUser: DeactivateUser,
+    private val closeAccount: CloseAccount,
     private val setAvatar: SetIdentityAvatar,
     private val deleteAvatar: DeleteIdentityAvatar,
     private val urls: SignedFileUrls,
@@ -204,6 +239,20 @@ class UserController(
         @AuthenticationPrincipal session: SessionClaims,
         @PathVariable id: UUID,
     ) = deactivateUser.handle(session, id)
+
+    /**
+     * Cerrar la cuenta propia. **Sin identificador en la ruta**, y no es un
+     * atajo: `DELETE /users/{id}` ya existe y significa otra cosa --sacar a
+     * alguien del hogar, y solo puede hacerlo quien administra--. Esta es la
+     * persona dandose de baja a si misma, asi que el sujeto lo pone el token y no
+     * se puede nombrar a nadie mas.
+     *
+     * Responde `204` y deja la sesion inservible: el cliente tiene que descartar
+     * sus tokens y volver a la pantalla de entrar.
+     */
+    @DeleteMapping("/me")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun closeOwnAccount(@AuthenticationPrincipal session: SessionClaims) = closeAccount.handle(session)
 
     /**
      * «me» resuelve a la **identidad** del token, no a la pertenencia: el avatar

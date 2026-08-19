@@ -59,8 +59,19 @@ class DailySweep(
      * Ordenadas por nombre, para que dos pasadas hagan lo mismo en el mismo
      * orden. Sin esto el orden lo decide el de los beans, que no es contrato de
      * nada y cambia al anadir un modulo.
+     *
+     * **Y con una clave gruesa delante: lo que puede borrar el hogar va al
+     * final** (ver [ScheduledCheck.purgesHousehold]). Hasta la baja de hogar
+     * (ADR-012) solo habia una comprobacion asi y que fuera la ultima era un
+     * accidente del alfabeto; con dos, el alfabeto deja de bastar --
+     * `PurgeClosedHouseholds` caeria la segunda de cuatro-- y lo que venga
+     * detras correria sobre un hogar que acaba de dejar de existir.
+     *
+     * Dos pasadas siguen haciendo lo mismo en el mismo orden, que es lo unico
+     * que la ADR-011 pedia de esta linea.
      */
-    private val checks: List<ScheduledCheck> = checks.sortedBy { it.name }
+    private val checks: List<ScheduledCheck> =
+        checks.sortedWith(compareBy({ it.purgesHousehold }, { it.name }))
 
     /**
      * La pasada diaria.

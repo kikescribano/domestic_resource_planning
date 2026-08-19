@@ -31,6 +31,8 @@ export type ApiErrorCode =
   | 'FILE_IN_USE'
   | 'FILE_TOO_LARGE'
   | 'FILE_TYPE_NOT_ALLOWED'
+  | 'HOUSEHOLD_CLOSURE_ALREADY_REQUESTED'
+  | 'HOUSEHOLD_CLOSURE_NOT_REQUESTED'
   | 'IDENTITY_ALREADY_MEMBER'
   | 'INTAKE_QUANTITY_NOT_POSITIVE'
   | 'INVITATION_ALREADY_PENDING'
@@ -96,6 +98,11 @@ const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   FILE_IN_USE: 'No se puede borrar: todavía cuelga de algo. Quítalo de ahí primero.',
   FILE_TOO_LARGE: 'El fichero pesa demasiado. El máximo son 25 MB.',
   FILE_TYPE_NOT_ALLOWED: 'Ese tipo de fichero no se admite. Solo JPEG, PNG, WebP y PDF.',
+  // Los dos de la baja de hogar se ven poco —la pantalla esconde el gesto
+  // que sobra— pero llegan cuando alguien lo hace desde dos pestañas o desde
+  // otro dispositivo, que en un hogar compartido no es raro.
+  HOUSEHOLD_CLOSURE_ALREADY_REQUESTED: 'El hogar ya tiene una baja pedida. Recarga para ver la fecha.',
+  HOUSEHOLD_CLOSURE_NOT_REQUESTED: 'El hogar no tiene ninguna baja pedida. Puede que alguien ya la cancelara.',
   EXISTENCE_ALREADY_IN_LOCATION: 'Ahí ya hay una existencia de este artículo. Únelas en lugar de moverla.',
   INTAKE_QUANTITY_NOT_POSITIVE: 'La cantidad que entra tiene que ser mayor que cero.',
   LOAN_ALREADY_RETURNED: 'Este préstamo ya estaba devuelto.',
@@ -109,6 +116,9 @@ const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   MERGE_ASSET_DEACTIVATED: 'Alguna de las dos existencias está dada de baja.',
   MERGE_NOT_CONSUMABLE: 'Solo se unen existencias de consumible.',
   MERGE_SAME_ASSET: 'Origen y destino son la misma existencia.',
+  // Sale en dos sitios distintos —al cambiar un rol y al cerrar la cuenta
+  // propia— así que dice la regla y no el sujeto, que cambia.
+  USER_LAST_ADMIN: 'Dejaría al hogar sin ninguna persona que lo administre. Nombra antes a otra.',
   SUPPLIER_CONTACT_REQUIRED: 'Hace falta al menos un teléfono, un correo o una web.',
   SUPPLIER_DUPLICATE: 'Ya hay un contacto de servicio con ese nombre.',
   SUPPLIER_LINK_DUPLICATE: 'Ese contacto ya está enlazado con eso.',
@@ -203,6 +213,39 @@ export interface User {
   lastLoginAt: string | null
   emailVerifiedAt: string | null
   deactivatedAt: string | null
+}
+
+/**
+ * La baja solicitada de un hogar (ADR-012).
+ *
+ * `effectiveAt` es **la fecha que se le prometió a una persona**: el instante a
+ * partir del cual el hogar desaparece. Viaja como instante y se pinta en la zona
+ * de quien mira.
+ */
+export interface HouseholdClosure {
+  requestedAt: string
+  /** La **pertenencia** de quien la pidió, como toda la autoría del contrato. */
+  requestedBy: string
+  effectiveAt: string
+}
+
+/**
+ * El hogar de la sesion.
+ *
+ * Es la primera lectura del hogar que tiene el contrato, y existe sobre todo por
+ * [closure]: el aviso persistente y la zona de peligro necesitan saber si el
+ * hogar se está dando de baja. **No sale del token** a propósito —el access
+ * token vive quince minutos, así que un hogar marcado después mentiría hasta la
+ * siguiente renovación—.
+ */
+export interface Household {
+  id: string
+  name: string
+  timeZone: string
+  createdAt: string
+  updatedAt: string
+  /** Nula es lo normal: solo tiene valor mientras corre el periodo de gracia. */
+  closure: HouseholdClosure | null
 }
 
 export interface Invitation {
@@ -1287,6 +1330,16 @@ export const api = {
       accessToken,
     }),
 
+  // --- El hogar y su baja ---------------------------------------------------
+  getCurrentHousehold: (accessToken: string) =>
+    request<Household>('/households/current', { accessToken }),
+
+  requestHouseholdClosure: (accessToken: string) =>
+    request<Household>('/households/current/closure', { method: 'POST', accessToken }),
+
+  cancelHouseholdClosure: (accessToken: string) =>
+    request<Household>('/households/current/closure', { method: 'DELETE', accessToken }),
+
   // --- Usuarios e invitaciones ----------------------------------------------
   listUsers: (accessToken: string, includeDeactivated = false) =>
     request<Page<User>>(`/users?includeDeactivated=${includeDeactivated}`, { accessToken }),
@@ -1296,6 +1349,17 @@ export const api = {
 
   deactivateUser: (memberId: string, accessToken: string) =>
     request<void>(`/users/${memberId}`, { method: 'DELETE', accessToken }),
+
+  /**
+   * Cerrar la cuenta propia. **Sin identificador**: el sujeto lo pone el token,
+   * y `deactivateUser` —que sí lo lleva— es otra cosa, sacar a alguien del
+   * hogar.
+   *
+   * Deja la sesión inservible, así que quien lo llame tiene que descartar los
+   * tokens y volver a la pantalla de entrar.
+   */
+  closeAccount: (accessToken: string) =>
+    request<void>('/users/me', { method: 'DELETE', accessToken }),
 
   listInvitations: (accessToken: string) =>
     request<Page<Invitation>>('/invitations', { accessToken }),

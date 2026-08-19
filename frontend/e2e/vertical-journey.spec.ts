@@ -750,7 +750,96 @@ test.describe('recorrido vertical', () => {
    * lo que se olvida en una pantalla nueva no es la comprobación difícil sino la
    * de siempre.
    */
-  test('la pasada sistemática: las seis pantallas de la Fase 2, con teclado, reflujo y axe', async ({
+  /**
+   * La baja del hogar: pedirla, ver el aviso, cancelarla y comprobar que sigue
+   * todo (ADR-012).
+   *
+   * **Lo que no está aquí es la purga**, y no por descuido: vencer treinta días
+   * de gracia exige mover el reloj, y eso se hace donde hay reloj que mover —la
+   * batería del backend, con ficheros de verdad en disco—. Aquí está lo que solo
+   * se puede ver en un navegador: que la confirmación hay que **escribirla**, que
+   * el aviso persiste **en otras pantallas** y no solo en la del hogar, y que
+   * cancelar lo deja todo como estaba.
+   */
+  test('la baja del hogar: pedirla con el nombre escrito, verla en todas partes y cancelarla', async ({
+    page,
+  }) => {
+    const email = `baja-${Date.now()}@example.test`
+    const password = 'el gato duerme en el sofa'
+    const householdName = 'Casa que se va'
+
+    await page.goto('/crear-hogar')
+    await page.getByLabel('Nombre del hogar').fill(householdName)
+    await page.getByLabel('Tu nombre').fill('Kike')
+    await page.getByLabel('Correo').fill(email)
+    await page.getByLabel('Contraseña', { exact: true }).fill(password)
+    await page.getByRole('button', { name: /crear/i }).click()
+    await page.goto(await linkFromEmail(email))
+    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+
+    // Algo dentro, para poder afirmar después que cancelar no se llevó nada.
+    await navigateTo(page, 'Sitios', '/ubicaciones')
+    await page.getByLabel('Nombre').fill('Trastero')
+    await page.getByLabel('Tipo').selectOption({ label: 'Habitación' })
+    await page.getByRole('button', { name: 'Crear ubicación' }).click()
+    await expect(
+      page.getByRole('tree', { name: 'Ubicaciones del hogar' }).getByText('Trastero'),
+    ).toBeVisible()
+
+    // --- 1. La zona de peligro, que no se dispara con un clic ---------------
+    await navigateTo(page, 'Hogar', '/', true)
+    const confirm = page.getByRole('button', { name: 'Dar de baja el hogar' })
+    await expect(confirm).toBeDisabled()
+
+    // Con el nombre a medias sigue sin poder pulsarse: es la diferencia entera
+    // entre esto y un «¿seguro?», que se contesta que sí por reflejo.
+    const field = page.getByLabel(`Escribe «${householdName}» para confirmarlo`)
+    await field.fill('Casa que')
+    await expect(confirm).toBeDisabled()
+
+    await field.fill(householdName)
+    await expect(confirm).toBeEnabled()
+    await confirm.click()
+
+    // --- 2. El aviso, con su fecha y en todas las pantallas -----------------
+    const banner = page.getByText(/Este hogar se borrará el/)
+    await expect(banner).toBeVisible()
+
+    // Y fuera de la pantalla del hogar, que es lo que de verdad se comprueba
+    // aquí: durante la gracia todo sigue igual, así que alguien puede pasarse
+    // treinta días en el inventario sin volver a «Tu hogar».
+    await navigateTo(page, 'Inventario', '/inventario')
+    await expect(page.getByText(/Este hogar se borrará el/)).toBeVisible()
+
+    // El hogar funciona **exactamente igual**: nada de solo lectura, que
+    // castigaría justo a quien todavía puede arrepentirse.
+    await navigateTo(page, 'Sitios', '/ubicaciones')
+    await page.getByLabel('Nombre').fill('Buhardilla')
+    await page.getByLabel('Tipo').selectOption({ label: 'Habitación' })
+    await page.getByRole('button', { name: 'Crear ubicación' }).click()
+    await expect(
+      page.getByRole('tree', { name: 'Ubicaciones del hogar' }).getByText('Buhardilla'),
+    ).toBeVisible()
+
+    await checkAccessibility(page, 'el hogar con la baja pedida')
+    await checkReflow(page, 'el hogar con la baja pedida')
+
+    // --- 3. Cancelarla, y comprobar que sigue todo --------------------------
+    await navigateTo(page, 'Hogar', '/', true)
+    await page.getByRole('button', { name: 'Cancelar la baja' }).click()
+
+    await expect(page.getByText(/Este hogar se borrará el/)).toHaveCount(0)
+    // La zona de peligro vuelve a estar disponible, que es como se ve que la
+    // baja se retiró de verdad y no solo el cartel.
+    await expect(page.getByRole('button', { name: 'Dar de baja el hogar' })).toBeVisible()
+
+    await navigateTo(page, 'Sitios', '/ubicaciones')
+    const tree = page.getByRole('tree', { name: 'Ubicaciones del hogar' })
+    await expect(tree.getByText('Trastero')).toBeVisible()
+    await expect(tree.getByText('Buhardilla')).toBeVisible()
+  })
+
+  test('la pasada sistemática: las ocho pantallas de la lista, con teclado, reflujo y axe', async ({
     page,
     request,
   }) => {
@@ -789,7 +878,7 @@ test.describe('recorrido vertical', () => {
     await checkTouchTargets(page)
 
     for (const screen of PHASE_TWO_SCREENS) {
-      await navigateTo(page, screen.link, screen.path)
+      await navigateTo(page, screen.link, screen.path, screen.exact ?? false)
       await expect(
         page.getByRole('heading', { level: 1, name: screen.heading }),
         `«${screen.link}» no llegó a montarse`,
@@ -803,8 +892,9 @@ test.describe('recorrido vertical', () => {
 })
 
 /**
- * Las seis pantallas que la Fase 2 añadió, con el nombre por el que se llega a
- * ellas desde la navegación.
+ * Las pantallas que la Fase 2 añadió, más las dos que el cierre de huecos llenó
+ * de contenido nuevo, con el nombre por el que se llega a ellas desde la
+ * navegación.
  *
  * Es una lista y no seis llamadas sueltas a propósito: **una pantalla nueva se
  * añade aquí y hereda la auditoría entera**, que es lo contrario de lo que pasó
@@ -813,6 +903,12 @@ test.describe('recorrido vertical', () => {
  */
 const PHASE_TWO_SCREENS = [
   { link: 'Módulos del hogar', path: '/modulos', heading: 'Módulos' },
+  // Las dos que la baja de hogar (ADR-012) llenó de contenido nuevo: «Tu hogar»
+  // estrena la zona de peligro y «Tu cuenta», el cierre de cuenta. No son rutas
+  // nuevas, pero lo que hay dentro sí lo es, y la auditoría se hereda por estar
+  // aquí en vez de escribirse aparte.
+  { link: 'Hogar', path: '/', heading: 'Tu hogar', exact: true },
+  { link: 'Cuenta', path: '/cuenta', heading: 'Tu cuenta' },
   { link: 'Avisos', path: '/avisos', heading: 'Avisos' },
   { link: 'Proveedores', path: '/proveedores', heading: 'Proveedores' },
   { link: 'Almacén', path: '/almacen', heading: 'Almacén' },
@@ -965,8 +1061,14 @@ async function checkTouchTargets(page: Page) {
  * vuelve antes de que la ruta haya cambiado y el `await` siguiente se pondría a
  * buscar en la pantalla anterior.
  */
-async function navigateTo(page: Page, label: string, path: string) {
-  await page.getByRole('navigation', { name: 'Principal' }).getByRole('link', { name: label }).click()
+async function navigateTo(page: Page, label: string, path: string, exact = false) {
+  // `exact` hace falta desde que la lista incluye «Hogar»: por omisión Playwright
+  // busca la subcadena, así que «Hogar» resuelve también a «Módulos del hogar» y
+  // el localizador falla por ambigüedad en vez de por ausencia.
+  await page
+    .getByRole('navigation', { name: 'Principal' })
+    .getByRole('link', { name: label, exact })
+    .click()
   await page.waitForURL(`**${path}`)
 }
 

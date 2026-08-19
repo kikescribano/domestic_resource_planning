@@ -1,5 +1,6 @@
 package com.drp.core.application.usecase
 
+import com.drp.core.application.port.FileStorage
 import com.drp.core.application.port.HouseholdMemberRepository
 import com.drp.core.application.port.IdentityRepository
 import com.drp.platform.page.Page
@@ -117,5 +118,91 @@ class DeactivateUser(
         // que la baja no se hace. Se localizan despues con
         // GET /assets?withoutOwner=true, que llega con el Hito 2.
         refreshTokens.revokeAllForIdentity(member.identityId, now)
+    }
+}
+
+/**
+ * Cerrar la cuenta (`CloseAccount`, 4.1.4 y 5.7).
+ *
+ * Es la regla que 4.1.4 llevaba escrita **desde la Fase 1 sin nada a lo que
+ * engancharse**: `DeactivateUser` da de baja la pertenencia, no la identidad, y
+ * no habia ninguna operacion que diera de baja a la persona. La baja de hogar
+ * (ADR-012) la trae consigo, porque es la que produce el caso que obliga a
+ * responder que se hace con una identidad.
+ *
+ * **La direccion importa y es de una sola via.** Cerrar la cuenta **no se lleva
+ * la casa por delante**: se va la persona y el hogar sigue con quien quede. Al
+ * reves si --la baja del hogar puede dejar identidades sin ninguna pertenencia, y
+ * de esas se ocupa [PurgeClosedHouseholds].
+ *
+ * Hace cuatro cosas, y ninguna es opcional:
+ *
+ * - **Da de baja la identidad.** `deactivatedAt`, que es lo que impide
+ *   autenticarse en cualquier hogar --`canAuthenticate` mira las dos cosas.
+ * - **Da de baja la pertenencia.** No lo decia 4.1.4 y hace falta: sin esto, la
+ *   persona sigue apareciendo activa en «Personas», cuenta como administrador a
+ *   efectos de [ChangeUserRole] y el hogar se queda creyendo que tiene a alguien
+ *   que no puede entrar nunca. Sus assets quedan **sin propietario**, igual que
+ *   en [DeactivateUser] y por el mismo motivo.
+ * - **Revoca sus refresh tokens**, o la sesion abierta seguiria renovandose
+ *   quince minutos mas cada vez durante dias.
+ * - **Borra el avatar.** Es lo unico del sistema que retrata a una persona, y la
+ *   baja de la identidad es el momento en que deja de haber motivo para
+ *   conservarlo. **Los ficheros del hogar se quedan**: son del hogar y no suyos.
+ *
+ * **El unico administrador activo no puede cerrar su cuenta** (`USER_LAST_ADMIN`,
+ * el mismo codigo que ya usan [ChangeUserRole] y [DeactivateUser], porque es
+ * literalmente la misma regla). Un hogar sin administrador no puede invitar,
+ * cambiar roles, encender modulos **ni pedir su propia baja**: queda bloqueado
+ * sin forma de salir, y bloqueado por una decision personal de alguien que ya no
+ * esta para arreglarlo. La salida esta en sus manos: nombrar a otra persona
+ * administradora, o pedir la baja del hogar y cerrar la cuenta despues de que se
+ * purgue.
+ *
+ * Se descarto **eximir de la regla a un hogar que ya tenga la baja pedida**, que
+ * parecia inofensivo porque ese hogar va a desaparecer igual. No lo es: dejaria
+ * la baja **sin nadie que pueda cancelarla**, y poder cancelarla es la razon
+ * entera de que haya treinta dias de gracia. Tambien se descarto **nombrar
+ * administrador a otra persona automaticamente**, que decide quien gobierna la
+ * casa en el gesto de irse de ella y sin preguntar a nadie.
+ */
+@Service
+class CloseAccount(
+    private val members: HouseholdMemberRepository,
+    private val identities: IdentityRepository,
+    private val refreshTokens: RefreshTokenRepository,
+    private val storage: FileStorage,
+    private val clock: Clock,
+) {
+
+    @Transactional
+    fun handle(session: SessionClaims) {
+        val member = members.findById(session.memberId)
+            ?.takeIf { it.isActive }
+            ?: throw ResourceNotFound("Usuario no encontrado")
+
+        if (member.isAdmin && members.countActiveAdmins() <= 1) {
+            throw BusinessRuleViolation(
+                ErrorCode.USER_LAST_ADMIN,
+                "Eres el único administrador activo del hogar",
+            )
+        }
+
+        val identity = identities.findById(session.identityId) ?: throw ResourceNotFound("Usuario no encontrado")
+        val now = clock.instant()
+
+        // Los bytes primero y la fila despues, que es el criterio de
+        // `PurgeUnusedFiles`. Al reves --como hace `DeleteIdentityAvatar`, donde
+        // es razonable porque una foto se vuelve a subir-- un fallo entre medias
+        // dejaria la cara de esta persona en disco para siempre: nada vuelve a
+        // mirar el avatar de una identidad dada de baja, asi que nadie lo
+        // recogeria. Aqui el compromiso es justo el contrario, y por eso el
+        // borrado va delante aunque la contrapartida sea una fila que apunte un
+        // instante a unos bytes que ya no estan.
+        identity.avatar?.let { storage.delete(it.storageKey) }
+
+        identities.save(identity.copy(avatar = null, deactivatedAt = now, updatedAt = now))
+        members.save(member.copy(deactivatedAt = now, updatedAt = now, updatedBy = session.memberId))
+        refreshTokens.revokeAllForIdentity(identity.id, now)
     }
 }

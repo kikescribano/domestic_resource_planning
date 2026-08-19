@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Dimensionado del servidor, medido al cerrar la Fase 1 y vuelto a medir al cerrar la Fase 2 |
-| Última revisión | 2026-08-19 |
+| Última revisión | 2026-08-20 |
 
 La [ADR-001](../../common/architecture/decisions/ADR-001-solution-architecture-baseline.md)
 dejó el despliegue abierto a propósito y el
@@ -221,8 +221,12 @@ faltaba desde el Hito 1 de la Fase 2 y lo que convierte «pendiente» en una tar
   contenido se puede reconstruir mirando el estado. Retención propuesta: **90 días
   desde la lectura, y sin límite mientras siga sin leer.**
 - **Las otras cuatro son historial del hogar** y se retiran con él: lo que se
-  lleva sus filas es la baja del hogar, que ya está en la lista de lo que la Fase
-  1 dejó abierto y sigue sin caso de uso que la active.
+  lleva sus filas es la baja del hogar. **Desde el 2026-08-20 eso ya no es una
+  promesa**: la baja existe, con treinta días de gracia, y la purga la ejecuta
+  `PurgeClosedHouseholds` desde el recorrido diario
+  ([ADR-012](../../common/architecture/decisions/ADR-012-data-erasure-household-closure-and-account-closure.md)).
+  Este criterio queda por tanto **cerrado para las cuatro**, y abierto solo para
+  `household_notices`.
 - **El disparador para revisarlo**: que la suma de las cinco pase de **50 MB en un
   solo hogar**, o que la base de datos entera pase de la mitad del volumen. Lo
   primero son unos sesenta años del perfil medido aquí, así que si llega antes es

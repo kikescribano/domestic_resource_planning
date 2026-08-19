@@ -2,11 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router'
 
-import { ApiError, api, humanMessage, type UserRole } from '../api/client'
+import { ApiError, api, formatDate, humanMessage, type Household, type UserRole } from '../api/client'
 import { useAuthenticatedSession, useSession } from '../auth/SessionProvider'
 import { useActiveModuleScreens } from './modules'
 import { Avatar } from '../ui/files'
-import { Button, Field, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primitives'
+import { Button, DangerZone, Field, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primitives'
 
 /**
  * Lo que vive detrás del login.
@@ -46,6 +46,52 @@ const SECONDARY_NAVIGATION = [
   { to: '/almacenamiento', label: 'Archivo', end: false },
   { to: '/cuenta', label: 'Cuenta', end: false },
 ]
+
+/**
+ * El hogar de la sesión, resuelto **una vez** y compartido.
+ *
+ * La clave de consulta es fija, así que React Query la reparte entre el shell
+ * —que pinta el aviso de la baja— y la pantalla del hogar, que la pide y la
+ * cancela. Es la misma economía que `listModules`.
+ *
+ * **No sale del token**, y esa es la razón entera de que exista esta lectura: el
+ * access token vive quince minutos y se emite al entrar, así que un hogar
+ * marcado después mentiría hasta la siguiente renovación —justo en la pantalla
+ * que sirve para cancelar la baja.
+ */
+export function useHousehold() {
+  const session = useAuthenticatedSession()
+
+  return useQuery({
+    queryKey: ['household'],
+    queryFn: () => api.getCurrentHousehold(session.accessToken),
+  })
+}
+
+/**
+ * El aviso de que el hogar va a desaparecer, **en todas las pantallas**.
+ *
+ * Vive en el shell y no en «Tu hogar» porque durante la gracia todo sigue
+ * funcionando igual: alguien puede pasarse treinta días dando de alta cosas en
+ * el inventario sin volver a la pantalla del hogar y sin enterarse de nada. Ese
+ * es exactamente el caso que la gracia existe para atrapar.
+ *
+ * Lleva **la fecha** y no «en 30 días», que es la diferencia entre saberlo y
+ * tener que contar.
+ */
+function ClosureBanner({ household }: { household: Household }) {
+  if (!household.closure) return null
+
+  return (
+    <div className="mb-6">
+      <Notice tone="warning" title={`Este hogar se borrará el ${formatDate(household.closure.effectiveAt)}`}>
+        Se pidió darlo de baja. Hasta esa fecha todo sigue funcionando igual, y quien administre el
+        hogar puede cancelarlo desde <Link to="/" className="underline">Tu hogar</Link>. Después no se
+        podrá recuperar nada.
+      </Notice>
+    </div>
+  )
+}
 
 export function RequireSession() {
   const { isAuthenticated, isResuming } = useSession()
@@ -92,6 +138,7 @@ export function RequireSession() {
  */
 function HouseholdShell() {
   const modules = useActiveModuleScreens()
+  const household = useHousehold()
 
   return (
     <div className="flex min-h-dvh flex-col bg-surface md:flex-row">
@@ -170,6 +217,11 @@ function HouseholdShell() {
       </header>
 
       <main id="contenido" className="mx-auto w-full max-w-shell flex-1 px-gutter py-6 pb-24 md:pb-6">
+        {/* Antes del `Outlet` y no dentro de cada pantalla: es del hogar entero,
+            y repetirlo pantalla a pantalla es la forma segura de que falte en
+            una. Mientras la consulta va, no se pinta nada — un hueco que
+            aparece es menos ruidoso que uno que parpadea. */}
+        {household.data && <ClosureBanner household={household.data} />}
         <Outlet />
       </main>
     </div>
@@ -261,6 +313,8 @@ export function MorePage() {
 
 export function HomePage() {
   const session = useAuthenticatedSession()
+  const { isAdmin } = useSession()
+  const household = useHousehold()
 
   return (
     <>
@@ -278,8 +332,90 @@ export function HomePage() {
             {session.claims.role === 'HOUSEHOLD_ADMIN' ? 'Administras el hogar' : 'Eres miembro del hogar'}
           </dd>
         </div>
+        {household.data && (
+          <div className="rounded-lg border border-border-subtle bg-surface-raised p-4">
+            <dt className="text-caption text-ink-muted">Cómo se llama</dt>
+            <dd className="mt-1 text-body text-ink">{household.data.name}</dd>
+          </div>
+        )}
       </dl>
+
+      {/* La baja solo la ve y la toca quien administra. Un miembro se entera por
+          el aviso de arriba, que sí sale para todos: enterarse no es lo mismo
+          que poder hacerlo. */}
+      {isAdmin && household.data && <HouseholdClosureSection household={household.data} />}
     </>
+  )
+}
+
+/**
+ * Pedir la baja del hogar y cancelarla.
+ *
+ * Las dos mitades no se parecen a propósito. **Pedirla** es la zona de peligro,
+ * con confirmación escrita, porque es irreversible una vez vencida la gracia.
+ * **Cancelarla** es un botón normal: deshacer algo destructivo no merece
+ * fricción, y ponérsela sería castigar el arrepentimiento, que es justo lo que
+ * los treinta días existen para permitir.
+ */
+function HouseholdClosureSection({ household }: { household: Household }) {
+  const session = useAuthenticatedSession()
+  const queryClient = useQueryClient()
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['household'] })
+
+  const request = useMutation({
+    mutationFn: () => api.requestHouseholdClosure(session.accessToken),
+    onSuccess: refresh,
+  })
+
+  const cancel = useMutation({
+    mutationFn: () => api.cancelHouseholdClosure(session.accessToken),
+    onSuccess: refresh,
+  })
+
+  if (household.closure) {
+    return (
+      <section className="mt-10 flex max-w-form flex-col gap-4 border-t border-border-subtle pt-6">
+        <h2 className="font-display text-title-sm text-ink">Baja del hogar</h2>
+        <p className="text-body-sm text-ink-muted">
+          Pedida. El hogar se borrará el <strong>{formatDate(household.closure.effectiveAt)}</strong> y
+          hasta entonces todo sigue funcionando igual.
+        </p>
+        {cancel.isError && <Notice tone="danger">{humanMessage(cancel.error)}</Notice>}
+        <Button
+          variant="primary"
+          className="w-fit"
+          busy={cancel.isPending}
+          busyLabel="Cancelando…"
+          onClick={() => cancel.mutate()}
+        >
+          Cancelar la baja
+        </Button>
+      </section>
+    )
+  }
+
+  return (
+    <DangerZone
+      title="Dar de baja el hogar"
+      confirmation={household.name}
+      confirmationLabel={`Escribe «${household.name}» para confirmarlo`}
+      action="Dar de baja el hogar"
+      busyLabel="Dando de baja…"
+      busy={request.isPending}
+      error={request.isError ? humanMessage(request.error) : null}
+      onConfirm={() => request.mutate()}
+    >
+      <p>
+        Se borrará el hogar entero <strong>30 días después</strong>: las cosas del inventario, las
+        ubicaciones, los préstamos, el catálogo, los documentos, las fotos y las personas que lo
+        comparten.
+      </p>
+      <p>
+        Durante esos 30 días no cambia nada y cualquiera que administre el hogar puede cancelarlo.
+        Pasada la fecha <strong>no se puede recuperar nada</strong>.
+      </p>
+    </DangerZone>
   )
 }
 
@@ -515,7 +651,59 @@ export function AccountPage() {
           Salir
         </Button>
       </section>
+
+      <CloseAccountSection />
     </>
+  )
+}
+
+/**
+ * Cerrar la cuenta, que **no es dejar el hogar ni cerrar sesión**.
+ *
+ * Va al final de la pantalla de la persona y no en la del hogar, porque el
+ * sujeto es la identidad: sus credenciales y su foto, que la acompañan a
+ * cualquier hogar. La casa **no se va con ella** — se va la persona y el hogar
+ * sigue con quien quede.
+ *
+ * La confirmación es una palabra fija y no un nombre: aquí no hay ningún nombre
+ * propio que copiar que no sea el de la propia persona, y hacerle teclear su
+ * nombre para irse tiene un tono que no queremos.
+ */
+function CloseAccountSection() {
+  const session = useAuthenticatedSession()
+  const { signOut } = useSession()
+  const navigate = useNavigate()
+
+  const close = useMutation({
+    mutationFn: () => api.closeAccount(session.accessToken),
+    onSuccess: async () => {
+      // La sesión ya no vale para nada: el `signOut` es lo que limpia el estado
+      // del cliente y revoca el refresh token que quedaba.
+      await signOut()
+      navigate('/entrar', { replace: true })
+    },
+  })
+
+  return (
+    <DangerZone
+      title="Cerrar tu cuenta"
+      confirmation="CERRAR"
+      confirmationLabel="Escribe «CERRAR» para confirmarlo"
+      action="Cerrar mi cuenta"
+      busyLabel="Cerrando…"
+      busy={close.isPending}
+      error={close.isError ? humanMessage(close.error) : null}
+      onConfirm={() => close.mutate()}
+    >
+      <p>
+        Dejarás de poder entrar, aquí y en cualquier otro hogar, y{' '}
+        <strong>se borrará tu foto</strong>. Las cosas del hogar se quedan: son del hogar y no tuyas.
+      </p>
+      <p>
+        Lo que tuvieras a tu nombre en el inventario queda <strong>sin propietario</strong>, para que
+        el hogar lo reasigne cuando quiera. Esto no da de baja el hogar.
+      </p>
+    </DangerZone>
   )
 }
 

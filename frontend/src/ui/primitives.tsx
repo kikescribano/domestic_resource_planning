@@ -576,3 +576,92 @@ function WarningIcon() {
     </svg>
   )
 }
+
+/**
+ * El sitio de una acción que **no se puede deshacer**.
+ *
+ * Es la pieza que estrena la baja de hogar y el cierre de cuenta (ADR-012), que
+ * son las dos primeras operaciones del producto que borran datos de verdad y
+ * para siempre. Todo lo demás que el sistema llama «baja» es lógica —un asset
+ * dado de baja sigue en su fila, alguien que deja el hogar conserva su
+ * historial—, y por eso le basta un `Button` de variante `danger`.
+ *
+ * **La confirmación se escribe, no se pulsa**, y no es teatro. Un «¿seguro?» se
+ * contesta que sí por reflejo: es el gesto que se hace cincuenta veces al día
+ * para cerrar avisos, y su coste es exactamente un clic más, que es lo que
+ * cuesta también equivocarse. Teclear el nombre del hogar obliga a leer qué se
+ * está borrando y a escribir justo eso, y ninguna de las dos cosas se hace sin
+ * querer.
+ *
+ * **No es un diálogo**, y ahí se gana lo que más caro sale en accesibilidad: sin
+ * modal no hay foco que atrapar ni `Escape` que atender. Es una sección al final
+ * de la pantalla, después de todo lo demás.
+ *
+ * La comparación es **exacta**: ni se recortan espacios ni se ignoran
+ * mayúsculas. La tolerancia aquí juega en contra, porque lo que se busca es
+ * precisamente que cueste.
+ */
+export function DangerZone({
+  title,
+  confirmation,
+  confirmationLabel,
+  action,
+  busyLabel,
+  busy = false,
+  error,
+  onConfirm,
+  children,
+}: {
+  title: string
+  confirmation: string
+  confirmationLabel: string
+  action: string
+  busyLabel: string
+  busy?: boolean
+  error?: string | null
+  onConfirm: () => void
+  children: ReactNode
+}) {
+  const [typed, setTyped] = useState('')
+  const armed = typed === confirmation
+
+  return (
+    <section className="mt-10 flex max-w-form flex-col gap-4 border-t border-border-subtle pt-6">
+      {/* Sin fondo de color: la superficie roja de bloque es lo que
+          `foundations/color.md` reserva para un error que YA ha ocurrido, y esto
+          todavía no ha ocurrido. Lo que la señala es el borde, el encabezado y
+          estar al final. */}
+      <h2 className="font-display text-title-sm text-danger">{title}</h2>
+
+      <div className="flex flex-col gap-2 break-words text-body-sm text-ink-muted">{children}</div>
+
+      {error && <Notice tone="danger">{error}</Notice>}
+
+      {/* Un `div` y no un `form`: en un formulario, `Enter` dentro del campo lo
+          envía, que es la forma más rápida de disparar esto sin haber mirado el
+          botón. */}
+      <Field
+        label={confirmationLabel}
+        value={typed}
+        onChange={(event) => setTyped(event.target.value)}
+        // No es una credencial, así que el navegador no debe ofrecer rellenarlo:
+        // sugerirlo sería justo lo contrario de lo que el campo consigue.
+        autoComplete="off"
+        spellCheck={false}
+      />
+
+      <Button
+        variant="danger"
+        // `disabled` de verdad y no `aria-disabled` sobre un botón vivo: quien
+        // navega sin ver tiene que enterarse de que no está disponible, y la
+        // etiqueta del campo dice qué falta para que lo esté.
+        disabled={!armed}
+        busy={busy}
+        busyLabel={busyLabel}
+        onClick={onConfirm}
+      >
+        {action}
+      </Button>
+    </section>
+  )
+}

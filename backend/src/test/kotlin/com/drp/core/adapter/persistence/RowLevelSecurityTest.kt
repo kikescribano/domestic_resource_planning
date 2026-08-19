@@ -232,6 +232,14 @@ class RowLevelSecurityTest {
                 "find_household_for_invitation_token",
                 "find_household_for_loan_token",
                 "list_household_ids",
+                // La quinta, con la baja de hogar (ADR-012): en que hogares
+                // consta una persona, para saber si se queda sin ninguna
+                // pertenencia al purgar uno. Entra en esta lista **a mano y a
+                // proposito**: una funcion `SECURITY DEFINER` nueva tiene que
+                // costar una linea aqui, porque es la unica grieta deliberada
+                // del aislamiento y crecer sin que nadie lo note es justo lo que
+                // esta prueba impide.
+                "list_households_for_identity",
             ),
         )
         owners.forEach { (function, role, privileged) ->

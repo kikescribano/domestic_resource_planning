@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Ejemplos de request y response de la API |
-| Última revisión | 2026-08-17 |
+| Última revisión | 2026-08-20 |
 
 > Trasladado desde la sección 5.4.3 del [`README principal`](../../../README.md) al iniciar la Fase 1. **Los números de sección se conservan**: hay más de cien referencias cruzadas del tipo «ver 4.1.1» repartidas por el repositorio, y renumerarlas las rompería todas.
 
@@ -230,6 +230,35 @@ El contrato completo, con todos los recursos, parámetros y esquemas de error, s
 }
 ```
 > **Las diez colecciones responden con esta misma envoltura**, sin excepción por tamaño esperado: una sola forma que aprender en el cliente, y ninguna migración el día que una lista que se creía acotada —categorías, invitaciones— deje de serlo. `page` empieza en 0 y `total` cuenta los elementos que cumplen el filtro, no los devueltos.
+
+**`GET /api/v1/households/current`** — response, **sin baja pedida** (el caso normal)
+```json
+{
+  "id": "2b7e1f90-...-000000000001",
+  "name": "Casa de Kike",
+  "timeZone": "Europe/Madrid",
+  "createdAt": "2026-01-11T09:00:00Z",
+  "updatedAt": "2026-01-11T09:00:00Z",
+  "closure": null
+}
+```
+
+**`POST /api/v1/households/current/closure`** — response (`200 OK`)
+```json
+{
+  "id": "2b7e1f90-...-000000000001",
+  "name": "Casa de Kike",
+  "timeZone": "Europe/Madrid",
+  "createdAt": "2026-01-11T09:00:00Z",
+  "updatedAt": "2026-08-19T18:42:11Z",
+  "closure": {
+    "requestedAt": "2026-08-19T18:42:11Z",
+    "requestedBy": "3d0a1e2c-...-000000000001",
+    "effectiveAt": "2026-09-18T18:42:11Z"
+  }
+}
+```
+> `requestedBy` es la **pertenencia**, como toda la autoría del contrato, y nunca la identidad. `effectiveAt` es **la fecha que se le prometió a una persona**: se guarda en lugar de calcularse al leer, para que cambiar el plazo no mueva hacia atrás una fecha ya dicha. Hasta ese instante el hogar funciona **exactamente igual**; lo único que cambia es que este campo deja de ser nulo. Ver la [ADR-012](../architecture/decisions/ADR-012-data-erasure-household-closure-and-account-closure.md).
 
 **Formato de error (todos los endpoints)**
 
