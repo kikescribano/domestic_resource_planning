@@ -265,12 +265,18 @@ quedan como estaban y reactivarlo las devuelve tal cual.
 | Recorrido vertical | Añadido a la batería existente y no en una suite paralela: encender el módulo, dar de alta un contacto, enlazarlo con una ubicación, verlo en la ficha, con axe en los dos modos, foco, teclado y reflujo de 320 px a ultrawide |
 
 **El barrido de aislamiento** —autenticado como hogar A, ninguna operación
-devuelve ni modifica datos del hogar B, ni por identificador directo— lo tiene
+devuelve ni modifica datos del hogar B, ni por identificador directo— lo tuvo
 asignado el **Hito 6**, que es donde el roadmap lo puso para las operaciones de
-toda la fase. Hoy `TenantIsolationSweepTest` cubre las treinta y ocho operaciones
-de la Fase 1 y ninguna de plataforma. **Se deja allí a propósito y se dice aquí
-para que no se dé por supuesto**: las siete operaciones de este módulo entran en
-ese barrido, no en este hito.
+toda la fase.
+
+> **Cerrado el 2026-08-19, en el Hito 6.** `TenantIsolationSweepTest` cubre ahora
+> el contrato entero —las treinta y ocho de la Fase 1 y las cuarenta y cuatro de
+> la Fase 2, en 313 comprobaciones— y **las siete de este módulo entraron con él**,
+> las cinco con identificador en la ruta y las dos referencias del enlace. Ninguna
+> desviación: ni un identificador de otro hogar delata, y el `409` de nombre
+> duplicado no cruza. De paso quedó medido lo que esta ficha había declarado por
+> adelantado —que el nombre único **entre vigentes** es por hogar— sobre el
+> barrido de unicidad y no solo sobre el recorrido del módulo.
 
 ## Operación
 
@@ -309,16 +315,35 @@ ese barrido, no en este hito.
   de preguntar nada, así que con este módulo apagado el consumidor recibe vacío y
   no tiene una sola rama para ello. El razonamiento completo está en
   [`purchasing.md`](purchasing.md) y en [`decisions.md`](../../common/product/decisions.md).
-- **Si la categoría de servicio tiene que pasar a catálogo por hogar.** Hoy es una
-  lista cerrada con `OTHER`, que es lo contrario de lo que el core decidió para su
-  `Category` —y la diferencia es deliberada: la del core clasifica **lo que el
-  hogar tiene**, que es ilimitado, y esta clasifica **a qué se dedica quien viene
-  a casa**, que son catorce entradas y no mil. El disparador está
-  escrito: **el día que `OTHER` sea la categoría más usada**, la lista cerrada
-  dejó de clasificar y toca convertirla en catálogo por hogar, con la siembra de
-  este módulo —hoy vacía— como el sitio natural donde nacen sus valores por
-  defecto. Responsable: quien abra el Hito 6, que es quien mira los datos reales
-  de la fase.
+- **Si la categoría de servicio tiene que pasar a catálogo por hogar.**
+  **Reafirmada el 2026-08-19, al cerrar la fase: sigue siendo lista cerrada, y el
+  disparador se afila y cambia de dueño.** Hoy es una lista cerrada con `OTHER`,
+  que es lo contrario de lo que el core decidió para su `Category` —y la
+  diferencia es deliberada: la del core clasifica **lo que el hogar tiene**, que
+  es ilimitado, y esta clasifica **a qué se dedica quien viene a casa**, que son
+  catorce entradas y no mil.
+
+  Lo que el Hito 6 tenía asignado era **mirar los datos reales de la fase**, y la
+  respuesta honesta es que **no hay ninguno y no puede haberlo**: la pregunta es
+  sobre qué eligen los hogares de verdad y **no hay ningún despliegue** —el VPS
+  está elegido y nada más—. Decir «sigue pendiente» sería fingir que le falta
+  trabajo; lo que le falta es una instalación con gente dentro.
+
+  Así que lo que se decide aquí es **de qué depende y cómo se mide**, que es lo
+  que faltaba:
+
+  - **El disparador, medible en una consulta** en lugar de «que sea la más
+    usada»: que `OTHER` pase del **30 % de los contactos vigentes** contando
+    todos los hogares, o que **cualquier hogar** tenga en `OTHER` más contactos
+    que en todas las demás juntas. Lo primero dice que la lista se quedó corta
+    para el conjunto; lo segundo, que se quedó corta para un oficio concreto —y
+    ese caso se arregla añadiendo una entrada, no abriendo el catálogo—.
+  - **El responsable deja de ser un hito**, porque ningún hito lo va a poder
+    contestar: es **la primera revisión de operación con hogares reales dentro**.
+    Un hito es una sesión de trabajo y esto necesita meses de uso.
+  - **Lo que no cambia**: si algún día se abre, la siembra de este módulo —hoy
+    vacía— es donde nacen los valores por defecto, y ese es justamente el motivo
+    de que se escribiera vacía en lugar de no escribirse.
 - **Si un contacto retirado se puede recuperar.** Hoy no, igual que una `Category`
   del core, y por el mismo motivo: nadie lo ha pedido y la salida —volver a darlo
   de alta— existe. Se anota porque el nombre único **entre vigentes** hace que esa
@@ -341,5 +366,6 @@ ese barrido, no en este hito.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-19 | **El Hito 6 cierra lo que esta ficha había dejado con destinatario.** Las siete operaciones entran en el barrido de aislamiento, sin desviaciones y con el `409` de nombre duplicado medido como oráculo. Y la decisión abierta de la **categoría de servicio** se reafirma con lo que le faltaba: su disparador pasa de «que `OTHER` sea la más usada» a dos umbrales que se consultan, y su responsable deja de ser un hito —ningún hito la puede contestar— para pasar a ser la primera revisión con hogares reales dentro. | Equipo DRP |
 | 2026-08-18 | Creación, **antes de la primera línea de código** del módulo, como pide el catálogo. Declara las siete operaciones, las dos tablas, las cinco invariantes, los cinco códigos de error, que no publica eventos ni declara comprobación periódica, y las tres decisiones abiertas con su destinatario. | Equipo DRP |
 | 2026-08-19 | **El Hito 4 vence la decisión abierta que esta ficha dejó con destinatario**: otro módulo lee este dato maestro por un **puerto en plataforma que no nombra a ningún módulo**, implementado aquí en `SupplierDirectory`. Se descarta la alternativa de eventos con copia local, que no se podría sembrar. El resto de la ficha no cambia: el módulo sigue sin publicar eventos y sin comprobación periódica. | Equipo DRP |

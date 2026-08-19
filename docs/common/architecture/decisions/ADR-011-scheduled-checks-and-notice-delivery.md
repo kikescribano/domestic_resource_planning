@@ -374,3 +374,44 @@ alcanzado.
   una comprobación más de este mismo recorrido. **Cerrado el Hito 5 es el único
   punto de la fase que ha crecido hito a hito sin destinatario**, así que el
   cierre de la fase tiene que decidirlo o decir por qué no.
+
+  **Decidido el 2026-08-19, en el Hito 6: no se escribe, y por primera vez con un
+  número delante en lugar de por aplazamiento.** La medición de capacidad se
+  rehízo con los cuatro módulos y se partió en dos justamente por estas cinco
+  tablas —lo que el hogar *tiene* y lo que *hace* son magnitudes distintas—: la
+  segunda da **2457 B por día, unos 875 kiB por hogar y año**. A ese ritmo un
+  hogar tarda **diez años en llegar a 9 MB**, así que escribir hoy un borrado
+  irreversible sobre el historial de una casa resolvería el problema equivocado —y
+  el historial es precisamente lo que cuatro de las cinco existen para guardar—.
+
+  Lo que sí queda escrito, que es lo que faltaba desde el Hito 1, es **el criterio
+  de retención con su disparador**, en la
+  [medición de capacidad](../../../backend/operations/capacity-measurements.md).
+  En resumen: `household_notices` es la única de las cinco que **no es historial
+  sino bandeja** y la única con retención propuesta —90 días desde la lectura, sin
+  límite mientras siga sin leer—; las otras cuatro se retiran con el hogar. El
+  disparador para revisarlo es que la suma de las cinco pase de 50 MB en un solo
+  hogar, que son unos sesenta años del perfil medido: si llega antes, lo que hay
+  que rehacer es la medición y no la purga.
+
+- **La antelación de un aviso es del hogar, no del módulo — cuando llegue.** Dos
+  módulos dejaron la misma pregunta abierta por separado: Warehouse con sus siete
+  días de caducidad y CMMS con sus quince de revisión, cada uno con la suya en el
+  código y con una cadena de anulaciones propia —sitio → artículo allí, plan
+  aquí—. El Hito 6 las resuelve juntas, y la resolución es de esta ADR y no de
+  ninguno de los dos: **a las dos cadenas les falta el mismo último eslabón**, el
+  valor por defecto del hogar, y ponerlo en cada módulo daría dos tablas de
+  configuración para la misma preferencia.
+
+  La línea que esta ADR ya trazaba lo resuelve sin ambigüedad: **cada módulo posee
+  su regla —qué se avisa y cuándo— y plataforma pone el recorrido y la entrega**.
+  La antelación no es qué se avisa: es cuánto antes se quiere saber, que es una
+  preferencia sobre la entrega. Así que el día que se construya será **una tabla
+  de plataforma**, con cada módulo conservando su cadena de anulaciones por encima
+  de ella.
+
+  **No se construye ahora**, y el disparador es el tercero: el día que un tercer
+  módulo traiga una regla de fecha con antelación propia —garantías, mascotas y
+  plantas o préstamos avanzados son los candidatos—, la duplicación pasa de dos a
+  tres y deja de poder llamarse coincidencia. Con dos, cambiar un número en el
+  código sigue costando menos que una tabla que nadie ha pedido.

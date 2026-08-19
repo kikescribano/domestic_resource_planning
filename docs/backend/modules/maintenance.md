@@ -657,11 +657,21 @@ inyectado, que además es el mismo método que llama el `@Scheduled`. Aquí se h
 lo mismo.
 
 **El barrido de aislamiento** —autenticado como hogar A, ninguna operación
-devuelve ni modifica datos del hogar B— lo tiene asignado el **Hito 6**, que es
-donde el roadmap lo puso para toda la fase. **Se deja allí a propósito y se dice
-aquí para que no se dé por supuesto**: las once operaciones de este módulo entran
-en ese barrido, junto con las siete de Proveedores, las diez de Warehouse y las
-diez de Compras, no en este hito.
+devuelve ni modifica datos del hogar B— lo tuvo asignado el **Hito 6**, que es
+donde el roadmap lo puso para toda la fase.
+
+> **Cerrado el 2026-08-19, en el Hito 6.** Las once operaciones entraron en el
+> barrido sin una sola desviación, y con ellas la referencia que solo este módulo
+> aporta: **el `supplierId` que viaja por el puerto de dato maestro**, en las tres
+> operaciones que lo aceptan. Un identificador de otro hogar sale de ahí como
+> inexistente, y se niega con el mismo `409 MAINTENANCE_SUPPLIER_UNKNOWN` con el
+> que se niega un módulo apagado — que es la degradación de plataforma
+> funcionando, medida esta vez desde el aislamiento y no desde el gate.
+>
+> Y el `planId` de una intervención preventiva es la referencia cuyo fallo
+> **habría avanzado la fecha prevista del plan de otro hogar**: de las escrituras
+> cruzadas posibles es la que nadie notaría, porque su síntoma llega dos años
+> después.
 
 ## Operación
 
@@ -680,8 +690,10 @@ diez de Compras, no en este hito.
   `household_notices`, y su sitio natural sigue siendo una comprobación más del
   mismo recorrido. Crece despacio —una casa registra unas pocas intervenciones al
   año, no varias al día— así que de los cinco es el menos urgente; se dice aquí
-  para que quien escriba esa purga no lo descubra después. **Volver a medir la
-  capacidad es del Hito 6** y aquí no se mide.
+  para que quien escriba esa purga no lo descubra después. **Medido el 2026-08-19,
+  en el Hito 6**, y el pronóstico se confirmó: no aparece siquiera entre lo que
+  crece con el tiempo. El criterio de retención de las cinco y su disparador están
+  en la [medición de capacidad](../operations/capacity-measurements.md).
 - **Recuperación.** Este módulo **sí** deriva parte de su estado del core —qué
   máquinas hay—, así que sí existe el caso «se ha quedado desincronizado»: un
   hogar que dio de alta la caldera con CMMS apagado. La salida es la siembra, que
@@ -690,13 +702,30 @@ diez de Compras, no en este hito.
 
 ## Decisiones abiertas
 
-- **Si un plan debe poder colgar de una ubicación y no solo de un asset.** Hoy
-  no: la revisión de la instalación eléctrica del piso no tiene una máquina a la
-  que apuntar, y el hogar la resuelve dando de alta un `DURABLE` que la
-  represente. Se anota porque es el primer caso que va a aparecer, y porque la
-  salida —un destino polimórfico como el de `SupplierLink`— ya está escrita en
-  otro módulo y sería barata. Responsable: quien abra el Hito 6, que es quien
-  mira los datos reales de la fase.
+- **Si un plan debe poder colgar de una ubicación y no solo de un asset.**
+  **Reafirmada el 2026-08-19, al cerrar la fase: sigue colgando solo de un asset,
+  y el motivo se refuerza — la salida que se llamaba rodeo resulta ser el modelo
+  correcto.** Hoy la revisión de la instalación eléctrica del piso no tiene una
+  máquina a la que apuntar y el hogar la resuelve dando de alta un `DURABLE` que
+  la represente. Eso se anotó como un apaño, y mirándolo con el core delante no lo
+  es: **el core define un asset como todo el material del hogar** (4.1.1), y una
+  instalación eléctrica **es** material del hogar, duradero y con identidad propia
+  —una por vivienda—. Darla de alta como `DURABLE` no es rodear el modelo: es
+  usarlo.
+
+  Y hay un motivo de este módulo para no abrirlo, que al escribirlo por delante no
+  se había visto: **un plan sobre una ubicación no tendría de dónde sacar el
+  histórico**. Una intervención se registra sobre un asset y de ahí sale la ficha
+  de la máquina, que es la pantalla entera del módulo; con planes colgando de dos
+  cosas distintas, la mitad no aparecería en ninguna ficha.
+
+  El disparador se afila, y ya no es «el primer caso que aparezca»: **el día que
+  haga falta un plan sobre algo que no sea material** —una zona, un contrato, una
+  obligación con fecha— deja de ser un asset y entonces sí falta un destino
+  polimórfico. Ese día, la salida —la forma de `SupplierLink`— sigue estando
+  escrita en otro módulo y sigue siendo barata. Responsable: quien traiga ese
+  caso; lo más probable es que llegue con **Garantías y seguros**, que es de
+  contratos y no de máquinas.
 - **Si una intervención debe descontar los repuestos que gastó.** Hoy no: el
   aceite del cambio de filtro es una existencia del core que Warehouse cuenta, y
   descontarlo desde aquí sería que este módulo escribiera en el contador de otro
@@ -705,12 +734,26 @@ diez de Compras, no en este hito.
   disparador está escrito: **el día que Gastos exista**, «qué gastó esta
   reparación» deja de ser una pregunta de material y pasa a ser una de dinero, y
   entonces se decide de quién es.
-- **Si la antelación del aviso necesita un valor por hogar.** Hoy la cadena es
-  plan → **quince días**, que está en el código. Es la misma decisión abierta que
-  dejó Warehouse con su antelación de caducidad, y por eso conviene que las dos se
-  resuelvan a la vez: un ajuste por hogar sería una tabla de configuración, y dos
-  tablas de configuración de dos módulos para lo mismo es la señal de que lo que
-  falta es una de plataforma.
+- ~~**Si la antelación del aviso necesita un valor por hogar.**~~ **Resuelta el
+  2026-08-19, junto con la de [Warehouse](warehouse.md), que era la misma pregunta
+  escrita dos veces: cuando haga falta será una tabla de plataforma y no una de
+  ningún módulo.** Hoy la cadena es plan → **quince días**, que está en el código.
+
+  Lo que la hace resoluble sin datos reales es que **no es una pregunta de uso
+  sino de dónde vive el dato**: a las dos cadenas —sitio → artículo → siete días
+  allí, plan → quince días aquí— les falta **el mismo último eslabón**, el valor
+  por defecto del hogar. Ponerlo en cada módulo daría dos tablas de configuración
+  para la misma preferencia, y **la antelación no es una regla del módulo sino una
+  preferencia del hogar sobre la entrega**, que es de plataforma
+  ([ADR-011](../../common/architecture/decisions/ADR-011-scheduled-checks-and-notice-delivery.md)).
+  Cada módulo seguiría poseyendo su regla —qué se avisa y cuándo—; lo que se
+  movería es solo el número.
+
+  **No se construye ahora**, y el disparador es el tercero: el día que un tercer
+  módulo traiga una regla de fecha con antelación propia. Con dos, cambiar un
+  número en el código cuesta menos que una tabla que nadie ha pedido. El
+  razonamiento completo, en [`warehouse.md`](warehouse.md) y en
+  [`decisions.md`](../../common/product/decisions.md).
 - **Si un plan cancelado se puede reactivar.** Hoy no, igual que un `Supplier`
   retirado y por el mismo motivo: nadie lo ha pedido y la salida —volver a
   crearlo— existe. Se anota porque el índice único **entre los vivos** hace que
@@ -748,4 +791,5 @@ diez de Compras, no en este hito.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-19 | **El Hito 6 cierra los pendientes de esta ficha.** Las once operaciones entran en el barrido de aislamiento sin desviaciones, con el `supplierId` del puerto de dato maestro y el `planId` de una preventiva —la referencia cuyo fallo habría avanzado la fecha del plan de otro hogar—. La **capacidad** está vuelta a medir y el pronóstico se confirmó: `maintenance_interventions` no aparece siquiera entre lo que crece con el tiempo. De las decisiones abiertas, el **plan sobre una ubicación** se reafirma con el motivo reforzado —un `DURABLE` que represente la instalación no es un rodeo sino el modelo del core, y un plan sobre una ubicación no tendría de dónde sacar su histórico— y la **antelación por hogar** queda **resuelta junto con la de Warehouse**. | Equipo DRP |
 | 2026-08-19 | Creación, **antes de la primera línea de código** del módulo. Declara las once operaciones, las tres tablas, las seis invariantes, los cinco códigos de error, los tres eventos consumidos —con la trampa de `DocumentAttached`, cuyo agregado es el documento y no el asset— y que **no publica ninguno**, con sus cuatro consumidores imaginables nombrados. Escribe **la frontera contra el planificador de tareas sin ambigüedad y por adelantado**: de CMMS es el cuándo, del planificador el quién lo hace. Y deja decididas las tres cosas que la definición no resolvía: **qué crea la siembra** —la ficha de cada máquina y ningún plan—, **cómo se rearma un aviso periódico** —cuelga de la próxima fecha y no del plan— y **si el puerto de dato maestro se ensancha** —no—. | Equipo DRP |
