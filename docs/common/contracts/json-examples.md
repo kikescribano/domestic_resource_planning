@@ -57,7 +57,7 @@ El contrato completo, con todos los recursos, parámetros y esquemas de error, s
   "createdAt": "2026-08-12T09:00:00Z"
 }
 ```
-> **El asset se ha creado**: es un `201`, no un `409`. Superar la capacidad declarada de una ubicación **advierte pero no bloquea** (ver 4.1.2), porque el sistema no sabe cuánto ocupa cada cosa —el asset no lleva peso ni volumen— y bloquear con datos incompletos impediría guardar algo que sí cabe. El aviso solo se calcula con capacidad de tipo `UNITS`, que es lo único que se puede contar con certeza. `warnings` va vacío en el caso normal, y aparece igual en `PATCH /assets/{id}` al mover un asset a una ubicación llena.
+> **El asset se ha creado**: es un `201`, no un `409`. Superar la capacidad declarada de una ubicación **advierte pero no bloquea** (ver 4.1.2), porque bloquear con datos incompletos impediría guardar algo que sí cabe. Desde el Hito 3 de la Fase 2 se calcula con las tres formas de capacidad: `UNITS` es exacta, y `WEIGHT` y `VOLUME` suman la medida que declara el artículo (`unitWeightGrams`, `unitVolumeMl`) **avisando solo cuando lo conocido ya se pasa**, porque una suma a la que le faltan artículos sin medir únicamente puede quedarse corta. `warnings` va vacío en el caso normal, y aparece igual en `PATCH /assets/{id}` al mover un asset a una ubicación llena.
 
 **`POST /api/v1/documents`** — adjuntar el manual a un **artículo**, no a una unidad
 ```json

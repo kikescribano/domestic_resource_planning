@@ -40,7 +40,10 @@ export const MODULE_SCREENS: Record<string, { path: string; label: string; miles
   // retira en lugar de dejarlo apuntando al pasado, que es como una promesa
   // cumplida se convierte en documentación falsa.
   SUPPLIERS: { path: '/proveedores', label: 'Proveedores' },
-  WAREHOUSE: { path: '/almacen', label: 'Almacén', milestone: 'Hito 3' },
+  // Sin `milestone` desde el Hito 3, por lo mismo que Proveedores lo perdió en
+  // el 2: era la promesa autoprogramada de «sus pantallas llegan en el Hito 3»,
+  // y este es ese hito.
+  WAREHOUSE: { path: '/almacen', label: 'Almacén' },
   PURCHASING: { path: '/compras', label: 'Compras', milestone: 'Hito 4' },
   MAINTENANCE: { path: '/mantenimiento', label: 'Mantenimiento', milestone: 'Hito 5' },
 }

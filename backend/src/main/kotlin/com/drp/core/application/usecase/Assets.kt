@@ -24,6 +24,7 @@ import com.drp.core.domain.inventory.Asset
 import com.drp.core.domain.inventory.AssetLocation
 import com.drp.core.domain.inventory.AssetStatus
 import com.drp.core.domain.inventory.AssetType
+import com.drp.core.domain.inventory.Capacity
 import com.drp.core.domain.inventory.CapacityType
 import com.drp.core.domain.inventory.LocationRefKind
 import org.springframework.stereotype.Service
@@ -278,7 +279,12 @@ class RegisterConsumableIntake(
                 existing.copy(quantity = after, updatedAt = now, updatedBy = session.memberId),
             )
             events.assetQuantityChanged(updated.id, before, after, QuantityChangeReason.INTAKE)
-            return Result(views.of(updated), created = false)
+            // **Tambien aqui se avisa de la capacidad**, y no lo hacia hasta el
+            // Hito 3 de la Fase 2. Con capacidad en unidades no habia nada que
+            // avisar --sumar sobre la existencia que ya estaba no anade ninguna
+            // pieza-- pero con peso o volumen si: traer otro kilo de arroz cambia
+            // lo que hay dentro aunque la fila sea la misma.
+            return Result(views.of(updated, capacity.adviseOn(command.location)), created = false)
         }
 
         val created = assets.save(
@@ -661,13 +667,32 @@ class AssetReferenceResolver(
 /**
  * La tercera validacion del hito, y la unica que **no rechaza nada**.
  *
- * Superar la capacidad declarada de una ubicacion advierte y deja pasar, porque
- * el sistema no sabe cuanto ocupa cada cosa --el asset no lleva peso ni volumen--
- * y bloquear con datos incompletos impediria guardar algo que si cabe.
+ * Superar la capacidad declarada de una ubicacion advierte y deja pasar, y ese
+ * sigue siendo el planteamiento: bloquear con datos incompletos impediria guardar
+ * algo que si cabe.
  *
- * Por eso solo se calcula con capacidad de tipo `UNITS`: es lo unico que se puede
- * contar con certeza. Con `WEIGHT` o `VOLUME` no hay nada que sumar hasta que el
- * asset lleve esos datos, que es terreno del modulo Warehouse.
+ * **Lo que cambio en el Hito 3 de la Fase 2 es cuanto puede decir.** Hasta
+ * entonces solo se calculaba con capacidad de tipo `UNITS`, porque nada en el
+ * modelo decia cuanto ocupa una cosa: una ubicacion que declaraba «50 kg» no
+ * recibia ningun aviso **nunca**, y eso no era prudencia sino silencio. Desde que
+ * `Article` lleva `unitWeightGrams` y `unitVolumeMl` --la pregunta que 4.1.7 dejo
+ * abierta con destinatario asignado, y que resulto ser del core y no del modulo
+ * Warehouse-- las tres formas de capacidad se pueden mirar.
+ *
+ * **Y sigue diciendo solo lo que puede demostrar**, que es la otra mitad de la
+ * decision. La medida la pone el articulo, y un articulo puede no llevarla; lo
+ * que no se sabe **no suma cero**, porque sumar cero es afirmar que no pesa. De
+ * ahi la regla:
+ *
+ * - Si lo **conocido ya se pasa** del maximo, se avisa. Una suma incompleta solo
+ *   puede quedarse corta, asi que si aun asi se pasa, se pasa de verdad: el aviso
+ *   no puede mentir por este lado.
+ * - Si lo conocido cabe **y falta por medir**, se calla. Decir «cabe» con media
+ *   despensa sin pesar seria justo la afirmacion que no se puede sostener.
+ *
+ * Las unidades de la capacidad son texto libre --el usuario escribe «kg» o
+ * «litros»-- asi que la comparacion se hace en la unidad canonica de cada tipo,
+ * gramos y mililitros, y el rotulo se repite tal cual en el mensaje.
  */
 @Service
 class CapacityAdvisor(
@@ -679,18 +704,42 @@ class CapacityAdvisor(
         if (location == null || location.kind != LocationRefKind.LOCATION) return emptyList()
 
         val capacity = locations.findById(location.id)?.capacity ?: return emptyList()
-        if (capacity.type != CapacityType.UNITS) return emptyList()
 
-        val occupied = assets.countLiveIn(location)
-        if (BigDecimal.valueOf(occupied) <= capacity.max) return emptyList()
+        val exceeded = when (capacity.type) {
+            CapacityType.UNITS -> countExceeds(location, capacity)
+            CapacityType.WEIGHT -> assets.measureLiveIn(location)
+                .let { loadExceeds(capacity, it.weightGrams, it.unmeasuredWeight) }
+            CapacityType.VOLUME -> assets.measureLiveIn(location)
+                .let { loadExceeds(capacity, it.volumeMl, it.unmeasuredVolume) }
+        } ?: return emptyList()
 
         return listOf(
             OperationWarning(
                 code = "LOCATION_CAPACITY_EXCEEDED",
                 message = "La ubicación declara un máximo de ${capacity.max.toPlainString()} " +
-                    "${capacity.unit} y ya contiene $occupied",
+                    "${capacity.unit} y ya contiene $exceeded",
             ),
         )
+    }
+
+    /** El recuento de piezas, que es exacto y no necesita ninguna medida. */
+    private fun countExceeds(location: AssetLocation, capacity: Capacity): String? {
+        val occupied = assets.countLiveIn(location)
+        return occupied.toString().takeIf { BigDecimal.valueOf(occupied) > capacity.max }
+    }
+
+    /**
+     * La suma medida, que puede estar incompleta.
+     *
+     * Devuelve el texto del aviso solo si **lo conocido ya se pasa**; con lo
+     * conocido dentro del maximo y piezas sin medir, se calla. Que la unidad
+     * canonica sea el gramo o el mililitro no aparece en el mensaje: el rotulo lo
+     * escribio el usuario al declarar la capacidad y es el suyo el que entiende.
+     */
+    private fun loadExceeds(capacity: Capacity, known: BigDecimal, unmeasured: Long): String? {
+        if (known <= capacity.max) return null
+        val plain = known.stripTrailingZeros().toPlainString()
+        return if (unmeasured > 0L) "$plain sin contar $unmeasured sin medir" else plain
     }
 }
 

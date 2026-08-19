@@ -195,8 +195,13 @@ siete pantallas; la de verificación del correo no tiene formulario— y tres en
   un número con la unidad del artículo al lado. El `<select>` de invitar a alguien
   ya está escrito a mano en `household.tsx`, repitiendo la maquetación de `Field`
   sin compartir código: es la señal de que el componente falta.
-- **No hay `Combobox`.** `GET /articles` lleva el parámetro `q` precisamente para
-  alimentar un autocompletado de artículos, y no hay con qué pintarlo.
+- ~~**No hay `Combobox`.**~~ **Construido en el Hito 3 de la Fase 2**, que es
+  cuando dejó de ser una comodidad: Warehouse busca un artículo entre los cientos
+  de una despensa, y eso no lo resuelve un `SelectField`. Comparte anatomía con
+  `Field` —rótulo, control, pista, error— y añade lo que un desplegable no tiene:
+  el foco **no se mueve nunca** de la caja de texto y las flechas cambian
+  `aria-activedescendant`, que es lo que el patrón combobox de ARIA 1.2 prescribe.
+  Vive en [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx).
 
 ## Referencias
 

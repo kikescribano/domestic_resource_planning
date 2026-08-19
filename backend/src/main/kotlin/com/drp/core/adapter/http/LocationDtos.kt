@@ -161,6 +161,14 @@ class JsonPatch(private val body: JsonNode) {
         if (!has(field)) Patch.Absent else Patch.Set(node(field)?.decimalValue())
 
     /**
+     * Un entero que se puede cambiar **y vaciar**, como la antelacion de aviso de
+     * Warehouse: a nulo significa «usa la de mas arriba en la cadena», que no es
+     * lo mismo que cero --cero seria «avisame el mismo dia».
+     */
+    fun integer(field: String): Patch<Int?> =
+        if (!has(field)) Patch.Absent else Patch.Set(node(field)?.asInt())
+
+    /**
      * Una fecha sin hora, que es lo que el contrato declara como `format: date`.
      *
      * Se parsea aqui y no en el caso de uso para que una fecha mal escrita sea un

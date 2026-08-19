@@ -349,6 +349,38 @@ interface AssetJpaRepository : JpaRepository<AssetEntity, UUID> {
     ): Long
 
     /**
+     * Lo que pesa y ocupa el contenido vivo de una ubicacion, y **cuantas piezas
+     * no se han podido medir**.
+     *
+     * Un consumible aporta `quantity x medida`; un duradero, una unidad de la
+     * medida de su articulo. Lo que no tiene articulo, o cuyo articulo no lleva
+     * la medida, **no suma cero**: se cuenta aparte, porque sumar cero es afirmar
+     * que no pesa y esa afirmacion es la que convertiria el aviso en mentira.
+     *
+     * Las dos medidas se cuentan por separado --un articulo puede llevar peso y
+     * no volumen-- y por eso hay dos contadores de desconocidos.
+     */
+    @Query(
+        value = """
+            SELECT
+                coalesce(sum(ar.unit_weight_grams * coalesce(a.quantity, 1)), 0) AS weight,
+                coalesce(sum(ar.unit_volume_ml   * coalesce(a.quantity, 1)), 0) AS volume,
+                count(*) FILTER (WHERE ar.unit_weight_grams IS NULL)            AS unknown_weight,
+                count(*) FILTER (WHERE ar.unit_volume_ml   IS NULL)             AS unknown_volume
+            FROM assets a
+            LEFT JOIN articles ar ON ar.id = a.article_id
+            WHERE a.status <> 'DECOMMISSIONED'
+              AND a.location_asset_id IS NOT DISTINCT FROM CAST(:locationAssetId AS uuid)
+              AND a.location_id IS NOT DISTINCT FROM CAST(:locationId AS uuid)
+        """,
+        nativeQuery = true,
+    )
+    fun measureLiveIn(
+        @Param("locationAssetId") locationAssetId: UUID?,
+        @Param("locationId") locationId: UUID?,
+    ): LocationLoadRow
+
+    /**
      * Igual que la de ubicaciones, y con el mismo motivo para no llevar tope de
      * profundidad: un tope no protege del ciclo, lo **provoca** en cuanto la
      * jerarquia es mas honda que el numero elegido. Ver `ancestorIdsOf` en
@@ -680,4 +712,17 @@ interface LoanJpaRepository : JpaRepository<LoanEntity, UUID> {
 interface LoanAccessTokenJpaRepository : JpaRepository<LoanAccessTokenEntity, UUID> {
 
     fun findByTokenHash(tokenHash: String): LoanAccessTokenEntity?
+}
+
+/**
+ * La fila que devuelve `measureLiveIn`, como proyeccion y no como `Object[]`.
+ *
+ * Con el array, el orden de las columnas seria el contrato y un `SELECT`
+ * reordenado cambiaria el peso por el volumen sin que nada fallara.
+ */
+interface LocationLoadRow {
+    fun getWeight(): java.math.BigDecimal
+    fun getVolume(): java.math.BigDecimal
+    fun getUnknownWeight(): Long
+    fun getUnknownVolume(): Long
 }

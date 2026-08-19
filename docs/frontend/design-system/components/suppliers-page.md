@@ -182,18 +182,21 @@ tramo del recorrido vertical, dentro de la batería existente en
   primero que añadir aquí, y no como una promesa autoprogramada: nada en la
   pantalla lo anuncia.
 - **Enlazar solo ofrece ubicaciones, no assets.** La API admite las dos cosas y el
-  módulo las guarda igual; lo que falta en el cliente es el `Combobox` con el que
-  buscar entre los assets de una casa, que pueden ser cientos. Con ubicaciones
-  —decenas— el `SelectField` aguanta. Está en la lista de abajo.
+  módulo las guarda igual; lo que faltaba en el cliente era el `Combobox` con el
+  que buscar entre los assets de una casa, que pueden ser cientos. Con ubicaciones
+  —decenas— el `SelectField` aguanta. **El `Combobox` existe desde el Hito 3 de la
+  Fase 2**, así que esto ya no está bloqueado por una pieza que falta: es trabajo
+  pendiente de esta pantalla, y lo primero que añadir aquí junto con la edición.
 
 **Lo que esta pantalla necesita y el sistema de diseño no tiene**, sin fingir que
 existe:
 
-- `Combobox` — sigue sin construirse desde el Hito 2 de la Fase 1. Elegir con qué
-  se enlaza un contacto es exactamente su caso: una lista de ubicaciones y assets
-  que hay que buscar. **Se resuelve con `SelectField` y solo con ubicaciones**,
-  que en una casa son decenas; los assets, que pueden ser cientos, esperan a que
-  esa pieza exista.
+- ~~`Combobox`~~ — **construido en el Hito 3 de la Fase 2** (2026-08-19), cuando
+  Warehouse lo pidió de verdad. Esta pantalla sigue resolviendo el enlace con
+  `SelectField` y solo con ubicaciones, que en una casa son decenas; lo que
+  cambia es que **ya no es una pieza que falta sino trabajo pendiente aquí**, y la
+  diferencia importa porque una deuda de sistema de diseño y una de pantalla no
+  las paga el mismo hito.
 - `Dialog` / hoja inferior — la confirmación de retirada. **Se resuelve sin
   confirmación**: retirar es reversible dando de alta otra vez, y una
   confirmación que no protege de nada solo añade un clic.

@@ -103,13 +103,20 @@ cerrada, ya no los pide ningún hito en curso**: quedan como lista de lo que el
 sistema de diseño no cubre, y cada uno se construirá cuando una pantalla lo
 necesite de verdad.
 
-Los cinco del Hito 2, que se cerró sin ellos y siguen sin construirse. Los
-patrones que los usan sí están escritos y dicen en cada punto qué pieza falta: ver
+Los cinco del Hito 2, de los que **uno ya está construido**. Los patrones que los
+usan sí están escritos y dicen en cada punto qué pieza falta: ver
 [`patterns/`](../patterns/README.md).
+
+**`Combobox` se construyó en el Hito 3 de la Fase 2** (2026-08-19), que es cuando
+dejó de ser una comodidad: buscar un artículo entre los cientos de una despensa no
+lo resuelve un `SelectField`, y Warehouse lo pide en su pantalla. Vive en
+[`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) con el patrón
+combobox de ARIA 1.2 —foco que no sale de la caja, `aria-activedescendant`,
+`listbox` referenciado por `aria-controls`, `Escape` que cierra sin elegir— y su
+prueba de teclado. Los cuatro que siguen no.
 
 | Componente previsto | Por qué se pide |
 |---|---|
-| `Combobox` | El artículo se busca antes de dar entrada a un consumible: `GET /articles` lleva un parámetro `q` que existe justamente para alimentar un autocompletado |
 | `Skeleton` | La primera carga de una vista se pinta con la forma real del contenido, no con un `Spinner`. Es lo que fija [`look-and-feel.md`](../../product-design/look-and-feel.md) y lo que la primitiva de carga actual no puede hacer |
 | `Toast` | El aviso efímero de esquina, con cierre y con deshacer. `Notice` es un aviso **en el sitio donde ocurrió**, que es otra cosa |
 | `Dialog` y hoja inferior | La confirmación de baja y las operaciones de existencias, que en móvil son hoja y en escritorio diálogo |

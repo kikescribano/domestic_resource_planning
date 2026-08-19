@@ -240,7 +240,7 @@ Lo que **no** se hace es colgar el resto del dominio de la vivienda. Categorías
 
 **Reglas mínimas de negocio:**
 - Una ubicación no puede ser su propia ancestra (evita ciclos).
-- Si se informa una capacidad, superarla al asignar un asset **advierte pero no bloquea**: el sistema no sabe cuánto ocupa cada cosa —el asset no lleva peso ni volumen— así que solo puede contar unidades con certeza. Bloquear con datos incompletos impediría guardar algo que sí cabe.
+- Si se informa una capacidad, superarla al asignar un asset **advierte pero no bloquea**: bloquear con datos incompletos impediría guardar algo que sí cabe. **Las tres formas se comprueban desde el Hito 3 de la Fase 2**, que resolvió la pregunta abierta de 4.1.7 poniendo la medida en el artículo (`unitWeightGrams`, `unitVolumeMl`) y no en el asset ni en un módulo. `UNITS` es exacta; con peso o volumen se suma lo que los artículos declaren y **solo se avisa cuando lo conocido ya se pasa** —una suma incompleta únicamente puede quedarse corta, así que pasarse es concluyente y caber no lo es—.
 - Una ubicación no puede eliminarse si tiene ubicaciones hijas o assets dentro.
 
 > **Por decidir, y no aquí:** que el aviso de capacidad sea útil más allá de contar unidades exige que el asset lleve peso o volumen, y eso solo tiene sentido si alguien los rellena. Es terreno del módulo **Warehouse** (ver 4.2), que es quien va a necesitar medir lo que ocupa cada cosa; se resolverá al definir los módulos, no antes. Queda anotado como pregunta en 4.1.7 en lugar de inventar aquí un campo que nadie mantendría.

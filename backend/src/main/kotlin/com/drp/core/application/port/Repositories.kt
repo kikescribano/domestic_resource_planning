@@ -22,6 +22,7 @@ import com.drp.core.domain.loan.Loan
 import com.drp.core.domain.loan.LoanAccessToken
 import com.drp.core.domain.loan.LoanStatus
 import com.drp.core.domain.token.SingleUseToken
+import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
 
@@ -293,9 +294,44 @@ interface AssetRepository {
     /** Cuantos assets vivos hay en esa ubicacion. Es lo que se compara con la capacidad declarada. */
     fun countLiveIn(location: AssetLocation): Long
 
+    /**
+     * Lo que pesa y lo que ocupa lo que hay vivo en esa ubicacion, **y cuanto de
+     * ello no se ha podido medir**.
+     *
+     * Las tres cosas van juntas a proposito: una suma sin saber cuantas piezas
+     * quedaron fuera no se puede interpretar. Con ella, el aviso puede decir la
+     * verdad --lo conocido ya se pasa-- o callarse, que es lo unico honesto
+     * cuando lo que falta podria cambiar la respuesta.
+     */
+    fun measureLiveIn(location: AssetLocation): LocationLoad
+
     /** `ACTIVE` u `OVERDUE`: un vencido sigue ocupando el asset igual que uno al dia. */
     fun hasOpenLoan(assetId: UUID): Boolean
 }
+
+/**
+ * Lo que ocupa el contenido vivo de una ubicacion, con la parte que no se sabe
+ * declarada aparte.
+ *
+ * Un `CONSUMABLE` aporta `cantidad x medida del articulo`; un `DURABLE`, la
+ * medida de su articulo si lo tiene. Lo que no tiene articulo o cuyo articulo no
+ * lleva la medida entra en [unmeasured] y **no** en la suma: sumarlo como cero
+ * seria decir que no pesa.
+ */
+data class LocationLoad(
+    val weightGrams: BigDecimal,
+    val volumeMl: BigDecimal,
+    /**
+     * Cuantos assets vivos han quedado fuera de cada suma. Cero significa que esa
+     * suma esta completa.
+     *
+     * Van separados porque un articulo puede llevar el peso y no el volumen, y
+     * mezclarlos haria callar al aviso de peso por culpa de un volumen que nadie
+     * necesitaba.
+     */
+    val unmeasuredWeight: Long,
+    val unmeasuredVolume: Long,
+)
 
 data class AssetFilter(
     val locationId: UUID? = null,

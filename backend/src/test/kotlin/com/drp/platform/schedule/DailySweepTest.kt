@@ -85,8 +85,14 @@ class DailySweepTest : SpringIntegrationTest() {
 
         // Al que se apago hay que volver a encenderlo **solo para poder leer su
         // tabla**: su ruta esta cerrada por el gate mientras esta apagado.
-        // Reactivar no siembra --es idempotente-- ni corre ninguna comprobacion,
-        // asi que no altera la cuenta que se va a mirar.
+        //
+        // Reactivar **si vuelve a sembrar** --`ActivateModule` solo se ahorra la
+        // siembra cuando el modulo YA estaba activo, y esto viene de `INACTIVE`--
+        // pero eso no altera la cuenta que se va a mirar, porque se cuenta el
+        // rastro de la comprobacion y no el de la siembra. La frase contraria
+        // estuvo aqui hasta el Hito 3, que es el que se topo con ello: la ADR-010
+        // dice «reactivar no vuelve a sembrar» y el codigo hace lo otro. Se
+        // conserva el codigo, y por eso toda siembra tiene que ser idempotente.
         http.activateTestbed(first.accessToken)
         withClue("el hogar que se apagó siguió corriendo su comprobación") {
             http.checkCount(first.accessToken).shouldBe(1)

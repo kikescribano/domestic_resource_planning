@@ -21,6 +21,7 @@ import { ModuleScreen, ModulesPage } from './routes/modules'
 import { NoticesPage } from './routes/notices'
 import { StoragePage } from './routes/storage'
 import { SuppliersPage } from './routes/suppliers'
+import { WarehousePage } from './routes/warehouse'
 
 /**
  * Las rutas de la aplicación.
@@ -123,7 +124,14 @@ export function App() {
                   </ModuleScreen>
                 }
               />
-              <Route path="/almacen" element={<ModuleScreen moduleKey="WAREHOUSE" />} />
+              <Route
+                path="/almacen"
+                element={
+                  <ModuleScreen moduleKey="WAREHOUSE">
+                    <WarehousePage />
+                  </ModuleScreen>
+                }
+              />
               <Route path="/compras" element={<ModuleScreen moduleKey="PURCHASING" />} />
               <Route path="/mantenimiento" element={<ModuleScreen moduleKey="MAINTENANCE" />} />
             </Route>

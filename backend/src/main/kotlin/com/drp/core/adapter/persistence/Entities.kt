@@ -212,6 +212,8 @@ class ArticleEntity(
     var model: String?,
     var barcode: String?,
     var packSize: BigDecimal?,
+    var unitWeightGrams: BigDecimal?,
+    var unitVolumeMl: BigDecimal?,
     var photoUrl: String?,
     var photoFileId: UUID?,
     var notes: String?,
