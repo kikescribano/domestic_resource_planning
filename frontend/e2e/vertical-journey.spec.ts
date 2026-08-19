@@ -345,7 +345,149 @@ test.describe('recorrido vertical', () => {
     // — es exactamente el defecto que obligó a reorganizar la navegación.
     await checkTouchTargets(page)
   })
+
+  /**
+   * El recorrido del **módulo que reacciona al core**, de encenderlo sobre una
+   * despensa que ya existía a apuntar un consumo y verlo en el cuaderno.
+   *
+   * Va aquí y no en una suite propia a propósito, igual que el de Proveedores:
+   * la batería del recorrido vertical es una y los módulos se añaden a ella, que
+   * es lo que la ADR-001 pide y lo que evita que cada módulo estrene su forma de
+   * comprobar lo mismo.
+   *
+   * Lo que solo se puede ver aquí son cinco cosas:
+   *
+   *  1. Que **la siembra enseña lo que ya había**: se da entrada a un consumible
+   *     ANTES de encender el módulo, y al encenderlo aparece. Eso es la regla de
+   *     la ADR-010 —sembrar desde el estado y no reproduciendo eventos— vista
+   *     desde la pantalla.
+   *  2. Que **apuntar un consumo mueve el contador del core**: la cifra que baja
+   *     en el almacén es la misma que se lee en el inventario, porque no hay dos.
+   *  3. Que el `Combobox` que este hito estrena **se usa con el teclado**.
+   *  4. Que la parada nueva no estropea la navegación a 320 px.
+   *  5. Que todo eso pasa axe en los dos modos.
+   */
+  test('el módulo Almacén: sembrarlo con lo que ya había, apuntar un consumo y anotar una caducidad', async ({
+    page,
+  }) => {
+    const email = `almacen-${Date.now()}@example.test`
+    const password = 'el gato duerme en el sofa'
+
+    await page.goto('/crear-hogar')
+    await page.getByLabel('Nombre del hogar').fill('Casa del Almacén')
+    await page.getByLabel('Tu nombre').fill('Kike')
+    await page.getByLabel('Correo').fill(email)
+    await page.getByLabel('Contraseña', { exact: true }).fill(password)
+    await page.getByRole('button', { name: /crear/i }).click()
+    await page.goto(await linkFromEmail(email))
+    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+
+    // --- 1. Una despensa con algo dentro, ANTES de encender el módulo -------
+    await navigateTo(page, 'Sitios', '/ubicaciones')
+    await page.getByLabel('Nombre').fill('Despensa')
+    await page.getByLabel('Tipo').selectOption({ label: 'Habitación' })
+    await page.getByRole('button', { name: 'Crear ubicación' }).click()
+    await expect(
+      page.getByRole('tree', { name: 'Ubicaciones del hogar' }).getByText('Despensa'),
+    ).toBeVisible()
+
+    await navigateTo(page, 'Catálogo', '/catalogo')
+    await page.getByLabel('Nombre del artículo').fill('Arroz')
+    await page.getByLabel('Categoría').selectOption({ label: 'Alimentación' })
+    // `exact` porque el catálogo tiene ahora dos campos cuyo nombre accesible
+    // contiene «unidad»: la unidad del artículo y su peso por unidad, que llegó
+    // con este mismo hito. Para una persona son distinguibles —los oye enteros—;
+    // para una búsqueda por subcadena, no.
+    await page.getByLabel('Unidad', { exact: true }).selectOption('GRAM')
+    await page.getByRole('button', { name: 'Crear artículo' }).click()
+    await expect(page.getByText('Arroz')).toBeVisible()
+
+    await page.goto('/inventario/entrada')
+    await page.getByLabel('Artículo').selectOption({ label: 'Arroz' })
+    await page.getByLabel('Dónde se guarda').selectOption({ label: 'Despensa' })
+    await page.getByLabel(/Cantidad que entra/).fill('900')
+    await page.getByRole('button', { name: 'Dar entrada' }).click()
+    await expect(page.getByText('Primera existencia creada')).toBeVisible()
+
+    // --- 2. Encender el módulo, con el teclado ------------------------------
+    await navigateTo(page, 'Módulos del hogar', '/modulos')
+    const encender = page.getByRole('button', { name: /^Encender Almacén/ })
+    await startKeyboardAtTop(page, encender)
+    await tabTo(page, encender, 'encender Almacén')
+    await page.keyboard.press('Enter')
+
+    // --- 3. La siembra: lo que ya había, ahí dentro -------------------------
+    await navigateTo(page, 'Almacén', '/almacen')
+    await expect(page.getByRole('heading', { level: 1, name: 'Almacén' })).toBeVisible()
+    // **No** está vacío, y esa es la diferencia con Proveedores: la siembra de
+    // este módulo lee el estado del core, así que los 900 g que entraron antes de
+    // encenderlo están aquí sin que ningún evento se haya reproducido.
+    await expect(page.getByText('El almacén está vacío')).toHaveCount(0)
+    // `/^Arroz/` y no `/Arroz/`: la ficha desplegada trae un botón «Anotar una
+    // caducidad de Arroz», y el nombre del artículo aparece dentro. La fila es la
+    // que **empieza** por él.
+    const fila = page.getByRole('button', { name: /^Arroz/ })
+    await expect(fila).toBeVisible()
+    await expect(fila).toContainText('900')
+    await checkAccessibility(page, 'almacén, recién sembrado')
+
+    // --- 4. El Combobox, con el teclado -------------------------------------
+    // Es el primitivo que este hito estrena, después de quedar aplazado desde el
+    // Hito 2 de la Fase 1. Lo que aquí se mide y ninguna prueba de componente
+    // puede medir es que **el anillo de foco se ve** al llegar a él.
+    const buscar = page.getByRole('combobox', { name: 'Buscar' })
+    await startKeyboardAtTop(page, buscar)
+    await tabTo(page, buscar, 'la búsqueda del almacén')
+    await expectFocusRing(page, 'la búsqueda del almacén')
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Enter')
+    await expect(buscar).toHaveValue('Arroz')
+
+    // --- 5. Apuntar un consumo, que mueve el contador DEL CORE --------------
+    await page.getByRole('button', { name: /^Arroz/ }).click()
+    await page.getByLabel(/Gastado de Arroz/).fill('250')
+    await page.getByRole('button', { name: 'Apuntar consumo' }).click()
+
+    // La cifra baja aquí...
+    await expect(page.getByRole('button', { name: /^Arroz/ })).toContainText('650')
+
+    // ...y **la misma cifra** se lee en el inventario del core, que es lo único
+    // que demuestra que no hay dos contadores: el almacén no guarda cantidad, la
+    // lee. Esta es la vuelta entera cerrada —pantalla, API del módulo, caso de
+    // uso del core, evento, manejador, dos árboles de tablas y de vuelta.
+    await navigateTo(page, 'Inventario', '/inventario')
+    await expect(page.getByText('650')).toBeVisible()
+
+    // --- 6. Anotar una caducidad -------------------------------------------
+    await navigateTo(page, 'Almacén', '/almacen')
+    await page.getByRole('button', { name: /^Arroz/ }).click()
+    await page.getByRole('button', { name: /^Anotar una caducidad/ }).click()
+    await page.getByLabel('Caduca el').fill(inDays(20))
+    await page.getByLabel(/Cuánto caduca/).fill('300')
+    await page.getByRole('button', { name: 'Guardar caducidad' }).click()
+
+    await expect(page.getByRole('button', { name: /^Descartar el lote que caduca/ })).toBeVisible()
+
+    // --- 7. Y lo que solo se mide en un navegador ---------------------------
+    await checkAccessibility(page, 'almacén, con consumo y caducidad')
+    await checkReflow(page, 'almacén')
+    // La parada nueva no roba sitio en el pulgar: entra en el grupo de módulos,
+    // que en móvil vive dentro de «Más».
+    await checkTouchTargets(page)
+  })
 })
+
+/**
+ * Una fecha de dentro de tantos dias, en el formato que espera un `input[type=date]`.
+ *
+ * Relativa a hoy y no fija: una fecha escrita a mano caduca --literalmente-- y
+ * convierte la prueba en una que empieza a fallar sola un dia cualquiera.
+ */
+function inDays(days: number): string {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  return date.toISOString().slice(0, 10)
+}
 
 /** Un access token de verdad, por el mismo camino por el que lo obtiene el cliente. */
 async function accessToken(

@@ -1,5 +1,11 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
-import { useId } from 'react'
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  KeyboardEvent,
+  ReactNode,
+  SelectHTMLAttributes,
+} from 'react'
+import { useId, useState } from 'react'
 
 /**
  * Los primitivos del sistema de diseño.
@@ -318,6 +324,202 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
     <div className="rounded-lg border border-dashed border-border p-6 text-center">
       <p className="text-body font-medium text-ink">{title}</p>
       {children && <div className="mt-1 text-body-sm text-ink-muted">{children}</div>}
+    </div>
+  )
+}
+
+/**
+ * Un campo de texto que sugiere entre muchas opciones.
+ *
+ * **Llevaba aplazado desde el Hito 2 de la Fase 1**, y se construye aquí porque
+ * Warehouse es el primero que lo pide de verdad. La deuda estaba dicha en la
+ * ficha de la pantalla de Proveedores, que salió del paso con un `SelectField`
+ * sobre ubicaciones —decenas—; buscar un artículo entre los cientos de una
+ * despensa no lo resuelve un desplegable, y `GET /articles` lleva un parámetro
+ * `q` que existe justamente para alimentar esto.
+ *
+ * **La accesibilidad es el motivo de que sea un primitivo y no código de
+ * pantalla.** Un combobox mal hecho es de los controles que peor se degradan:
+ * sin `aria-activedescendant` el lector de pantalla no anuncia la opción
+ * resaltada, y moviendo el foco a la lista se pierde lo que se está escribiendo.
+ * Así que aquí:
+ *
+ * - **El foco no se mueve nunca de la caja de texto.** Las flechas cambian
+ *   `aria-activedescendant`, que es lo que el patrón combobox de ARIA 1.2
+ *   prescribe.
+ * - **El listado es un `role="listbox"` con `role="option"`**, y la relación la
+ *   declara `aria-controls` sobre el input.
+ * - **`Escape` cierra sin elegir** y `Enter` elige lo resaltado. Un combobox del
+ *   que no se puede salir sin ratón deja la pantalla bloqueada para quien navega
+ *   con teclado.
+ * - **El estado se anuncia** con `aria-expanded`, y cuántas opciones hay con una
+ *   región `aria-live` discreta: teclear y no oír nada es indistinguible de que
+ *   el control esté roto.
+ *
+ * Lo que **no** hace, a propósito: no busca por su cuenta. Recibe las opciones
+ * ya filtradas y avisa de lo que se teclea, de modo que quien lo usa decide si
+ * eso es una consulta al servidor o un filtro en memoria. Meterle la consulta
+ * dentro lo ataría a una forma de pedir datos.
+ */
+export function Combobox({
+  label,
+  hint,
+  error,
+  value,
+  options,
+  onQueryChange,
+  onSelect,
+  id,
+  placeholder,
+}: {
+  label: string
+  hint?: string
+  error?: string
+  /** Lo que se ve escrito. Lo controla quien lo usa, como en [Field]. */
+  value: string
+  options: Array<{ id: string; label: string; detail?: string }>
+  onQueryChange: (query: string) => void
+  onSelect: (option: { id: string; label: string }) => void
+  id?: string
+  placeholder?: string
+}) {
+  const generatedId = useId()
+  const fieldId = id ?? generatedId
+  const listId = `${fieldId}-list`
+  const hintId = `${fieldId}-hint`
+  const errorId = `${fieldId}-error`
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(0)
+
+  // Acotado al último índice válido: la lista cambia con cada tecla, y un
+  // resaltado que apunte fuera deja `aria-activedescendant` señalando a un
+  // elemento que no existe —que es peor que no tenerlo.
+  const activeIndex = options.length === 0 ? -1 : Math.min(active, options.length - 1)
+  const activeOption = activeIndex >= 0 ? options[activeIndex] : undefined
+
+  function choose(option: { id: string; label: string }) {
+    onSelect(option)
+    setOpen(false)
+    setActive(0)
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      setOpen(true)
+      setActive((current) => {
+        if (options.length === 0) return 0
+        const next = event.key === 'ArrowDown' ? current + 1 : current - 1
+        // Da la vuelta: llegar al final y quedarse ahí obliga a contar cuántas
+        // veces se ha pulsado para poder volver arriba.
+        return (next + options.length) % options.length
+      })
+      return
+    }
+
+    if (event.key === 'Enter' && open && activeOption) {
+      event.preventDefault()
+      choose(activeOption)
+      return
+    }
+
+    if (event.key === 'Escape') {
+      setOpen(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={fieldId} className="text-body-sm font-medium text-ink">
+        {label}
+      </label>
+
+      {/* `relative` en un contenedor propio y no en el campo: la lista se
+          posiciona contra esto, y anclada al campo taparía la pista de abajo. */}
+      <div className="relative">
+        <input
+          id={fieldId}
+          type="text"
+          role="combobox"
+          autoComplete="off"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={open && activeOption ? `${listId}-${activeOption.id}` : undefined}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={[hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ') || undefined}
+          value={value}
+          placeholder={placeholder}
+          onChange={(event) => {
+            onQueryChange(event.target.value)
+            setOpen(true)
+            setActive(0)
+          }}
+          onKeyDown={onKeyDown}
+          onFocus={() => setOpen(true)}
+          // Con retardo: sin él, el `blur` cierra la lista antes de que el clic
+          // sobre una opción llegue a dispararse, y elegir con el ratón deja de
+          // funcionar sin que nada falle.
+          onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+          className={[
+            'min-h-touch w-full rounded-md border bg-surface-raised px-3 py-2 text-body text-ink',
+            'placeholder:text-ink-subtle',
+            error ? 'border-danger' : 'border-border',
+          ].join(' ')}
+        />
+
+        <ul
+          id={listId}
+          role="listbox"
+          aria-label={label}
+          // Siempre en el DOM y oculto cuando toca: un `listbox` que entra y sale
+          // del árbol rompe la referencia de `aria-controls`.
+          hidden={!open || options.length === 0}
+          className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-surface-raised shadow-lg"
+        >
+          {options.map((option, index) => (
+            <li
+              key={option.id}
+              id={`${listId}-${option.id}`}
+              role="option"
+              aria-selected={index === activeIndex}
+              // `onMouseDown` y no `onClick`: el clic llega después del `blur`, y
+              // para entonces la lista ya se está cerrando.
+              onMouseDown={(event) => {
+                event.preventDefault()
+                choose(option)
+              }}
+              onMouseEnter={() => setActive(index)}
+              className={[
+                'flex min-h-touch cursor-pointer flex-wrap items-center justify-between gap-2 px-3 py-2 text-body-sm',
+                index === activeIndex ? 'bg-surface-hover text-ink' : 'text-ink',
+              ].join(' ')}
+            >
+              <span>{option.label}</span>
+              {option.detail && <span className="text-ink-muted">{option.detail}</span>}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <p className="sr-only" aria-live="polite">
+        {open && options.length > 0
+          ? `${options.length} ${options.length === 1 ? 'resultado' : 'resultados'}`
+          : ''}
+      </p>
+
+      {hint && !error && (
+        <p id={hintId} className="text-caption text-ink-muted">
+          {hint}
+        </p>
+      )}
+
+      {error && (
+        <p id={errorId} className="flex items-start gap-1.5 text-caption text-danger">
+          <ErrorIcon />
+          <span>{error}</span>
+        </p>
+      )}
     </div>
   )
 }

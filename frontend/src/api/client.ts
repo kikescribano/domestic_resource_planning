@@ -57,6 +57,11 @@ export type ApiErrorCode =
   | 'SUPPLIER_LINK_DUPLICATE'
   | 'SUPPLIER_LINK_TARGET_INVALID'
   | 'SUPPLIER_RETIRED'
+  | 'STOCK_ITEM_NOT_TRACKED'
+  | 'STOCK_CONSUMPTION_NOT_POSITIVE'
+  | 'STOCK_CONSUMPTION_EXCEEDS_QUANTITY'
+  | 'STOCK_LOT_DUPLICATE'
+  | 'STOCK_LOT_EXCEEDS_QUANTITY'
   | 'VERIFICATION_TOKEN_INVALID'
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
@@ -104,6 +109,11 @@ const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   SUPPLIER_LINK_DUPLICATE: 'Ese contacto ya está enlazado con eso.',
   SUPPLIER_LINK_TARGET_INVALID: 'Elige una cosa con la que enlazarlo.',
   SUPPLIER_RETIRED: 'Ese contacto está retirado: no admite enlaces nuevos.',
+  STOCK_ITEM_NOT_TRACKED: 'El almacén solo lleva la cuenta de los consumibles que hay en casa.',
+  STOCK_CONSUMPTION_NOT_POSITIVE: 'Lo que has gastado tiene que ser mayor que cero.',
+  STOCK_CONSUMPTION_EXCEEDS_QUANTITY: 'No puedes gastar más de lo que hay.',
+  STOCK_LOT_DUPLICATE: 'Ya tienes anotada esa misma caducidad para este artículo.',
+  STOCK_LOT_EXCEEDS_QUANTITY: 'Las caducidades anotadas sumarían más de lo que hay.',
   // Se ve poco a propósito: la pantalla de una ruta apagada ofrece activar el
   // módulo en lugar de enseñar un error. Este texto es para el caso raro de
   // que alguien lo reciba en medio de otra cosa, por haberlo desactivado desde
@@ -261,6 +271,93 @@ export interface Article {
   photoUrl: string | null
   photoThumbnailUrl: string | null
   photoFileId: string | null
+}
+
+// --- Almacén (módulo WAREHOUSE) ---------------------------------------------
+
+/**
+ * Una existencia vista por el almacén.
+ *
+ * `quantity` **es la del core**: Warehouse no lleva un segundo contador —el core
+ * mantiene uno, y el módulo guarda consumos, mínimos, caducidad y lotes—. Que
+ * aquí llegue una sola cifra es porque solo hay una, no porque se hayan
+ * reconciliado dos.
+ */
+export interface StockItem {
+  assetId: string
+  articleId: string
+  article: string
+  unit: MeasurementUnit
+  locationId: string | null
+  location: string | null
+  quantity: number
+  minimumQuantity: number | null
+  belowMinimum: boolean
+  nearestExpiry: string | null
+  lotCount: number
+}
+
+export type MovementKind =
+  | 'OPENING'
+  | 'INTAKE'
+  | 'ADJUSTMENT'
+  | 'MERGE'
+  | 'DECOMMISSION'
+  | 'RELOCATION'
+
+/** Cómo se lee cada motivo en pantalla. Los identificadores van en inglés; esto es dato. */
+export const MOVEMENT_KIND_LABELS: Record<MovementKind, string> = {
+  OPENING: 'Al encender el almacén',
+  INTAKE: 'Entrada',
+  ADJUSTMENT: 'Ajuste',
+  MERGE: 'Fusión',
+  DECOMMISSION: 'Baja',
+  RELOCATION: 'Cambio de sitio',
+}
+
+export interface StockMovement {
+  id: string
+  assetId: string
+  articleId: string | null
+  locationId: string | null
+  /** El nombre que el sitio tenía **ese día**: el core borra ubicaciones de verdad. */
+  location: string | null
+  kind: MovementKind
+  previousQuantity: number | null
+  quantity: number | null
+  delta: number | null
+  occurredAt: string
+}
+
+export interface StockLot {
+  id: string
+  assetId: string
+  articleId: string
+  lotCode: string | null
+  expiresOn: string
+  quantity: number
+  consumedAt: string | null
+}
+
+export interface StockItemDetail {
+  item: StockItem
+  expiryLeadDays: number | null
+  lots: StockLot[]
+  movements: StockMovement[]
+}
+
+export interface WarehouseArticle {
+  articleId: string
+  minimumQuantity: number | null
+  expiryLeadDays: number | null
+  lowStockSince: string | null
+}
+
+export interface StockFilters {
+  q?: string
+  locationId?: string
+  belowMinimum?: boolean
+  expiringWithinDays?: number
 }
 
 export type CapacityType = 'WEIGHT' | 'VOLUME' | 'UNITS'
@@ -1047,6 +1144,43 @@ export const api = {
 
   unlinkSupplier: (id: string, linkId: string, accessToken: string) =>
     request<void>(`/suppliers/${id}/links/${linkId}`, { method: 'DELETE', accessToken }),
+
+  // --- Almacén --------------------------------------------------------------
+  // Todo lo que cuelga de /warehouse responde 403 MODULE_INACTIVE mientras el
+  // hogar no lo tenga encendido. La pantalla no lo comprueba: la envuelve
+  // `ModuleScreen`, que ya tiene el catálogo en la caché de la sesión.
+
+  listStock: (accessToken: string, filters: StockFilters = {}) =>
+    request<Page<StockItem>>(`/warehouse/stock${queryString({ ...filters, size: 200 })}`, { accessToken }),
+
+  getStockItem: (assetId: string, accessToken: string) =>
+    request<StockItemDetail>(`/warehouse/stock/${assetId}`, { accessToken }),
+
+  // Un **delta**, no un absoluto: es la diferencia entera con el PATCH del core.
+  recordConsumption: (assetId: string, quantity: number, accessToken: string) =>
+    request<void>(`/warehouse/stock/${assetId}/consumptions`, {
+      method: 'POST',
+      body: { quantity },
+      accessToken,
+    }),
+
+  listStockMovements: (accessToken: string, filters: { assetId?: string; articleId?: string } = {}) =>
+    request<Page<StockMovement>>(`/warehouse/movements${queryString({ ...filters, size: 200 })}`, {
+      accessToken,
+    }),
+
+  listStockLots: (accessToken: string, filters: { assetId?: string } = {}) =>
+    request<Page<StockLot>>(`/warehouse/lots${queryString({ ...filters, size: 200 })}`, { accessToken }),
+
+  registerStockLot: (body: Record<string, unknown>, accessToken: string) =>
+    request<StockLot>('/warehouse/lots', { method: 'POST', body, accessToken }),
+
+  // Da el lote por consumido. **No toca el contador del core**: eso es un consumo.
+  discardStockLot: (lotId: string, accessToken: string) =>
+    request<void>(`/warehouse/lots/${lotId}`, { method: 'DELETE', accessToken }),
+
+  updateWarehouseArticle: (articleId: string, body: Record<string, unknown>, accessToken: string) =>
+    request<WarehouseArticle>(`/warehouse/articles/${articleId}`, { method: 'PATCH', body, accessToken }),
 
   // --- Categorías -----------------------------------------------------------
   listCategories: (accessToken: string, includeRetired = false) =>
