@@ -82,11 +82,41 @@ tasks.named<ProcessResources>("processResources") {
     }
 }
 
+/**
+ * `bootRun` es **el arranque local**, asi que declara el perfil `dev`.
+ *
+ * Es la otra mitad de lo que hace la tarea de pruebas, y por el mismo motivo:
+ * los secretos de ejemplo del `application.yml` solo se toleran con un perfil de
+ * desarrollo declarado, de modo que un despliegue que no declare ninguno falla
+ * al arrancar en lugar de firmar con una clave publicada en el repositorio.
+ *
+ * Cubre tambien el recorrido vertical, que arranca el backend por aqui
+ * (`frontend/e2e/start-backend.mjs`).
+ */
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    systemProperty("spring.profiles.active", "dev")
+}
+
 tasks.withType<Test> {
     useJUnitPlatform()
     testLogging {
         events("passed", "skipped", "failed")
     }
+
+    // **Las pruebas declaran su perfil, y no es cosmetico.**
+    //
+    // Los secretos de despliegue --la clave del JWT y la que firma las URL de
+    // ficheros-- traen en el `application.yml` un valor de ejemplo que solo vale
+    // para desarrollo, y el arranque lo rechaza **salvo** con un perfil de
+    // desarrollo declarado. Antes la ausencia de perfil se tomaba por
+    // desarrollo, y eso hacia que la comprobacion no mordiera justo donde tenia
+    // que morder: en un despliegue que olvidara declararlo.
+    //
+    // Invertido el criterio, quien tiene que declararse es el que usa los
+    // valores de ejemplo. Va aqui y no clase a clase porque son **47 clases**
+    // con `@SpringBootTest`: anotarlas una a una convierte el olvido de la
+    // proxima en un fallo de arranque sin relacion aparente con la causa.
+    systemProperty("spring.profiles.active", "test")
 
     // El cliente de Docker que arrastra Testcontainers negocia por defecto la
     // version 1.32 de la API, y Docker 29 rechaza cualquiera anterior a la 1.40

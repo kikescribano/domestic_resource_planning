@@ -12,6 +12,7 @@ import org.springframework.core.annotation.Order
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.security.web.util.matcher.IpAddressMatcher
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 import java.io.ByteArrayInputStream
@@ -45,9 +46,11 @@ class RateLimitFilter(
     @Value("\${drp.rate-limit.window}") window: Duration,
     @Value("\${drp.rate-limit.per-ip}") private val perIpLimit: Int,
     @Value("\${drp.rate-limit.per-email}") private val perEmailLimit: Int,
+    @Value("\${drp.rate-limit.trusted-proxies:}") trustedProxies: List<String>,
 ) : OncePerRequestFilter() {
 
     private val limiter = FixedWindowRateLimiter(clock, window)
+    private val clientIps = ClientIpResolver(trustedProxies)
 
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -75,7 +78,7 @@ class RateLimitFilter(
             return
         }
 
-        val retryAfter = limiter.consume("ip:$path:${request.clientIp()}", perIpLimit)
+        val retryAfter = limiter.consume("ip:$path:${clientIps.resolve(request)}", perIpLimit)
             ?: cached.emailBucketFor(path)?.let { limiter.consume(it, perEmailLimit) }
 
         if (retryAfter != null) {
@@ -100,18 +103,6 @@ class RateLimitFilter(
         if (path !in EMAIL_SENDING_PATHS) return null
         return emailInBody()?.let { "email:$path:$it" }
     }
-
-    /**
-     * La IP del cliente.
-     *
-     * **`X-Forwarded-For` se ignora a proposito mientras no haya proxy delante.**
-     * La cabecera solo es fiable si la pone un intermediario de confianza; sin
-     * el, la escribe entera quien hace la peticion, y basta variarla en cada
-     * llamada para tener un cubo nuevo siempre --es decir, para no tener limite.
-     * nginx llega en el Hito 3, y es entonces cuando esta cabecera pasa a
-     * leerse, y solo si `remoteAddr` es el suyo.
-     */
-    private fun HttpServletRequest.clientIp(): String = remoteAddr ?: "desconocida"
 
     /** Busca `email` en la raiz y en `admin.email`, que son las dos formas del contrato. */
     private fun CachedBodyRequest.emailInBody(): String? = runCatching {
@@ -185,6 +176,92 @@ class RateLimitFilter(
  * encarecer.
  */
 const val RATE_LIMIT_FILTER_ORDER = -200
+
+/**
+ * De quien es una peticion, para poder contarsela.
+ *
+ * ## Por que no basta `remoteAddr`
+ *
+ * Con nginx delante --que es como se despliega (5.8.4)-- `remoteAddr` es
+ * **siempre la IP del proxy**, la misma para todo el mundo. El cubo `ip:<ruta>`
+ * pasaba entonces a ser **uno solo para toda la instalacion**: veinte peticiones
+ * cada cinco minutos entre todos los hogares juntos. Cualquiera podia dejar sin
+ * login, sin refresco y sin restablecer contrasena a la instalacion entera con
+ * veinte peticiones sin credencial, repetibles cada ventana; y una casa con uso
+ * normal podia bloquearse sola. De paso, contar por IP dejaba de encarecer la
+ * enumeracion, que es justo para lo que existe ese cubo.
+ *
+ * Estaba anotado en el codigo como pendiente «cuando llegue nginx en el Hito 3».
+ * nginx llego --y manda las dos cabeceras-- y esta mitad no se escribio.
+ *
+ * ## Por que no basta leer `X-Forwarded-For`
+ *
+ * Porque **la escribe quien hace la peticion**. Sin comprobar de quien viene,
+ * basta variarla en cada llamada para estrenar cubo siempre: el limite dejaria
+ * de existir en vez de arreglarse, que es peor que el problema de partida. De
+ * ahi que solo se lea cuando el salto inmediato --`remoteAddr`-- es un proxy
+ * declarado de confianza.
+ *
+ * ## Y por que la **ultima** entrada de la cabecera
+ *
+ * `X-Forwarded-For` es una lista `cliente, proxy1, proxy2` y nginx la construye
+ * con `$proxy_add_x_forwarded_for`, que **anade al final la IP que el mismo
+ * observo**. Asi que si el cliente manda una cabecera inventada, nginx la deja
+ * delante y pone detras la de verdad: la ultima entrada es la unica que no ha
+ * podido escribir el atacante. Tomar la primera --el reflejo habitual, porque
+ * «es el cliente original»-- seria leer exactamente el valor que el atacante
+ * elige, con un solo proxy de confianza por delante.
+ *
+ * @param trustedProxies IP o rangos CIDR de los proxies de confianza. **Vacio
+ *   significa no fiarse de nadie**, que es lo correcto sin proxy delante y lo
+ *   que viene por defecto: quien despliega detras de nginx lo declara.
+ */
+class ClientIpResolver(trustedProxies: List<String>) {
+
+    /**
+     * Se construyen al arrancar a proposito: un rango mal escrito revienta la
+     * aplicacion al levantarla y no en la primera peticion, que es cuando ya no
+     * lo esta mirando nadie.
+     */
+    private val trusted = trustedProxies
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .map { IpAddressMatcher(it) }
+
+    fun resolve(request: HttpServletRequest): String {
+        val peer = request.remoteAddr?.takeIf { it.isNotBlank() } ?: return UNKNOWN
+        if (trusted.none { it.matches(peer) }) return peer
+
+        return request.forwardedFor() ?: request.realIp() ?: peer
+    }
+
+    /** La ultima entrada: la que puso el proxy de confianza y no quien llamo. */
+    private fun HttpServletRequest.forwardedFor(): String? =
+        getHeader(FORWARDED_FOR)
+            ?.split(',')
+            ?.map { it.trim() }
+            ?.lastOrNull { it.isNotEmpty() }
+
+    /**
+     * Respaldo para un proxy que solo mande `X-Real-IP`. La nuestra la fija con
+     * `$remote_addr`, que **sustituye** lo que trajera la peticion en lugar de
+     * anadirse, asi que tampoco la elige quien llama.
+     */
+    private fun HttpServletRequest.realIp(): String? =
+        getHeader(REAL_IP)?.trim()?.takeIf { it.isNotEmpty() }
+
+    private companion object {
+        const val FORWARDED_FOR = "X-Forwarded-For"
+        const val REAL_IP = "X-Real-IP"
+
+        /**
+         * Un contenedor de servlets siempre da `remoteAddr`; esto cubre el caso
+         * de una peticion simulada sin el. Todas caen en el mismo cubo, que es
+         * el lado seguro por el que equivocarse.
+         */
+        const val UNKNOWN = "desconocida"
+    }
+}
 
 /**
  * Guarda el cuerpo para poder leerlo dos veces: una el limitador, para sacar el
