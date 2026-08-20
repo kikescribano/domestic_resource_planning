@@ -685,6 +685,8 @@ test.describe('recorrido vertical', () => {
 
   test('el módulo Mantenimiento: la máquina que ya había, su plan, y la fecha que avanza al registrarlo', async ({
     page,
+    request,
+    browser,
   }) => {
     const email = `mantenimiento-${Date.now()}@example.test`
     const password = 'el gato duerme en el sofa'
@@ -786,7 +788,47 @@ test.describe('recorrido vertical', () => {
     await expect(page.getByText('Revisada y limpiada')).toBeVisible()
     await expect(page.getByText('Preventiva')).toBeVisible()
 
-    // --- 7. Y lo que solo se mide en un navegador ---------------------------
+    // --- 7. El día que propone el campo es el DEL HOGAR ---------------------
+    // La otra mitad del mismo defecto vive en el backend y tiene allí su prueba
+    // con el reloj parado. Lo que solo se puede ver aquí es lo que la persona
+    // encuentra: el campo relleno con el día que tiene delante y un tope que la
+    // deja elegirlo. Con el día de Greenwich salía **ayer**, que como síntoma es
+    // peor que el error —registra el día equivocado en silencio.
+    const zonaDelHogar = await householdTimeZone(request, email, password)
+
+    // De vuelta a «Qué toca», que es donde vive el plan: el paso anterior dejó la
+    // pantalla en el histórico, y allí no hay ningún botón que abrir.
+    await page.getByRole('tab', { name: 'Qué toca' }).click()
+    await page.getByRole('button', { name: 'Ya está hecho' }).click()
+    const cuando = page.getByLabel('Cuándo se hizo')
+    await expect(cuando).toHaveValue(dayIn(zonaDelHogar))
+    await expect(cuando).toHaveAttribute('max', dayIn(zonaDelHogar))
+
+    // Y **desde un navegador que está en otro día**, que es lo que distingue «el
+    // día del hogar» de «el día de quien mira»: el calendario de la casa no se
+    // muda con el móvil. Las dos zonas de abajo van 25 horas la una de la otra,
+    // así que alguna de las dos cae siempre en un día distinto al del hogar; se
+    // usa la que caiga, y con eso esto no depende de la hora a la que se lance
+    // la suite.
+    const zonaAjena = [KIRITIMATI, NIUE].find((zona) => dayIn(zona) !== dayIn(zonaDelHogar))
+    expect(zonaAjena, 'ninguna de las dos zonas cae en otro día que el hogar').toBeTruthy()
+
+    const lejosContext = await browser.newContext({ timezoneId: zonaAjena })
+    const lejos = await lejosContext.newPage()
+    await lejos.goto('/entrar')
+    await lejos.getByLabel('Correo').fill(email)
+    await lejos.getByLabel('Contraseña', { exact: true }).fill(password)
+    await lejos.getByRole('button', { name: 'Entrar' }).click()
+    await expect(lejos.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+
+    await navigateTo(lejos, 'Mantenimiento', '/mantenimiento')
+    await lejos.getByRole('button', { name: 'Ya está hecho' }).click()
+    await expect(lejos.getByLabel('Cuándo se hizo')).toHaveValue(dayIn(zonaDelHogar))
+    await expect(lejos.getByLabel('Cuándo se hizo')).not.toHaveValue(dayIn(zonaAjena!))
+
+    await lejosContext.close()
+
+    // --- 8. Y lo que solo se mide en un navegador ---------------------------
     await checkAccessibility(page, 'mantenimiento, con su plan y su histórico')
     await checkReflow(page, 'mantenimiento')
     // La parada nueva no roba sitio en el pulgar: entra en el grupo de módulos,
@@ -1332,7 +1374,61 @@ async function sweepKeyboard(page: Page, screen: string, limit = 80) {
 function inDays(days: number): string {
   const date = new Date()
   date.setDate(date.getDate() + days)
-  return date.toISOString().slice(0, 10)
+  return dayOf(date, Intl.DateTimeFormat().resolvedOptions().timeZone)
+}
+
+/**
+ * Las dos zonas con las que se comprueba que el día es **el del hogar** y no el
+ * de quien mira: los dos extremos del huso, +14 y −11.
+ *
+ * Son 25 horas de diferencia, así que su día de calendario **nunca** coincide.
+ * De ahí que baste elegir la que no coincida con la del hogar para tener siempre
+ * un navegador en otro día, a cualquier hora a la que se lance la suite.
+ */
+const KIRITIMATI = 'Pacific/Kiritimati'
+const NIUE = 'Pacific/Niue'
+
+/** Qué día es hoy en esa zona, en el `YYYY-MM-DD` que usan los campos de fecha. */
+function dayIn(timeZone: string): string {
+  return dayOf(new Date(), timeZone)
+}
+
+/**
+ * El día de calendario de un instante en una zona.
+ *
+ * Con `Intl` y no con `toISOString()`, que da el de Greenwich: es el mismo
+ * defecto que este hito corrige en la pantalla, y una prueba que lo repitiera
+ * mediría con la regla torcida.
+ */
+function dayOf(at: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(at)
+
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)!.value
+  return `${value('year')}-${value('month')}-${value('day')}`
+}
+
+/**
+ * La zona del hogar, leída **de la API** y no del navegador.
+ *
+ * Del navegador salió al darlo de alta —el enrolamiento la detecta— pero
+ * volverla a leer de ahí sería dar por hecho justo lo que se quiere comprobar.
+ */
+async function householdTimeZone(
+  request: APIRequestContext,
+  email: string,
+  password: string,
+): Promise<string> {
+  const token = await accessToken(request, email, password)
+  const response = await request.get('/api/v1/households/current', {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  expect(response.ok(), 'no se pudo leer el hogar por la API').toBe(true)
+  return ((await response.json()) as { timeZone: string }).timeZone
 }
 
 /** Un access token de verdad, por el mismo camino por el que lo obtiene el cliente. */

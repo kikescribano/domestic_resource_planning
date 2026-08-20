@@ -5,10 +5,10 @@ import com.drp.module.maintenance.domain.DueStage
 import com.drp.platform.notice.NoticeDraft
 import com.drp.platform.schedule.CheckOwner
 import com.drp.platform.schedule.ScheduledCheck
+import com.drp.platform.tenant.HouseholdCalendar
 import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.LocalDate
-import java.time.ZoneId
 
 /**
  * La comprobacion periodica de CMMS: **que toca revisar y que se ha pasado**.
@@ -47,6 +47,7 @@ import java.time.ZoneId
 @Component
 class MaintenanceDueCheck(
     private val maintenance: MaintenanceRepository,
+    private val calendar: HouseholdCalendar,
     private val clock: Clock,
 ) : ScheduledCheck {
 
@@ -54,7 +55,10 @@ class MaintenanceDueCheck(
     override val owner: CheckOwner = CheckOwner.Module(MaintenanceModule.KEY)
 
     override fun check(): List<NoticeDraft> {
-        val today = LocalDate.ofInstant(clock.instant(), clock.zone ?: ZoneId.systemDefault())
+        // **El dia es el del hogar y no el del servidor.** Con el dia de UTC, un
+        // hogar en Auckland recibe el aviso de lo que le toca hoy con un dia de
+        // retraso, y uno en Honolulu con uno de adelanto.
+        val today = calendar.today()
 
         // El horizonte se acota por la antelacion mas larga posible, y la fase
         // exacta la decide el dominio plan a plan: la antelacion es de cada uno y

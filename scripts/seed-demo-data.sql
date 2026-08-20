@@ -31,7 +31,9 @@
 -- 3. **Todas las fechas son relativas a `now()`.** No hay ni una fecha fija: las
 --    caducidades, los vencimientos de préstamo y las próximas revisiones se
 --    calculan al cargar. Un juego de datos con fechas absolutas envejece, y a los
---    seis meses enseña una despensa entera caducada.
+--    seis meses enseña una despensa entera caducada. Los **días de calendario**
+--    salen de `CURRENT_DATE`, que depende de la zona de la sesión: se fija a la
+--    del hogar más abajo, por lo mismo que la aplicación resuelve ahí su «hoy».
 --
 -- Es **idempotente**: empieza borrando su propio hogar --y solo el suyo-- así que
 -- se puede volver a lanzar cuantas veces se quiera. No toca ningún otro hogar de
@@ -53,6 +55,15 @@ CREATE FUNCTION pg_temp.demo_id(clave text) RETURNS uuid
 -- El contexto de inquilino, igual que lo fija cualquier transacción de la
 -- aplicación. Sin esto, RLS rechaza hasta el primer INSERT.
 SELECT set_config('app.household_id', pg_temp.demo_id('hogar')::text, false);
+
+-- Y el calendario del hogar, que es la otra mitad del mismo contexto. Todos los
+-- días relativos de este fichero salen de `CURRENT_DATE`, y `CURRENT_DATE`
+-- depende de la zona de la **sesión** --que por omisión es la del servidor--: sin
+-- esto, cargar la demo entre la medianoche de Madrid y la de Greenwich siembra
+-- «caduca dentro de 9 días» sobre el día de ayer. Es exactamente la regla que la
+-- aplicación sigue desde que el «hoy» de una regla de calendario es el del hogar,
+-- aplicada al fichero que la enseña. `SET LOCAL` muere con esta transacción.
+SET LOCAL TimeZone = 'Europe/Madrid';
 
 -- Borrado de la carga anterior. El hogar arrastra en cascada todo lo suyo; las
 -- identidades no, porque no pertenecen a ningún hogar (README 4.1.4) y hay que

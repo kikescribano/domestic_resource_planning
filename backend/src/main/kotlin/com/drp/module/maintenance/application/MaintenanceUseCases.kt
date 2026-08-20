@@ -16,11 +16,11 @@ import com.drp.platform.error.ResourceNotFound
 import com.drp.platform.error.ValidationFailure
 import com.drp.platform.page.Page
 import com.drp.platform.page.Pagination
+import com.drp.platform.tenant.HouseholdCalendar
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.LocalDate
-import java.time.ZoneId
 import java.util.UUID
 
 /**
@@ -366,6 +366,7 @@ class ListMaintenanceInterventions(private val maintenance: MaintenanceRepositor
 class RegisterMaintenanceIntervention(
     private val maintenance: MaintenanceRepository,
     private val masterData: MasterData,
+    private val calendar: HouseholdCalendar,
     private val clock: Clock,
 ) {
 
@@ -376,7 +377,11 @@ class RegisterMaintenanceIntervention(
         val summary = command.summary.trim()
         if (summary.isEmpty()) throw ValidationFailure(mapOf("summary" to "hay que decir qué se hizo"))
 
-        val today = LocalDate.ofInstant(clock.instant(), clock.zone ?: ZoneId.systemDefault())
+        // **Hoy es el dia del hogar y no el del servidor.** El reloj es
+        // `Clock.systemUTC()`, asi que con su zona un hogar peninsular no puede
+        // apuntar entre la medianoche local y la de Greenwich lo que acaba de
+        // hacer: la fecha que tiene delante le llega como manana.
+        val today = calendar.today()
 
         val plan = command.planId?.let { planId ->
             val found = maintenance.findPlan(planId) ?: throw ResourceNotFound("Ese plan no existe")

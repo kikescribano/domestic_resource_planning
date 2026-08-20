@@ -5,6 +5,7 @@ import {
   INTERVENTION_KIND_LABELS,
   SERVICE_CATEGORY_LABELS,
   api,
+  dayInMonths,
   humanMessage,
   type MaintenanceIntervention,
   type MaintenanceMachine,
@@ -13,6 +14,7 @@ import {
   type ServiceCategory,
 } from '../api/client'
 import { useAuthenticatedSession } from '../auth/SessionProvider'
+import { useHouseholdToday } from './household'
 import {
   Button,
   Combobox,
@@ -189,6 +191,7 @@ function PlanRow({
   onFailure: (message: string) => void
 }) {
   const { accessToken } = useAuthenticatedSession()
+  const today = useHouseholdToday()
   const [registering, setRegistering] = useState(false)
 
   const detail = useQuery({
@@ -203,7 +206,7 @@ function PlanRow({
     onError: (error) => onFailure(humanMessage(error)),
   })
 
-  const status = dueStatus(plan.nextDueOn)
+  const status = dueStatus(plan.nextDueOn, today)
 
   return (
     <li className="rounded-lg border border-border-subtle bg-surface-raised p-4">
@@ -279,8 +282,14 @@ function NewPlanForm({ onDone, onFailure }: { onDone: () => void; onFailure: (me
   const [assetId, setAssetId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [intervalMonths, setIntervalMonths] = useState('12')
-  const [nextDueOn, setNextDueOn] = useState(inMonths(12))
   const [supplierId, setSupplierId] = useState('')
+
+  // Nulo es «no lo ha tocado nadie», y entonces manda el año que viene contado
+  // desde el día del hogar. Arrancar el estado con un valor exigiría tenerlo en
+  // el primer render, que es justo cuando el hogar puede no haber llegado.
+  const today = useHouseholdToday()
+  const [chosenDueOn, setChosenDueOn] = useState<string | null>(null)
+  const nextDueOn = chosenDueOn ?? (today ? dayInMonths(today, 12) : '')
 
   const machines = useQuery({
     queryKey: ['maintenance-machine-suggestions', text],
@@ -314,7 +323,7 @@ function NewPlanForm({ onDone, onFailure }: { onDone: () => void; onFailure: (me
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    if (assetId && name.trim()) create.mutate()
+    if (assetId && name.trim() && nextDueOn) create.mutate()
   }
 
   return (
@@ -362,7 +371,7 @@ function NewPlanForm({ onDone, onFailure }: { onDone: () => void; onFailure: (me
         label="Cuándo toca la próxima"
         type="date"
         value={nextDueOn}
-        onChange={(event) => setNextDueOn(event.target.value)}
+        onChange={(event) => setChosenDueOn(event.target.value)}
       />
 
       {/* Solo si hay a quién llamar. Con el módulo de proveedores apagado el
@@ -595,7 +604,9 @@ function InterventionForm({
   onFailure: (message: string) => void
 }) {
   const { accessToken } = useAuthenticatedSession()
-  const [performedOn, setPerformedOn] = useState(today())
+  const today = useHouseholdToday()
+  const [chosenDay, setChosenDay] = useState<string | null>(null)
+  const performedOn = chosenDay ?? today ?? ''
   const [summary, setSummary] = useState('')
   const [supplierId, setSupplierId] = useState('')
   const suppliers = useSuppliers()
@@ -623,7 +634,7 @@ function InterventionForm({
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    if (summary.trim()) register.mutate()
+    if (summary.trim() && performedOn) register.mutate()
   }
 
   return (
@@ -631,9 +642,9 @@ function InterventionForm({
       <Field
         label="Cuándo se hizo"
         type="date"
-        max={today()}
+        max={today ?? undefined}
         value={performedOn}
-        onChange={(event) => setPerformedOn(event.target.value)}
+        onChange={(event) => setChosenDay(event.target.value)}
         hint="No puede ser del futuro"
       />
 
@@ -735,15 +746,18 @@ function SupplierField({
 // Fechas
 // ---------------------------------------------------------------------------
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function inMonths(months: number): string {
-  const date = new Date()
-  date.setMonth(date.getMonth() + months)
-  return date.toISOString().slice(0, 10)
-}
+/**
+ * El «hoy» de esta pantalla **no está aquí**, y esa es la corrección de este
+ * hito. Era `new Date().toISOString().slice(0, 10)` —el día de Greenwich— y
+ * salía por dos sitios a la vez: como valor inicial del campo de fecha y como su
+ * `max`. A las 00:30 de Madrid eso no daba un error, daba algo peor: el campo
+ * relleno con **ayer** y el selector negándose a ofrecer hoy.
+ *
+ * Ahora sale de `useHouseholdToday`, que lo resuelve con `households.time_zone`
+ * —el mismo dato con el que el servidor decide si una intervención es del
+ * futuro—, y sumar meses es `dayInMonths`, que hace aritmética de calendario en
+ * lugar de mezclar el huso del navegador con el formato en UTC.
+ */
 
 function formatDate(iso: string): string {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('es-ES', {
@@ -760,9 +774,20 @@ function formatDate(iso: string): string {
  * pintar, y quien decide de verdad si se avisa es el servidor con la antelación de
  * cada plan. Que las dos cifras coincidan es una comodidad y no un contrato: esta
  * pantalla no calcula ningún aviso.
+ *
+ * **Pero se cuenta desde el día del hogar**, que es de donde sale [today]. Antes
+ * restaba un día de calendario menos `Date.now()`, o sea un día contra un
+ * instante: en la franja entre dos medianoches eso pinta «Se ha pasado» sobre un
+ * plan que toca hoy. Sin el día del hogar todavía no hay nada que decir, y decir
+ * «Al día» por omisión sería justo la mitad tranquilizadora de la duda.
  */
-function dueStatus(nextDueOn: string): { tone: 'danger' | 'warning' | 'neutral'; label: string } {
-  const days = Math.round((new Date(`${nextDueOn}T00:00:00`).getTime() - Date.now()) / 86_400_000)
+function dueStatus(
+  nextDueOn: string,
+  today: string | null,
+): { tone: 'danger' | 'warning' | 'neutral'; label: string } {
+  if (!today) return { tone: 'neutral', label: '—' }
+
+  const days = Math.round((Date.parse(`${nextDueOn}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000)
 
   if (days < 0) return { tone: 'danger', label: 'Se ha pasado' }
   if (days <= 15) return { tone: 'warning', label: 'Toca pronto' }

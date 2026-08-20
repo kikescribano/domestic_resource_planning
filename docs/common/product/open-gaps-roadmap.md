@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | En curso — Hitos 0, 1, 2, 3 y 4 cerrados |
+| Estado | En curso — Hitos 0, 1, 2, 3, 4 y 5 cerrados |
 | Responsable | Equipo DRP |
 | Ámbito | Los cuatro huecos que las Fases 1 y 2 dejaron abiertos a propósito, más el quinto que apareció ejecutándolos |
 | Última revisión | 2026-08-20 |
@@ -29,11 +29,12 @@ cierra cuatro de ellas:
 
 > **Y un quinto que no estaba en ninguna lista, porque nadie lo había visto
 > (2026-08-20).** Ejecutando el Hito 1 se destapó que **el «hoy» de las reglas de
-> calendario es el de UTC y no el del hogar**, con lo que un hogar peninsular no
-> puede registrar entre la medianoche local y la de Greenwich lo que acaba de
+> calendario era el de UTC y no el del hogar**, con lo que un hogar peninsular no
+> podía registrar entre la medianoche local y la de Greenwich lo que acababa de
 > hacer. No es un hueco dejado a propósito sino un defecto, y entra aquí por lo
 > mismo que los otros cuatro: es saldo de las dos fases cerradas, no avance del
-> producto. Su hito es el **5**, y el detalle de cómo se encontró está más abajo.
+> producto. Su hito es el **5** —**cerrado el 2026-08-20**—, y el detalle de cómo
+> se encontró está más abajo.
 
 **Por qué ahora y no dentro de la Fase 3.** Tres de los cuatro **se encarecen con
 cada módulo nuevo**, y el cuarto no cambia de precio:
@@ -675,7 +676,7 @@ Los **dos atributos que quedaban** de los cuatro que 4.1.7 dejó propuestos el
 > con veintidós nombres repetidos. Es el mismo fallo que la ficha de
 > `SuppliersPage` encontró en su día al escribirse por delante.
 
-### Hito 5 — El «hoy» de las reglas de calendario · **Pendiente**
+### Hito 5 — El «hoy» de las reglas de calendario · **Hecho** (2026-08-20)
 
 No venía del plan: salió de ejecutar el Hito 1, y el detalle de qué se encontró
 está en la sección «El “hoy” de una regla no es el del servidor» de más arriba. Es el hito más
@@ -683,51 +684,90 @@ pequeño del bloque —sin migración, sin operación nueva y sin pantalla nueva
 tiene hito propio en lugar de colgarse del cierre porque **cambia una regla de
 dominio** y el Hito 6 no añade producto.
 
-- [ ] **La pregunta del hito, decidida primero**: si el día de calendario de una
-      regla es el del hogar o el de UTC. La recomendación de quien lo encontró es
-      el del hogar, y el motivo es que `performedOn` es un `LocalDate`; pero se
-      decide aquí, con su alternativa descartada, y no se da por decidida por venir
-      escrita en el plan.
-- [ ] **La [ADR-011](../architecture/decisions/ADR-011-scheduled-checks-and-notice-delivery.md)
-      se amplía y no se reescribe**, con una sección que enlaza hacia adelante como
-      hace la ADR-002. Hoy dice que la hora del recorrido es una decisión de
-      despliegue y no de dominio, y sigue siendo verdad; lo que hay que separar es
-      que **el día que el recorrido mira sí es del hogar**. No nace una ADR nueva:
-      no hay ninguna alternativa estructural que descartar, solo una frase que
-      matizar.
-- [ ] **Un puerto de plataforma que el core implementa**, que resuelve el día del
-      hogar actual leyendo `households.time_zone`. Es la misma inversión que
-      `HouseholdDirectory` y `NoticeRecipients`, y por el mismo motivo: un módulo no
-      puede importar al core ([ADR-010](../architecture/decisions/ADR-010-module-boundaries-and-activation.md)),
-      y **la lista de excepciones de ArchUnit tiene que seguir teniendo un solo
-      nombre**. Se descarta llevar la zona en `SessionClaims`: engordaría justo esa
-      excepción y además no sirve en el recorrido diario, que no tiene sesión.
-- [ ] **Los tres sitios pasan por él** y el `ZoneId` desaparece de los módulos. Con
-      él se va también el `?: ZoneId.systemDefault()` de las tres líneas, que es
-      código muerto —`Clock.getZone()` nunca devuelve nulo— y que sugiere un
-      respaldo que no puede darse.
-- [ ] **El `today()` del frontend**, que hoy es UTC en el valor inicial y en el
-      `max` del campo. La zona del hogar ya viaja en el contrato y el cliente ya la
-      tiene: es formatear con ella en lugar de con `toISOString()`. Con `inMonths()`
-      dentro, que mezcla aritmética local con formato UTC.
-- [ ] **La prueba de regresión que fija el reloj**, y no una que dependa de la hora
-      a la que se lance la suite: reloj en las 23:30 UTC, hogar en `Europe/Madrid`,
-      intervención con la fecha local del hogar y el servidor aceptándola. Es lo que
-      convierte esto en algo que no puede volver.
-- [ ] **El helper `today()` de `ApiClient.kt` deja de necesitar `ZoneOffset.UTC`.**
-      El Hito 1 lo puso para que las pruebas usaran el mismo «hoy» que la
-      aplicación, que era lo correcto entonces; cuando la aplicación use el del
-      hogar, ese helper tiene que seguirla o volverá a mentir en la otra dirección.
-- [ ] **Sin migración y sin contrato nuevo.** `households.time_zone` existe desde la
-      `V2`, se valida como identificador IANA en el enrolamiento y ya viaja en la
-      respuesta del hogar. Si este hito propone una tabla o una operación, es que se
-      ha ensanchado.
-- [ ] **Recorrido vertical**: el de CMMS, que ya existe, con el caso del cambio de
-      día dentro. No nace una batería nueva.
-- [ ] **La frase de [`users-and-access.md`](users-and-access.md) sobre `timeZone`**,
-      que sigue justificándolo por «el proceso diario de vencidos» — lo que la
-      decisión del 2026-08-17 ya desmintió y nadie actualizó. Su justificación real
-      depende de lo que este hito decida, y por eso se corrige aquí y no antes.
+- [x] **La pregunta del hito, decidida: el día es el del hogar.** Y no por venir
+      recomendada en el plan sino por lo que significa el tipo: `performedOn` y
+      `nextDueOn` son `LocalDate`, y un día de calendario no significa nada sin
+      una zona. Se descarta **dejarlo en UTC**, que parece la opción neutral y no
+      lo es —es la zona del despliegue— y cuesta que un hogar peninsular no pueda
+      apuntar de madrugada lo que acaba de hacer. La decisión del 2026-08-17 sobre
+      el vencimiento **no se reabre**: sigue siendo cierta, y la frontera que
+      trazaba era `Instant` frente a `LocalDate`.
+- [x] **La [ADR-011](../architecture/decisions/ADR-011-scheduled-checks-and-notice-delivery.md)
+      ampliada y no reescrita**, con una sección que enlaza hacia adelante: a qué
+      hora corre el recorrido sigue siendo del despliegue, **qué día mira es del
+      hogar**. Ninguna ADR nueva, porque no había ninguna alternativa estructural
+      que descartar.
+- [x] **`HouseholdCalendar`, un puerto de plataforma que el core implementa**
+      leyendo `households.time_zone`. Misma inversión que `HouseholdDirectory` y
+      `NoticeRecipients`, y **la lista de excepciones de ArchUnit sigue teniendo un
+      solo nombre**. Se descarta llevar la zona en `SessionClaims`, que la
+      engordaría y además no sirve en el recorrido diario, que no tiene sesión.
+- [x] **Los tres sitios pasan por él** y el `ZoneId` desaparece de los dos módulos.
+      Con él se va el `?: ZoneId.systemDefault()` de las tres líneas, que era
+      código muerto y sugería un respaldo imposible. El puerto, en cambio, **falla
+      ruidosamente** sin contexto de inquilino: un respaldo a UTC daría un día
+      plausible y equivocado.
+- [x] **El `today()` del frontend**, que salía por dos sitios —valor inicial y
+      `max`—, más `inMonths()`, que sumaba meses en local y formateaba en UTC. Sale
+      de `useHouseholdToday()`, que lo resuelve con la zona que ya viaja en el
+      contrato. Y con ellos **`dueStatus()`, que el plan no había visto**: restaba
+      un día de calendario menos `Date.now()`, o sea un día contra un instante.
+- [x] **La prueba de regresión con el reloj fijado**: 23:30 UTC, hogar en
+      `Europe/Madrid`, intervención con la fecha local del hogar y el servidor
+      aceptándola. Comprobado que sin el cambio da `400`. Lleva delante una prueba
+      de que el instante elegido **de verdad cambia de día**, para que mover la
+      hora no deje las otras cuatro pasando sin medir nada. Y una que ningún hogar
+      solo puede dar: **el mismo instante, dos hogares y dos días**, con Madrid
+      aceptando la fecha que Honolulu rechaza.
+- [x] **El helper `today()` de `ApiClient.kt` sigue a la aplicación**: cuenta desde
+      `HOUSEHOLD_ZONE`, que es la misma constante con la que `registerHousehold`
+      da de alta el hogar. Separadas, la prueba vuelve a mentir en cuanto alguien
+      cambia una de las dos.
+- [x] **Sin migración y sin contrato nuevo.** El modelo se queda en **31 tablas** y
+      el contrato en **106 operaciones**; lo único que cambia de `openapi.yaml` es
+      la descripción de `timeZone`.
+- [x] **Recorrido vertical**: dentro del de CMMS, que ya existía. El campo sale
+      relleno con el día del hogar y su tope lo deja elegir, y **desde un navegador
+      que está en otro día** —una de las dos antípodas horarias, la que caiga—
+      sigue saliendo el del hogar: es lo que distingue «el día del hogar» de «el
+      día de quien mira», y lo único que no puede comprobar el backend.
+- [x] **Barrido de aislamiento: no cambia, y se dice por qué.** El hito no añade
+      ninguna operación ni ningún filtro con identificador, así que por el criterio
+      de inclusión de `TenantIsolationSweepTest` —entra lo que puede **nombrar** o
+      **devolver** algo del hogar A— no hay nada que añadir. Lo más parecido a un
+      riesgo entre hogares que introduce —que un hogar resuelva su día con la zona
+      de otro— lo cierra `findCurrent()`, que va por la política, y lo mide la
+      prueba de los dos hogares con el mismo reloj.
+- [x] **La frase de [`users-and-access.md`](users-and-access.md) sobre `timeZone`**,
+      corregida —y con ella **las otras dos que decían lo mismo** y que el plan no
+      había localizado: la de [`data-model.md`](../architecture/data-model.md) y la
+      del propio `openapi.yaml`. Ahora dicen para qué sirve de verdad y qué es lo
+      que **no** la usa.
+- [x] **El hogar de demostración**: una línea. Sus fechas eran relativas y no había
+      nada que reescribir, pero salían de `CURRENT_DATE`, que depende de la zona de
+      la sesión —la del servidor— y no de la del hogar. Se fija con `SET LOCAL`, que
+      es la misma regla del hito aplicada al fichero que la enseña.
+
+> **Lo que la implementación destapó y el plan no preveía.** Tres cosas. La
+> primera es **un cuarto sitio que el plan no contaba**: `dueStatus()` en la
+> pantalla de CMMS, que decide si un plan está «Al día», «Toca pronto» o «Se ha
+> pasado» restando un `LocalDate` de `Date.now()`. No es una regla del dominio
+> —quien avisa es el servidor— pero es lo que la persona lee, y en la franja
+> entre dos medianoches pintaba «Se ha pasado» sobre un plan que toca hoy.
+>
+> La segunda es que **el día del hogar puede no estar todavía** cuando un
+> formulario se pinta por primera vez, porque sale de una consulta. Se resuelve
+> sin añadir ningún `Spinner`: el estado del campo arranca en nulo —«nadie lo ha
+> tocado»— y lo que se pinta es la elección de la persona o, si no la hay, el día
+> del hogar en cuanto llega. Un valor inicial de verdad habría exigido tenerlo en
+> el primer render, que es justo cuando puede faltar.
+>
+> La tercera es de utillaje: la prueba del reloj fijado
+> **estrena contexto de Spring** —el bean del reloj lo pone `SecurityConfig` y no
+> hay propiedad que lo mueva— y el reloj sustituto tiene que ser `@Primary`. Con
+> el mismo nombre de bean sería una redefinición, que Spring Boot prohíbe salvo
+> abriendo `spring.main.allow-bean-definition-overriding` para toda la clase —un
+> interruptor que además taparía el próximo choque de nombres que sí sea un error.
 
 ### Hito 6 — Cierre del bloque · **Pendiente**
 
@@ -784,7 +824,7 @@ no aquí.
 | ~~**¿La fila entregada se borra o se conserva?**~~ **Resuelta (2026-08-20): se borra.** El outbox es una cola y no un archivo, así que **no hay sexta tabla**: su estado normal es vacía y su tamaño es el indicador. Conservarla habría dado un registro de lo publicado a cambio de una segunda copia de cada `payload` y de una retención inventada para una necesidad que nadie ha expresado | 1 | La medición de capacidad distingue lo que crece con lo que el hogar tiene de lo que crece con lo que hace, y esto es lo segundo |
 | ~~**HEIC: ¿cliente o servidor?**~~ **Resuelta (2026-08-20): el cliente**, en la [ADR-014](../architecture/decisions/ADR-014-heic-conversion.md) y en [`decisions.md`](decisions.md). Con las dos medidas delante, y las dos cambiaron el resultado que se esperaba: el megabyte no cae sobre el bundle sino sobre un fragmento que solo descarga quien elige un HEIC —**2,49 kB** sobre la primera carga—, y el camino del servidor no era una dependencia más sino **JDK 22 y `libheif` del sistema**, con el proyecto en 17. La tercera salida —no convertir— se evaluó y se descartó por escrito | 2 | Es la decisión del hito, y su ADR no se puede escribir sin ella |
 | ~~**La etiqueta: ¿catálogo por hogar o columna de texto?**~~ **Resuelta (2026-08-20): catálogo por hogar**, en la [ADR-015](../architecture/decisions/ADR-015-user-chosen-category-identity.md) y en [`decisions.md`](decisions.md). Las tres cosas que la decidían se midieron una a una y las tres tienen su prueba: renombrar es una fila frente a recorrer todos los assets de la casa; deduplicar sin mayúsculas ni acentos lo hace el índice normalizado que ya protege categorías y artículos, y sobre texto no hay ninguna fila común donde ponerlo; y autocompletar es un `SELECT` sobre una tabla pequeña frente a un `DISTINCT` sobre un campo repetido tantas veces como cosas tenga la casa | 4 | Es lo que decide la migración, y con datos dentro cambiarla cuesta otra |
-| **El «hoy» de una regla de calendario: ¿el del hogar o el de UTC?** El del hogar da el día que la persona tiene delante y cuesta un puerto de plataforma más; el de UTC es lo que hay hoy, no cuesta nada y hace que un hogar al este de Greenwich no pueda registrar de madrugada lo que acaba de hacer | 5 | De ella depende si el puerto hace falta, y es lo único que ese hito decide |
+| ~~**El «hoy» de una regla de calendario: ¿el del hogar o el de UTC?**~~ **Resuelta (2026-08-20): el del hogar**, en la [ADR-011 ampliada](../architecture/decisions/ADR-011-scheduled-checks-and-notice-delivery.md) y en [`decisions.md`](decisions.md). Se decide por lo que significa el tipo y no por la recomendación del plan: `performedOn` y `nextDueOn` son `LocalDate`, y un día de calendario no significa nada sin una zona. UTC **parece la opción neutral y no lo es** —es la zona del despliegue—, y su precio es que un hogar peninsular no pueda apuntar de madrugada lo que acaba de hacer. Sí hace falta el puerto: `HouseholdCalendar`, declarado en plataforma e implementado por el core, con la lista de excepciones de ArchUnit intacta | 5 | De ella depende si el puerto hace falta, y es lo único que ese hito decide |
 
 ## Lo que sigue fuera, y por qué
 
@@ -811,6 +851,7 @@ no aquí.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | **Hito 5 cerrado**: el «hoy» de las reglas de calendario pasa a ser **el del hogar**. Es el único hito del bloque que no venía del plan —salió de ejecutar el Hito 1— y el más pequeño: **sin migración, sin operación nueva y sin pantalla nueva**, con el modelo quieto en 31 tablas y el contrato en 106 operaciones. **La pregunta se decide por lo que significa el tipo** y no por venir recomendada: `performedOn` y `nextDueOn` son `LocalDate`, y un día de calendario no significa nada sin una zona; UTC parece la opción neutral y no lo es, porque es la del despliegue. **No hay ADR nueva y eso es parte de la decisión**: la **ADR-011 se amplía** con una sección hacia adelante que separa lo que su sección 7 confundía —a qué hora corre el recorrido es del despliegue, **qué día mira es del hogar**— y la decisión del 2026-08-17 sobre el vencimiento **no se reabre**, porque su frontera real era `Instant` frente a `LocalDate`. Llega `HouseholdCalendar`, un puerto que declara plataforma y implementa el core leyendo `households.time_zone`, con la misma inversión que `HouseholdDirectory` y `NoticeRecipients` y **con la lista de excepciones de ArchUnit intacta**; se descarta llevar la zona en `SessionClaims`, que la engordaría y no sirve en el recorrido diario, que no tiene sesión. Con las tres líneas idénticas se va el `?: ZoneId.systemDefault()`, que era código muerto y prometía un respaldo imposible: el puerto **falla ruidosamente** sin contexto de inquilino. En el cliente cambian `today()`, `inMonths()` y **un cuarto sitio que el plan no había visto**, `dueStatus()`, que restaba un día de calendario menos `Date.now()`. La regresión se fija **con el reloj parado** —23:30 UTC, hogar en `Europe/Madrid`—, comprobada dando `400` sin el cambio, y con dos pruebas que ninguna suite tenía: que el instante elegido de verdad cambia de día, y que **el mismo instante da dos días en dos hogares**. El recorrido vertical de CMMS gana el caso, y con él lo único que el backend no puede decir: **desde un navegador que está en otro día, el campo sigue enseñando el del hogar**. Se corrigen las **tres** frases que justificaban `timeZone` por «el proceso diario de vencidos» —el plan había localizado una— y el hogar de demostración gana una línea: sus `CURRENT_DATE` salían de la zona del servidor |
 | 2026-08-20 | **Hito 4 cerrado**: las **etiquetas libres** y el **icono y color de una categoría**, que son los dos atributos que quedaban de los cuatro que 4.1.7 llevaba desde el 2026-08-09 dejando fuera — con lo que esa propuesta queda cerrada entera. Trae la **ADR-015**, que extiende la ADR-006 sin reescribirla y le añade su sección hacia adelante, la migración `V17` que lleva el modelo de **29 a 31 tablas** y **cuatro operaciones** que llevan el contrato de 102 a **106**. **La pregunta del hito se resuelve con las tres cosas medidas**: la etiqueta es un **catálogo por hogar** porque el texto libre no se puede renombrar de una vez, ni deduplicar sin distinguir mayúsculas ni acentos —no hay ninguna fila común donde poner la restricción—, ni autocompletar sin recorrer los assets enteros. Etiquetar **no gana operación**: viaja en `tagIds`, que es absoluto como la cantidad de una existencia, porque una operación más sería una segunda escritura sobre el inventario para hacer lo que el `PATCH` ya hace. El icono y el color van dentro de un **juego cerrado** —dieciséis y seis— y esa es la ADR entera: un color libre no está en ningún token, así que **no lo mide nadie** y sería lo único de la interfaz cuyo contraste se afirma en vez de comprobarse; `check-contrast.py` pasa de **36 pares a 48** y tres de los doce valores nuevos nacieron fuera del gamut sRGB. Se cierra además la decisión abierta de **`lucide-react`**, con el número delante —5,88 kB sobre la primera carga, 2,63 comprimidos— y se migran los cuatro iconos que llevaban dos fases dibujados a mano; detrás aparece una contradicción que la dependencia tapaba y que **no se resuelve aquí**: `iconography.md` y `status-badge.md` dicen lo contrario sobre el icono de estado. **«Catálogo» entra en la auditoría sistemática** con una categoría de color puesto, y el recorrido **mide el contraste ya aplicado** en los dos modos, que es lo único que demuestra que el par medido es el que llega. Lo que la implementación destapó: el índice de `tags` **no puede ser parcial por retirada** y lo que lo sustituye es que crear una retirada **la revive**; **Chrome conserva `oklch()` en `getComputedStyle`**, lo que hizo que la primera versión del medidor diera 1,00:1 para todo; y dos defectos de accesibilidad que solo aparecieron al escribir las pruebas —JSX se come el espacio inicial de la línea, y el selector puede estar dos veces en la misma pantalla—. La categoría **no entra en la navegación móvil**, que el plan pedía, porque en la navegación no hay ninguna categoría; a cambio se cumple la promesa que `iconography.md` llevaba desde la Fase 1 sobre el hueco de una foto que falta |
 | 2026-08-20 | **Hito 3 cerrado**: el **estado de conservación** de un asset y la **condición en la entrega y la devolución** de un préstamo, que son dos de los cuatro atributos que 4.1.7 llevaba desde el 2026-08-09 dejando fuera. **Sin ADR y sin operación nueva**: tres columnas anulables en la `V16`, seis esquemas ensanchados y el contrato quieto en **102 operaciones**, que era la condición del plan. Lo que sí trae son ocho decisiones de producto. **Una sola escala de cinco valores** para los tres campos, porque el motivo entero de la condición en préstamo es poder decir «salió bien y volvió rayado» y dos escalas distintas no se comparan; **solo sobre un `DURABLE`**, ampliando la restricción que ya cubría el número de serie en vez de añadir una segunda; y **la devolución no toca el asset**, que es la decisión que más se discutió: propagarla le daría a un token acotado —el de quien no tiene cuenta— una escritura sobre el inventario, y CMMS ya había declarado que registrar una intervención «no toca el asset». La vista externa **se ensancha por primera vez** desde que se escribió, de siete campos a nueve, y con su motivo: las dos condiciones describen la cosa que quien pregunta tiene en las manos, no el hogar que se la prestó. La devolución gana un **cuerpo opcional** en lugar de una operación nueva, porque una operación más sería una segunda escritura que el token acotado tendría que alcanzar; hay una prueba que le manda cinco campos de más y comprueba desde dentro de casa que ninguno se escribió. **La condición no se pinta con color** —dos distintivos en una fila es antiuso declarado, y la paleta de dominio tiene cinco tonos elegidos para sobrevivir a una deuteranopia— así que `check-contrast.py` sigue midiendo 36 pares. «Inventario» entra en la auditoría sistemática, con un asset sembrado, y el hogar de demostración trae las tres columnas puestas con diez duraderos sin anotar a propósito. Y se destapa algo ajeno: **la pantalla de Préstamos era el único fichero del frontend pintado con tokens que no existen**, `text-muted` y `border-line`, que no generan ni una regla de CSS |
 | 2026-08-20 | **Hito 2 cerrado**: la **conversión de HEIC**, con la **ADR-014** y las dos medidas delante en lugar de una opinión. **Gana el cliente**, que es lo que 5.8.3 ya decía —así que esa sección se confirma y no se enmienda—, y las dos cifras llegaron cambiando lo que el plan esperaba: **el megabyte no cae sobre el bundle** —en un `import()` dinámico son 2,49 kB sobre la primera carga y 2 995 kB para quien elige un HEIC—, y **el camino del servidor no era una dependencia más sino un cambio de plataforma**, porque el único plugin de ImageIO para HEIF exige JDK 22 con el proyecto en 17, además de `libheif` en la imagen y en el runner, y de ×3,4 a ×5,6 sobre la operación que ya era la cara. **La tercera salida se evalúa y se descarta por escrito**: pedir que se cambie el ajuste de la cámara cuesta cero y pierde porque no arregla la foto ya hecha, no toca el HEIC que llega de fuera del teléfono y se paga en la cuota del usuario. La trampa que el plan anunciaba se resolvió del otro lado —**HEIC no llega nunca a `files.content_type`**, así que no hay migración ni cambio de contrato— y aparece **una tercera magnitud de capacidad**: lo que cuesta llegar al navegador. Se decide además `heic-to` frente al que pesa la mitad, por decodificar fuera del hilo principal y no necesitar `unsafe-eval`. Y se destapa algo ajeno: **`UploadField` documenta desde la Fase 1 un botón de Cancelar que nunca se construyó**, que se deja de afirmar aunque no se arregle aquí |

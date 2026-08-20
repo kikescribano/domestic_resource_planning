@@ -1114,6 +1114,55 @@ export function formatDay(day: string | null): string {
   })
 }
 
+/**
+ * **Qué día es hoy en la zona del hogar**, en el `YYYY-MM-DD` que declara el
+ * contrato.
+ *
+ * No vale `new Date().toISOString().slice(0, 10)`, que es lo que había: eso da el
+ * día **de Greenwich**, y a las 00:30 de Madrid todavía es ayer. Como valor
+ * inicial de un campo de fecha eso es peor que un error, porque registra el día
+ * equivocado en silencio; y como `max`, deja el selector negándose a ofrecer hoy.
+ *
+ * Tampoco vale el huso del navegador, aunque casi siempre coincida: quien decide
+ * si una intervención es «del futuro» es el servidor, y lo hace contra la zona
+ * del hogar. Un móvil que viaja no cambia el calendario de la casa.
+ *
+ * Un `timeZone` que no sea un identificador IANA hace saltar a `Intl`, y se deja
+ * saltar a propósito: el valor sale de `households.time_zone`, que se validó al
+ * dar de alta el hogar, así que si aquí no lo es hay algo roto más abajo y un
+ * respaldo silencioso solo taparía **qué** día se está usando en su lugar.
+ */
+export function todayIn(timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)!.value
+  return `${value('year')}-${value('month')}-${value('day')}`
+}
+
+/**
+ * Un día de calendario, [months] meses después.
+ *
+ * Sobre el `YYYY-MM-DD` y no sobre un `Date` local: la versión anterior sumaba
+ * meses **en el huso del navegador** y formateaba el resultado **en UTC**, así
+ * que mezclaba dos calendarios en la misma línea y se equivocaba en un día en la
+ * mitad del planeta. Aquí no interviene ninguna zona porque no hace falta:
+ * sumarle un año al 16 de julio es aritmética de calendario, no de instantes.
+ *
+ * El desbordamiento lo resuelve `Date` como siempre —el 29 de febrero más doce
+ * meses cae en el 1 de marzo— y está bien que así sea: es el mismo día que
+ * elegiría cualquiera que no tenga un 29 al que ir.
+ */
+export function dayInMonths(day: string, months: number): string {
+  const shifted = new Date(`${day}T00:00:00Z`)
+  shifted.setUTCMonth(shifted.getUTCMonth() + months)
+  return shifted.toISOString().slice(0, 10)
+}
+
 /** Cómo se escribe un tamaño para que lo lea una persona. */
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`

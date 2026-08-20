@@ -122,6 +122,13 @@ caducidades, los vencimientos y las próximas revisiones se calculan al cargar. 
 juego de datos con fechas fijas envejece, y a los seis meses enseña una despensa
 entera caducada.
 
+**Y los días de calendario salen de la zona del hogar**, que el fichero fija con
+un `SET LOCAL TimeZone = 'Europe/Madrid'` junto al contexto de inquilino. Sin él,
+`CURRENT_DATE` sería el día de la **sesión** —o sea el del servidor—, así que
+cargar la demo entre la medianoche de Madrid y la de Greenwich sembraría «caduca
+dentro de nueve días» contado desde ayer. Es la misma regla que la aplicación
+sigue desde que el «hoy» de una regla de calendario es el del hogar.
+
 ## Lo que el script comprueba antes de confirmar
 
 Un juego de datos que se contradice a sí mismo es peor que no tenerlo: enseña una

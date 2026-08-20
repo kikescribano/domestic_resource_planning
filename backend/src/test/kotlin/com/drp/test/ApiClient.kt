@@ -8,7 +8,7 @@ import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import java.time.LocalDate
-import java.time.ZoneOffset
+import java.time.ZoneId
 import java.util.UUID
 
 /**
@@ -49,15 +49,29 @@ private fun String.claim(name: String): String {
 }
 
 /**
+ * La zona del hogar que estas pruebas dan de alta.
+ *
+ * Vive aqui y no repetida en cada cuerpo JSON porque **es la misma que usa
+ * [today]**: desde que el dia de calendario de una regla es el del hogar, la
+ * fecha que una prueba envia y la zona con la que se dio de alta el hogar son el
+ * mismo dato, y separarlos deja una prueba que miente en cuanto alguien cambia
+ * uno de los dos.
+ */
+val HOUSEHOLD_ZONE: ZoneId = ZoneId.of("Europe/Madrid")
+
+/**
  * Da de alta un hogar y lo deja verificado, leyendo el enlace del **correo real**
  * de Mailpit igual que lo leeria una persona.
  */
-fun TestRestTemplate.registerHousehold(mailpit: DrpMailpit = DrpMailpit.instance): TestHousehold {
+fun TestRestTemplate.registerHousehold(
+    mailpit: DrpMailpit = DrpMailpit.instance,
+    timeZone: ZoneId = HOUSEHOLD_ZONE,
+): TestHousehold {
     val email = "persona-${UUID.randomUUID()}@example.test"
     postJson(
         "/api/v1/households",
         """
-        {"name":"Hogar ${UUID.randomUUID()}","timeZone":"Europe/Madrid",
+        {"name":"Hogar ${UUID.randomUUID()}","timeZone":"$timeZone",
          "admin":{"name":"Alguien","email":"$email","password":"el gato duerme en el sofa"}}
         """.trimIndent(),
     )
@@ -121,16 +135,21 @@ fun String.extractRaw(field: String): String =
 /**
  * **El dia de hoy tal y como lo ve la aplicacion**, que no es el de la maquina.
  *
- * El reloj de la aplicacion es `Clock.systemUTC()` --ver `SecurityConfig`-- asi
- * que toda regla que compare fechas de calendario, como la de CMMS que rechaza
- * una intervencion «del futuro», usa **la fecha UTC**. Una prueba que enviara
- * `LocalDate.now()` mandaria la fecha de la zona de la maquina, y las dos no son
- * la misma durante las primeras horas del dia en cualquier zona por delante de
- * UTC: a la 01:30 en Madrid la aplicacion todavia esta en el dia anterior, asi
- * que «hoy» le llega como manana y responde `400`.
+ * Toda regla que compare fechas de calendario --la de CMMS que rechaza una
+ * intervencion «del futuro», las dos comprobaciones nocturnas-- resuelve su
+ * «hoy» en **la zona del hogar**, por `HouseholdCalendar`. Una prueba que
+ * enviara `LocalDate.now()` mandaria la fecha de la zona de la maquina, que no
+ * tiene por que ser ninguna de las dos: en un corredor de CI puesto en UTC, a la
+ * 01:30 de Madrid la maquina esta en el dia anterior al del hogar, asi que «hoy»
+ * le llega como manana y responde `400`.
  *
  * El sintoma no se parece a la causa --la suite pasa entera de dia y falla de
- * madrugada, siempre en CMMS-- asi que la fecha se pide aqui y no a
- * `LocalDate.now()`.
+ * madrugada, siempre en CMMS-- asi que la fecha se pide aqui, y aqui sigue a la
+ * aplicacion: [HOUSEHOLD_ZONE] es la zona con la que [registerHousehold] da de
+ * alta el hogar.
+ *
+ * Antes de este hito esto era `LocalDate.now(ZoneOffset.UTC)`, que era lo
+ * correcto cuando la aplicacion resolvia el dia contra UTC. Cambio con ella; de
+ * no hacerlo habria vuelto a mentir, en la otra direccion.
  */
-fun today(): LocalDate = LocalDate.now(ZoneOffset.UTC)
+fun today(zone: ZoneId = HOUSEHOLD_ZONE): LocalDate = LocalDate.now(zone)
