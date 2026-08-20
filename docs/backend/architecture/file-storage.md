@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Almacenamiento de ficheros en el servidor |
-| Última revisión | 2026-08-10 |
+| Última revisión | 2026-08-20 |
 
 > Trasladado desde la sección 5.8 del [`README principal`](../../../README.md) al iniciar la Fase 1. **Los números de sección se conservan**: hay más de cien referencias cruzadas del tipo «ver 4.1.1» repartidas por el repositorio, y renumerarlas las rompería todas.
 
@@ -48,7 +48,7 @@ El `Content-Length` sirve para reservar y para rechazar antes de recibir, nunca 
 **Lista blanca de tipos:** `image/jpeg`, `image/png`, `image/webp` y `application/pdf`. Nada más, con dos exclusiones deliberadas:
 
 - **SVG queda fuera.** Es XML con scripts dentro, y nadie fotografía una caldera en SVG.
-- **HEIC queda fuera por ahora**, aunque sea lo que produce un iPhone por defecto: la JVM no lo decodifica sin librerías nativas. Lo convierte el frontend antes de subirlo.
+- **HEIC queda fuera**, aunque sea lo que produce un iPhone por defecto: la JVM no lo decodifica sin librerías nativas. **Lo convierte el frontend antes de subirlo**, y desde el 2026-08-20 eso ya no es un reparto pendiente sino uno que existe: lo cierra la [ADR-014](../../common/architecture/decisions/ADR-014-heic-conversion.md), con las dos medidas que exigía el plan del cierre de huecos delante. Esta sección **no se enmienda** — se confirma: la dirección que decidió es la que ganó, y la comprobación que faltaba es que **HEIC no llega nunca a esta lista** porque lo que aquí se guarda es el tipo detectado tras recodificar (paso 4), y por ese camino el servidor no ve un HEIC. Los cuatro tipos siguen siendo cuatro, aquí, en el `CHECK` de `files.content_type` y en el contrato.
 
 El PDF sí entra —los manuales y las facturas son PDF— pero nunca se muestra incrustado dentro de la aplicación.
 

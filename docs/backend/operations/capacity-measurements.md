@@ -4,7 +4,7 @@
 |---|---|
 | Estado | Vigente |
 | Responsable | Equipo DRP |
-| Ámbito | Dimensionado del servidor, medido al cerrar la Fase 1 y vuelto a medir al cerrar la Fase 2 |
+| Ámbito | Dimensionado del servidor, medido al cerrar la Fase 1 y vuelto a medir al cerrar la Fase 2 — y, desde el Hito 2 del cierre de huecos, **lo que cuesta llegar al navegador** |
 | Última revisión | 2026-08-20 |
 
 La [ADR-001](../../common/architecture/decisions/ADR-001-solution-architecture-baseline.md)
@@ -156,6 +156,78 @@ Lo que sí se puede leer de ellos, porque no depende de la máquina:
 - **La memoria transitoria de Argon2id es de 19 MiB por login simultáneo**, que
   es lo que hay que sumar al montón de la JVM al dimensionar.
 
+## Bytes por navegador: lo que cuesta llegar al cliente
+
+**Es una tercera magnitud y llega con el Hito 2 del cierre de huecos**, que fue
+el primero que tuvo que elegir entre pagar en el servidor y pagar en el cliente.
+Hasta entonces no hacía falta: nada de lo que se había construido movía la aguja
+de lo que el navegador descarga.
+
+Se mide con la construcción de producción, que es la única que dice la verdad —el
+servidor de desarrollo no minifica ni comprime—:
+
+```bash
+cd frontend && npm run build
+```
+
+| | Sin minificar | Comprimido (gzip) |
+|---|---|---|
+| `index.js`, **antes** del Hito 2 | 407,28 kB | 119,74 kB |
+| `index.js`, **después** | **409,77 kB** | 120,78 kB |
+| `index.css` | 26,00 kB | 6,01 kB |
+| `heic-to`, **fragmento aparte** | **2 995,46 kB** | **734,16 kB** |
+
+> **El número de referencia al planificar eran 402 kB y no lo son.** El plan del
+> cierre de huecos pedía volver a medirlo antes de comparar, precisamente porque
+> un bundle envejece: entre la planificación y el hito habían entrado la baja de
+> hogar y el cierre de cuenta con sus pantallas. Son 407,28 kB, y de ahí sale
+> todo lo demás.
+
+**Lo que hace legible esta tabla es la última fila, y no está donde se esperaba.**
+El decodificador de HEIC pesa casi tres megabytes, siete veces la aplicación
+entera; y sobre lo que descarga quien abre DRP cuesta **2,49 kB, un 0,61 %**. La
+diferencia es que va en un `import()` dinámico: los 2 995 kB salen en su propio
+fragmento y solo los pide el navegador de quien elige una foto HEIC, una vez y
+luego de su caché.
+
+Por eso la medición se expresa en dos filas y no en una suma. Un solo número
+—«3,4 MB»— habría descrito una aplicación que nadie usa: la que descarga el
+decodificador sin necesitarlo.
+
+**Y por eso el aviso de la construcción se deja puesto.** Vite avisa de que hay un
+fragmento por encima de 500 kB y su consejo —usar `import()` dinámico— ya está
+aplicado. Subir `chunkSizeWarningLimit` lo taparía a cambio de dejar de avisar el
+día en que crezca el fragmento de la aplicación, que es el aviso que sí importa.
+Está escrito en [`vite.config.ts`](../../../frontend/vite.config.ts) para que
+nadie lo «arregle».
+
+### Y lo que habría costado en el servidor
+
+La otra mitad de la decisión de la
+[ADR-014](../../common/architecture/decisions/ADR-014-heic-conversion.md), medida
+antes de elegir y no después. Con `libheif` 1.15.1 en Debian 12, **limitado a 2
+vCPU** para parecerse al runner, y una imagen de 4032 × 3024 —12 MP, la misma
+talla que mide la tabla de arriba—, mediana de 10 repeticiones:
+
+| Origen, 12 MP | Solo decodificar | Decodificar y recodificar a JPEG |
+|---|---|---|
+| JPEG típico, 172 kB | 139 ms | 233 ms |
+| **HEIC típico, 594 kB** | **691 ms** | **790 ms** |
+| JPEG con mucho detalle, 1,51 MB | 167 ms | 333 ms |
+| **HEIC con mucho detalle, 7,78 MB** | **1 671 ms** | **1 865 ms** |
+
+Es decir: **de ×3,4 a ×5,6 sobre la misma operación con un JPEG dentro**. Llevado
+a la cifra del runner de la tabla anterior —775,9 ms de mediana para recodificar
+una foto de 12 MP—, admitir HEIC en el servidor dejaría esa operación en **2,6 a
+4,3 s de núcleo por foto**, sobre las 2 vCPU que también atienden los logins con
+sus 19 MiB cada uno. Y era ya la operación cara por un orden de magnitud.
+
+> **Los milisegundos de esta tabla no son del runner** y se dice, con la misma
+> regla que el resto del documento: se tomaron en el equipo de desarrollo dentro
+> de un contenedor. Lo que sí viaja es **la proporción**, que es lo que aquí se
+> usa: las dos filas de cada par se midieron en la misma máquina, con la misma
+> herramienta y en la misma pasada.
+
 ## La decisión: **VPS-3**
 
 Y el motivo no es el que se esperaba al abrir la pregunta.
@@ -258,6 +330,7 @@ faltaba desde el Hito 1 de la Fase 2 y lo que convierte «pendiente» en una tar
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | **Aparece una tercera magnitud: lo que cuesta llegar al navegador.** La trae el Hito 2 del cierre de huecos, que fue el primero que tuvo que elegir entre pagar en el servidor y pagar en el cliente, y las dos mitades quedan medidas aquí porque es donde viven los números. El bundle se **vuelve a medir** y no son los 402 kB que citaba el plan sino **407,28 kB**; el decodificador de HEIC pesa **2 995,46 kB** (734,16 comprimido) y cuesta **2,49 kB sobre la primera carga**, porque va en un fragmento que solo pide quien elige un HEIC. Enfrente, el coste en servidor medido con `libheif` sobre 2 vCPU: recodificar una foto de 12 MP pasa de ×3,4 a ×5,6, o sea **2,6 a 4,3 s** aplicado a la cifra del runner. La decisión que sale de las dos está en la [ADR-014](../../common/architecture/decisions/ADR-014-heic-conversion.md). **La tabla de CPU del runner no se toca**: el camino elegido no añade ni una operación al servidor. |
 | 2026-08-20 | **No hay una sexta tabla sin techo**, aunque el Transactional Outbox parecía traerla. `event_outbox` crece con lo que el hogar hace y **la fila se borra al repartirse**, así que no acumula: su estado normal es vacía y su tamaño mide lo pendiente, no lo ocurrido. Se anota aquí para que nadie tenga que volver a derivarlo, junto con lo que sí sirve para operarla. No se vuelve a medir nada: la cola vacía no ocupa. |
 | 2026-08-19 | **Vuelta a medir al cerrar la Fase 2, con los cuatro módulos dentro.** La pendiente por hogar pasa de **61 kB a 116 kB** —casi el doble, y dos tercios de la subida son las entradas de apertura de Warehouse y las fichas de máquina de CMMS— y el esquema vacío, de 8,4 a 9,3 MiB. Aparece **una magnitud nueva que aquí no existía**: lo que crece con lo que el hogar *hace*, medido en **2457 B por día, ~875 kiB por hogar y año**, sin techo. La medición se parte en dos por eso, y el tramo de la segunda es de cuatro meses porque uno de dos daba pendientes con un tercio de diferencia entre ejecuciones. **La decisión no cambia: sigue siendo VPS-3 y sigue siendo por disco**, con tres órdenes de magnitud entre la cuota de ficheros y las filas. Se fija por fin el **criterio de retención** de las cinco tablas de la purga, con su disparador. |
 | 2026-08-17 | Se crea al cerrar la Fase 1, con la medición de los tres puntos, el coste de las tres operaciones caras y la elección de VPS-3 por disco y no por CPU. Las cifras son las del runner de la CI —Linux, 2 vCPU—, tomadas en la primera ejecución del trabajo `capacity`; los bytes coincidieron con los del equipo de desarrollo y los milisegundos no, que es la razón de medirlos allí. |

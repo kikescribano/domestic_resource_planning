@@ -219,7 +219,18 @@ consume nadie.
 - **El tope de 1 MB es estrecho para una foto de móvil**, que ronda los 3-8 MB.
   Sin reducción en el cliente, subir el avatar va a fallar más veces de las que
   va a funcionar. Es el mismo hueco que arrastra `UploadField`, y aquí se nota
-  antes.
+  antes. **Con una excepción desde el 2026-08-20, y por casualidad:** un HEIC se
+  convierte a JPEG en el cliente antes de subirse
+  ([ADR-014](../../../common/architecture/decisions/ADR-014-heic-conversion.md)),
+  y una foto de 12 MP sale de ahí en unos 240 kB — así que **el caso que menos
+  cabía es el único que ahora entra con holgura**. El hueco sigue abierto para
+  todo lo demás.
+- **El `accept` del avatar incluye HEIC**, con la misma distinción que explica la
+  ficha de [`upload-field`](upload-field.md#el-accept-es-una-comodidad-nunca-una-validación):
+  no es que la lista blanca del servidor haya crecido —sigue teniendo cuatro
+  tipos— sino que el cliente convierte antes de enviar. La conversión le llega
+  sola porque vive en `uploadFile`, que es por donde pasa también esta subida;
+  lo único propio de esta pantalla es decir «Convirtiendo…» mientras dura.
 
 ## Referencias
 

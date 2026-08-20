@@ -165,3 +165,23 @@ Revertir a enlaces externos es viable mientras `url` siga admitiéndose, que es
 siempre. Cambiar el almacén por S3 u otro backend no requiere una ADR nueva si se
 respeta el puerto `FileStorage`; sí la requiere volver a meter los binarios en la
 base de datos, porque cambia el modelo de copia de seguridad y el de aislamiento.
+
+## Posterior a esta decisión
+
+El cuerpo de esta ADR se conserva tal y como se aceptó, y **nada de lo que decidió
+cambia**. Lo que se ha resuelto después:
+
+- **La conversión de HEIC**, que esta ADR y 5.8.3 asignaron al frontend —«lo
+  convierte el frontend antes de subirlo»— sin que el frontend tuviera con qué,
+  se cierra en la [ADR-014](ADR-014-heic-conversion.md) con las dos medidas que el
+  plan del cierre de huecos exigía delante. Convierte el cliente, como aquí se
+  dijo. **La lista blanca de cuatro tipos no se amplía**: lo que se guarda es el
+  tipo detectado tras recodificar, y por ese camino el servidor no llega a ver un
+  HEIC.
+- **El borrado del árbol de ficheros de un hogar que se da de baja**, que aquí
+  quedaba fuera porque no había caso de uso al que engancharlo, entra en la
+  [ADR-012](ADR-012-data-erasure-household-closure-and-account-closure.md) con el
+  orden que `PurgeUnusedFiles` ya había fijado: los bytes primero y las filas
+  después.
+- **El análisis antivirus sigue pendiente**, con el motivo intacto: es la defensa
+  que toca añadir el día que un fichero pueda salir del hogar que lo subió.

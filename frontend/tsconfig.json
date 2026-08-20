@@ -16,7 +16,13 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
-    "types": ["vitest/globals", "@testing-library/jest-dom"]
+    // `node` entra con el Hito 2 del cierre de huecos y por una sola razon:
+    // `heic.test.ts` lee de disco **un HEIC de verdad**, que es lo que separa
+    // esa prueba de una que se pasaria un JPEG renombrado. Nada del repositorio
+    // sabe escribir un HEIC, asi que el fichero se versiona y hay que abrirlo.
+    // El precio, dicho en vez de disimulado: `process` y `Buffer` pasan a estar
+    // declarados tambien para el codigo de la aplicacion, donde no existen.
+    "types": ["node", "vitest/globals", "@testing-library/jest-dom"]
   },
   "include": ["src", "vite.config.ts"]
 }

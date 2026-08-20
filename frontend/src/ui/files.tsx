@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import {
   ALLOWED_FILE_TYPES,
   ApiError,
+  CONVERTIBLE_FILE_TYPES,
   formatBytes,
   humanMessage,
   uploadFile,
@@ -25,8 +26,25 @@ import { Button, EmptyState } from './primitives'
  * y [`avatar.md`](../../../docs/frontend/design-system/components/avatar.md).
  */
 
-/** Los siete estados de la ficha. El séptimo, `processing`, es el hueco entre el último byte y el `201`. */
-type UploadState = 'idle' | 'selected' | 'uploading' | 'processing' | 'done' | 'error' | 'cancelled'
+/**
+ * Los ocho estados. Dos de ellos son huecos en los que no hay barra que mover y
+ * conviene no confundirlos:
+ *
+ * - `converting` va **antes** del primer byte —el HEIC se está decodificando
+ *   aquí, en esta máquina (ADR-014)—, y en una foto de 12 MP es del orden de un
+ *   segundo en un escritorio y de varios en un móvil.
+ * - `processing` va **después** del último: es lo que el servidor tarda en
+ *   inspeccionar, recodificar, hacer la miniatura y cerrar la fila.
+ */
+type UploadState =
+  | 'idle'
+  | 'selected'
+  | 'converting'
+  | 'uploading'
+  | 'processing'
+  | 'done'
+  | 'error'
+  | 'cancelled'
 
 interface UploadFieldProps {
   label: string
@@ -41,14 +59,19 @@ interface UploadFieldProps {
   accessToken: string
 }
 
+/**
+ * HEIC va en los dos, y no porque la lista blanca haya crecido: sigue teniendo
+ * cuatro tipos. Va porque el cliente lo convierte antes de enviarlo (ADR-014), y
+ * dejarlo en gris en el diálogo sería el mismo muro que el `415` con otra cara.
+ */
 const ACCEPT_ATTRIBUTE = {
-  image: 'image/jpeg,image/png,image/webp',
-  document: ALLOWED_FILE_TYPES.join(','),
+  image: ['image/jpeg', 'image/png', 'image/webp', ...CONVERTIBLE_FILE_TYPES].join(','),
+  document: [...ALLOWED_FILE_TYPES, ...CONVERTIBLE_FILE_TYPES].join(','),
 }
 
 const DEFAULT_HINT = {
-  image: 'JPEG, PNG o WebP. Hasta 25 MB.',
-  document: 'JPEG, PNG, WebP o PDF. Hasta 25 MB.',
+  image: 'JPEG, PNG, WebP o HEIC. Hasta 25 MB.',
+  document: 'JPEG, PNG, WebP, HEIC o PDF. Hasta 25 MB.',
 }
 
 /**
@@ -106,10 +129,15 @@ export function UploadField({
     setState('selected')
 
     try {
-      const stored = await uploadFile(file, accessToken, (fraction) => {
-        setProgress(fraction)
-        setState(fraction >= 1 ? 'processing' : 'uploading')
-      })
+      const stored = await uploadFile(
+        file,
+        accessToken,
+        (fraction) => {
+          setProgress(fraction)
+          setState(fraction >= 1 ? 'processing' : 'uploading')
+        },
+        { onConverting: () => setState('converting') },
+      )
       setUploaded(stored)
       setState('done')
       onUploaded(stored)
@@ -174,6 +202,10 @@ export function UploadField({
             <p className="truncate text-body-sm text-ink">{chosen.name}</p>
             <p className="text-caption text-ink-muted">
               {formatBytes(uploaded?.sizeBytes ?? chosen.size)}
+              {/* Se dice «convirtiendo» y no «procesando» porque no es lo
+                  mismo ni pasa en el mismo sitio: esto ocurre aquí, antes de
+                  enviar nada, y puede tardar más que la subida entera. */}
+              {state === 'converting' && ' · Convirtiendo la foto…'}
               {state === 'uploading' && ` · ${Math.round(progress * 100)} %`}
               {state === 'processing' && ' · Procesando…'}
               {state === 'done' && ' · Subido'}
@@ -188,19 +220,30 @@ export function UploadField({
         </div>
       )}
 
-      {(state === 'uploading' || state === 'processing') && (
+      {(state === 'converting' || state === 'uploading' || state === 'processing') && (
         <div
           role="progressbar"
-          aria-label={`Subiendo ${chosen?.name ?? 'el fichero'}`}
+          aria-label={
+            state === 'converting'
+              ? `Convirtiendo ${chosen?.name ?? 'la foto'}`
+              : `Subiendo ${chosen?.name ?? 'el fichero'}`
+          }
           aria-valuemin={0}
           aria-valuemax={100}
-          // Indeterminada al procesar: no hay porcentaje que dar, y dar uno
-          // sería inventarlo.
-          aria-valuenow={state === 'processing' ? undefined : Math.round(progress * 100)}
+          // Indeterminada al convertir y al procesar: no hay porcentaje que dar,
+          // y dar uno sería inventarlo. El decodificador de HEIC tampoco lo
+          // ofrece --devuelve la imagen o no la devuelve--, así que aquí la
+          // barra tampoco puede medir nada.
+          aria-valuenow={
+            state === 'processing' || state === 'converting' ? undefined : Math.round(progress * 100)
+          }
           className="h-1 overflow-hidden rounded-full bg-surface-sunken"
         >
           <div
-            className={['h-full bg-accent transition-[width]', state === 'processing' ? 'animate-pulse' : ''].join(' ')}
+            className={[
+              'h-full bg-accent transition-[width]',
+              state === 'processing' || state === 'converting' ? 'animate-pulse' : '',
+            ].join(' ')}
             style={{ width: `${Math.max(progress, 0.02) * 100}%` }}
           />
         </div>
