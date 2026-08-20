@@ -1,26 +1,27 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from '../App'
-import { fakeTokenPair, stubFetch } from '../test/http'
+import { SESSION_CLAIMS, fakeTokenPair, stubFetch } from '../test/http'
 
 /**
  * La guía de la herramienta.
  *
  * Lo que se comprueba aquí es lo que solo se ve aquí: que hay un bloque por
- * pantalla de la navegación con su enlace, y que el buscador deja a la vista
+ * pantalla de la navegación con su enlace, que el buscador deja a la vista
  * solo los bloques que coinciden —sin distinguir acentos, que es la promesa
- * escrita en la pista del campo—. El contenido es estático: no hay ninguna
- * petición a la API que preparar más allá de la sesión.
+ * escrita en la pista del campo— y que la parada «Ayuda» remata el grupo
+ * «Configuración» también para quien no administra. El contenido es estático:
+ * no hay ninguna petición a la API que preparar más allá de la sesión.
  */
 
-async function openHelp() {
+async function openHelp(role = 'HOUSEHOLD_ADMIN') {
   localStorage.setItem('drp.refreshToken', 'refresh-de-mentira')
   window.history.pushState({}, '', '/ayuda')
 
   const stub = stubFetch({
-    'POST /api/v1/auth/refresh': { status: 200, body: fakeTokenPair() },
+    'POST /api/v1/auth/refresh': { status: 200, body: fakeTokenPair({ ...SESSION_CLAIMS, role }) },
   })
 
   render(<App />)
@@ -64,5 +65,31 @@ describe('la guía de la herramienta', () => {
 
     expect(screen.getByText('Ningún bloque coincide')).toBeInTheDocument()
     expect(screen.queryByRole('article')).not.toBeInTheDocument()
+  })
+
+  it('su parada remata el grupo «Configuración» de la navegación', async () => {
+    await openHelp()
+
+    // La última del grupo, que es la última de la navegación entera: la ayuda
+    // cierra la lista, no se cuela entre las paradas de administración.
+    const nav = within(screen.getByRole('navigation', { name: 'Principal' }))
+    const config = within(nav.getByRole('list', { name: 'Configuración' }))
+    const links = config.getAllByRole('link')
+
+    expect(links.at(-1)).toHaveAccessibleName('Ayuda')
+    expect(links.at(-1)).toHaveAttribute('href', '/ayuda')
+  })
+
+  it('quien no administra la ve igual, aunque el resto del grupo no exista para él', async () => {
+    await openHelp('HOUSEHOLD_MEMBER')
+
+    // El grupo «Configuración» era solo de administración hasta que «Ayuda» lo
+    // remató: la guía es de quien usa la herramienta, no de quien la configura.
+    const nav = within(screen.getByRole('navigation', { name: 'Principal' }))
+    const config = within(nav.getByRole('list', { name: 'Configuración' }))
+
+    expect(config.getByRole('link', { name: 'Ayuda' })).toBeInTheDocument()
+    expect(config.queryByRole('link', { name: 'General' })).not.toBeInTheDocument()
+    expect(config.queryByRole('link', { name: 'Módulos del hogar' })).not.toBeInTheDocument()
   })
 })
