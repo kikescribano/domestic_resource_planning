@@ -242,22 +242,26 @@ alta de hogares en autoservicio hace que «autenticado» sea una barrera baja.
   va dentro del jar; como mitigación temporal, valorar retirar `image/webp` de la
   lista blanca de subida (la escritura de miniaturas en WebP no depende de la
   entrada del usuario, pero la decodificación de la subida sí).
-- **Corregido.** Sustituida por `com.github.usefulness:webp-imageio:0.11.0`, que
-  es la continuación mantenida del mismo código —conserva el paquete
+- **Corregido.** Sustituida por `com.github.usefulness:webp-imageio:0.10.2`, la
+  continuación mantenida del mismo código —conserva el paquete
   `com.luciad.imageio.webp` del original, de ahí que el cambio **no toque una
-  sola línea de la aplicación**: el procesador pide el códec por SPI genérico— y
-  que empaqueta **libwebp 1.6.0**, muy por delante de la 1.3.2 que trajo el
-  arreglo. La versión del nativo no se dio por supuesta ni se leyó del README,
-  que no la dice: se descargó el jar, se comprobó que trae binarios por
-  plataforma y se confirmó contra las notas de publicación del proyecto, donde
-  consta que la 0.11.0 sube a 1.6.0 y que fue su v0.5.0 la que adoptó la 1.3.2.
-  No hizo falta la mitigación temporal de retirar `image/webp` de la lista
-  blanca.
-- **Nota para el despliegue:** desde la 0.11.0 los binarios de Linux x86/x86_64
-  se construyen con toolchains más nuevos y **dejan de servir para glibc muy
-  antiguas** (ya no son manylinux2010). Para un VPS actual es indiferente; lo que
-  habría que mirar es empaquetar la aplicación sobre una imagen musl (Alpine),
-  donde la carga del binario nativo es su propio asunto.
+  sola línea de la aplicación**: el procesador pide el códec por SPI genérico—.
+  La versión del nativo no se dio por supuesta ni se leyó del README, que no la
+  dice: se comprobó que **el submódulo apunta al commit exacto del tag v1.5.0 de
+  libwebp**, muy por delante de la 1.3.2 que trajo el arreglo. No hizo falta la
+  mitigación temporal de retirar `image/webp` de la lista blanca.
+- **Por qué no la 0.11.0, que es la última.** Está compilada con Kotlin 2.4 y el
+  compilador del proyecto va por 2.1.20, así que rechaza su metadata. Subir
+  Kotlin para esto sería meter una migración dentro de un arreglo de seguridad, y
+  además Kotlin 2.2+ es requisito del salto a Spring Boot 4: su sitio es aquel
+  bloque. La 0.10.2 evita de paso una regresión de la 0.11.0, cuyos binarios de
+  Linux x86/x86_64 dejan de valer para glibc antiguas —lo que importaría al
+  empaquetar sobre una imagen musl (Alpine)—.
+- **Trampa medida, y aplicable a cualquier cambio de dependencia:** la primera
+  versión de este arreglo **pasó en local y falló en la CI**. Kotlin no vuelve a
+  escanear la metadata del classpath si no ha cambiado ningún fuente, de modo que
+  la construcción incremental da verde sobre una biblioteca que una construcción
+  desde cero rechaza. Se comprueba con `./gradlew compileKotlin --rerun-tasks`.
 
 ### 5. Spring Boot 3.4.x fuera de soporte OSS, sin detección continua de dependencias
 

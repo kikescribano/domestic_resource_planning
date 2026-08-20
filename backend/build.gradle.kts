@@ -86,14 +86,29 @@ dependencies {
     //
     // Esta es la continuacion mantenida del mismo codigo --conserva el paquete
     // `com.luciad.imageio.webp` del original, de ahi que el cambio no toque una
-    // sola linea de la aplicacion-- y la 0.11.0 empaqueta **libwebp 1.6.0**.
+    // sola linea de la aplicacion.
     //
-    // Un detalle que importa al desplegar: desde la 0.11.0 los binarios de Linux
-    // x86/x86_64 se construyen con toolchains mas nuevos y **dejan de valer para
-    // glibc muy antiguas** (ya no son manylinux2010). Para un VPS actual da
-    // igual; lo que hay que mirar es empaquetar la aplicacion sobre una imagen
-    // musl --Alpine-- donde la carga del nativo es su propio asunto.
-    implementation("com.github.usefulness:webp-imageio:0.11.0")
+    // **Se queda en la 0.10.2 y no sube a la 0.11.0, que es la ultima.** La
+    // 0.11.0 esta compilada con Kotlin 2.4 y el compilador de este proyecto va
+    // por 2.1.20, asi que rechaza su metadata: «The binary version of its
+    // metadata is 2.4.0, expected version is 2.1.0». Subir Kotlin para esto
+    // seria meter una migracion dentro de un arreglo de seguridad, y ademas
+    // Kotlin 2.2+ es requisito del salto a Spring Boot 4: su sitio es aquel
+    // bloque, no este. Cuando Kotlin suba alli, la 0.11.0 queda disponible.
+    //
+    // Lo que importa se cumple igual: **la 0.10.2 fija libwebp en el commit
+    // exacto del tag v1.5.0**, muy por delante de la 1.3.2 que trae el arreglo
+    // de CVE-2023-4863. Y de paso evita una regresion de la 0.11.0, cuyos
+    // binarios de Linux x86/x86_64 se construyen con toolchains mas nuevos y
+    // dejan de valer para glibc antiguas: la 0.10.2 sigue sirviendo para una
+    // imagen musl --Alpine-- si algun dia la aplicacion se empaqueta asi.
+    //
+    // **Cuidado al cambiar esta linea:** un cambio de dependencia puede pasar en
+    // local y fallar en la CI. Kotlin no vuelve a escanear la metadata del
+    // classpath si no ha cambiado ningun fuente, asi que la construccion
+    // incremental da verde sobre una biblioteca que la CI --que parte de cero--
+    // rechaza. Comprobalo con `./gradlew compileKotlin --rerun-tasks`.
+    implementation("com.github.usefulness:webp-imageio:0.10.2")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
