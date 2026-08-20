@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | kikescribano |
 | Ámbito | common (backend, frontend, infraestructura y despliegue) |
-| Última revisión | 2026-08-20 |
+| Última revisión | 2026-08-21 |
 
 ## Propósito
 
@@ -355,7 +355,26 @@ punto accionable no depende de ninguna en particular:
 - **Además entra CodeQL**, que el hallazgo citaba entre lo ausente aunque la
   acción no lo exigía: el *default setup* queda `configured` —analiza el
   TypeScript y compila el Kotlin en Actions, sin coste en un repositorio
-  público— y los primeros análisis subidos no traen ninguna alerta.
+  público—. Su primera pasada completa (la de Kotlin tardó 1 h 42 min, que es
+  compilar el backend entero instrumentado en un runner de 2 núcleos) subió
+  **cinco alertas de severidad alta, y las cinco se revisaron contra el código
+  el 2026-08-21 y se descartaron con el motivo escrito en la propia alerta**:
+  - Tres `java/sql-injection` en los adaptadores de persistencia de Warehouse,
+    Purchasing y Maintenance — **falsos positivos**: esas consultas interpolan
+    solo plantillas constantes y todos los valores del usuario viajan como
+    parámetros `?`; lo único dinámico, `placeholders()`, genera marcadores y
+    nunca valores. CodeQL ve interpolación de cadena en el SQL y no distingue
+    que lo interpolado no lleva datos.
+  - Un `java/path-injection` en `FilesystemFileStorage` — **falso positivo**:
+    toda clave pasa por `resolve()`, que normaliza y exige `startsWith(root)`,
+    la doble valla que la sección «Cumple» de esta misma auditoría verificó.
+  - El CSRF deshabilitado de `SecurityConfig` — ***won't fix***: no es un
+    descuido sino la decisión documentada y validada en «Cumple» (API Bearer
+    sin cookies, token solo en cabecera).
+
+  El tablero queda a cero a propósito: una alerta futura debe destacar en vez
+  de ahogarse entre conocidas, y el motivo de cada descarte queda en la alerta
+  para quien vuelva a hacerse la pregunta.
 - **Quedan fuera a propósito** los *non-provider patterns* y las *validity
   checks* del escaneo de secretos: son funciones de pago (Secret Protection) y
   el criterio del proyecto es la cuenta gratuita con repositorio público. La
@@ -728,3 +747,4 @@ Lo que la auditoría comprobó como correcto, para que no se toque sin querer:
 | 2026-08-20 | **Hallazgo 4 cerrado: fuera la libwebp sin parchear.** `org.sejda.imageio:webp-imageio:0.1.6` —publicada en 2020 y nunca más— se sustituye por `com.github.usefulness:webp-imageio:0.10.2`, la continuación mantenida del mismo código, cuyo submódulo apunta al tag **v1.5.0 de libwebp** —muy por delante de la 1.3.2 que trajo el arreglo, y comprobado contra el repositorio en lugar de suponerlo—. Importaba porque ese decodificador se alimenta con los bytes que sube cualquier miembro de cualquier hogar: `image/webp` está en la lista blanca y toda imagen se decodifica para recodificarla. El cambio **no toca una sola línea de la aplicación**, porque la sustituta conserva el paquete `com.luciad.imageio.webp` y el procesador pide el códec por SPI genérico. No se fue a la 0.11.0 —la última— porque está compilada con Kotlin 2.4 y el proyecto va por 2.1.20: subir Kotlin es parte del salto a Spring Boot 4, no de un arreglo de seguridad, y la 0.10.2 evita de paso su regresión con glibc antiguas. *(Esta fila decía 0.11.0 con libwebp 1.6.0: se escribió antes de que la CI obligara al peldaño 0.10.2 y no se corrigió con el cuerpo del hallazgo.)* **Con esto el único ALTA abierto es el salto a Spring Boot 4.x** | kikescribano |
 | 2026-08-20 | **Hallazgo 5: cerrada también la mitad que vivía en los ajustes del repositorio**, auditada contra la API de GitHub con la CLI `gh` en lugar de fiarla a la interfaz. Lo encontrado: alertas de Dependabot ya activas y grafo de dependencias funcionando, pero las security updates y todo el escaneo de secretos apagados. Se activan por API las security updates, el secret scanning y la push protection —re-verificado con las mismas consultas—, se comprueba que el token de Actions ya tenía `read` por defecto, y entra CodeQL con el *default setup*. Cero alertas de dependencias y de código a día de hoy. Los *non-provider patterns* y las *validity checks* quedan fuera a propósito: son de pago y el criterio es cuenta gratuita con repositorio público. Del hallazgo 5 solo queda abierto el salto a Spring Boot 4.x. | kikescribano |
 | 2026-08-21 | **`webp-imageio` llega a la 0.11.0 y se retira el candado que lo impedía.** El proyecto sube a **Kotlin 2.4.10**, que era la única condición que bloqueaba esa versión —está compilada con Kotlin 2.4 y el compilador anterior rechazaba su metadata—, así que se sube la dependencia y **se retira la regla de `dependabot.yml`** que fijaba la línea 0.10.x. El criterio queda escrito: una regla cuya condición se cumple y no se retira es deuda que nadie vuelve a mirar, y acaba bloqueando algo por un motivo que dejó de ser cierto; la nota se conserva en el fichero para que quien dude de si estuvo fijado encuentre la respuesta. La 0.11.0 empaqueta **libwebp 1.6.0**, verificada como en cada salto anterior. Sigue vigente el aviso de despliegue —sus binarios de Linux x86/x86_64 ya no valen para glibc antiguas, lo que importaría sobre una imagen musl— y la trampa medida de que un cambio de dependencia puede pasar en local y fallar en la CI por la compilación incremental de Kotlin. | kikescribano |
+| 2026-08-21 | **Primera pasada completa de CodeQL, revisada y a cero.** El análisis de Kotlin tardó 1 h 42 min y subió cinco alertas de severidad alta; se revisaron las cinco contra el código y ninguna era real: tres `java/sql-injection` en la persistencia de Warehouse, Purchasing y Maintenance (plantillas constantes con los valores por parámetros `?`; `placeholders()` genera marcadores, no valores) y un `java/path-injection` en `FilesystemFileStorage` (la doble valla de `resolve()`) se descartan como *false positive*, y el CSRF deshabilitado —decisión documentada en «Cumple»— como *won't fix*, cada una con su motivo escrito en la propia alerta. Con ello la pestaña Security queda entera a cero —dependencias, código y secretos— con los cuatro mecanismos encendidos: lo que aparezca ahí a partir de ahora es nuevo de verdad. | kikescribano |
