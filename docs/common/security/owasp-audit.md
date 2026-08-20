@@ -300,10 +300,34 @@ punto accionable no depende de ninguna en particular:
   hallazgo. Entra `.github/dependabot.yml` con los tres ecosistemas y las
   actualizaciones agrupadas —el BOM de Spring mueve decenas de artefactos, y un
   pull request por cada uno convierte la vigilancia en ruido que se acaba
-  ignorando—, y la CI declara `permissions: contents: read`. **Sigue pendiente y
-  no se puede hacer desde el repositorio:** activar Dependabot alerts, las
-  actualizaciones de seguridad y el escaneo de secretos con protección de push,
-  que son ajustes de la configuración del repositorio en GitHub.
+  ignorando—, y la CI declara `permissions: contents: read`.
+- **Y cerrada la parte que no vivía en el código: los ajustes del repositorio
+  en GitHub**, auditados el 2026-08-20 contra la API con la CLI `gh` y no
+  contra la interfaz —la existencia de ramas `dependabot/…` no demuestra nada,
+  porque las actualizaciones de versión funcionan aunque las alertas estén
+  apagadas—. El estado encontrado fue la mitad del que se creía: las
+  **Dependabot alerts** ya estaban activas (`vulnerability-alerts` responde
+  `204`) y el grafo de dependencias funciona (su SBOM devuelve 274 paquetes),
+  pero las **security updates** —el pull request automático de arreglo— estaban
+  apagadas (`automated-security-fixes` devolvía `enabled: false`), igual que
+  **todo el bloque de secretos**. Se activaron ese mismo día por API y se
+  verificaron después con las mismas consultas: security updates
+  `enabled: true`, `secret_scanning` y `secret_scanning_push_protection` en
+  `enabled`. Los permisos por defecto del token de Actions ya eran los
+  deseables (`default_workflow_permissions: read`, sin aprobar pull requests),
+  que es lo que protege a cualquier workflow futuro que no declare los suyos.
+  Y el mecanismo, además de encendido, responde: **cero alertas de
+  dependencias** en cualquier estado, coherente con el peldaño 3.5.16 recién
+  dado.
+- **Además entra CodeQL**, que el hallazgo citaba entre lo ausente aunque la
+  acción no lo exigía: el *default setup* queda `configured` —analiza el
+  TypeScript y compila el Kotlin en Actions, sin coste en un repositorio
+  público— y los primeros análisis subidos no traen ninguna alerta.
+- **Quedan fuera a propósito** los *non-provider patterns* y las *validity
+  checks* del escaneo de secretos: son funciones de pago (Secret Protection) y
+  el criterio del proyecto es la cuenta gratuita con repositorio público. La
+  API los deja en `disabled` sin error si se intenta activarlos, así que no
+  hay nada encendido a medias.
 
 ---
 
@@ -668,3 +692,4 @@ Lo que la auditoría comprobó como correcto, para que no se toque sin querer:
 | 2026-08-20 | Creación: auditoría OWASP previa al despliegue en VPS, sobre las 106 operaciones y 31 tablas del cierre de huecos. Cinco superficies auditadas; sin vulnerabilidades críticas; cinco ALTA y catorce MEDIA en el código actual, más los requisitos del despliegue. | kikescribano |
 | 2026-08-20 | **Corregidos los tres ALTA acotados**, que eran los tres «a medio cumplir»: el rate limit recupera la IP del cliente tras un proxy declarado de confianza (`drp.rate-limit.trusted-proxies`, leyendo la **última** entrada de `X-Forwarded-For`), la ausencia de perfil pasa a contar como producción —con `bootRun` declarando `dev` y la tarea de pruebas `test`— y el secreto de firma de ficheros se valida al arrancar igual que el del JWT. La tabla del resumen gana **fecha de detección y de corrección** por hallazgo, para que se pueda decir cuánto tiempo estuvo vivo cada uno y no solo si está cerrado. Quedan abiertos los dos ALTA de dependencias, que van en su propio bloque. | kikescribano |
 | 2026-08-20 | **Hallazgo 5, cerrado en parte, y con una corrección del propio informe delante**: la recomendación original —«migrar a Spring Boot 3.5.x, es un salto menor»— **era falsa**, y se descubrió al ir a ejecutarla. La 3.5 también está fuera de soporte OSS desde el 2026-06-30 y la línea con soporte es la 4.x; el destino es un salto **mayor** que arrastra Jackson 3 con cambio de `groupId`, Kotlin 2.2+, Spring Security 7 y Hibernate 7. Se deja escrito cómo se detectó, porque el modo de fallo se repetirá: las páginas de fechas de fin de vida daban versiones inexistentes y el índice de búsqueda de Maven Central respondía con una versión atrasada; lo zanjó el `maven-metadata.xml` del repositorio. Entra el **peldaño 3.5.16** que la guía de Spring exige antes del salto y que **ya cierra todas las CVE concretas** del hallazgo —Spring Security 6.5.11, Framework 6.2.19, Tomcat 10.1.55 y nimbus-jose-jwt 9.37.4—, con springdoc 2.9.0 y BouncyCastle 1.85.2 detrás. Y entra la **vigilancia continua**, que era la otra mitad: `dependabot.yml` con los tres ecosistemas y actualizaciones agrupadas, más `permissions: contents: read` en la CI. | kikescribano |
+| 2026-08-20 | **Hallazgo 5: cerrada también la mitad que vivía en los ajustes del repositorio**, auditada contra la API de GitHub con la CLI `gh` en lugar de fiarla a la interfaz. Lo encontrado: alertas de Dependabot ya activas y grafo de dependencias funcionando, pero las security updates y todo el escaneo de secretos apagados. Se activan por API las security updates, el secret scanning y la push protection —re-verificado con las mismas consultas—, se comprueba que el token de Actions ya tenía `read` por defecto, y entra CodeQL con el *default setup*. Cero alertas de dependencias y de código a día de hoy. Los *non-provider patterns* y las *validity checks* quedan fuera a propósito: son de pago y el criterio es cuenta gratuita con repositorio público. Del hallazgo 5 solo queda abierto el salto a Spring Boot 4.x. | kikescribano |
