@@ -128,19 +128,19 @@ function LoanCard({
   const isOpen = loan.status === 'ACTIVE' || loan.status === 'OVERDUE'
 
   return (
-    <li className="rounded-lg border border-line bg-surface p-4">
+    <li className="rounded-lg border border-border-subtle bg-surface-raised p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="font-medium">{loan.assetName ?? 'Sin nombre'}</p>
-          <p className="text-sm text-muted">
+          <p className="text-body-sm text-ink-muted">
             {describeParticipant(loan, 'borrower')} · desde el {formatDate(loan.startedAt)}
           </p>
           {loan.dueAt && (
-            <p className="text-sm text-muted">
+            <p className="text-body-sm text-ink-muted">
               {loan.status === 'RETURNED' ? 'Vencía' : 'Vence'} el {formatDate(loan.dueAt)}
             </p>
           )}
-          {loan.returnedAt && <p className="text-sm text-muted">Devuelto el {formatDate(loan.returnedAt)}</p>}
+          {loan.returnedAt && <p className="text-body-sm text-ink-muted">Devuelto el {formatDate(loan.returnedAt)}</p>}
         </div>
 
         <div className="flex items-center gap-3">
@@ -225,7 +225,7 @@ function StartLoanForm({ onDone }: { onDone: () => void }) {
   const error = start.error instanceof ApiError ? start.error : null
 
   return (
-    <form onSubmit={submit} className="space-y-4 rounded-lg border border-line bg-surface p-4">
+    <form onSubmit={submit} className="space-y-4 rounded-lg border border-border-subtle bg-surface-raised p-4">
       <SelectField
         label="Qué prestas"
         value={assetId}
@@ -378,20 +378,20 @@ function ExternalLoanView({
         <div className="space-y-4">
           <StatusBadge tone={toneOf(loan.status)}>{LOAN_STATUS_LABELS[loan.status]}</StatusBadge>
 
-          <dl className="space-y-2 text-sm">
+          <dl className="space-y-2 text-body-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-muted">Desde</dt>
+              <dt className="text-ink-muted">Desde</dt>
               <dd>{formatDate(loan.startedAt)}</dd>
             </div>
             {loan.dueAt && (
               <div className="flex justify-between gap-4">
-                <dt className="text-muted">{loan.status === 'RETURNED' ? 'Vencía' : 'Hasta'}</dt>
+                <dt className="text-ink-muted">{loan.status === 'RETURNED' ? 'Vencía' : 'Hasta'}</dt>
                 <dd>{formatDate(loan.dueAt)}</dd>
               </div>
             )}
             {loan.returnedAt && (
               <div className="flex justify-between gap-4">
-                <dt className="text-muted">Devuelto</dt>
+                <dt className="text-ink-muted">Devuelto</dt>
                 <dd>{formatDate(loan.returnedAt)}</dd>
               </div>
             )}
@@ -407,7 +407,7 @@ function ExternalLoanView({
               parada de tabulador, que es su estado final correcto. */}
           {isOpen ? (
             <>
-              <p className="text-sm text-muted">
+              <p className="text-body-sm text-ink-muted">
                 {isLender
                   ? 'Cuando te lo devuelvan, avísalo aquí y se cerrará el préstamo.'
                   : 'Cuando se lo devuelvas, avísalo aquí y se cerrará el préstamo.'}
@@ -439,7 +439,7 @@ function BrokenLink() {
   return (
     <main className="flex min-h-dvh items-center justify-center px-gutter py-10">
       <AuthCard title="Este enlace ya no vale">
-        <p className="text-sm text-muted">
+        <p className="text-body-sm text-ink-muted">
           Puede que haya caducado o que se haya sustituido por otro. Habla con la persona que te prestó la
           cosa: puede volver a enviártelo o apuntar la devolución por su cuenta.
         </p>
