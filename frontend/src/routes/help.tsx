@@ -17,7 +17,7 @@ import {
   Wrench,
   type LucideIcon,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 
 import { EmptyState, Field, PageHeading } from '../ui/primitives'
@@ -547,10 +547,9 @@ interface HelpCardData {
 /**
  * El nombre de la pantalla cuenta en el pajar de TODAS sus tarjetas: buscar
  * «préstamos» tiene que enseñar la sección entera, no obligar a que cada caso
- * repita la palabra.
+ * repita la palabra. La aguja llega YA normalizada.
  */
-function cardsOf(topic: HelpTopic, query: string): HelpCardData[] {
-  const needle = normalized(query.trim())
+function cardsOf(topic: HelpTopic, needle: string): HelpCardData[] {
   const cards: HelpCardData[] = [
     { id: `ayuda-${topic.path}-general`, title: 'Explicación general', body: topic.overview, example: null },
     ...topic.useCases.map((useCase, index) => ({
@@ -567,10 +566,56 @@ function cardsOf(topic: HelpTopic, query: string): HelpCardData[] {
   )
 }
 
+/**
+ * Envuelve en `<mark>` cada coincidencia con la aguja ya normalizada. La
+ * coincidencia se busca sobre el texto normalizado y el tramo se recorta del
+ * original —«prestamo» resalta «préstamo» entero, tilde incluida—, y para eso
+ * hace falta el mapa de índices: normalizar puede comerse caracteres (los
+ * diacríticos descompuestos), y sin mapa el recorte bailaría.
+ *
+ * El color es el que el sistema ya usa para texto resaltado: la pareja del
+ * `::selection` de la capa base, `accent-soft` con la tinta normal.
+ */
+function highlightMatches(text: string, needle: string): ReactNode {
+  if (!needle) return text
+
+  const map: number[] = []
+  let haystack = ''
+  for (let i = 0; i < text.length; i++) {
+    for (const piece of normalized(text.charAt(i))) {
+      haystack += piece
+      map.push(i)
+    }
+  }
+
+  const parts: ReactNode[] = []
+  let cursor = 0
+  let at = haystack.indexOf(needle)
+  while (at !== -1) {
+    const start = map[at]
+    const last = map[at + needle.length - 1]
+    // No puede pasar --el pajar y el mapa se construyen a la vez--, pero el
+    // acceso indexado no lo sabe, y romper el bucle es mejor que afirmarlo.
+    if (start === undefined || last === undefined) break
+    const end = last + 1
+    if (start > cursor) parts.push(text.slice(cursor, start))
+    parts.push(
+      <mark key={`${start}-${end}`} className="rounded-sm bg-accent-soft text-ink">
+        {text.slice(start, end)}
+      </mark>,
+    )
+    cursor = end
+    at = haystack.indexOf(needle, at + needle.length)
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor))
+  return parts
+}
+
 export function HelpPage() {
   const [query, setQuery] = useState('')
 
-  const sections = HELP_TOPICS.map((topic) => ({ topic, cards: cardsOf(topic, query) })).filter(
+  const needle = normalized(query.trim())
+  const sections = HELP_TOPICS.map((topic) => ({ topic, cards: cardsOf(topic, needle) })).filter(
     ({ cards }) => cards.length > 0,
   )
 
@@ -597,14 +642,16 @@ export function HelpPage() {
         {sections.length === 0 ? (
           <EmptyState title="Ninguna tarjeta coincide">Prueba con otras palabras.</EmptyState>
         ) : (
-          sections.map(({ topic, cards }) => <HelpSection key={topic.path} topic={topic} cards={cards} />)
+          sections.map(({ topic, cards }) => (
+            <HelpSection key={topic.path} topic={topic} cards={cards} needle={needle} />
+          ))
         )}
       </div>
     </>
   )
 }
 
-function HelpSection({ topic, cards }: { topic: HelpTopic; cards: HelpCardData[] }) {
+function HelpSection({ topic, cards, needle }: { topic: HelpTopic; cards: HelpCardData[]; needle: string }) {
   const Icon = topic.icon
 
   return (
@@ -629,31 +676,32 @@ function HelpSection({ topic, cards }: { topic: HelpTopic; cards: HelpCardData[]
           sección a todo el ancho, que es su jerarquía. */}
       <ul className="grid gap-3 md:grid-cols-2">
         {cards.map((card) => (
-          <HelpCard key={card.id} card={card} spanFull={card.example === null} />
+          <HelpCard key={card.id} card={card} spanFull={card.example === null} needle={needle} />
         ))}
       </ul>
     </section>
   )
 }
 
-function HelpCard({ card, spanFull }: { card: HelpCardData; spanFull: boolean }) {
+function HelpCard({ card, spanFull, needle }: { card: HelpCardData; spanFull: boolean; needle: string }) {
   return (
     <li className={spanFull ? 'md:col-span-2' : ''}>
       {/* `article` con su `aria-labelledby`: cada tarjeta es una pieza con
           nombre —el del caso de uso—, y un lector de pantalla salta de una a
-          otra. El `h-full` iguala las tarjetas de una misma fila de la
-          rejilla. */}
+          otra. El `<mark>` no cambia el nombre accesible: el texto es el
+          mismo, resaltado. El `h-full` iguala las tarjetas de una misma fila
+          de la rejilla. */}
       <article
         aria-labelledby={card.id}
         className="flex h-full flex-col gap-1.5 rounded-lg border border-border-subtle bg-surface-raised p-4"
       >
         <h3 id={card.id} className="text-body-sm font-medium text-ink">
-          {card.title}
+          {highlightMatches(card.title, needle)}
         </h3>
-        <p className="max-w-prose text-body-sm text-ink-muted">{card.body}</p>
+        <p className="max-w-prose text-body-sm text-ink-muted">{highlightMatches(card.body, needle)}</p>
         {card.example && (
           <p className="max-w-prose text-body-sm text-ink-muted">
-            <span className="italic">Ejemplo:</span> {card.example}
+            <span className="italic">Ejemplo:</span> {highlightMatches(card.example, needle)}
           </p>
         )}
       </article>

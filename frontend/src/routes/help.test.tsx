@@ -80,6 +80,20 @@ describe('la guía de la herramienta', () => {
     expect(screen.getAllByRole('region')).toHaveLength(1)
   })
 
+  it('resalta la coincidencia dentro de la tarjeta, con sus acentos', async () => {
+    await openHelp()
+
+    // La aguja va sin tilde y el resaltado recorta del texto ORIGINAL: lo que
+    // queda dentro del `<mark>` es «préstamo» con su tilde, no la forma
+    // normalizada que usó la comparación.
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar' }), 'prestamo')
+
+    const general = within(screen.getByRole('region', { name: 'Préstamos' })).getByRole('article', {
+      name: 'Explicación general',
+    })
+    expect(within(general).getAllByText('préstamo', { selector: 'mark' }).length).toBeGreaterThan(0)
+  })
+
   it('cuando nada coincide lo dice, en lugar de dejar la lista vacía', async () => {
     await openHelp()
 

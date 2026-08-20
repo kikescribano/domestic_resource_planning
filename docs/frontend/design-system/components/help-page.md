@@ -63,6 +63,13 @@ sección a todo el ancho, que es su jerarquía. Cuando el filtro no deja ninguna
 tarjeta en ninguna sección, `EmptyState` con «Ninguna tarjeta coincide» — la
 lista vacía sin explicación sería indistinguible de una rota.
 
+Mientras hay búsqueda activa, **las coincidencias se resaltan** dentro de las
+tarjetas con `<mark>`: la comparación normalizada encuentra y el recorte sale
+del texto original —«prestamo» resalta «préstamo», tilde incluida—. El color
+del resalte es la pareja que la capa base ya usa para el `::selection`
+—`accent-soft` con la tinta normal—, así que no estrena combinación de
+contraste.
+
 Sin variantes y sin estados remotos: el único estado es el texto del buscador.
 
 ## API pública o propiedades relevantes
@@ -136,6 +143,7 @@ que nació, que es como se hereda la auditoría.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **Las coincidencias de la búsqueda se resaltan** dentro de las tarjetas con `<mark>`, recortando del texto original lo que encontró la comparación normalizada, y con la pareja de color del `::selection` de la capa base. | Equipo DRP |
 | 2026-08-20 | **El bloque único se parte en tarjetas**: cada pantalla pasa a ser una sección —cabecera con su enlace— y debajo una tarjeta por la explicación general y una por caso de uso, en rejilla de dos columnas desde `md`. El motivo es el buscador, que ahora filtra **tarjeta a tarjeta** en lugar de bloques enteros: una palabra que solo vive en un ejemplo deja esa tarjeta sola bajo su cabecera. | Equipo DRP |
 | 2026-08-20 | **Cada bloque se reparte en dos partes bajo subtítulo** —«Explicación general» y «Casos de uso»— y los casos pasan de uno a uno por funcionalidad, cada uno con su ejemplo práctico. La revisión que lo trajo corrigió además dos afirmaciones que la pantalla real desmintió: el papel se elige **al invitar** —no hay cambio de rol en Personas— y el avatar se pone en **Cuenta**. | Equipo DRP |
 | 2026-08-20 | Creación de la ficha con la pantalla ya implementada, y con el apartado que es su motivo: la regla de alineación con las pantallas y el registro de deuda para saldarla en lote. | Equipo DRP |
