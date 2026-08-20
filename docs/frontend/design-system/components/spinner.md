@@ -2,10 +2,10 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Borrador |
+| Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-12 |
+| Última revisión | 2026-08-20 |
 
 ## Propósito y situaciones de uso
 
@@ -200,4 +200,5 @@ en [`household.tsx`](../../../../frontend/src/routes/household.tsx).
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **Repasada entera contra el código y no cambia ni una afirmación**: el elemento raíz sigue siendo un `<p>` —así que sigue sin caber dentro de un `<button>`—, sigue sin haber `Skeleton`, ni barra de actualización, ni retardo antes de aparecer, ni tamaño alternativo. Lo único que se corrige es el marco temporal de la lista. | Equipo DRP |
 | 2026-08-12 | Creación de la ficha sobre la implementación del Hito 1. | Equipo DRP |

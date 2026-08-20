@@ -2,10 +2,10 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Borrador |
+| Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-12 |
+| Última revisión | 2026-08-20 |
 
 ## Propósito y situaciones de uso
 
@@ -190,11 +190,16 @@ siete pantallas; la de verificación del correo no tiene formulario— y tres en
 - **No hay marca de campo obligatorio.** `required` llega al `<input>` y no se ve.
   Con formularios de cuatro campos donde todos lo son, no importa; el alta de
   asset del Hito 2 mezcla obligatorios y opcionales en la misma columna.
-- **No hay `Select`, `Textarea` ni campo numérico.** Los tres los pide el Hito 2:
-  categoría y unidad son desplegables, las notas son texto largo y la cantidad es
-  un número con la unidad del artículo al lado. El `<select>` de invitar a alguien
-  ya está escrito a mano en `household.tsx`, repitiendo la maquetación de `Field`
-  sin compartir código: es la señal de que el componente falta.
+- **De los tres que faltaban, uno se construyó y dos siguen sin existir.**
+  `SelectField` llegó con el Hito 2 y comparte anatomía con `Field`; **`Textarea`
+  y campo numérico no**, así que las notas de un asset se escriben en un `<input>`
+  de una línea y los diez `type="number"` del producto van sin la unidad al lado
+  que esta ficha pedía.
+- **Y el `<select>` a mano de `household.tsx` sigue ahí**, en el formulario de
+  invitar. El hallazgo original se conserva y **su diagnóstico se invierte**: ya no
+  es «la señal de que el componente falta» sino un sitio que no se migró cuando el
+  componente llegó. Lo que se pierde no es cosmético — `SelectField` es el que
+  pone la pista en `aria-describedby` en lugar de dentro del nombre accesible.
 - ~~**No hay `Combobox`.**~~ **Construido en el Hito 3 de la Fase 2**, que es
   cuando dejó de ser una comodidad: Warehouse busca un artículo entre los cientos
   de una despensa, y eso no lo resuelve un `SelectField`. Comparte anatomía con
@@ -216,4 +221,5 @@ siete pantallas; la de verificación del correo no tiene formulario— y tres en
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **De los tres campos que faltaban, uno llegó**: `SelectField` existe desde el Hito 2 de la Fase 2, y `Textarea` y el campo numérico siguen sin existir. El `<select>` a mano de `household.tsx` **sigue ahí**, así que el hallazgo se conserva con el diagnóstico invertido: ya no es la señal de que falta el componente, sino un sitio sin migrar — y lo que se pierde no es cosmético, porque es el que pone la pista en `aria-describedby` en vez de dentro del nombre accesible. | Equipo DRP |
 | 2026-08-12 | Creación de la ficha sobre la implementación del Hito 1. | Equipo DRP |

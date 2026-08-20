@@ -2,10 +2,10 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Borrador |
+| Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-12 |
+| Última revisión | 2026-08-20 |
 
 ## Propósito y situaciones de uso
 
@@ -165,12 +165,12 @@ Antiusos:
 | Usarlo para el resultado de una operación | Eso es feedback y va en [`Notice`](notice.md) |
 | Meterlo dentro de un botón para hacerlo pulsable | Un objetivo pulsable son 44 px, y esto mide 22. Sería un filtro, que es otro componente |
 
-**Evidencias de prueba: ninguna.** En
-[`App.test.tsx`](../../../../frontend/src/App.test.tsx) no hay una sola
-aserción que toque este componente. La prueba «lista a los miembros y deja
-invitar siendo administradora» renderiza una fila que **sí** lleva distintivo, y
-comprueba el correo de la persona, no su papel. Es un hueco conocido, y el más
-barato de tapar de los tres que hay en las fichas.
+**Evidencias de prueba: ninguna, y ya no es «el más barato de tapar».** Cuando se
+escribió esto había un solo uso; hoy hay **diez repartidos por seis pantallas** —
+inventario, catálogo, personas, préstamos y mantenimiento— y ninguna prueba
+afirma nada sobre el distintivo. Las pruebas que lo montan comprueban lo que hay
+a su lado: el correo de la persona, el nombre del asset, la fecha del préstamo.
+Sigue siendo un hueco conocido, y ahora uno más ancho.
 
 ## Estado de implementación y enlace al componente real
 
@@ -178,22 +178,22 @@ barato de tapar de los tres que hay en las fichas.
 [`frontend/src/ui/primitives.tsx`](../../../../frontend/src/ui/primitives.tsx),
 función `StatusBadge`.
 
-**Un solo uso en toda la aplicación**: el papel de cada persona en `UsersPage`,
-dentro de [`household.tsx`](../../../../frontend/src/routes/household.tsx). De
-los cinco tonos solo se usan dos, `info` y `neutral`.
+**Diez usos en seis pantallas**, que era uno solo cuando se escribió esta ficha:
+el papel de cada persona en `UsersPage`, el estado de un asset en el inventario y
+en su ficha, el artículo retirado del catálogo, los tres estados del préstamo y
+cuatro cosas de mantenimiento. Se usan **los nueve tonos menos `warning`**.
 
 ### Lo que falta
 
-- **Sus tonos son los del feedback, no los de los estados del dominio.** El tipo
-  de `tone` es `NoticeTone | 'neutral'`, y solo `neutral` está cableado a un token
-  `state-*`. Pintar hoy los cinco estados del asset obligaría a mapear
-  `AVAILABLE`→`success`, `LENT`→`warning`, `OVERDUE`→`danger`, lo que **anula
-  justamente la separación** que [`color.md`](../foundations/color.md) creó los
-  tokens `state-*` para conseguir. Se ve igual porque los valores coinciden hoy;
-  deja de verse igual el día que dejen de coincidir, y entonces el inventario se
-  repinta solo. La corrección es un juego de tonos propio
-  —`available`, `lent`, `overdue`, `decommissioned`, `out-of-stock`— y no
-  reutilizar el de `Notice`.
+- ~~**Sus tonos son los del feedback, no los de los estados del dominio.**~~
+  **Corregido en el Hito 2 de la Fase 2**, y con la corrección que esta ficha
+  proponía: `tone` admite hoy las dos familias, y la de dominio
+  —`available`, `lent`, `overdue`, `decommissioned`, `out-of-stock`— está cableada
+  a los tokens `state-*` en lugar de prestar el rojo de un aviso. La frontera que
+  [`color.md`](../foundations/color.md) creó esos tokens para levantar deja de
+  cruzarse. Queda **un resto**: `neutral` sigue apuntando a
+  `state-decommissioned`, así que son dos nombres para el mismo par y el sistema
+  no puede distinguir «sin estado» de «dado de baja».
 - **No hay icono.** El comentario del código dice «un estado del dominio: color,
   etiqueta e icono. Los tres juntos, siempre», y el componente solo pinta
   `children`. Los cinco iconos que
@@ -235,4 +235,5 @@ los cinco tonos solo se usan dos, `info` y `neutral`.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **Se corrige lo que la ficha daba por pendiente y ya no lo estaba**: los tonos de dominio existen desde el Hito 2 de la Fase 2, cableados a los tokens `state-*` y con los cinco nombres que esta ficha proponía, así que la frontera de `color.md` deja de cruzarse — queda el resto de que `neutral` y `decommissioned` apuntan al mismo par. Y los datos de uso estaban congelados: eran «un solo uso y dos tonos», y son **diez usos en seis pantallas con nueve tonos**, lo que convierte el hueco de pruebas de barato en ancho. | Equipo DRP |
 | 2026-08-12 | Creación de la ficha sobre la implementación del Hito 1. | Equipo DRP |

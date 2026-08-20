@@ -2,10 +2,10 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Borrador |
+| Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-12 |
+| Última revisión | 2026-08-20 |
 
 ## Propósito y situaciones de uso
 
@@ -187,11 +187,12 @@ distinta con su propio titular.
   tres. O se renombra a lo que es —una plantilla— o se convierte en lo que dice
   ser; lo que no puede quedarse es la ambigüedad, porque el Hito 2 **sí** trae
   tarjetas de verdad: cada fila de un listado en móvil es una.
-- **No hay equivalente para las pantallas de dentro.** `PageHeading` —el
-  encabezado con su acción a la derecha— está escrito dentro de
-  `household.tsx` y no es un componente del sistema. Las cuatro superficies del
-  Hito 2 lo van a necesitar las cuatro, y con acciones distintas cada una: es la
-  señal de que hay que sacarlo.
+- ~~**No hay equivalente para las pantallas de dentro.**~~ **Resuelto en el Hito 2
+  de la Fase 2**, y por donde esta ficha señalaba: `PageHeading` salió de
+  `household.tsx` y es hoy un componente de
+  [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx), con su `h1` y su
+  acción opcional a la derecha. **No tiene ficha propia**, que es lo que queda
+  pendiente de él.
 - **No tiene sitio para la ilustración.**
   [`iconography.md`](../foundations/iconography.md) admite ilustración en tres
   sitios, y el onboarding es uno; la dirección visual habla de «la ilustración de
@@ -222,4 +223,5 @@ distinta con su propio titular.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **`PageHeading` dejó de estar dentro de `household.tsx`** en el Hito 2 de la Fase 2 y es hoy un componente de `primitives.tsx`, exactamente por donde esta ficha señalaba. Se tacha esa entrada de «Lo que falta» y se anota lo que queda de ella: no tiene ficha propia. | Equipo DRP |
 | 2026-08-12 | Creación de la ficha sobre la implementación del Hito 1. | Equipo DRP |
