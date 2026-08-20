@@ -74,7 +74,26 @@ dependencies {
     // Se enchufa como plugin de ImageIO, de modo que el codigo de recodificacion
     // es el mismo para los tres formatos de imagen y no hay un camino aparte.
     // Trae los binarios nativos dentro del jar y los extrae al arrancar.
-    implementation("org.sejda.imageio:webp-imageio:0.1.6")
+    //
+    // **Era `org.sejda.imageio:webp-imageio:0.1.6`, y se cambio por seguridad.**
+    // Aquella se publico en 2020 y no ha vuelto a publicarse, asi que los
+    // binarios que lleva dentro son de una libwebp anterior a la 1.3.2 --de
+    // septiembre de 2023-- y por tanto vulnerables a **CVE-2023-4863**, el
+    // desbordamiento de heap de WebP que se exploto de verdad. No era teorico:
+    // este decodificador se alimenta con **los bytes que sube cualquier miembro
+    // de cualquier hogar**, porque `image/webp` esta en la lista blanca y toda
+    // imagen se decodifica para recodificarla.
+    //
+    // Esta es la continuacion mantenida del mismo codigo --conserva el paquete
+    // `com.luciad.imageio.webp` del original, de ahi que el cambio no toque una
+    // sola linea de la aplicacion-- y la 0.11.0 empaqueta **libwebp 1.6.0**.
+    //
+    // Un detalle que importa al desplegar: desde la 0.11.0 los binarios de Linux
+    // x86/x86_64 se construyen con toolchains mas nuevos y **dejan de valer para
+    // glibc muy antiguas** (ya no son manylinux2010). Para un VPS actual da
+    // igual; lo que hay que mirar es empaquetar la aplicacion sobre una imagen
+    // musl --Alpine-- donde la carga del nativo es su propio asunto.
+    implementation("com.github.usefulness:webp-imageio:0.11.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
