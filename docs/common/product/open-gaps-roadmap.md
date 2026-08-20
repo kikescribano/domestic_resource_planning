@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | En curso — Hitos 0, 1 y 2 cerrados |
+| Estado | En curso — Hitos 0, 1, 2 y 3 cerrados |
 | Responsable | Equipo DRP |
 | Ámbito | Los cuatro huecos que las Fases 1 y 2 dejaron abiertos a propósito, más el quinto que apareció ejecutándolos |
 | Última revisión | 2026-08-20 |
@@ -540,25 +540,71 @@ crecen sin techo se resuelve, según
 > construyó, con su `AbortController` declarado y sin usar. No se arregla aquí,
 > pero se deja de afirmar.
 
-### Hito 3 — Estado de conservación y condición en préstamo · **Pendiente**
+### Hito 3 — Estado de conservación y condición en préstamo · **Hecho** (2026-08-20)
 
 Los dos atributos que no traen entidad nueva. Van juntos porque son el mismo tipo
 de cambio: un enumerado corto que nace en el dominio y llega hasta un desplegable.
 
-- [ ] **Migración `V16`**: la condición del asset y las dos del préstamo —en la
+- [x] **Migración `V16`**: la condición del asset y las dos del préstamo —en la
       entrega y en la devolución—, todas anulables. Nulo no es un hueco: significa
-      que nadie lo anotó.
-- [ ] **Dominio y casos de uso**: `CreateAsset` y `UpdateAsset`, `StartLoan` y
+      que nadie lo anotó. **Tres columnas y ninguna tabla**, así que el modelo se
+      queda en 29. Con tres garantías de la base de datos: la escala cerrada en
+      las tres columnas, la conservación **solo sobre un `DURABLE`** —ampliando la
+      restricción que ya cubría el número de serie, en vez de añadir una segunda—
+      y la condición de vuelta exigiendo que haya vuelta.
+- [x] **Dominio y casos de uso**: `CreateAsset` y `UpdateAsset`, `StartLoan` y
       `ConfirmReturn`. La condición de devolución solo se admite al confirmarla,
-      que es cuando se sabe.
-- [ ] **El contrato no gana operaciones: ensancha esquemas.** El validador se
-      ejecuta igual, y los ejemplos de 5.4.3 se actualizan con ellos.
-- [ ] **Frontend**: el campo en el alta y en la edición del asset, el filtro en el
-      listado y los dos momentos del préstamo. La vista externa del préstamo
-      también lo ve — es donde el receptor dice en qué estado lo devuelve.
-- [ ] **Documentos**: 4.1.1, 4.1.5, 5.6, 5.7 y los ejemplos JSON.
-- [ ] **Barrido de aislamiento y auditoría de accesibilidad**, que las pantallas
-      heredan por la lista del recorrido vertical.
+      que es cuando se sabe. **Una sola escala de cinco valores para los tres
+      campos**, porque comparar dos momentos es el motivo entero del atributo, y
+      **la devolución no toca el asset**: lo que se afirma al devolver es del
+      préstamo, y quien lo afirma puede ser alguien de fuera del hogar.
+- [x] **El contrato no gana operaciones: ensancha esquemas.** Sigue en **102**, y
+      lo que cambia son seis esquemas más dos nuevos —`AssetCondition` y el cuerpo
+      **opcional** de la devolución—, un filtro en `listAssets` y los ejemplos de
+      5.4.3.
+- [x] **Frontend**: el campo en el alta y en la ficha del asset, el filtro en el
+      listado y los dos momentos del préstamo. La vista externa lo ve y lo
+      escribe, y esa es **la única escritura que un token acotado alcanza en todo
+      el hogar**: lo que la contiene es que el cuerpo tiene un solo campo y es un
+      enumerado cerrado, con una prueba que manda cinco campos de más y comprueba
+      desde dentro de casa que ninguno se escribió.
+- [x] **Documentos**: 4.1.1, 4.1.5, 5.6, 5.7, los ejemplos JSON y 4.1.7 con las
+      ocho decisiones y sus alternativas descartadas.
+- [x] **Barrido de aislamiento: no cambia, y se dice por qué.** El hito no añade
+      operaciones, y el filtro nuevo de `ListAssets` es un enumerado: por el
+      criterio de inclusión de `TenantIsolationSweepTest` —entra lo que puede
+      **nombrar** algo del hogar A— un valor cerrado no tiene por dónde cruzar, y
+      `listAssets` ya está dentro por los seis filtros que sí son identificadores.
+- [x] **Auditoría de accesibilidad**: **«Inventario» entra en la lista**, que era
+      una de las cuatro pantallas del core que seguían sin auditar y es la que
+      este hito toca en sus tres sitios. Con un asset sembrado antes, porque una
+      pantalla vacía pasa axe sin haber mirado ninguna fila.
+- [x] **El hogar de demostración trae valores**, que si no la pantalla nueva
+      saldría vacía justo en el hogar que existe para enseñarla: la mayoría de los
+      duraderos con su estado, **diez sin anotar a propósito** y ninguno `NEW`
+      —lo más joven de esa casa tiene once meses—, y los préstamos con sus dos
+      condiciones, incluido el patinete que «volvió con un arañazo» y cuya ficha
+      dice `WORN`.
+
+> **Lo que se decidió y el plan no preguntaba.** Ocho decisiones, todas en 4.1.7.
+> Las dos que más cambian el producto son que **la devolución no propaga la
+> condición al asset** —propagarla le daría a un token acotado una escritura sobre
+> el inventario, y CMMS ya había sentado el precedente contrario— y que **la
+> condición no se pinta con color**: la ficha de `StatusBadge` declara antiuso dos
+> distintivos en la misma fila y la paleta de dominio tiene cinco tonos elegidos
+> para sobrevivir a una deuteranopia, así que un sexto para una escala de cinco
+> valores sería color como único portador. De ahí que **`check-contrast.py` siga
+> midiendo 36 pares**: no hay ningún color nuevo que certificar.
+
+> **Y lo que la implementación destapó, que no era del hito.** La pantalla de
+> Préstamos es **el único fichero del frontend que se pinta con tokens que no
+> existen**: `text-muted` y `border-line` no generan ni una regla de CSS
+> —comprobado sobre el CSS construido—, así que su texto secundario salía a plena
+> tinta y sus tarjetas llevaban un borde en `currentColor` donde el resto de la
+> aplicación lleva `border-border-subtle`. No fallaba nada: se veía como una
+> pantalla que no se parece a las demás. Se arregla aquí, en un commit mecánico
+> aparte, porque apareció al añadirle la condición y copiarle las clases habría
+> propagado el defecto.
 
 ### Hito 4 — Etiquetas e identidad visual de las categorías · **Pendiente**
 
@@ -726,6 +772,7 @@ no aquí.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | **Hito 3 cerrado**: el **estado de conservación** de un asset y la **condición en la entrega y la devolución** de un préstamo, que son dos de los cuatro atributos que 4.1.7 llevaba desde el 2026-08-09 dejando fuera. **Sin ADR y sin operación nueva**: tres columnas anulables en la `V16`, seis esquemas ensanchados y el contrato quieto en **102 operaciones**, que era la condición del plan. Lo que sí trae son ocho decisiones de producto. **Una sola escala de cinco valores** para los tres campos, porque el motivo entero de la condición en préstamo es poder decir «salió bien y volvió rayado» y dos escalas distintas no se comparan; **solo sobre un `DURABLE`**, ampliando la restricción que ya cubría el número de serie en vez de añadir una segunda; y **la devolución no toca el asset**, que es la decisión que más se discutió: propagarla le daría a un token acotado —el de quien no tiene cuenta— una escritura sobre el inventario, y CMMS ya había declarado que registrar una intervención «no toca el asset». La vista externa **se ensancha por primera vez** desde que se escribió, de siete campos a nueve, y con su motivo: las dos condiciones describen la cosa que quien pregunta tiene en las manos, no el hogar que se la prestó. La devolución gana un **cuerpo opcional** en lugar de una operación nueva, porque una operación más sería una segunda escritura que el token acotado tendría que alcanzar; hay una prueba que le manda cinco campos de más y comprueba desde dentro de casa que ninguno se escribió. **La condición no se pinta con color** —dos distintivos en una fila es antiuso declarado, y la paleta de dominio tiene cinco tonos elegidos para sobrevivir a una deuteranopia— así que `check-contrast.py` sigue midiendo 36 pares. «Inventario» entra en la auditoría sistemática, con un asset sembrado, y el hogar de demostración trae las tres columnas puestas con diez duraderos sin anotar a propósito. Y se destapa algo ajeno: **la pantalla de Préstamos era el único fichero del frontend pintado con tokens que no existen**, `text-muted` y `border-line`, que no generan ni una regla de CSS |
 | 2026-08-20 | **Hito 2 cerrado**: la **conversión de HEIC**, con la **ADR-014** y las dos medidas delante en lugar de una opinión. **Gana el cliente**, que es lo que 5.8.3 ya decía —así que esa sección se confirma y no se enmienda—, y las dos cifras llegaron cambiando lo que el plan esperaba: **el megabyte no cae sobre el bundle** —en un `import()` dinámico son 2,49 kB sobre la primera carga y 2 995 kB para quien elige un HEIC—, y **el camino del servidor no era una dependencia más sino un cambio de plataforma**, porque el único plugin de ImageIO para HEIF exige JDK 22 con el proyecto en 17, además de `libheif` en la imagen y en el runner, y de ×3,4 a ×5,6 sobre la operación que ya era la cara. **La tercera salida se evalúa y se descarta por escrito**: pedir que se cambie el ajuste de la cámara cuesta cero y pierde porque no arregla la foto ya hecha, no toca el HEIC que llega de fuera del teléfono y se paga en la cuota del usuario. La trampa que el plan anunciaba se resolvió del otro lado —**HEIC no llega nunca a `files.content_type`**, así que no hay migración ni cambio de contrato— y aparece **una tercera magnitud de capacidad**: lo que cuesta llegar al navegador. Se decide además `heic-to` frente al que pesa la mitad, por decodificar fuera del hilo principal y no necesitar `unsafe-eval`. Y se destapa algo ajeno: **`UploadField` documenta desde la Fase 1 un botón de Cancelar que nunca se construyó**, que se deja de afirmar aunque no se arregle aquí |
 | 2026-08-20 | **Se añade el Hito 5, que no venía del plan**: ejecutando el Hito 1 se destapó que las tres reglas de calendario del proyecto —la que rechaza una intervención «del futuro» y las dos comprobaciones de fecha de CMMS y Warehouse— resuelven su «hoy» contra la **fecha UTC** y no contra la del hogar, con la misma línea copiada en los tres sitios. La consecuencia es que un hogar peninsular **no puede registrar de madrugada lo que acaba de hacer**: entre la medianoche local y la de Greenwich, la fecha de hoy es futuro para la aplicación. El frontend arrastra el mismo criterio y lo empeora, porque el campo de fecha sale relleno con ayer y el selector no ofrece hoy. Se anota como hito propio y no dentro del cierre del bloque porque **cambia una regla de dominio** y el cierre no añade producto; el de cierre pasa a ser el **6**. La pregunta que decide —día del hogar o día de UTC— queda asignada al Hito 5, y **no se da por resuelta aquí**. La parte de las pruebas ya la arregló el Hito 1, alineando su «hoy» con el de la aplicación; lo que queda es si ese «hoy» es el correcto |
 | 2026-08-20 | **Hito 1 cerrado**: el **Transactional Outbox**, con la **ADR-013**, la migración `V15` —`event_outbox` y la sexta función acotada— y el relay con su periodo en segundos y su propio interruptor. Se resuelven las dos preguntas que el plan le había asignado —**convive** con la entrega en el acto, y **la fila entregada se borra**— y se deciden otras seis por el camino. La trampa que el plan anunciaba estaba donde decía y era de una línea: el `try/catch` de `publish` habría pasado de proteger al core a **tragarse el fallo de escribir la fila**, perdiendo el evento en el silencio exacto que el outbox viene a impedir. Sacarla del `try` —y no confirmar cuando el reparto lanza— cierra de paso **la peor limitación conocida del bus**, medida desde la Fase 1 y hasta hoy sin respuesta: un `@EventListener` a pelo que revienta dejaba sin evento a los handlers que iban detrás. Lo que la implementación destapó y el plan no preveía: **el `@Order` de la clase base no puede ser `@Order(0)`** —adelantaría a los handlers respecto a listeners con orden declarado, y una prueba de la Fase 1 lo midió— así que va un escalón por delante de la confirmación y no a la cabeza; **publicar un evento de un hogar que no existe deja de ser posible**, por la clave ajena, lo que obligó a sembrar un hogar de verdad en una prueba del bus que llevaba desde la Fase 1 usando un `UUID` inventado; y **`event_outbox` es la primera tabla del modelo que no puede estar llena**, así que la prueba de la cascada del Hito 0 —que exige que cada tabla con `household_id` tenga algo dentro antes de purgar— la llena **a mano** con una entrega que nadie va a confirmar, y de paso comprueba que lo pendiente de un hogar purgado se va con él. La decisión sobre `ModuleEventHandler` se cierra **con las dos mitades medidas** y ninguna se retira; la guarda de idempotencia se muda a la fila del outbox y **no a una tabla de `(handler, eventId)`**, porque no cerraría la ventana y ningún handler desplegado la necesita — los tres ya son idempotentes por construcción en sus propias tablas, y hay una prueba que lo mide entregando el mismo `eventId` a dos instancias del handler. **Sin frontend y sin tocar la batería E2E**, que es la excepción declarada del plan |
