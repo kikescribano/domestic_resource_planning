@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | En curso — Hitos 0 y 1 cerrados |
+| Estado | En curso — Hitos 0, 1 y 2 cerrados |
 | Responsable | Equipo DRP |
 | Ámbito | Los cuatro huecos que las Fases 1 y 2 dejaron abiertos a propósito, más el quinto que apareció ejecutándolos |
 | Última revisión | 2026-08-20 |
@@ -494,24 +494,51 @@ crecen sin techo se resuelve, según
       código que no defiende nada. Su recorrido vertical es dominio → aplicación →
       adaptador → PostgreSQL, y la batería E2E no se toca.
 
-### Hito 2 — Conversión de HEIC · **Pendiente**
+### Hito 2 — Conversión de HEIC · **Hecho** (2026-08-20)
 
-- [ ] **Las dos medidas, y antes de decidir**: el peso real del decodificador wasm
-      sobre el bundle vuelto a medir, y el coste en servidor con los números del
-      runner de la CI. Las dos quedan escritas donde viven los números, no en una
-      conversación.
-- [ ] **ADR-014 — Conversión de HEIC**, escrita **con las medidas delante** y con
-      las tres salidas evaluadas, incluida la de no convertir.
-- [ ] **La implementación del camino que gane**, entera: no hay media conversión.
-- [ ] **Si gana el servidor, la enmienda de 5.8.3 es parte del hito** —con su
-      motivo—, y la ADR-005 se enlaza hacia adelante desde la nueva, nunca se
-      reescribe. Si gana el cliente, lo que se cierra es la nota de la ficha de
+- [x] **Las dos medidas, y antes de decidir**, escritas en
+      [`capacity-measurements.md`](../../backend/operations/capacity-measurements.md),
+      que gana **una tercera magnitud**: lo que cuesta llegar al navegador. El
+      bundle **no eran 402 kB sino 407,28** —volver a medirlo era la condición, y
+      con razón— y el decodificador pesa **2 995 kB**. En servidor, de **×3,4 a
+      ×5,6** sobre la operación que ya era la cara por un orden de magnitud.
+- [x] **ADR-014 — Conversión de HEIC**, con las medidas dentro y **las tres
+      salidas evaluadas**, la de no convertir incluida y descartada por escrito.
+- [x] **La implementación del camino que gana, entera**: el cliente, en
+      `uploadFile` —que es la única puerta por la que pasan las dos vías de
+      subida— con el decodificador en un `import()` dinámico.
+- [x] **Gana el cliente, así que 5.8.3 no se enmienda: se confirma.** Lo que se
+      cierra es la nota de la ficha de
       [`upload-field`](../../frontend/design-system/components/upload-field.md), y
-      su sección «Lo que falta» pierde la primera línea.
-- [ ] **El mensaje del `415`**, que hoy enumera los tipos admitidos y seguirá
-      haciéndolo para todo lo demás.
-- [ ] **Recorrido vertical**: subir una foto HEIC de verdad —un fichero de prueba,
-      no un JPEG renombrado— y verla en la galería y en la ficha del asset.
+      la ADR-005 gana una sección «Posterior a esta decisión» que enlaza hacia
+      adelante, sin tocar su cuerpo.
+- [x] **El mensaje del `415` se queda como está**, y se dice por qué: sigue siendo
+      la respuesta correcta para todo lo demás, y ya no es la que recibe una foto
+      de iPhone.
+- [x] **Recorrido vertical**: un HEIC de verdad —marca `heic`, 1280 × 960 y con
+      **352 B de EXIF con coordenadas GPS dentro**— sube, se ve en la galería y en
+      la ficha del asset, se guarda como `image/jpeg` y sale sin metadatos.
+
+> **La trampa que el plan anunciaba estaba, y se resolvió del otro lado.** «Puede
+> que HEIC no llegue nunca a `files.content_type`» era la sospecha correcta y el
+> hito la comprobó en vez de suponerla: por el camino del cliente el servidor **no
+> ve un HEIC nunca**, así que no hay migración, ni cambio de contrato, ni entrada
+> nueva en el enumerado del dominio. El recorrido vertical lo afirma leyendo el
+> `contentType` de lo guardado.
+
+> **Y lo que la implementación destapó y el plan no preveía.** Tres cosas. La
+> primera es que **el megabyte no cae sobre el bundle**: en un `import()` dinámico
+> son 2,49 kB sobre la primera carga y 2 995 kB para quien elige un HEIC, así que
+> el «cambio de categoría» que el plan temía era cierto para un supuesto que
+> resultó evitable. La segunda es que **el camino del servidor no empezaba por
+> escribir código**: el único plugin de ImageIO para HEIF de Maven Central exige
+> **JDK 22** —con el proyecto en 17— y enlaza con el `libheif` del sistema, de modo
+> que la comparación no era «una dependencia más» sino un cambio de plataforma. Y
+> la tercera no es del hito: al escribir el estado **Convirtiendo** hubo que decir
+> que **no** se puede cancelar, y la fila de al lado prometía que la subida sí —
+> `UploadField` documenta desde la Fase 1 un botón de **Cancelar** que nunca se
+> construyó, con su `AbortController` declarado y sin usar. No se arregla aquí,
+> pero se deja de afirmar.
 
 ### Hito 3 — Estado de conservación y condición en préstamo · **Pendiente**
 
@@ -670,7 +697,7 @@ no aquí.
 | ~~**La identidad que se queda sin ninguna pertenencia: ¿baja lógica o borrado real?**~~ **Resuelta (2026-08-20): borrado real**, en la [ADR-012](../architecture/decisions/ADR-012-data-erasure-household-closure-and-account-closure.md) y en [`decisions.md`](decisions.md). Conservarla retiene datos personales de alguien que ya no puede entrar y **no libera su correo** —el índice único dejó de ser parcial por baja—, así que esa persona no puede volver nunca. Borrarla es lo que `PurgeUnverifiedHouseholds` ya hace, pero allí no había nada que conservar | 0 | Es lo que la baja de hogar produce, y sin respuesta no se puede escribir su purga |
 | ~~**¿El outbox es el único camino de entrega, o convive con la entrega in-process?**~~ **Resuelta (2026-08-20): convive**, en la [ADR-013](../architecture/decisions/ADR-013-transactional-outbox.md) y en [`decisions.md`](decisions.md). Un solo camino volvería **asíncrona respecto a la petición** una entrega que hoy no lo es, en los cuatro módulos a la vez y sin ninguna pantalla que lo pida; el relay queda como camino de recuperación, con un periodo de gracia para no pisar al reparto en el acto | 1 | De ello depende si `AFTER_COMMIT` sigue significando algo en `ModuleEventHandler` |
 | ~~**¿La fila entregada se borra o se conserva?**~~ **Resuelta (2026-08-20): se borra.** El outbox es una cola y no un archivo, así que **no hay sexta tabla**: su estado normal es vacía y su tamaño es el indicador. Conservarla habría dado un registro de lo publicado a cambio de una segunda copia de cada `payload` y de una retención inventada para una necesidad que nadie ha expresado | 1 | La medición de capacidad distingue lo que crece con lo que el hogar tiene de lo que crece con lo que hace, y esto es lo segundo |
-| **HEIC: ¿cliente o servidor?** Con las dos medidas delante, y no antes | 2 | Es la decisión del hito, y su ADR no se puede escribir sin ella |
+| ~~**HEIC: ¿cliente o servidor?**~~ **Resuelta (2026-08-20): el cliente**, en la [ADR-014](../architecture/decisions/ADR-014-heic-conversion.md) y en [`decisions.md`](decisions.md). Con las dos medidas delante, y las dos cambiaron el resultado que se esperaba: el megabyte no cae sobre el bundle sino sobre un fragmento que solo descarga quien elige un HEIC —**2,49 kB** sobre la primera carga—, y el camino del servidor no era una dependencia más sino **JDK 22 y `libheif` del sistema**, con el proyecto en 17. La tercera salida —no convertir— se evaluó y se descartó por escrito | 2 | Es la decisión del hito, y su ADR no se puede escribir sin ella |
 | **La etiqueta: ¿catálogo por hogar o columna de texto?** El catálogo cuesta una tabla y una relación; el texto no se puede renombrar, ni deduplicar sin distinguir mayúsculas, ni autocompletar sin recorrer todos los assets | 4 | Es lo que decide la migración, y con datos dentro cambiarla cuesta otra |
 | **El «hoy» de una regla de calendario: ¿el del hogar o el de UTC?** El del hogar da el día que la persona tiene delante y cuesta un puerto de plataforma más; el de UTC es lo que hay hoy, no cuesta nada y hace que un hogar al este de Greenwich no pueda registrar de madrugada lo que acaba de hacer | 5 | De ella depende si el puerto hace falta, y es lo único que ese hito decide |
 
@@ -699,6 +726,7 @@ no aquí.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | **Hito 2 cerrado**: la **conversión de HEIC**, con la **ADR-014** y las dos medidas delante en lugar de una opinión. **Gana el cliente**, que es lo que 5.8.3 ya decía —así que esa sección se confirma y no se enmienda—, y las dos cifras llegaron cambiando lo que el plan esperaba: **el megabyte no cae sobre el bundle** —en un `import()` dinámico son 2,49 kB sobre la primera carga y 2 995 kB para quien elige un HEIC—, y **el camino del servidor no era una dependencia más sino un cambio de plataforma**, porque el único plugin de ImageIO para HEIF exige JDK 22 con el proyecto en 17, además de `libheif` en la imagen y en el runner, y de ×3,4 a ×5,6 sobre la operación que ya era la cara. **La tercera salida se evalúa y se descarta por escrito**: pedir que se cambie el ajuste de la cámara cuesta cero y pierde porque no arregla la foto ya hecha, no toca el HEIC que llega de fuera del teléfono y se paga en la cuota del usuario. La trampa que el plan anunciaba se resolvió del otro lado —**HEIC no llega nunca a `files.content_type`**, así que no hay migración ni cambio de contrato— y aparece **una tercera magnitud de capacidad**: lo que cuesta llegar al navegador. Se decide además `heic-to` frente al que pesa la mitad, por decodificar fuera del hilo principal y no necesitar `unsafe-eval`. Y se destapa algo ajeno: **`UploadField` documenta desde la Fase 1 un botón de Cancelar que nunca se construyó**, que se deja de afirmar aunque no se arregle aquí |
 | 2026-08-20 | **Se añade el Hito 5, que no venía del plan**: ejecutando el Hito 1 se destapó que las tres reglas de calendario del proyecto —la que rechaza una intervención «del futuro» y las dos comprobaciones de fecha de CMMS y Warehouse— resuelven su «hoy» contra la **fecha UTC** y no contra la del hogar, con la misma línea copiada en los tres sitios. La consecuencia es que un hogar peninsular **no puede registrar de madrugada lo que acaba de hacer**: entre la medianoche local y la de Greenwich, la fecha de hoy es futuro para la aplicación. El frontend arrastra el mismo criterio y lo empeora, porque el campo de fecha sale relleno con ayer y el selector no ofrece hoy. Se anota como hito propio y no dentro del cierre del bloque porque **cambia una regla de dominio** y el cierre no añade producto; el de cierre pasa a ser el **6**. La pregunta que decide —día del hogar o día de UTC— queda asignada al Hito 5, y **no se da por resuelta aquí**. La parte de las pruebas ya la arregló el Hito 1, alineando su «hoy» con el de la aplicación; lo que queda es si ese «hoy» es el correcto |
 | 2026-08-20 | **Hito 1 cerrado**: el **Transactional Outbox**, con la **ADR-013**, la migración `V15` —`event_outbox` y la sexta función acotada— y el relay con su periodo en segundos y su propio interruptor. Se resuelven las dos preguntas que el plan le había asignado —**convive** con la entrega en el acto, y **la fila entregada se borra**— y se deciden otras seis por el camino. La trampa que el plan anunciaba estaba donde decía y era de una línea: el `try/catch` de `publish` habría pasado de proteger al core a **tragarse el fallo de escribir la fila**, perdiendo el evento en el silencio exacto que el outbox viene a impedir. Sacarla del `try` —y no confirmar cuando el reparto lanza— cierra de paso **la peor limitación conocida del bus**, medida desde la Fase 1 y hasta hoy sin respuesta: un `@EventListener` a pelo que revienta dejaba sin evento a los handlers que iban detrás. Lo que la implementación destapó y el plan no preveía: **el `@Order` de la clase base no puede ser `@Order(0)`** —adelantaría a los handlers respecto a listeners con orden declarado, y una prueba de la Fase 1 lo midió— así que va un escalón por delante de la confirmación y no a la cabeza; **publicar un evento de un hogar que no existe deja de ser posible**, por la clave ajena, lo que obligó a sembrar un hogar de verdad en una prueba del bus que llevaba desde la Fase 1 usando un `UUID` inventado; y **`event_outbox` es la primera tabla del modelo que no puede estar llena**, así que la prueba de la cascada del Hito 0 —que exige que cada tabla con `household_id` tenga algo dentro antes de purgar— la llena **a mano** con una entrega que nadie va a confirmar, y de paso comprueba que lo pendiente de un hogar purgado se va con él. La decisión sobre `ModuleEventHandler` se cierra **con las dos mitades medidas** y ninguna se retira; la guarda de idempotencia se muda a la fila del outbox y **no a una tabla de `(handler, eventId)`**, porque no cerraría la ventana y ningún handler desplegado la necesita — los tres ya son idempotentes por construcción en sus propias tablas, y hay una prueba que lo mide entregando el mismo `eventId` a dos instancias del handler. **Sin frontend y sin tocar la batería E2E**, que es la excepción declarada del plan |
 | 2026-08-20 | **Hito 0 cerrado**: la baja de hogar con treinta días de gracia, el cierre de cuenta con su avatar y `PurgeClosedHouseholds` dentro del recorrido que ya existía. Con ellos, la **ADR-012**, la migración `V14` —tres columnas y una función acotada más—, cuatro operaciones en el contrato y la zona de peligro con confirmación escrita. Se resuelve la pregunta que el plan le había asignado —la identidad huérfana **se borra de verdad**— y se deciden otras cinco por el camino, entre ellas la del último administrador. Se cierran de paso dos promesas ajenas: la de `PurgeUnverifiedHouseholds` sobre el directorio del hogar y el criterio de retención de cuatro de las cinco tablas sin techo. La auditoría sistemática destapó además que **el limitador de frecuencia no daba para dos pantallas más**, con un síntoma que no se parecía a la causa |

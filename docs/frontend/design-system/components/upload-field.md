@@ -5,15 +5,17 @@
 | Estado | Implementado |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-13 |
+| Última revisión | 2026-08-20 |
 
 > **Esta ficha se escribió antes que el componente**, como especificación, y el
 > Hito 3 lo construyó siguiéndola: vive en
 > [`files.tsx`](../../../../frontend/src/ui/files.tsx) y no en
 > [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx), porque trae
 > estado propio y una petición en curso. Los siete estados están, el séptimo
-> incluido. Lo que sigue sin construirse está en
-> [Lo que falta](#lo-que-falta), no disimulado.
+> incluido — y desde el **Hito 2 del cierre de huecos** son **ocho**: la
+> conversión de HEIC ([ADR-014](../../../common/architecture/decisions/ADR-014-heic-conversion.md))
+> añade un hueco que va **antes** del primer byte. Lo que sigue sin construirse
+> está en [Lo que falta](#lo-que-falta), no disimulado.
 
 ## Propósito y situaciones de uso
 
@@ -76,24 +78,31 @@ tres primeras están siempre y las dos últimas aparecen con el fichero**.
 | Nombre del fichero | 14 px, tinta principal | `text-body-sm text-ink` |
 | Mensaje de error | 13 px, con icono | `text-caption text-danger` |
 
-### Los siete estados
+### Los ocho estados
 
 El hito enumera seis —reposo, seleccionado, subiendo, terminado, error y
 cancelado— y al escribir la anatomía aparece un séptimo, **Procesando**, que no
 es un adorno: es el hueco real entre el último byte enviado y la respuesta del
-servidor. Hay que pintarlos los siete; saltarse uno es lo que produce el campo
-que parece colgado. Ninguno se dice **solo** con color: cada uno tiene texto
-propio.
+servidor. El octavo llegó con la conversión de HEIC y es **el hueco simétrico**:
+**Convirtiendo**, entre elegir el fichero y el primer byte. Hay que pintarlos los
+ocho; saltarse uno es lo que produce el campo que parece colgado. Ninguno se dice
+**solo** con color: cada uno tiene texto propio.
 
 | Estado | Qué se ve | Qué se puede hacer |
 |---|---|---|
 | **Reposo** | Disparador y pista | Elegir un fichero |
 | **Seleccionado** | Nombre y tamaño, sin barra | Nada: dura lo que tarda la comprobación local en pasar y el `XMLHttpRequest` en arrancar |
+| **Convirtiendo** | Barra indeterminada, «Convirtiendo la foto…» | Nada. Solo aparece con un HEIC, y ocurre **en esta máquina**: ver más abajo |
 | **Subiendo** | Barra al *n* %, porcentaje en texto y **Cancelar** | Cancelar, que aborta la petición |
 | **Procesando** | Barra completa e indeterminada, «Procesando…» | Nada. Ver más abajo: no es lo mismo que terminado |
 | **Terminado** | Miniatura o icono, nombre, tamaño y **Quitar** | Quitar, que devuelve a reposo |
 | **Error** | El fichero elegido, el mensaje y qué hacer | Reintentar, elegir otro, o —si es la cuota— liberar espacio |
 | **Cancelado** | Vuelta a reposo, con una línea que dice que se canceló | Elegir otro fichero |
+
+> **Dos filas de esta tabla son especificación y no descripción**, y conviene
+> saberlo antes de fiarse: **Cancelar** no existe en el componente, y por tanto
+> **Cancelado** no se alcanza. Está en [Lo que falta](#lo-que-falta) con lo que
+> hay que escribir para que sea cierto.
 
 **El 100 % no es el final, y confundirlos es el fallo clásico de esta pieza.**
 `upload.onprogress` mide **bytes enviados**; cuando llega a `total`, al servidor
@@ -103,6 +112,18 @@ la fila (ver [`file-storage.md`](../../../backend/architecture/file-storage.md),
 5.8.3). Una barra clavada en 100 % durante dos segundos se lee como una
 aplicación colgada. Por eso hay un estado **Procesando** entre el 100 % y el
 `201`, con la barra indeterminada y su etiqueta.
+
+**Y el otro hueco está antes del primer byte, no después del último.** Cuando lo
+elegido es un HEIC hay que decodificarlo **aquí**, en el dispositivo de quien
+sube, antes de que empiece la subida: 913 ms medidos en un escritorio con una foto
+de 12 MP, y varias veces más en un móvil (ADR-014). Se dice «Convirtiendo la
+foto…» y no «Procesando» a propósito, porque no es lo mismo ni ocurre en el mismo
+sitio, y quien mira una barra quieta merece saber cuál de las dos esperas es.
+
+La barra va **indeterminada**, como en Procesando y por el mismo motivo elevado a
+regla: el decodificador no ofrece porcentaje —devuelve la imagen o no la
+devuelve—, así que dar uno sería inventarlo. **Y no se puede cancelar**, que es la
+limitación conocida de este estado: la conversión no admite aborto.
 
 **Un fichero subido y no adjuntado no es basura que haya que recoger.** Ocupa
 cuota desde que se reserva y no se puede adjuntar mientras `uploadedAt` siga a
@@ -286,8 +307,8 @@ misma pieza con esa configuración.
 
 Merece su apartado porque es el malentendido más caro de esta pieza.
 
-`accept="image/jpeg,image/png,image/webp,application/pdf"` solo **preselecciona
-el filtro del selector de ficheros del sistema**. No impide elegir otra cosa —el
+`accept="image/jpeg,image/png,image/webp,application/pdf,image/heic,image/heif,.heic,.heif"`
+solo **preselecciona el filtro del selector de ficheros del sistema**. No impide elegir otra cosa —el
 usuario puede cambiar el filtro a «todos los archivos»—, algunos selectores de
 móvil lo ignoran, y el `type` que el navegador pone en el `File` es una
 suposición basada en la extensión. Renombrar un `.exe` a `.jpg` lo cuela por ahí
@@ -298,12 +319,30 @@ el `415` puede llegar aunque el `accept` estuviera puesto y el nombre acabara en
 `.png`. La comprobación local de tipo, si se hace, es para no gastar una subida
 inútil; nunca para dar por bueno un fichero.
 
-Con una consecuencia práctica que va a aparecer el primer día: **un iPhone
-fotografía en HEIC por defecto**, HEIC está fuera de la lista blanca a propósito,
-y la nota de 5.8.3 dice que «lo convierte el frontend antes de subirlo». Hoy no
-hay nada que lo convierta ni ninguna dependencia que pueda hacerlo. Está en
-[Lo que falta](#lo-que-falta), y es lo primero que se va a notar en un móvil de
-verdad.
+**Y HEIC está en esa lista sin estar en la lista blanca**, que es la distinción
+que hay que tener clara al leerlo. La lista blanca del servidor sigue teniendo
+**cuatro tipos** —JPEG, PNG, WebP y PDF— en los tres sitios donde vive: el
+enumerado del dominio, el `CHECK` de `files.content_type` y el contrato. Lo que
+HEIC hace es entrar por el `accept` porque **el cliente lo convierte a JPEG antes
+de enviarlo** ([ADR-014](../../../common/architecture/decisions/ADR-014-heic-conversion.md)),
+así que el servidor no llega a verlo nunca.
+
+Dejarlo fuera del `accept` sería el mismo muro que el `415` con otra cara: el
+fichero aparecería en gris en el diálogo y no habría nada que hacer. Van los
+tipos **y** las dos extensiones porque `image/heic` no está registrado en todos
+los sistemas, y donde no lo está el diálogo solo casa por el final del nombre.
+
+Lo que **no** cambia es la regla de arriba: la conversión es una comodidad, igual
+que el `accept`. Detecta por los bytes —la caja `ftyp` y la marca del contenedor,
+no la extensión, así que la foto que llega renombrada como `IMG_0042.JPG` también
+se convierte— y si aun así llegara un HEIC sin convertir, lo rechaza el servidor
+como siempre.
+
+**Si la conversión falla, no se sube el original.** Sería gastar la conexión para
+acabar en el mismo `415`, y con el mensaje equivocado: enumeraría los cuatro tipos
+admitidos cuando el problema es otro. Sale un error propio —«No se ha podido
+convertir esta foto. Vuelve a intentarlo, o súbela en JPEG.»— que además no se
+confunde con un fallo de red.
 
 ## Ejemplos correctos, antiusos y evidencias de prueba
 
@@ -337,8 +376,13 @@ Antiusos:
 | Guardar la `url` del `StoredFile` en el estado o en `localStorage` | Caduca en unos quince minutos. Vale para pintar ahora (ver [`file-gallery.md`](file-gallery.md)) |
 | Un `Spinner` en lugar de la barra | Hay porcentaje real: enseñarlo es la diferencia entre esperar y no saber |
 
-Evidencias de prueba: **ninguna todavía**. Lo que las pruebas del hito tendrán
-que cubrir, y que conviene dejar dicho antes de escribirlas:
+Evidencias de prueba, en [`files.test.tsx`](../../../../frontend/src/routes/files.test.tsx)
+y [`heic.test.ts`](../../../../frontend/src/api/heic.test.ts): que la subida va
+por `XMLHttpRequest` y no por `fetch` —con el progreso llegando—, que el `409` de
+cuota se traduce a algo que se puede hacer, que el selector ofrece HEIC sin que la
+lista blanca del servidor haya crecido, y que la conversión detecta por bytes,
+renombra a `.jpg` y no sube el original cuando falla. Lo que se dijo al escribir
+esta ficha, antes de que existieran:
 
 - `userEvent.upload` sobre el `<input>` localizado por `getByLabelText`, que de
   paso verifica que la atadura etiqueta–campo sobrevive a ocultarlo.
@@ -353,37 +397,51 @@ que cubrir, y que conviene dejar dicho antes de escribirlas:
 contra el doble, no contra el navegador. La comprobación de que la barra se mueve
 de verdad es del recorrido con Playwright del Hito 4.
 
+**Y el reparto vale igual para la conversión**, por una razón más dura: `jsdom` no
+tiene `<canvas>` con contexto 2D, ni `Worker`, ni WebAssembly instanciable, y el
+decodificador necesita las tres. Allí se dobla el módulo; el decodificador de
+verdad lo ejecuta el recorrido vertical en Chromium, con **un HEIC de verdad y no
+un JPEG renombrado**.
+
 ## Estado de implementación y enlace al componente real
 
-**Previsto.** No existe. Su sitio es
-[`frontend/src/ui/primitives.tsx`](../../../../frontend/src/ui/primitives.tsx),
-junto a `Field` y `SelectField`, salvo que el fichero se haya partido antes —lo
-que está anotado como decisión abierta en [`components/`](README.md)—.
+**Implementado.** Vive en
+[`frontend/src/ui/files.tsx`](../../../../frontend/src/ui/files.tsx) y no en
+[`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx), que es donde esta
+ficha lo situaba antes de existir: trae estado propio y una petición en curso, y
+ese fichero se había puesto a sí mismo el criterio de «mientras quepa en algo que
+se lee de una sentada».
+
+La conversión de HEIC **no está ahí sino en
+[`api/heic.ts`](../../../../frontend/src/api/heic.ts)**, invocada desde
+`uploadFile`. Es deliberado y está razonado en la
+[ADR-014](../../../common/architecture/decisions/ADR-014-heic-conversion.md): hay
+dos vías de subida —esta y el avatar, que tiene su propio `<input>`— y ponerla en
+el campo dejaría la segunda sin ella.
 
 ### Lo que falta
 
-Todo, y en este orden:
+**La lista se había quedado atrás tres veces**, y se pone al día en vez de
+arrastrar lo que ya está hecho: la función de subida de `client.ts`, los cuatro
+códigos de error sin tipar y la conversión de HEIC estaban aquí y hoy existen las
+tres. Lo que queda:
 
-- **La función de subida en `client.ts`.** Es el requisito previo: hoy no hay
-  ninguna llamada que no sea `fetch` con cuerpo JSON, y esta necesita
-  `XMLHttpRequest`, `FormData`, la cabecera `Authorization` y la misma renovación
-  de sesión que `request()`. Sin eso, el componente no se puede escribir bien.
-- **Los cuatro códigos nuevos no están tipados.** `ApiErrorCode` en
-  [`client.ts`](../../../../frontend/src/api/client.ts) enumera 34 códigos y no
-  incluye `FILE_TOO_LARGE`, `FILE_TYPE_NOT_ALLOWED`, `STORAGE_QUOTA_EXCEEDED` ni
-  `FILE_IN_USE`, que sí están en el esquema `Error` de
-  [`openapi.yaml`](../../../../openapi.yaml). Hoy caerían en el mensaje genérico
-  de `humanMessage`.
-- **La conversión de HEIC.** 5.8.3 se la asigna al frontend y el frontend no la
-  tiene. Sin ella, la foto que hace un iPhone con los ajustes de fábrica se
-  rechaza con un `415` que el usuario no puede entender. Las salidas posibles
-  —convertir en el cliente con una librería wasm, pedirle al usuario que cambie
-  el ajuste de la cámara, o admitir HEIC en el servidor— no están evaluadas, y
-  ninguna es gratis.
+- **Cancelar una subida en curso.** Es lo único que esta ficha describe y el
+  componente no tiene: la fila del fichero enseña **Quitar** cuando ha terminado
+  y no ofrece **Cancelar** mientras sube, así que el estado **Cancelado** tampoco
+  se alcanza. Está escrito arriba en presente porque es la especificación de la
+  pieza, y aquí en su sitio porque no es cierto todavía. Lo que falta es el
+  `AbortController` que el componente ya declara y no llega a usar; el `onabort`
+  del cliente sí está.
+- **Cancelar la conversión de HEIC no se puede, y no es lo mismo.** El
+  decodificador no ofrece por dónde abortar, así que esa espera se aguanta entera
+  aunque llegue el botón de arriba. Queda dicho para que no se cuente como parte
+  del mismo arreglo.
 - **La reducción de tamaño en el cliente.** Una foto de móvil ronda los 3-8 MB y
   el tope son 25, así que no falla casi nunca; pero recomprimirla a 2000 px antes
   de subir ahorra cuota, ancho de banda y tiempo de espera, y el hogar solo tiene
-  un gigabyte. No está decidido si se hace.
+  un gigabyte. No está decidido si se hace. **Y ahora comparte camino con la
+  conversión** —el mismo lienzo, el mismo sitio— sin ser la misma decisión.
 - **La cola de varios ficheros.** Adjuntar seis fotos de una vez es la petición
   obvia en cuanto la primera funcione, y el contrato ya obliga a una petición por
   fichero.
@@ -414,4 +472,5 @@ Todo, y en este orden:
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **La conversión de HEIC deja de faltar** (Hito 2 del cierre de huecos, [ADR-014](../../../common/architecture/decisions/ADR-014-heic-conversion.md)). Los estados pasan de siete a **ocho**: el nuevo, **Convirtiendo**, es el hueco simétrico del de Procesando —uno va antes del primer byte y ocurre en el dispositivo de quien sube; el otro, después del último y en el servidor—. El `accept` gana HEIC **sin que la lista blanca crezca**, que es la distinción que su apartado explica. Se pone al día el estado de la ficha, que seguía diciendo «previsto» con el componente construido, y **la lista de «Lo que falta» pierde tres entradas ya hechas** y gana la que faltaba de verdad: **cancelar una subida no está implementado**, aunque esta ficha lo describa desde el primer día. | Equipo DRP |
 | 2026-08-13 | Creación de la ficha al arrancar el Hito 3. El componente está **previsto**: no existe nada de esto en el frontend. | Equipo DRP |

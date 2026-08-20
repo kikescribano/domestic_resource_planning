@@ -65,6 +65,13 @@ data class StoredFile(
  * contrato, y esa friccion es deliberada. Las dos exclusiones tambien lo son:
  * **SVG** queda fuera por ser XML con scripts dentro, y **HEIC** porque la JVM no
  * lo decodifica sin librerias nativas --lo convierte el frontend antes de subir.
+ *
+ * **Y desde la ADR-014 eso ultimo es cierto de verdad**, que hasta el 2026-08-20
+ * era una frase esperando a que alguien la cumpliera. El cliente decodifica el
+ * HEIC y envia un JPEG, asi que **HEIC no llega nunca aqui**: lo que se guarda es
+ * el tipo detectado tras recodificar, y a este enumerado solo llegan bytes que
+ * ImageIO ya ha sabido abrir. De ahi que admitir la foto de un iPhone no haya
+ * costado ni una migracion ni una entrada mas en esta lista.
  */
 enum class StoredContentType(val value: String) {
     JPEG("image/jpeg"),
