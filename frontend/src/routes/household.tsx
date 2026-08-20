@@ -70,6 +70,32 @@ const SECONDARY_NAVIGATION = [
 ]
 
 /**
+ * La marca de DRP: el sello redondo en el teal del acento con la casa dentro,
+ * el nombre en la redonda de la marca y el lema debajo. Es el eco del logotipo
+ * circular de la identidad comercial, con los pares ya medidos del sistema
+ * —`ink-inverse` sobre `accent`—. Vive en dos sitios y por eso es una pieza:
+ * la barra lateral desde `md` y la cabecera de «Hogar» en móvil, que sin esto
+ * no veía la marca nunca. Es sello, no la acción principal de la pantalla:
+ * el relleno de acento sigue apareciendo una sola vez como *acción*.
+ */
+function BrandMark({ className = '' }: { className?: string }) {
+  return (
+    // En móvil la marca preside la pantalla de «Hogar» y va un tercio más
+    // grande; en la barra lateral vuelve a su tamaño de trabajo. El tamaño del
+    // icono va por clase y no por la prop `size`, que no sabe de breakpoints.
+    <p className={['items-center gap-3', className].join(' ')}>
+      <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-accent text-ink-inverse md:size-11">
+        <House strokeWidth={1.75} aria-hidden="true" className="size-7 md:size-5.5" />
+      </span>
+      <span className="flex flex-col">
+        <span className="font-display text-display font-extrabold leading-tight text-ink md:text-title">DRP</span>
+        <span className="text-body-sm text-ink-muted md:text-caption">El ERP doméstico</span>
+      </span>
+    </p>
+  )
+}
+
+/**
  * El icono de una parada de la navegación. Mismo juego (Lucide), mismo trazo
  * (1,75) y mismo tamaño en línea (20 px) que el resto del sistema, y
  * `aria-hidden` porque el significado lo lleva siempre la etiqueta de al lado:
@@ -208,10 +234,7 @@ function HouseholdShell() {
           'md:static md:flex md:w-64 md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-t-0 md:p-gutter-lg',
         ].join(' ')}
       >
-        <p className="hidden font-display text-title font-extrabold text-ink md:flex md:items-center md:gap-2">
-          <House size={24} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
-          DRP
-        </p>
+        <BrandMark className="hidden md:flex" />
 
         <nav aria-label="Principal" className="flex md:flex-col md:gap-6">
           {/* Los rótulos de grupo se leen siempre aunque solo se vean desde
@@ -383,6 +406,11 @@ export function HomePage() {
 
   return (
     <>
+      {/* La marca solo en móvil: en escritorio ya la enseña la barra lateral,
+          y aquí es el único sitio donde el móvil la ve. Centrada: presentada a
+          la izquierda parecía un desajuste del título de la pantalla. */}
+      <BrandMark className="mb-6 flex justify-center md:hidden" />
+
       <PageHeading title="Hogar" icon={House} />
       <Notice tone="info" title="Por dónde empezar">
         Crea primero las <Link to="/ubicaciones" className="underline">ubicaciones</Link> —la vivienda y
