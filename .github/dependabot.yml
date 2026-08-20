@@ -38,11 +38,45 @@ updates:
         patterns:
           - org.springframework*
           - org.springdoc*
+      # **Los tres plugins de Kotlin van juntos o no van.** La primera versión de
+      # este fichero se los dejó fuera y el resultado fue una trampa: Dependabot
+      # abrió el de `jvm` y el de `plugin.spring` por separado, y **cada uno pasa
+      # la integración por su cuenta** — porque en su rama sube los dos números a
+      # la vez. Fusionar solo uno deja las versiones descuadradas y rompe la
+      # construcción en `main`, que es donde ya no lo está mirando nadie.
+      #
+      # Los nombres son los cortos del DSL de Kotlin (`kotlin("jvm")`), que es
+      # como los ve Dependabot, y no `org.jetbrains.kotlin.*`: con el patrón de
+      # la forma larga el grupo no casaría con nada y **fallaría en silencio**,
+      # que es exactamente el modo de fallo que esto viene a evitar. El último
+      # patrón se queda como red por si algún día los nombra de la otra forma.
+      kotlin:
+        patterns:
+          - jvm
+          - plugin.*
+          - org.jetbrains.kotlin*
       test:
         patterns:
           - org.testcontainers*
           - io.kotest*
           - com.tngtech.archunit*
+    ignore:
+      # **El salto a la línea 4.x de Spring Boot no lo hace Dependabot.** No es
+      # una actualización sino una migración: arrastra Jackson 3 con cambio de
+      # `groupId`, Kotlin 2.2+, Spring Security 7 e Hibernate 7, y la prueba está
+      # hecha — la propuesta automática falló en tres trabajos de la integración.
+      # Sin esto se reabre cada semana y gasta cinco trabajos en volver a fallar,
+      # que además enseña a ignorar los fallos de la CI.
+      #
+      # **Esto no oculta ninguna CVE**: los parches de la línea en uso siguen
+      # llegando, y las alertas de seguridad de Dependabot son otro mecanismo al
+      # que un `ignore` de versiones mayores no afecta. Se retira el día que la
+      # migración se haga a propósito, en su propio bloque.
+      - dependency-name: org.springframework.boot
+        update-types: [version-update:semver-major]
+      # springdoc va atado a Boot: su línea 3.x es la del Boot 4 y no sirve antes.
+      - dependency-name: org.springdoc:*
+        update-types: [version-update:semver-major]
     commit-message:
       prefix: build
 
@@ -66,5 +100,18 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    ignore:
+      # **`gradle/actions` se queda en v5 por decisión tomada**, y el motivo está
+      # escrito en la cabecera de `workflows/ci.yml`: la v6 saca el cacheo a una
+      # librería aparte que **ya no es código abierto** y elimina el soporte de
+      # configuration-cache. Eso no es una versión más sino un cambio en la
+      # naturaleza de lo que se ejecuta en la integración.
+      #
+      # Sin esta regla la propuesta vuelve cada semana, y quien la vea en verde
+      # la fusionará sin saber que había una decisión detrás — que es justo cómo
+      # se pierden las decisiones. Se revisa el día que el cacheo vuelva a ser
+      # código abierto, no antes.
+      - dependency-name: gradle/actions
+        update-types: [version-update:semver-major]
     commit-message:
       prefix: ci
