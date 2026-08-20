@@ -131,7 +131,7 @@ class ArticleController(
             ArticlePatch(
                 name = patch.requiredText("name"),
                 categoryId = patch.requiredUuid("categoryId"),
-                unit = patch.enum("unit"),
+                unit = patch.requiredEnum("unit"),
                 brand = patch.text("brand"),
                 model = patch.text("model"),
                 barcode = patch.text("barcode"),
