@@ -331,6 +331,13 @@ const HELP_TOPICS: HelpTopic[] = [
         description: 'Las invitaciones enviadas y aún no aceptadas se ven con su papel, para saber qué falta.',
         example: 'Invitaste a tu hija el martes y no aparece: la invitación sigue pendiente, y lo ves sin preguntarle.',
       },
+      {
+        title: 'Dar de baja a alguien, y traerlo de vuelta',
+        description:
+          'Quien administra apaga y enciende a cada persona con un interruptor. Apagar pide confirmación —cierra sus sesiones en el acto y sus cosas quedan sin responsable—, y quien está de baja se queda en la lista con su etiqueta, para poder traerlo de vuelta con su papel y sus credenciales de siempre.',
+        example:
+          'Se marcha quien compartía piso: lo apagas y ya no entra. Si vuelve en septiembre, el mismo interruptor lo trae sin invitarlo otra vez.',
+      },
     ],
   },
   {
