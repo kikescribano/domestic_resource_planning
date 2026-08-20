@@ -731,7 +731,16 @@ export function AssetDetailPage() {
             {/* Para las dos naturalezas, al contrario que la conservación:
                 clasificar la despensa por «lo del bebé» tiene tanto sentido
                 como clasificar el taller. */}
-            <TagsForm tags={current.tags} onSave={retag.mutate} busy={retag.isPending} accessToken={accessToken} />
+            {/* `key` por el asset: esta ruta **no se desmonta** al pasar de una
+                ficha a otra --el `:id` cambia y el componente se queda-- así que
+                sin él el borrador seguiría siendo el del asset anterior. */}
+            <TagsForm
+              key={current.id}
+              tags={current.tags}
+              onSave={retag.mutate}
+              busy={retag.isPending}
+              accessToken={accessToken}
+            />
 
             <AssetDocuments assetId={current.id} assetName={current.name} accessToken={accessToken} />
 

@@ -250,7 +250,16 @@ function CategoryRow({
           <Button variant="primary" busy={busy} busyLabel="Guardando…" onClick={() => onSave(edited)}>
             Guardar
           </Button>
-          <Button variant="ghost" onClick={onCancel}>
+          {/* Cancelar **descarta**: sin devolver el borrador a lo que dice la
+              fila, volver a abrir el formulario enseñaría los cambios que se
+              acaban de tirar. */}
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setEdited(category)
+              onCancel()
+            }}
+          >
             Cancelar
           </Button>
         </div>
