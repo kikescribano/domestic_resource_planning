@@ -12,9 +12,8 @@ skill [`marketing-deck`](../../../../.claude/skills/marketing-deck/SKILL.md).
 
     python docs/common/marketing/assets/build-drp-comercial-minitheme.py
 
-**Refleja el estado del repositorio a 2026-08-19**: Fases 1 y 2 cerradas, cuatro
-módulos construidos, cierre de huecos planificado y sin empezar, Fase 3 sin
-planificar. Los cinco datos que caducan antes, y que hay que repasar siempre
+**Refleja el estado del repositorio a 2026-08-20**: Fases 1 y 2 cerradas, cuatro
+módulos construidos, cierre de huecos completado y Fase 3 sin planificar. Los cinco datos que caducan antes, y que hay que repasar siempre
 antes de regenerar, son **la fase en curso, el número de operaciones del
 contrato, el de tablas, el de ADR y cuántos módulos hay construidos**.
 """
@@ -197,7 +196,7 @@ def build() -> Path:
     cifras.drop(415)  # duplicado que la plantilla dejó debajo del 419
     cifras.text(425, "13")
     cifras.text(426, "módulos previstos, cuatro construidos")
-    cifras.text(420, "98")
+    cifras.text(420, "106")
     cifras.text(419, "operaciones disponibles en la API")
     cifras.text(421, "1 GB")
     cifras.text(424, "de documentos por hogar")

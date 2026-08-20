@@ -7,11 +7,12 @@ skill [`marketing-deck`](../../../../.claude/skills/marketing-deck/SKILL.md).
 
     python docs/common/marketing/assets/build-drp-tecnico-minitheme.py
 
-**Refleja el estado del repositorio a 2026-08-19**: 98 operaciones en el
-contrato, 28 tablas, once ADR, Fases 1 y 2 cerradas y cuatro módulos
-construidos. Los cinco datos que caducan antes, y que hay que repasar siempre
-antes de regenerar, son **la fase en curso, el número de operaciones del
-contrato, el de tablas, el de ADR y cuántos módulos hay construidos**.
+**Refleja el estado del repositorio a 2026-08-20**: 106 operaciones en el
+contrato, 31 tablas, quince ADR, Fases 1 y 2 cerradas más el cierre de huecos, y
+cuatro módulos construidos. Los cinco datos que caducan antes, y que hay que
+repasar siempre antes de regenerar, son **la fase en curso, el número de
+operaciones del contrato, el de tablas, el de ADR y cuántos módulos hay
+construidos**.
 """
 
 from __future__ import annotations
@@ -54,18 +55,18 @@ def build() -> Path:
     alcance.text(
         172,
         "Cómo está construido DRP: arquitectura, datos, contrato y "
-        "verificación. Refleja el repositorio a 19 de agosto de 2026.",
+        "verificación. Refleja el repositorio a 20 de agosto de 2026.",
         "Backend en Kotlin sobre Spring Boot: monolito modular con Clean "
         "Architecture y un event bus in-process.",
         "PostgreSQL 16 o superior, con Row-Level Security y migraciones en SQL "
         "plano versionadas con Flyway.",
         "Frontend en TypeScript y React sobre Vite, mobile-first desde 375 px "
         "y accesible según WCAG 2.2 nivel AA.",
-        "Contrato OpenAPI 3.0 en la raíz del repositorio, con 98 operaciones y "
-        "cliente de TypeScript generado.",
+        "Contrato OpenAPI 3.0 en la raíz del repositorio, con 106 operaciones "
+        "y cliente de TypeScript generado.",
         "Monorepo con backend, frontend y documentación, construido en GitHub "
         "Actions con cinco trabajos.",
-        "Once ADR recogen las decisiones estructurales, sus alternativas "
+        "Quince ADR recogen las decisiones estructurales, sus alternativas "
         "descartadas y el motivo de cada una.",
         "Ficheros en el disco del servidor tras un puerto propio, servidos por "
         "nginx con una cuota de 1 GB por hogar.")
@@ -168,10 +169,10 @@ def build() -> Path:
 
     # 12 · Lo que ocupa un hogar ---------------------------------------------
     capacidad = deck.use(11)
-    capacidad.text(433, "116 kB")
+    capacidad.text(433, "142 kB")
     capacidad.text(432, "es lo que crece la base de datos por hogar")
     capacidad.notes("docs/backend/operations/capacity-measurements.md, "
-                    "medición del 2026-08-19.")
+                    "medición del 2026-08-20.")
 
     # 13 · Sección 3 ----------------------------------------------------------
     seccion(deck, "#03", "CONTRATO Y STACK",
@@ -181,13 +182,13 @@ def build() -> Path:
     # 14 · Cifras -------------------------------------------------------------
     cifras = deck.use(10)
     cifras.drop(415)  # duplicado que la plantilla dejó debajo del 419
-    cifras.text(425, "98")
+    cifras.text(425, "106")
     cifras.text(426, "operaciones en el contrato OpenAPI")
-    cifras.text(420, "28")
+    cifras.text(420, "31")
     cifras.text(419, "tablas, con RLS y FORCE las del core")
-    cifras.text(421, "313")
-    cifras.text(424, "comprobaciones de aislamiento")
-    cifras.text(423, "7")
+    cifras.text(421, "15")
+    cifras.text(424, "ADR, cada una con su porqué")
+    cifras.text(423, "10")
     cifras.text(422, "recorridos en navegador real")
     cifras.notes("README, cabecera y sección 8.")
 
