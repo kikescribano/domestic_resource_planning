@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookOpen } from 'lucide-react'
+import { Archive, BookOpen, Pencil } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import {
@@ -269,29 +269,41 @@ function CategoryRow({
   }
 
   return (
-    <li className="flex min-h-touch flex-wrap items-center justify-between gap-2 rounded-md border border-border-subtle bg-surface-raised px-3 py-2">
-      <span className="flex items-center gap-2">
+    // La misma altura fija que las tarjetas de Ubicaciones: una categoría no
+    // tiene segunda línea, así que el centrado vertical deja el nombre a la
+    // altura de su marcador.
+    <li className="flex h-15 items-center justify-between gap-2 rounded-md border border-border-subtle bg-surface-raised px-3 py-2">
+      <span className="flex min-w-0 flex-1 items-center gap-2">
         <CategoryMarker icon={category.icon} color={category.color} />
-        <span className="text-body text-ink">{category.name}</span>
+        <span className="min-w-0 truncate text-body text-ink" title={category.name}>
+          {category.name}
+        </span>
       </span>
-      <span className="flex flex-wrap gap-1">
+      <span className="flex items-center gap-1">
         {/* El nombre de la categoría dentro del nombre accesible: doce botones
             «Editar» en columna son doce controles indistinguibles para quien no
-            ve la fila. Con `aria-label` y no con un `<span class="sr-only">`
-            detrás del texto, que es lo primero que se intentó: **JSX se come el
-            espacio inicial de la línea** y el lector de pantalla acababa
-            diciendo «EditarAlimentación». Y el rótulo visible sigue estando
-            dentro del nombre, que es lo que 2.5.3 exige. */}
-        <Button variant="ghost" onClick={onEdit} aria-label={`Editar ${category.name}`}>
-          Editar
-        </Button>
+            ve la fila. El lápiz y el archivador son los mismos gestos que en
+            Ubicaciones: editar en el teal del acento y lo que quita de en
+            medio, en el rojo del esquema — retirar no destruye, y por eso es
+            un archivador y no una papelera. */}
         <Button
           variant="ghost"
+          onClick={onEdit}
+          aria-label={`Editar ${category.name}`}
+          title="Editar"
+          className="w-11 px-0"
+        >
+          <Pencil size={20} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
+        </Button>
+        <Button
+          variant="ghost-danger"
           onClick={onRetire}
           disabled={busy}
           aria-label={`Retirar ${category.name}`}
+          title="Retirar"
+          className="w-11 px-0"
         >
-          Retirar
+          <Archive size={20} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
         </Button>
       </span>
     </li>
@@ -448,17 +460,34 @@ function ArticlesPanel() {
 
 function ArticleRow({ article, onRetire }: { article: Article; onRetire: () => void }) {
   return (
-    <li className="flex min-h-touch flex-wrap items-center justify-between gap-2 rounded-md border border-border-subtle bg-surface-raised px-3 py-2">
-      <span className="flex flex-wrap items-center gap-2">
-        <span className="text-body text-ink">{article.name}</span>
-        <span className="text-caption text-ink-muted">
+    // La misma altura fija que las categorías y que Ubicaciones. Un artículo
+    // siempre trae segunda línea —su categoría y su unidad—, así que aquí el
+    // centrado reparte las dos.
+    <li className="flex h-15 items-center justify-between gap-2 rounded-md border border-border-subtle bg-surface-raised px-3 py-2">
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="min-w-0 truncate text-body text-ink" title={article.name}>
+            {article.name}
+          </span>
+          {article.retiredAt && (
+            <span className="shrink-0">
+              <StatusBadge tone="decommissioned">Retirado</StatusBadge>
+            </span>
+          )}
+        </span>
+        <span className="truncate text-caption text-ink-muted">
           {article.category} · {UNIT_LABELS[article.unit]}
         </span>
-        {article.retiredAt && <StatusBadge tone="decommissioned">Retirado</StatusBadge>}
       </span>
       {!article.retiredAt && (
-        <Button variant="ghost" onClick={onRetire}>
-          Retirar
+        <Button
+          variant="ghost-danger"
+          onClick={onRetire}
+          aria-label={`Retirar ${article.name}`}
+          title="Retirar"
+          className="w-11 shrink-0 px-0"
+        >
+          <Archive size={20} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
         </Button>
       )}
     </li>
