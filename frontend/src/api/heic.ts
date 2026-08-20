@@ -13,9 +13,9 @@
  * única puerta por la que pasan todos, no hay forma de olvidarla en la tercera.
  *
  * **El import es dinámico, y esa es la mitad de la decisión.** El decodificador
- * pesa 2 996 kB minificado (734 kB comprimido) y vive en un fragmento aparte:
+ * pesa 2 995 kB minificado (734 kB comprimido) y vive en un fragmento aparte:
  * quien no elige un HEIC no descarga ni un byte de él, y sobre el bundle inicial
- * esto cuesta **1,35 kB**. Sustituirlo por un import estático no cambiaría nada
+ * esto cuesta **2,49 kB**. Sustituirlo por un import estático no cambiaría nada
  * visible en desarrollo y multiplicaría por ocho la primera carga de todo el
  * mundo.
  *

@@ -59,16 +59,20 @@ referencia se vuelve a medir y no son los 402 kB que citaba el plan: son 407,28
 kB** (119,74 comprimido) — entre planificar y ejecutar habían entrado la baja de
 hogar y el cierre de cuenta con sus pantallas.
 
-| Decodificador | Peso propio | Comprimido | Sobre la primera carga |
-|---|---|---|---|
-| `heic-to` 1.5.2 (libheif al día) | 2 995,46 kB | 734,16 kB | **+2,49 kB** |
-| `heic2any` 0.0.4 (libheif de 2023) | 1 352,97 kB | 341,25 kB | +2,49 kB |
+| Decodificador | Peso propio | Comprimido |
+|---|---|---|
+| `heic-to` 1.5.2 (libheif al día) | 2 995,46 kB | 734,16 kB |
+| `heic2any` 0.0.4 (libheif de 2023) | 1 352,97 kB | 341,25 kB |
 
-**La columna que decide es la última, y no está donde el plan esperaba.** El
-decodificador pesa siete veces la aplicación entera, pero solo si se descarga: en
-un `import()` dinámico sale en su propio fragmento y lo pide únicamente el
-navegador que se encuentra un HEIC. Sobre lo que descarga quien abre DRP, el coste
-medido es de **2,49 kB, un 0,61 %**.
+Y **sobre la primera carga, ninguno de los dos pesa**: con el decodificador
+detrás de un `import()`, lo que el bundle gana es el módulo que decide si hace
+falta convertir. Medido con el elegido ya implementado, `index.js` pasa de 407,28
+a **409,77 kB**: **+2,49 kB, un 0,61 %**.
+
+**Y esa cifra es la que decide, no la de la tabla.** El decodificador pesa siete
+veces la aplicación entera, pero solo si se descarga: en un `import()` dinámico
+sale en su propio fragmento y lo pide únicamente el navegador que se encuentra un
+HEIC — una vez, y luego de su caché.
 
 El plan advertía que «un megabyte encima de eso no es un incremento, es un cambio
 de categoría», y tenía razón sobre el supuesto que manejaba —el decodificador
@@ -130,7 +134,7 @@ Las tres razones, en orden de peso:
    construya el proyecto, para resolver un caso que el cliente resuelve dentro de
    su propio proceso.
 3. **El decodificador acaba donde menos daño puede hacer.** Es un parser de
-   formato de imagen escrito en C, es decir la clase de componente donde
+   formato de imagen escrito en C++, es decir la clase de componente donde
    históricamente aparecen los desbordamientos, y aquí corre **en la caja de arena
    del navegador de la propia persona, sobre un fichero que ella misma acaba de
    elegir**. En el servidor correría como proceso de la aplicación sobre bytes que

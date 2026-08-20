@@ -716,6 +716,15 @@ function CloseAccountSection() {
 }
 
 /**
+ * El avatar admite HEIC por el mismo motivo que el campo de subida: no porque la
+ * lista blanca haya crecido, sino porque el cliente lo convierte antes de enviar
+ * (ADR-014). Y aquí el megabyte de tope importa más que allí — un HEIC de 12 MP
+ * convertido a JPEG con calidad 0,90 ronda los 240 kB, así que entra con holgura
+ * donde el original de varios megabytes no habría entrado.
+ */
+const AVATAR_ACCEPT = ['image/jpeg', 'image/png', 'image/webp', ...CONVERTIBLE_FILE_TYPES].join(',')
+
+/**
  * El avatar propio.
  *
  * Se parece a subir un fichero y es otra operación: `PUT /users/me/avatar`
@@ -727,14 +736,6 @@ function CloseAccountSection() {
  * eso su tope es otro: 1 MB, y solo imagen.
  */
 
-/**
- * El avatar admite HEIC por el mismo motivo que el campo de subida: no porque la
- * lista blanca haya crecido, sino porque el cliente lo convierte antes de enviar
- * (ADR-014). Y aquí el megabyte de tope importa más que allí — un HEIC de 12 MP
- * convertido a JPEG con calidad 0,90 ronda los 240 kB, así que entra con holgura
- * donde el original de varios megabytes no habría entrado.
- */
-const AVATAR_ACCEPT = ['image/jpeg', 'image/png', 'image/webp', ...CONVERTIBLE_FILE_TYPES].join(',')
 function OwnAvatar({ accessToken }: { accessToken: string }) {
   const queryClient = useQueryClient()
   const [problem, setProblem] = useState<string | null>(null)
