@@ -163,8 +163,8 @@ python scripts/check-links.py
 ```
 
 Comprobar el contraste de los tokens de color: lee los valores `oklch()` reales de
-`frontend/src/index.css` y mide los 48 pares **en los dos modos** —los doce
-últimos son los colores de categoría que el usuario puede elegir—, así que un
+`frontend/src/index.css` y mide los 49 pares **en los dos modos** —doce de ellos
+son los colores de categoría que el usuario puede elegir—, así que un
 retoque de paleta que baje de WCAG AA rompe la construcción en lugar de
 descubrirse en una auditoría:
 

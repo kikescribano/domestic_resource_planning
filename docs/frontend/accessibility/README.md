@@ -37,11 +37,11 @@ la construcción falla.
 python scripts/check-contrast.py
 ```
 
-**48 pares medidos en los dos modos**, con estos resultados:
+**49 pares medidos en los dos modos**, con estos resultados:
 
 | Medida | Valor | Mínimo exigido |
 |---|---|---|
-| Peor caso de **texto** | **4,70:1** | 4,5:1 (1.4.3) |
+| Peor caso de **texto** | **4,67:1** | 4,5:1 (1.4.3) |
 | Peor caso **no textual** | **3,46:1** | 3:1 (1.4.11) |
 | Anillo de foco sobre el fondo, modo claro | 9,35:1 | 3:1 (1.4.11) |
 | Anillo de foco sobre el fondo, modo oscuro | 11,87:1 | 3:1 (1.4.11) |
@@ -49,7 +49,7 @@ python scripts/check-contrast.py
 
 Tres notas sobre por qué se mide así:
 
-- **El peor caso de texto es el distintivo de «dado de baja»** (4,70:1), que es
+- **El peor caso de texto es el distintivo de «dado de baja»** (4,67:1), que es
   el único gris del sistema y por tanto el que menos margen tiene. Está por
   encima del mínimo, pero es el par que hay que volver a medir antes que ningún
   otro si se toca la paleta.
@@ -65,7 +65,7 @@ Tres notas sobre por qué se mide así:
   categoría: tres de los doce valores nuevos —el suave del índigo y los fuertes
   del cielo y el turquesa— nacieron fuera de gamut y hubo que bajarles el croma
   antes de que el número significara algo.
-- **Doce de los cuarenta y ocho pares los elige el usuario**, y son los seis
+- **Doce de los cuarenta y nueve pares los elige el usuario**, y son los seis
   colores de categoría de la [ADR-015](../../common/architecture/decisions/ADR-015-user-chosen-category-identity.md):
   dos por color, contra su propio fondo suave —el marcador— y contra
   `surface-sunken` —el hueco de una foto que falta—. Es la única parte de la
@@ -144,7 +144,7 @@ mueva solo, también 2.2.2.
 No es un extra: es un ajuste de accesibilidad para quien tiene fotofobia o
 sensibilidad a la luz. Sigue al sistema por defecto y admite conmutación
 explícita con `data-theme`, que gana en las dos direcciones —para que quien tenga
-el sistema en oscuro pueda quedarse en claro—. **Los 48 pares están medidos en
+el sistema en oscuro pueda quedarse en claro—. **Los 49 pares están medidos en
 los dos modos**, no solo en el claro.
 
 ## Lo que se comprueba sobre pantallas montadas
@@ -196,6 +196,7 @@ ponía —contraste, foco visible y teclado a 375 px y en ultrawide—, y
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | La tanda de ajustes de interfaz deja la auditoría en **49 pares**: entra el del tono `accent` del `StatusBadge` (5,57:1 y 7,40:1), el gris neutro rota al pino y el ámbar al oro —el peor caso de texto pasa a 4,67:1, el mismo distintivo de «dado de baja»—. Además: casillas deshabilitadas visiblemente apagadas desde la capa base, interruptor `Switch` con `role="switch"`, iconos con nombre accesible que lleva el objeto dentro, y el tipo de una ubicación en móvil se retira de la vista con `sr-only`, no del árbol de accesibilidad. |
 | 2026-08-20 | **Se remiden los 48 pares tras el giro de la paleta de marca al esquema de la identidad comercial** (neutros de pino y acento teal): todo sigue dentro de AA. El peor caso de texto no se mueve —el distintivo de «dado de baja», 4,70:1—; el peor no textual pasa de 3,49:1 a 3,46:1 (el mismo borde de control) y el anillo de foco queda en 9,35:1 en claro y 11,87:1 en oscuro. |
 | 2026-08-20 | La auditoría pasa de **36 pares a 48**: los doce que añaden los seis colores de categoría, que son los primeros que **elige el usuario** y no el sistema (cierre de huecos, Hito 4). Se anota que tres de los doce valores nuevos nacieron fuera del gamut sRGB y que la comprobación de gamut fue lo que lo destapó. |
 | 2026-08-11 | Se fija WCAG 2.2 AA como objetivo normativo y se documenta la auditoría de contraste de los 36 pares, con su script de comprobación en la CI. Se anota lo que queda pendiente de verificar sobre pantallas reales. |

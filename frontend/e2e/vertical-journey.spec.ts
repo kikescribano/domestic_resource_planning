@@ -367,7 +367,7 @@ test.describe('recorrido vertical', () => {
     // la puerta de entrada a todo lo demás, y si no se llega a ella sin ratón,
     // para quien navega así el módulo no existe.
     await navigateTo(page, 'Módulos del hogar', '/modulos')
-    const encender = page.getByRole('button', { name: /^Encender Proveedores/ })
+    const encender = page.getByRole('switch', { name: /^Proveedores/ })
     await startKeyboardAtTop(page, encender)
     await tabTo(page, encender, 'encender Proveedores')
     await page.keyboard.press('Enter')
@@ -483,7 +483,7 @@ test.describe('recorrido vertical', () => {
 
     // --- 2. Encender el módulo, con el teclado ------------------------------
     await navigateTo(page, 'Módulos del hogar', '/modulos')
-    const encender = page.getByRole('button', { name: /^Encender Almacén/ })
+    const encender = page.getByRole('switch', { name: /^Almacén/ })
     await startKeyboardAtTop(page, encender)
     await tabTo(page, encender, 'encender Almacén')
     await page.keyboard.press('Enter')
@@ -614,7 +614,7 @@ test.describe('recorrido vertical', () => {
 
     // --- 2. Encender el módulo, con el teclado ------------------------------
     await navigateTo(page, 'Módulos del hogar', '/modulos')
-    const encender = page.getByRole('button', { name: /^Encender Compras/ })
+    const encender = page.getByRole('switch', { name: /^Compras/ })
     await startKeyboardAtTop(page, encender)
     await tabTo(page, encender, 'encender Compras')
     await page.keyboard.press('Enter')
@@ -718,7 +718,7 @@ test.describe('recorrido vertical', () => {
 
     // --- 2. Encender el módulo, con el teclado ------------------------------
     await navigateTo(page, 'Módulos del hogar', '/modulos')
-    const encender = page.getByRole('button', { name: /^Encender Mantenimiento/ })
+    const encender = page.getByRole('switch', { name: /^Mantenimiento/ })
     await startKeyboardAtTop(page, encender)
     await tabTo(page, encender, 'encender Mantenimiento')
     await page.keyboard.press('Enter')

@@ -137,7 +137,7 @@ imagen vieja se queda en pantalla hasta esa relectura.
 - **Nombre sin letras** —solo emoji, o vacío—: se cae al icono de persona en
   lugar de pintar un círculo mudo.
 - **El texto de las iniciales escala con el círculo**: `text-caption` en `sm` y
-  `md`, `text-body-sm` en `lg`, `text-title` en `xl`. Nunca en serif: la serif no
+  `md`, `text-body-sm` en `lg`, `text-title` en `xl`. Nunca en la display: la display no
   entra en una fila de listado, y `sm` y `md` viven ahí.
 - **A 96 px la imagen se ve ampliada si el original era pequeño.** No hay
   miniatura de avatar en el contrato —el tope de 1 MB hace de límite—, así que lo

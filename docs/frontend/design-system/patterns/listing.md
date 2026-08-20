@@ -66,7 +66,7 @@ lector de pantalla recorre la colección dos veces y una búsqueda del navegador
 encuentra cada nombre dos veces. Que una esté oculta lo salva en la práctica y
 basta un cambio de clase para que deje de estarlo.
 
-Dentro de la fila mandan las prohibiciones de `density.md` —sin serif, sin
+Dentro de la fila mandan las prohibiciones de `density.md` —sin display, sin
 sombra, sin radio mayor que `sm`, sin segundo peso, sin ilustración— y el
 presupuesto de calidez: **el único color de la fila es el estado**, con su
 [`StatusBadge`](../components/status-badge.md).

@@ -47,19 +47,22 @@ El redondeo completo es el que le corresponde:
 [`shape-and-elevation.md`](../foundations/shape-and-elevation.md) reserva la
 píldora para avatares y distintivos de estado, y para nada más.
 
-Los cinco tonos, tal y como están escritos en el objeto `tones` de la función:
+Los tonos de feedback, el neutro y —desde la pasada de chips del 2026-08-20— el
+de marca, tal y como están escritos en `STATUS_TONES` (los cinco de dominio
+tienen su tabla más abajo):
 
 | Tono | Clases | De dónde sale el color |
 |---|---|---|
+| `accent` | `bg-accent-soft text-accent-ink` | **La marca**: lo pendiente que no es feedback ni estado —«sin leer», «administra»— |
 | `info` | `bg-info-soft text-info` | Feedback del sistema |
 | `success` | `bg-success-soft text-success` | Feedback del sistema |
 | `warning` | `bg-warning-soft text-warning` | Feedback del sistema |
 | `danger` | `bg-danger-soft text-danger` | Feedback del sistema |
 | `neutral` | `bg-state-decommissioned-soft text-state-decommissioned` | **Estado del dominio** |
 
-Cuatro de los cinco tonos son de feedback y solo uno es de dominio. No es una
-elección de tono: el tipo de la propiedad es `NoticeTone | 'neutral'`, así que
-**no hay forma de pedir `state-lent` aunque el token exista**.
+El tipo de la propiedad admite las tres familias —feedback, marca y los cinco
+de dominio— desde la Fase 2; la frontera que esta ficha vigila es no pedir un
+tono de feedback para un estado del dominio, no que falte la forma de pedirlo.
 
 No hay estados. Un distintivo está o no está, y no reacciona al puntero, al foco
 ni a nada: no es interactivo.
@@ -73,7 +76,7 @@ y hoy no lo mete nadie.
 
 ```ts
 function StatusBadge(props: {
-  tone: NoticeTone | 'neutral'   // 'info' | 'success' | 'warning' | 'danger' | 'neutral'
+  tone: NoticeTone | 'accent' | 'neutral' | 'available' | 'lent' | 'overdue' | 'decommissioned' | 'out-of-stock'
   children: ReactNode
 }): JSX.Element
 ```
@@ -125,19 +128,20 @@ reales de `index.css`, en claro y en oscuro:
 | Par | Claro | Oscuro |
 |---|---|---|
 | Distintivo `DISPONIBLE` | 6,10:1 | 7,50:1 |
-| Distintivo `PRESTADO` | 5,75:1 | 7,52:1 |
+| Distintivo `PRESTADO` | 5,68:1 | 8,08:1 |
 | Distintivo `VENCIDO` | 6,00:1 | 5,65:1 |
-| **Distintivo `DADO DE BAJA`** | **4,70:1** | 5,06:1 |
+| **Distintivo `DADO DE BAJA`** | **4,67:1** | 5,08:1 |
 | Distintivo `SIN EXISTENCIAS` | 6,35:1 | 6,82:1 |
 
 El de dado de baja es **el peor par de texto de todo el sistema**: cumple los
-4,5:1 con 0,20 de margen, y es el primero que hay que volver a medir si alguien
+4,5:1 con 0,17 de margen, y es el primero que hay que volver a medir si alguien
 toca la paleta (ver [`accessibility/`](../../accessibility/README.md)).
 
 Esos cinco pares son los de los tokens `state-*`. Los cuatro tonos de feedback
 que el componente usa de verdad están medidos aparte —«distintivo de éxito»
-6,10:1, «de aviso» 5,75:1, «de error» 6,00:1, «informativo» 6,35:1 en claro— y
-dan **exactamente los mismos números**, porque hoy los valores coinciden. Ese es
+6,10:1, «de aviso» 5,68:1, «de error» 6,00:1, «informativo» 6,35:1 y «de
+acento» 5,57:1 en claro— y dan **exactamente los mismos números** donde los
+valores coinciden. Ese es
 el motivo de que la confusión de tokens no se vea: no se ve, se mide.
 
 ## Ejemplos correctos, antiusos y evidencias de prueba
@@ -145,7 +149,7 @@ el motivo de que la confusión de tokens no se vea: no se ve, se mide.
 Correcto — el único uso que existe hoy, en la lista de personas del hogar:
 
 ```tsx
-<StatusBadge tone={user.role === 'HOUSEHOLD_ADMIN' ? 'info' : 'neutral'}>
+<StatusBadge tone={user.role === 'HOUSEHOLD_ADMIN' ? 'accent' : 'neutral'}>
   {ROLE_LABEL[user.role]}
 </StatusBadge>
 ```
@@ -235,5 +239,6 @@ cuatro cosas de mantenimiento. Se usan **los nueve tonos menos `warning`**.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | Entra el tono **`accent`** —la marca, para lo pendiente que no es feedback ni estado: «sin leer», «administra»— con su par medido (5,57:1 y 7,40:1). Se remiden los pares tras el giro del gris al pino y del ámbar al oro: el peor sigue siendo «dado de baja», ahora 4,67:1. | Equipo DRP |
 | 2026-08-20 | **Se corrige lo que la ficha daba por pendiente y ya no lo estaba**: los tonos de dominio existen desde el Hito 2 de la Fase 2, cableados a los tokens `state-*` y con los cinco nombres que esta ficha proponía, así que la frontera de `color.md` deja de cruzarse — queda el resto de que `neutral` y `decommissioned` apuntan al mismo par. Y los datos de uso estaban congelados: eran «un solo uso y dos tonos», y son **diez usos en seis pantallas con nueve tonos**, lo que convierte el hueco de pruebas de barato en ancho. | Equipo DRP |
 | 2026-08-12 | Creación de la ficha sobre la implementación del Hito 1. | Equipo DRP |
