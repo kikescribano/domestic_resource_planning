@@ -25,17 +25,17 @@
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "^4",
-    "@testing-library/jest-dom": "^6",
+    "@testing-library/jest-dom": "^7",
     "@testing-library/react": "^16",
     "@testing-library/user-event": "^14",
     "@types/node": "^26.2.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^5",
-    "jsdom": "^28",
+    "@vitejs/plugin-react": "^6",
+    "jsdom": "^30",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "vite": "^7",
-    "vitest": "^3"
+    "typescript": "^7",
+    "vite": "^8",
+    "vitest": "^4"
   }
 }
