@@ -341,6 +341,15 @@
     outline-offset: 2px;
   }
 
+  /* Una casilla deshabilitada tiene que parecerlo: la nativa apenas cambia de
+     cara —en oscuro, nada—, y una casilla viva en una fila apagada invita a
+     marcar lo que no se puede. En la capa base, para que ningún componente
+     pueda olvidarlo. */
+  input[type='checkbox']:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
   ::placeholder {
     color: var(--color-ink-subtle);
     opacity: 1;

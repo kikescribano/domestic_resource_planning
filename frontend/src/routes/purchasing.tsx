@@ -126,7 +126,10 @@ function ShoppingListPanel() {
 
   const list = useQuery({
     queryKey: ['shopping-list'],
-    queryFn: () => api.listShoppingList(accessToken),
+    // Con los descartados incluidos, que el servidor no manda por defecto: un
+    // «no hace falta» no borra la fila, la deja apagada con su chip — quien lo
+    // pulsó por error lo ve, y quien mira la lista sabe qué se decidió ya.
+    queryFn: () => api.listShoppingList(accessToken, { status: ['NEEDED', 'IN_PURCHASE', 'DISMISSED'] }),
   })
 
   const invalidate = () => {
@@ -141,6 +144,21 @@ function ShoppingListPanel() {
   return (
     <>
       {failure && <Notice tone="danger">{failure}</Notice>}
+
+      {/* «Dónde vas a comprar» va antes que «Qué hace falta»: el gesto grande
+          de la pantalla es llevarse la compra, y tenerlo arriba lo hace visible
+          sin desplazarse por una lista larga. Apuntar algo nuevo es el gesto
+          pequeño y espera debajo. */}
+      {available.length > 0 && (
+        <NewPurchaseForm
+          itemIds={selected.filter((id) => available.some((item) => item.id === id))}
+          onDone={() => {
+            setSelected([])
+            invalidate()
+          }}
+          onFailure={setFailure}
+        />
+      )}
 
       <AddItemForm onDone={invalidate} onFailure={setFailure} />
 
@@ -177,16 +195,6 @@ function ShoppingListPanel() {
         )}
       </div>
 
-      {available.length > 0 && (
-        <NewPurchaseForm
-          itemIds={selected.filter((id) => available.some((item) => item.id === id))}
-          onDone={() => {
-            setSelected([])
-            invalidate()
-          }}
-          onFailure={setFailure}
-        />
-      )}
     </>
   )
 }
@@ -309,15 +317,21 @@ function ShoppingItemRow({
   })
 
   const inPurchase = item.status === 'IN_PURCHASE'
+  const dismissed = item.status === 'DISMISSED'
 
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface-raised p-4">
       <label className="flex min-h-touch flex-1 items-center gap-3">
-        {/* Deshabilitado y no oculto cuando ya va en una compra: quitarlo movería
-            las filas de sitio cada vez que alguien abre una compra. */}
-        <input type="checkbox" checked={checked} disabled={inPurchase} onChange={onToggle} />
+        {/* Deshabilitado y no oculto cuando ya va en una compra o se descartó:
+            quitarlo movería las filas de sitio, y una casilla viva en una fila
+            descartada invitaría a llevarse lo que se dijo que no hacía falta. */}
+        <input type="checkbox" checked={checked} disabled={inPurchase || dismissed} onChange={onToggle} />
         <span className="flex flex-wrap items-center gap-2">
-          <span className="text-body font-medium text-ink">{item.name}</span>
+          {/* El nombre también se apaga al descartar: el estado no lo dice solo
+              la casilla, y el chip sigue ahí para nombrarlo. */}
+          <span className={['text-body font-medium', dismissed ? 'text-ink-muted' : 'text-ink'].join(' ')}>
+            {item.name}
+          </span>
           {item.quantity !== null && (
             <span className="text-body-sm text-ink-muted">
               {item.quantity} {item.unit ? item.unit.toLowerCase() : ''}
@@ -330,10 +344,11 @@ function ShoppingItemRow({
             {ITEM_ORIGIN_LABELS[item.origin]}
           </StatusBadge>
           {inPurchase && <StatusBadge tone="success">En una compra</StatusBadge>}
+          {dismissed && <StatusBadge tone="neutral">No hace falta</StatusBadge>}
         </span>
       </label>
 
-      {!inPurchase && (
+      {item.status === 'NEEDED' && (
         <Button
           variant="secondary"
           onClick={() => dismiss.mutate()}
@@ -389,7 +404,7 @@ function NewPurchaseForm({
   }
 
   return (
-    <form onSubmit={submit} className="mt-6 flex flex-wrap items-start gap-3 border-t border-border-subtle pt-6">
+    <form onSubmit={submit} className="mt-6 flex flex-wrap items-start gap-3 border-b border-border-subtle pb-6">
       {/* Solo si hay dónde elegir. Con el módulo de proveedores apagado la lista
           llega vacía, así que el campo no se pinta y nadie tiene que enterarse
           de por qué. */}
