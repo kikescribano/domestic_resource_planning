@@ -250,20 +250,24 @@ alta de hogares en autoservicio hace que «autenticado» sea una barrera baja.
   dice: se comprobó que **el submódulo apunta al commit exacto del tag v1.5.0 de
   libwebp**, muy por delante de la 1.3.2 que trajo el arreglo. No hizo falta la
   mitigación temporal de retirar `image/webp` de la lista blanca.
-- **Por qué no la 0.11.0, que es la última.** Está compilada con Kotlin 2.4 y el
-  compilador del proyecto va por 2.1.20, así que rechaza su metadata. Subir
-  Kotlin para esto sería meter una migración dentro de un arreglo de seguridad, y
-  además Kotlin 2.2+ es requisito del salto a Spring Boot 4: su sitio es aquel
-  bloque. La 0.10.2 evita de paso una regresión de la 0.11.0, cuyos binarios de
-  Linux x86/x86_64 dejan de valer para glibc antiguas —lo que importaría al
-  empaquetar sobre una imagen musl (Alpine)—.
-- **Y la decisión está donde se aplica, no solo escrita.** Dependabot volvió a
+- **Por qué entonces no la 0.11.0, que era la última.** Estaba compilada con
+  Kotlin 2.4 y el compilador del proyecto iba por 2.1.20, así que rechazaba su
+  metadata. Subir Kotlin para eso habría sido meter una migración dentro de un
+  arreglo de seguridad, y además Kotlin 2.2+ es requisito del salto a Spring Boot
+  4: su sitio era aquel bloque, no este.
+- **Y la decisión estuvo donde se aplica, no solo escrita.** Dependabot volvió a
   proponer la 0.11.0 al día siguiente, porque un comentario en el código no lo
-  lee nadie más que una persona. La línea 0.10.x queda fijada en
+  lee nadie más que una persona. La línea 0.10.x se fijó en
   `.github/dependabot.yml`, ignorando **minor y major pero no patch**: si
-  apareciera una 0.10.3 con un arreglo de libwebp tiene que poder llegar, que es
-  justo lo que esta vigilancia existe para traer. La regla se retira cuando
-  Kotlin suba con el bloque de Spring Boot 4.
+  apareciera una 0.10.3 con un arreglo de libwebp tenía que poder llegar.
+- **Cerrado del todo el 2026-08-21, ya en la 0.11.0.** Al subir el proyecto a
+  **Kotlin 2.4.10** desaparece la única razón que bloqueaba esa versión, así que
+  se sube y **se retira la regla**: una regla cuya condición se cumple y no se
+  retira es deuda que nadie vuelve a mirar, y acaba bloqueando algo por un motivo
+  que dejó de ser cierto. La 0.11.0 empaqueta **libwebp 1.6.0**, verificada como
+  las anteriores. Queda vigente el aviso de despliegue: sus binarios de Linux
+  x86/x86_64 **ya no valen para glibc antiguas**, lo que importaría al empaquetar
+  sobre una imagen musl (Alpine) — ahí habría que volver a la 0.10.2.
 - **Trampa medida, y aplicable a cualquier cambio de dependencia:** la primera
   versión de este arreglo **pasó en local y falló en la CI**. Kotlin no vuelve a
   escanear la metadata del classpath si no ha cambiado ningún fuente, de modo que
@@ -723,3 +727,4 @@ Lo que la auditoría comprobó como correcto, para que no se toque sin querer:
 | 2026-08-20 | **Hallazgo 5, cerrado en parte, y con una corrección del propio informe delante**: la recomendación original —«migrar a Spring Boot 3.5.x, es un salto menor»— **era falsa**, y se descubrió al ir a ejecutarla. La 3.5 también está fuera de soporte OSS desde el 2026-06-30 y la línea con soporte es la 4.x; el destino es un salto **mayor** que arrastra Jackson 3 con cambio de `groupId`, Kotlin 2.2+, Spring Security 7 y Hibernate 7. Se deja escrito cómo se detectó, porque el modo de fallo se repetirá: las páginas de fechas de fin de vida daban versiones inexistentes y el índice de búsqueda de Maven Central respondía con una versión atrasada; lo zanjó el `maven-metadata.xml` del repositorio. Entra el **peldaño 3.5.16** que la guía de Spring exige antes del salto y que **ya cierra todas las CVE concretas** del hallazgo —Spring Security 6.5.11, Framework 6.2.19, Tomcat 10.1.55 y nimbus-jose-jwt 9.37.4—, con springdoc 2.9.0 y BouncyCastle 1.85.2 detrás. Y entra la **vigilancia continua**, que era la otra mitad: `dependabot.yml` con los tres ecosistemas y actualizaciones agrupadas, más `permissions: contents: read` en la CI. | kikescribano |
 | 2026-08-20 | **Hallazgo 4 cerrado: fuera la libwebp sin parchear.** `org.sejda.imageio:webp-imageio:0.1.6` —publicada en 2020 y nunca más— se sustituye por `com.github.usefulness:webp-imageio:0.10.2`, la continuación mantenida del mismo código, cuyo submódulo apunta al tag **v1.5.0 de libwebp** —muy por delante de la 1.3.2 que trajo el arreglo, y comprobado contra el repositorio en lugar de suponerlo—. Importaba porque ese decodificador se alimenta con los bytes que sube cualquier miembro de cualquier hogar: `image/webp` está en la lista blanca y toda imagen se decodifica para recodificarla. El cambio **no toca una sola línea de la aplicación**, porque la sustituta conserva el paquete `com.luciad.imageio.webp` y el procesador pide el códec por SPI genérico. No se fue a la 0.11.0 —la última— porque está compilada con Kotlin 2.4 y el proyecto va por 2.1.20: subir Kotlin es parte del salto a Spring Boot 4, no de un arreglo de seguridad, y la 0.10.2 evita de paso su regresión con glibc antiguas. *(Esta fila decía 0.11.0 con libwebp 1.6.0: se escribió antes de que la CI obligara al peldaño 0.10.2 y no se corrigió con el cuerpo del hallazgo.)* **Con esto el único ALTA abierto es el salto a Spring Boot 4.x** | kikescribano |
 | 2026-08-20 | **Hallazgo 5: cerrada también la mitad que vivía en los ajustes del repositorio**, auditada contra la API de GitHub con la CLI `gh` en lugar de fiarla a la interfaz. Lo encontrado: alertas de Dependabot ya activas y grafo de dependencias funcionando, pero las security updates y todo el escaneo de secretos apagados. Se activan por API las security updates, el secret scanning y la push protection —re-verificado con las mismas consultas—, se comprueba que el token de Actions ya tenía `read` por defecto, y entra CodeQL con el *default setup*. Cero alertas de dependencias y de código a día de hoy. Los *non-provider patterns* y las *validity checks* quedan fuera a propósito: son de pago y el criterio es cuenta gratuita con repositorio público. Del hallazgo 5 solo queda abierto el salto a Spring Boot 4.x. | kikescribano |
+| 2026-08-21 | **`webp-imageio` llega a la 0.11.0 y se retira el candado que lo impedía.** El proyecto sube a **Kotlin 2.4.10**, que era la única condición que bloqueaba esa versión —está compilada con Kotlin 2.4 y el compilador anterior rechazaba su metadata—, así que se sube la dependencia y **se retira la regla de `dependabot.yml`** que fijaba la línea 0.10.x. El criterio queda escrito: una regla cuya condición se cumple y no se retira es deuda que nadie vuelve a mirar, y acaba bloqueando algo por un motivo que dejó de ser cierto; la nota se conserva en el fichero para que quien dude de si estuvo fijado encuentre la respuesta. La 0.11.0 empaqueta **libwebp 1.6.0**, verificada como en cada salto anterior. Sigue vigente el aviso de despliegue —sus binarios de Linux x86/x86_64 ya no valen para glibc antiguas, lo que importaría sobre una imagen musl— y la trampa medida de que un cambio de dependencia puede pasar en local y fallar en la CI por la compilación incremental de Kotlin. | kikescribano |
