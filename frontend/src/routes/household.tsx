@@ -9,6 +9,7 @@ import {
   Handshake,
   HardDrive,
   House,
+  LogOut,
   MapPin,
   Users,
 } from 'lucide-react'
@@ -60,13 +61,16 @@ const PRIMARY_NAVIGATION = [
  * sexta las deja por debajo de los 44 px que exige la dirección visual. Así que
  * lo que gana una pantalla nueva es sitio en la columna del escritorio y en
  * «Más», no un hueco en el pulgar.
+ *
+ * «Cuenta» no está en la lista: es de la persona y no del hogar, así que
+ * acompaña a la marca —bajo el sello en escritorio, cerrando «Más» en móvil—
+ * junto a la salida directa. Ver [AccountControls].
  */
 const SECONDARY_NAVIGATION = [
   { to: '/avisos', label: 'Avisos', end: false, icon: Bell },
   { to: '/catalogo', label: 'Catálogo', end: false, icon: BookOpen },
   { to: '/usuarios', label: 'Personas', end: false, icon: Users },
   { to: '/almacenamiento', label: 'Archivo', end: false, icon: HardDrive },
-  { to: '/cuenta', label: 'Cuenta', end: false, icon: CircleUserRound },
 ]
 
 /**
@@ -76,6 +80,60 @@ const SECONDARY_NAVIGATION = [
  * el icono orienta, no nombra.
  */
 const NAV_ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true, className: 'shrink-0' } as const
+
+/**
+ * Cerrar la sesión y volver a la puerta. Compartido por los tres sitios desde
+ * los que se sale: el bloque de la marca en escritorio, el apartado que cierra
+ * «Más» en móvil y la sección de la pantalla de «Cuenta», que es la que
+ * explica qué pasa al salir.
+ */
+function useSignOut() {
+  const { signOut } = useSession()
+  const navigate = useNavigate()
+  return async () => {
+    await signOut()
+    navigate('/entrar', { replace: true })
+  }
+}
+
+/**
+ * La cuenta, junto a la marca y no entre las paradas.
+ *
+ * «Cuenta» dejó de ser una parada de la navegación: es de la persona y no del
+ * hogar, así que va con la marca, con la salida directa al lado. Son un par de
+ * medias filas centradas a propósito —no la anchura entera de una parada—
+ * para que se lean como parte del bloque de identidad y no como dos entradas
+ * más de la lista.
+ */
+function AccountControls({ className = '' }: { className?: string }) {
+  const exit = useSignOut()
+  const itemClass = 'flex min-h-touch flex-1 items-center justify-center gap-2 rounded-md px-3 text-body-sm'
+
+  return (
+    <div className={['items-center gap-1', className].join(' ')}>
+      <NavLink
+        to="/cuenta"
+        className={({ isActive }) =>
+          [
+            itemClass,
+            isActive ? 'bg-accent-soft font-medium text-accent-ink' : 'text-ink-muted hover:bg-surface-hover',
+          ].join(' ')
+        }
+      >
+        <CircleUserRound {...NAV_ICON} />
+        <span>Cuenta</span>
+      </NavLink>
+      <button
+        type="button"
+        onClick={exit}
+        className={[itemClass, 'text-ink-muted hover:bg-surface-hover'].join(' ')}
+      >
+        <LogOut {...NAV_ICON} />
+        <span>Salir</span>
+      </button>
+    </div>
+  )
+}
 
 /**
  * El hogar de la sesión, resuelto **una vez** y compartido.
@@ -185,6 +243,10 @@ export function RequireSession() {
  * **el hogar** y **los módulos**. Un hogar sin módulos activos ve sus ocho
  * enlaces del core intactos y una novena entrada, que es la puerta para encender
  * alguno.
+ *
+ * **«Cuenta» no es una parada**: acompaña a la marca con la salida directa al
+ * lado —en escritorio bajo el sello, dentro del banner y fuera del landmark de
+ * navegación; en móvil, en el apartado que cierra «Más»—.
  */
 function HouseholdShell() {
   const modules = useActiveModuleScreens()
@@ -208,7 +270,13 @@ function HouseholdShell() {
           'md:static md:flex md:w-64 md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-t-0 md:p-gutter-lg',
         ].join(' ')}
       >
-        <BrandMark className="hidden md:flex" />
+        {/* La marca y la cuenta comparten bloque con un aire más corto que el
+            de la columna: son la identidad —quién es DRP y quién está dentro—
+            y no dos vecinos casuales de la lista de paradas. */}
+        <div className="hidden md:flex md:flex-col md:gap-2">
+          <BrandMark className="flex" />
+          <AccountControls className="flex" />
+        </div>
 
         <nav aria-label="Principal" className="flex md:flex-col md:gap-6">
           {/* Los rótulos de grupo se leen siempre aunque solo se vean desde
@@ -323,21 +391,28 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
  * del core que se tocan al montar el hogar, más los módulos— y por eso se
  * enumera entero en lugar de esconderse tras un menú.
  */
+/** La fila-tarjeta de «Más»: una parada por fila, con su objetivo táctil entero. */
+const MORE_ROW =
+  'flex min-h-touch items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink'
+
 export function MorePage() {
   const modules = useActiveModuleScreens()
+  const exit = useSignOut()
 
   return (
     <>
+      {/* La marca igual que en «Hogar»: solo en móvil, centrada. Las dos
+          puertas de la barra inferior la enseñan, y así el móvil la ve
+          entre por la que entre. */}
+      <BrandMark className="mb-6 flex justify-center md:hidden" />
+
       <PageHeading title="Más" icon={Ellipsis} />
 
       <nav aria-label="Resto del hogar">
         <ul className="flex flex-col gap-2">
           {SECONDARY_NAVIGATION.map((item) => (
             <li key={item.to}>
-              <Link
-                to={item.to}
-                className="flex min-h-touch items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
-              >
+              <Link to={item.to} className={MORE_ROW}>
                 <item.icon {...NAV_ICON} />
                 {item.label}
               </Link>
@@ -349,26 +424,42 @@ export function MorePage() {
         <ul className="mt-3 flex flex-col gap-2">
           {modules.map((module) => (
             <li key={module.key}>
-              <Link
-                to={module.path}
-                className="flex min-h-touch items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
-              >
+              <Link to={module.path} className={MORE_ROW}>
                 <module.icon {...NAV_ICON} />
                 {module.label}
               </Link>
             </li>
           ))}
           <li>
-            <Link
-              to="/modulos"
-              className="flex min-h-touch items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
-            >
+            <Link to="/modulos" className={MORE_ROW}>
               <Blocks {...NAV_ICON} />
               Módulos del hogar
             </Link>
           </li>
         </ul>
       </nav>
+
+      {/* El apartado de la persona cierra la pantalla, fuera del landmark de
+          navegación: la salida es una acción y no un sitio al que ir. Solo en
+          móvil — en escritorio la cuenta ya vive junto a la marca y a «Más»
+          no llega nadie. */}
+      <section className="mt-8 md:hidden">
+        <h2 className="font-display text-title-sm text-ink">Tu cuenta</h2>
+        <ul className="mt-3 flex flex-col gap-2">
+          <li>
+            <Link to="/cuenta" className={MORE_ROW}>
+              <CircleUserRound {...NAV_ICON} />
+              Cuenta
+            </Link>
+          </li>
+          <li>
+            <button type="button" onClick={exit} className={[MORE_ROW, 'w-full'].join(' ')}>
+              <LogOut {...NAV_ICON} />
+              Salir
+            </button>
+          </li>
+        </ul>
+      </section>
     </>
   )
 }
@@ -380,9 +471,10 @@ export function HomePage() {
 
   return (
     <>
-      {/* La marca solo en móvil: en escritorio ya la enseña la barra lateral,
-          y aquí es el único sitio donde el móvil la ve. Centrada: presentada a
-          la izquierda parecía un desajuste del título de la pantalla. */}
+      {/* La marca solo en móvil: en escritorio ya la enseña la barra lateral.
+          La ven «Hogar» y «Más», las dos puertas de la barra inferior.
+          Centrada: presentada a la izquierda parecía un desajuste del título
+          de la pantalla. */}
       <BrandMark className="mb-6 flex justify-center md:hidden" />
 
       <PageHeading title="Hogar" icon={House} />
@@ -638,8 +730,7 @@ export function UsersPage() {
 
 export function AccountPage() {
   const session = useAuthenticatedSession()
-  const { signOut } = useSession()
-  const navigate = useNavigate()
+  const exit = useSignOut()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
 
@@ -699,22 +790,17 @@ export function AccountPage() {
         </Button>
       </form>
 
-      {/* Cerrar sesión vive aquí y no en la navegación: es una acción, no un
-          sitio al que ir, y meterla entre los enlaces la deja al lado de
-          «Personas» esperando a que alguien la pulse por error con el pulgar. */}
+      {/* La salida rápida vive con la marca —bajo el sello en escritorio,
+          cerrando «Más» en móvil—, pero esta sección se queda: es la única que
+          explica qué pasa al salir. Lo que sigue sin existir es un «Salir»
+          entre las paradas de la lista, al lado de «Personas», esperando a que
+          alguien lo pulse por error con el pulgar. */}
       <section className="mt-10 max-w-form border-t border-border-subtle pt-6">
         <h2 className="font-display text-title-sm text-ink">Cerrar sesión</h2>
         <p className="mt-1 text-body-sm text-ink-muted">
           Se cierra en este dispositivo. Las demás siguen abiertas.
         </p>
-        <Button
-          variant="secondary"
-          className="mt-4"
-          onClick={async () => {
-            await signOut()
-            navigate('/entrar', { replace: true })
-          }}
-        >
+        <Button variant="secondary" className="mt-4" onClick={exit}>
           Salir
         </Button>
       </section>
@@ -738,17 +824,13 @@ export function AccountPage() {
  */
 function CloseAccountSection() {
   const session = useAuthenticatedSession()
-  const { signOut } = useSession()
-  const navigate = useNavigate()
+  const exit = useSignOut()
 
   const close = useMutation({
     mutationFn: () => api.closeAccount(session.accessToken),
-    onSuccess: async () => {
-      // La sesión ya no vale para nada: el `signOut` es lo que limpia el estado
-      // del cliente y revoca el refresh token que quedaba.
-      await signOut()
-      navigate('/entrar', { replace: true })
-    },
+    // La sesión ya no vale para nada: salir es lo que limpia el estado del
+    // cliente y revoca el refresh token que quedaba.
+    onSuccess: exit,
   })
 
   return (

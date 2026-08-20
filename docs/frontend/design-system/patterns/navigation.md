@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-18 |
+| Última revisión | 2026-08-20 |
 
 ## Propósito
 
@@ -74,7 +74,7 @@ Anatomía, tal y como está escrita:
 |---|---|---|
 | Contenedor | Columna | Fila (`md:flex-row`) |
 | `<header>` | Fijo abajo, con `border-t` | Estático, 256 px de ancho, con `border-r` |
-| Marca «DRP» | Oculta en la barra —la enseña la cabecera de «Hogar»— | Visible: el sello de la marca con nombre y lema |
+| Marca «DRP» | Oculta en la barra —la enseñan las cabeceras de «Hogar» y «Más»— | Visible: el sello de la marca con nombre y lema, y debajo «Cuenta» y «Salir» |
 | `<nav aria-label="Principal">` | Fila con cuatro paradas del core y «Más» | Columna con dos grupos: el hogar y los módulos |
 | Rótulo de grupo | Oculto | Visible, en `text-caption`, y siempre referenciado con `aria-labelledby` |
 | Enlace | `min-h-touch`, `flex-1`, centrado | Alineado a la izquierda, con radio y fondo al pasar |
@@ -87,9 +87,13 @@ Tres detalles que se pierden al leer las clases por encima:
   literal de la regla en el sitio donde más fácil sería saltársela.
 - **El `pb-24` de `main` no es margen decorativo**: reserva la altura de la barra
   fija para que el final del contenido no quede debajo de ella.
-- **Cerrar sesión no está en la navegación.** Es una acción, no un sitio, y
+- **Cerrar sesión no está entre las paradas.** Es una acción, no un sitio, y
   ponerla entre los enlaces la deja al lado de «Personas» esperando a que alguien
-  la pulse con el pulgar por error. Vive en `AccountPage`, como botón.
+  la pulse con el pulgar por error. Desde el 2026-08-20 la salida rápida
+  acompaña a la marca —«Cuenta» y «Salir» bajo el sello en escritorio, en el
+  banner y fuera del landmark de navegación; en móvil, en el apartado que
+  cierra «Más»— y `AccountPage` conserva la sección que explica qué pasa al
+  salir. Lo que sigue sin existir es un «Salir» dentro de la lista.
 
 ### Dos grupos, y el tope de cinco paradas
 
@@ -107,7 +111,10 @@ Así que:
 - **En móvil**, cuatro paradas del core —Hogar, Inventario, Sitios, Préstamos— y
   **«Más»**, que es una pantalla con el resto del core y con los módulos activos.
   El corte entre unas y otras es de **frecuencia**, no de importancia: arriba lo
-  de todos los días, en «Más» lo que se toca al montar el hogar.
+  de todos los días, en «Más» lo que se toca al montar el hogar. «Más» abre con
+  la marca igual que «Hogar» y cierra con el apartado de la cuenta —el enlace al
+  detalle y la salida directa—, que es donde el móvil tiene lo que en escritorio
+  vive bajo el sello.
 - **Desde `md`**, la columna las enseña todas repartidas en dos grupos: **Tu
   hogar** y **Módulos**. Un hogar sin ningún módulo activo conserva sus enlaces
   del core y ve además «Módulos del hogar», que es la puerta para encender alguno.
@@ -240,5 +247,6 @@ tiene ranura para ninguna de las dos.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **«Cuenta» deja de ser una parada y se va con la marca**, con la salida directa al lado: en escritorio bajo el sello —en el banner, fuera del landmark de navegación—; en móvil, en el apartado que cierra «Más», que además abre con la marca igual que «Hogar». La lista queda para lo que es del hogar, y «Salir» sigue sin pisar la lista de paradas. | Equipo DRP |
 | 2026-08-18 | Fase 2, Hito 0: la navegación se parte en dos grupos —el hogar y los módulos— dentro del mismo `<nav>`, y la barra inferior de móvil baja a cuatro paradas más «Más». Queda resuelta la decisión abierta de cuántos destinos caben abajo: cinco a 320 px, medido y comprobado en el recorrido vertical. | Equipo DRP |
 | 2026-08-12 | Creación del documento con el shell del Hito 1 y las tres decisiones que el Hito 2 tiene que tomar. | Equipo DRP |
