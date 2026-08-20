@@ -82,6 +82,26 @@ class SchedulingEnabledTest {
             scheduled.any { it.contains("DailySweep") && it.contains("run") }.shouldBe(true)
         }
     }
+
+    @Test
+    @DisplayName("y el relay del outbox NO, porque tiene su propio interruptor")
+    fun `el relay no cuelga de este interruptor`() {
+        // **Esta prueba vive aqui a proposito, que es donde estaba el peligro.**
+        // El relay del Hito 1 del cierre de huecos (ADR-013) corre cada cinco
+        // segundos, no una vez al dia. Si colgara de `drp.schedule.enabled`, esta
+        // clase --que lo enciende para medir la pasada diaria-- pondria a repartir
+        // eventos dentro de su contexto, sobre la base que toda la suite comparte
+        // y a mitad de otra prueba.
+        //
+        // La mitad contraria --que encendido si se programa-- la mide
+        // `OutboxSchedulingSwitchTest`. Sin las dos, esto solo diria que la
+        // propiedad no hace nada.
+        val scheduled = context.scheduledTaskDescriptions()
+
+        withClue("las tareas programadas son: $scheduled") {
+            scheduled.any { it.contains("OutboxRelay") }.shouldBe(false)
+        }
+    }
 }
 
 /**

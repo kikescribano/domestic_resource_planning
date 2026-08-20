@@ -1,6 +1,8 @@
 package com.drp.platform.event
 
 import org.slf4j.LoggerFactory
+import org.springframework.core.Ordered
+import org.springframework.core.annotation.Order
 import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
 import java.util.Collections
@@ -44,21 +46,38 @@ import java.util.UUID
  *
  * **3. Es idempotente.** La entrega es at-least-once, asi que se **reserva** el
  * `eventId` antes de atenderlo y se descarta lo ya reservado. La reserva cubre
- * dos casos que hoy si pueden darse --varios hilos publicando el mismo evento, y
- * un handler que republique el suyo y se reentre-- ademas del que traera el
- * Transactional Outbox que nombra README 5.2.2, que reentrega **el mismo
- * `eventId`**. Escribir la guarda despues significaria repasar todos los
- * handlers que existan para entonces.
+ * dos casos que si pueden darse: varios hilos publicando el mismo evento, y un
+ * handler que republique el suyo y se reentre.
  *
- * Lo recordado vive en memoria y no en una tabla, porque el bus tambien: un
- * reinicio no reentrega nada --pierde el evento, que es justo lo que el outbox
- * viene a arreglar--, asi que persistirlo no protegeria de nada que pueda pasar
- * hoy. El dia que haya outbox, esa guarda se muda con el.
+ * **Y aqui hay una guarda que se mudo, que es lo que este comentario prometia**
+ * (ADR-013). La version anterior razonaba que lo recordado vivia en memoria
+ * «porque el bus tambien: un reinicio no reentrega nada --pierde el evento--,
+ * asi que persistirlo no protegeria de nada que pueda pasar hoy», y cerraba con
+ * «el dia que haya outbox, esa guarda se muda con el». Ese dia llego: tras un
+ * reinicio, `OutboxRelay` reentrega **el mismo `eventId`**.
+ *
+ * Lo que se mudo es **la mitad duradera**, y su casa es la fila del outbox: el
+ * `eventId` es la clave primaria de `event_outbox`, la fila se reserva al
+ * publicar y se borra al repartir, y esa es la unica reserva que sobrevive a un
+ * reinicio. Lo que queda aqui es la mitad que **solo tiene sentido dentro de un
+ * proceso** --los dos casos del parrafo anterior-- y para la que una tabla no
+ * anadiria nada.
+ *
+ * Se descarto una tabla de `(handler, eventId)`, y por dos motivos que conviene
+ * dejar escritos. **No cerraria la ventana, solo la estrecharia**, salvo que se
+ * escribiera dentro de la misma transaccion que el efecto del handler --y eso
+ * seria prometer exactamente-una-vez por handler, que es justo lo que la ADR-013
+ * se niega a prometer--. Y **no le haria falta a ningun handler que exista**:
+ * los tres modulos desplegados ya son idempotentes por construccion en sus
+ * propias tablas, con un indice unico por `event_id` en Warehouse y uno por
+ * asset o por articulo en CMMS y en Compras, que es la reserva puesta donde si
+ * puede ser transaccional con el efecto. Hay una prueba que lo mide.
  *
  * **La guarda no exime al handler de ser idempotente por dentro.** Es una red,
  * no una garantia: solo cubre reentregas del mismo `eventId` a este mismo
  * proceso. Un handler cuya operacion no se pueda repetir sin dano sigue estando
- * mal escrito.
+ * mal escrito --y con outbox lo esta mas, porque ahora las reentregas ocurren de
+ * verdad.
  */
 abstract class IdempotentEventHandler(private val handlerName: String) {
 
@@ -70,8 +89,30 @@ abstract class IdempotentEventHandler(private val handlerName: String) {
      * publica no tiene transaccion abierta. Sin eso, un evento publicado fuera de
      * una transaccion se descarta sin ruido, que es la clase de perdida que no se
      * nota hasta que un modulo pregunta por que no recibio nada.
+     *
+     * **Y desde el outbox tiene un segundo sujeto, que es el que lo hace
+     * imprescindible** (ADR-013): `OutboxRelay` reparte **fuera de toda
+     * transaccion**, asi que sin `fallbackExecution` el camino de recuperacion
+     * entero no entregaria nada --y no entregarlo se veria exactamente igual que
+     * no tener nada que entregar--. Hay una prueba que lo mide en las dos
+     * direcciones.
+     *
+     * El `@Order` no es decoracion, y su valor tampoco. `SpringEventBus` borra la
+     * fila del outbox con una sincronizacion de esta misma fase, y **tiene que ir
+     * detras del ultimo handler**: confirmar antes de repartir daria por
+     * entregado lo que aun no ha salido. Las sincronizaciones se ordenan por
+     * [Ordered], asi que sin declarar nada un handler valdria `LOWEST_PRECEDENCE`
+     * --lo mismo que la confirmacion-- y el desempate no seria de nadie.
+     *
+     * **Un escalon por delante del ultimo, y no el primero.** La tentacion es
+     * `@Order(0)`, y adelanta a los handlers respecto a cualquier
+     * `@EventListener` con orden declarado --lo mide `EventBusSweepTest`, que
+     * tiene tres con ordenes 1, 2 y 3--. Cambiar quien recibe antes que quien no
+     * es asunto de esta clase: lo unico que hace falta es quedar **antes de la
+     * confirmacion**, y eso se dice con un escalon, no con un salto a la cabeza.
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     fun receive(event: DomainEvent) {
         // Se **reserva** el evento antes de atenderlo, no despues. La version
         // anterior comprobaba primero y marcaba al terminar bien, y con eso la

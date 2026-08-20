@@ -237,9 +237,27 @@ faltaba desde el Hito 1 de la Fase 2 y lo que convierte «pendiente» en una tar
   módulo y no puede serlo: purga tablas de cuatro módulos distintos y de
   plataforma, y ninguno puede tocar las del otro.
 
+> **Y no hay una sexta, aunque el Transactional Outbox parecía traerla.** El Hito
+> 1 del cierre de huecos añade `event_outbox`, que crece con lo que el hogar
+> **hace** —una fila por evento publicado— y que por tanto habría entrado en esta
+> lista con su criterio de retención. No entra porque **la fila se borra al
+> repartirse**: el outbox es una cola y no un archivo, así que su estado normal es
+> vacía y su tamaño no crece con el tiempo sino con lo que haya pendiente en ese
+> instante. La [ADR-013](../../common/architecture/decisions/ADR-013-transactional-outbox.md)
+> razona por qué se descarta conservarla, y una de las tres razones es
+> precisamente esta: convertirla en archivo obligaría a inventar una retención
+> para una necesidad que nadie ha expresado, justo después de haber cerrado esa
+> misma discusión para las cinco de arriba.
+>
+> Lo que sí conviene saber para operar: **que `event_outbox` tenga filas en reposo
+> es el síntoma de que algo no está repartiendo**, y esa es toda la
+> instrumentación que necesita. Está en
+> [`scheduled-jobs.md`](scheduled-jobs.md).
+
 ## Historial
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | **No hay una sexta tabla sin techo**, aunque el Transactional Outbox parecía traerla. `event_outbox` crece con lo que el hogar hace y **la fila se borra al repartirse**, así que no acumula: su estado normal es vacía y su tamaño mide lo pendiente, no lo ocurrido. Se anota aquí para que nadie tenga que volver a derivarlo, junto con lo que sí sirve para operarla. No se vuelve a medir nada: la cola vacía no ocupa. |
 | 2026-08-19 | **Vuelta a medir al cerrar la Fase 2, con los cuatro módulos dentro.** La pendiente por hogar pasa de **61 kB a 116 kB** —casi el doble, y dos tercios de la subida son las entradas de apertura de Warehouse y las fichas de máquina de CMMS— y el esquema vacío, de 8,4 a 9,3 MiB. Aparece **una magnitud nueva que aquí no existía**: lo que crece con lo que el hogar *hace*, medido en **2457 B por día, ~875 kiB por hogar y año**, sin techo. La medición se parte en dos por eso, y el tramo de la segunda es de cuatro meses porque uno de dos daba pendientes con un tercio de diferencia entre ejecuciones. **La decisión no cambia: sigue siendo VPS-3 y sigue siendo por disco**, con tres órdenes de magnitud entre la cuota de ficheros y las filas. Se fija por fin el **criterio de retención** de las cinco tablas de la purga, con su disparador. |
 | 2026-08-17 | Se crea al cerrar la Fase 1, con la medición de los tres puntos, el coste de las tres operaciones caras y la elección de VPS-3 por disco y no por CPU. Las cifras son las del runner de la CI —Linux, 2 vCPU—, tomadas en la primera ejecución del trabajo `capacity`; los bytes coincidieron con los del equipo de desarrollo y los milisegundos no, que es la razón de medirlos allí. |
