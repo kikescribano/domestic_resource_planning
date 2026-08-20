@@ -97,12 +97,12 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
-    testImplementation("io.kotest:kotest-assertions-core:5.9.1")
+    testImplementation("io.kotest:kotest-assertions-core:6.2.4")
     // Las fronteras de modulo de la ADR-010, comprobadas por la construccion y no
     // por un acuerdo: ningun modulo puede referenciar a otro, el core no puede
     // referenciar a ninguno y plataforma no se apoya en el core. Una regla que
     // solo se escribe en una ADR se incumple al tercer hito sin que nadie lo note.
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.5.0")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
