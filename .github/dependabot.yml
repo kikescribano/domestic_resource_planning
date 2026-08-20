@@ -80,15 +80,43 @@ updates:
       # Sin esto se reabre cada semana y gasta cinco trabajos en volver a fallar,
       # que además enseña a ignorar los fallos de la CI.
       #
-      # **Esto no oculta ninguna CVE**: los parches de la línea en uso siguen
-      # llegando, y las alertas de seguridad de Dependabot son otro mecanismo al
-      # que un `ignore` de versiones mayores no afecta. Se retira el día que la
-      # migración se haga a propósito, en su propio bloque.
+      # **Corrección de lo que decía aquí antes.** Este comentario afirmaba que
+      # un `ignore` «no oculta ninguna CVE» porque las actualizaciones de
+      # seguridad son otro mecanismo. **La referencia de Dependabot dice lo
+      # contrario**: el filtro de `ignore` se aplica también a las
+      # actualizaciones de seguridad, así que puede suprimir el pull request
+      # automático de arreglo. Lo que no toca son las **alertas**, que salen del
+      # grafo de dependencias y no de este fichero: una vulnerabilidad se seguirá
+      # viendo, pero puede que sin PR que la arregle sola.
+      #
+      # De ahí que estas reglas se escriban **lo más estrechas posible**: cada
+      # una bloquea exactamente el salto que hay que decidir a mano y deja pasar
+      # todo lo demás.
       - dependency-name: org.springframework.boot
         update-types: [version-update:semver-major]
       # springdoc va atado a Boot: su línea 3.x es la del Boot 4 y no sirve antes.
       - dependency-name: org.springdoc:*
         update-types: [version-update:semver-major]
+      # **`webp-imageio` se queda en la línea 0.10.x hasta que suba Kotlin.**
+      #
+      # La 0.11.0 está compilada con Kotlin 2.4 y el compilador del proyecto va
+      # por 2.1.20, así que rechaza su metadata y **la construcción no compila**
+      # — ya pasó: la propuesta entró, la CI la tumbó y hubo que volver atrás.
+      # Kotlin 2.2+ es además requisito del salto a Spring Boot 4, así que esa
+      # subida pertenece a aquel bloque y no a una actualización rutinaria.
+      #
+      # El motivo entero, con la verificación de qué libwebp lleva cada versión,
+      # está junto a la dependencia en `backend/build.gradle.kts` y en el informe
+      # `docs/common/security/owasp-audit.md` (hallazgo 4).
+      #
+      # Se ignoran **minor y major, pero no patch**, y la distinción importa: si
+      # apareciera una 0.10.3 con un arreglo de seguridad de libwebp, tiene que
+      # poder llegar. Bloquear la línea entera dejaría fuera justamente lo que
+      # esta vigilancia existe para traer.
+      - dependency-name: com.github.usefulness:webp-imageio
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-major
     commit-message:
       prefix: build
 
