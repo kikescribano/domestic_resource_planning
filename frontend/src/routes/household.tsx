@@ -916,13 +916,20 @@ function MemberRow({ user, canDecide }: { user: User; canDecide: boolean }) {
           <p className={`text-body ${active ? 'text-ink' : 'text-ink-muted'}`}>{user.name}</p>
           <p className="text-caption text-ink-muted">{user.email}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Estado con etiqueta y no solo con color ni solo con la posición
-              del interruptor, que es la regla de la dirección visual. */}
-          {!active && <StatusBadge tone="neutral">De baja</StatusBadge>}
-          <StatusBadge tone={active && user.role === 'HOUSEHOLD_ADMIN' ? 'accent' : 'neutral'}>
-            {ROLE_LABEL[user.role]}
-          </StatusBadge>
+        {/* Dos líneas y no una: los distintivos arriba y el interruptor debajo,
+            el conjunto centrado en vertical contra el nombre y las dos líneas
+            a ras del borde derecho — centrarlas entre sí dejaba el distintivo
+            a una altura distinta en cada tarjeta según lo ancho del
+            interruptor, y descolgado del borde en las filas que no lo llevan. */}
+        <div className="flex flex-col items-end justify-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {/* Estado con etiqueta y no solo con color ni solo con la posición
+                del interruptor, que es la regla de la dirección visual. */}
+            {!active && <StatusBadge tone="neutral">De baja</StatusBadge>}
+            <StatusBadge tone={active && user.role === 'HOUSEHOLD_ADMIN' ? 'accent' : 'neutral'}>
+              {ROLE_LABEL[user.role]}
+            </StatusBadge>
+          </div>
           {canDecide && (
             <Switch
               checked={active}
