@@ -108,7 +108,7 @@ dependencies {
     // classpath si no ha cambiado ningun fuente, asi que la construccion
     // incremental da verde sobre una biblioteca que la CI --que parte de cero--
     // rechaza. Comprobalo con `./gradlew compileKotlin --rerun-tasks`.
-    implementation("com.github.usefulness:webp-imageio:0.10.2")
+    implementation("com.github.usefulness:webp-imageio:0.11.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
