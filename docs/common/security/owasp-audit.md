@@ -257,6 +257,13 @@ alta de hogares en autoservicio hace que «autenticado» sea una barrera baja.
   bloque. La 0.10.2 evita de paso una regresión de la 0.11.0, cuyos binarios de
   Linux x86/x86_64 dejan de valer para glibc antiguas —lo que importaría al
   empaquetar sobre una imagen musl (Alpine)—.
+- **Y la decisión está donde se aplica, no solo escrita.** Dependabot volvió a
+  proponer la 0.11.0 al día siguiente, porque un comentario en el código no lo
+  lee nadie más que una persona. La línea 0.10.x queda fijada en
+  `.github/dependabot.yml`, ignorando **minor y major pero no patch**: si
+  apareciera una 0.10.3 con un arreglo de libwebp tiene que poder llegar, que es
+  justo lo que esta vigilancia existe para traer. La regla se retira cuando
+  Kotlin suba con el bloque de Spring Boot 4.
 - **Trampa medida, y aplicable a cualquier cambio de dependencia:** la primera
   versión de este arreglo **pasó en local y falló en la CI**. Kotlin no vuelve a
   escanear la metadata del classpath si no ha cambiado ningún fuente, de modo que
