@@ -247,7 +247,10 @@ class HouseholdMemberRepositoryAdapter(
         members.findByIdentityId(identityId)?.toDomain()
 
     override fun list(includeDeactivated: Boolean, pagination: Pagination): Page<HouseholdMember> {
-        val request = PageRequest.of(pagination.page, pagination.size)
+        // Por antiguedad en el hogar, con el id de desempate: sin un orden
+        // estable, paginar puede repetir o saltarse filas entre paginas. Por
+        // nombre no se puede aqui: vive en `identities` y se resuelve despues.
+        val request = PageRequest.of(pagination.page, pagination.size, Sort.by("createdAt", "id"))
         val found = if (includeDeactivated) {
             members.findAll(request)
         } else {
@@ -308,7 +311,10 @@ class InvitationRepositoryAdapter(
         invitations.findLiveByEmail(email.value, now)?.toDomain()
 
     override fun listLive(now: Instant, pagination: Pagination): Page<Invitation> {
-        val found = invitations.findLive(now, PageRequest.of(pagination.page, pagination.size))
+        // Por orden de emision y con desempate, por lo mismo que los miembros:
+        // sin orden estable la paginacion no promete cubrir todas las filas.
+        val request = PageRequest.of(pagination.page, pagination.size, Sort.by("createdAt", "id"))
+        val found = invitations.findLive(now, request)
         return Page(
             items = found.content.map { it.toDomain() },
             page = pagination.page,
