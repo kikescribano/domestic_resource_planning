@@ -156,7 +156,8 @@ Worker **es la diferencia entre una interfaz que espera y una que parece colgada
 en un móvil la decodificación son varios segundos, y en el hilo principal no se
 repinta ni la barra que dice que algo está pasando. Y la variante sin `eval` deja
 abierta la puerta de poner una Content-Security-Policy sin `unsafe-eval` delante de
-la aplicación el día que toque; la otra la cerraría por medio kilobyte.
+la aplicación el día que toque; la otra la cerraría, y por un kilobyte de
+diferencia entre las dos variantes.
 
 Se usa por tanto `heic-to/csp`, no la entrada por defecto.
 

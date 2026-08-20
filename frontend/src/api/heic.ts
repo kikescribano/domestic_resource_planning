@@ -109,7 +109,7 @@ export async function toUploadable(file: File, onConverting?: () => void): Promi
     // La variante `csp` en lugar de la de por defecto: hace lo mismo sin
     // `eval` ni `new Function`, así que poner una Content-Security-Policy sin
     // `unsafe-eval` delante de la aplicación sigue siendo posible el día que
-    // toque. La otra lo cerraría, y por medio kilobyte.
+    // toque. La otra lo cerraría, y por un kilobyte de diferencia.
     const { heicTo } = await import('heic-to/csp')
     const converted = await heicTo({ blob: file, type: 'image/jpeg', quality: QUALITY })
 
