@@ -3,6 +3,8 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import {
+  CONDITIONS,
+  CONDITION_LABELS,
   DOCUMENT_TYPE_LABELS,
   UNIT_LABELS,
   api,
@@ -10,6 +12,7 @@ import {
   humanMessage,
   type ApiWarning,
   type Asset,
+  type AssetCondition,
   type AssetStatus,
   type AssetType,
   type DocumentType,
@@ -68,10 +71,15 @@ function quantityOf(asset: Asset): string | null {
 export function AssetsPage() {
   const { accessToken } = useAuthenticatedSession()
   const [type, setType] = useState<AssetType | ''>('')
+  const [condition, setCondition] = useState<AssetCondition | ''>('')
 
   const assets = useQuery({
-    queryKey: ['assets', type],
-    queryFn: () => api.listAssets(accessToken, type ? { type } : {}),
+    queryKey: ['assets', type, condition],
+    queryFn: () =>
+      api.listAssets(accessToken, {
+        ...(type ? { type } : {}),
+        ...(condition ? { condition } : {}),
+      }),
   })
 
   return (
@@ -108,6 +116,26 @@ export function AssetsPage() {
             Consumibles
           </FilterChip>
         </div>
+
+        {/* En desplegable y no en más pastillas: son cinco valores, y cinco
+            pastillas más al lado de las tres de arriba convierten la cabecera
+            del listado en un panel de filtros. Va con `SelectField` porque es
+            quien pone la pista en `aria-describedby` en vez de dentro del
+            nombre accesible del campo. */}
+        <SelectField
+          label="Estado de conservación"
+          hint="Lo que nadie ha anotado no aparece en ningún filtro: sin anotar no es un estado."
+          className="max-w-form"
+          value={condition}
+          onChange={(event) => setCondition(event.target.value as AssetCondition | '')}
+        >
+          <option value="">Cualquiera</option>
+          {CONDITIONS.map((value) => (
+            <option key={value} value={value}>
+              {CONDITION_LABELS[value]}
+            </option>
+          ))}
+        </SelectField>
 
         {assets.isPending ? (
           <Spinner label="Cargando inventario" />
@@ -165,6 +193,13 @@ function AssetRow({ asset }: { asset: Asset }) {
         <span className="flex flex-wrap items-baseline gap-2">
           <span className="text-body text-ink">{asset.name}</span>
           {asset.category && <span className="text-caption text-ink-muted">{asset.category}</span>}
+          {/* En tinta y no en un segundo distintivo: la ficha de `StatusBadge`
+              declara antiuso dos distintivos en la misma fila, y el presupuesto
+              de calidez de `density.md` da un color por fila. El de la derecha
+              ya lo gasta el estado, así que esto es un metadato. */}
+          {asset.condition && (
+            <span className="text-caption text-ink-muted">{CONDITION_LABELS[asset.condition]}</span>
+          )}
         </span>
         <span className="flex items-center gap-2">
           {quantity && <span className="text-body-sm tabular-nums text-ink-muted">{quantity}</span>}
@@ -190,6 +225,7 @@ export function NewAssetPage() {
     locationId: '',
     serialNumber: '',
     acquiredOn: '',
+    condition: '' as AssetCondition | '',
   })
 
   const categories = useQuery({
@@ -214,6 +250,7 @@ export function NewAssetPage() {
           // que es «».
           ...(draft.serialNumber.trim() ? { serialNumber: draft.serialNumber.trim() } : {}),
           ...(draft.acquiredOn ? { acquiredOn: draft.acquiredOn } : {}),
+          ...(draft.condition ? { condition: draft.condition } : {}),
         },
         accessToken,
       ),
@@ -286,6 +323,23 @@ export function NewAssetPage() {
           value={draft.acquiredOn}
           onChange={(event) => setDraft({ ...draft, acquiredOn: event.target.value })}
         />
+
+        {/* Sin valor preseleccionado, y no por prudencia: preseleccionar «buen
+            estado» convertiría en dato lo que nadie llegó a mirar, y el hueco
+            significa exactamente eso —que no se anotó—. */}
+        <SelectField
+          label="Estado de conservación (opcional)"
+          hint="Se puede anotar después, y se corrige cuando cambie."
+          value={draft.condition}
+          onChange={(event) => setDraft({ ...draft, condition: event.target.value as AssetCondition | '' })}
+        >
+          <option value="">Sin anotar</option>
+          {CONDITIONS.map((value) => (
+            <option key={value} value={value}>
+              {CONDITION_LABELS[value]}
+            </option>
+          ))}
+        </SelectField>
 
         {failure && <Notice tone="danger">{failure}</Notice>}
 
@@ -489,6 +543,14 @@ export function AssetDetailPage() {
     onError: (error) => setFailure(humanMessage(error)),
   })
 
+  const recondition = useMutation({
+    // A `null` y no a cadena vacía: el contrato declara el campo anulable, y
+    // vaciarlo es retirar la anotación —no anotar «ninguno de los cinco».
+    mutationFn: (condition: AssetCondition | null) => api.updateAsset(id, { condition }, accessToken),
+    onSuccess: refresh,
+    onError: (error) => setFailure(humanMessage(error)),
+  })
+
   const merge = useMutation({
     mutationFn: (targetAssetId: string) => api.mergeStockItems(id, targetAssetId, accessToken),
     onSuccess: (target) => {
@@ -534,6 +596,11 @@ export function AssetDetailPage() {
             <>
               <Detail label="Número de serie">{current.serialNumber ?? '—'}</Detail>
               <Detail label="Adquirido">{formatDay(current.acquiredOn)}</Detail>
+              {/* «Sin anotar» y no un guion: el hueco de este campo significa
+                  algo —que nadie lo ha mirado— y merece decirlo con palabras. */}
+              <Detail label="Conservación">
+                {current.condition ? CONDITION_LABELS[current.condition] : 'Sin anotar'}
+              </Detail>
             </>
           )}
           {current.articleId && (
@@ -560,12 +627,19 @@ export function AssetDetailPage() {
             />
 
             {current.type === 'DURABLE' && (
-              <IdentificationForm
-                serialNumber={current.serialNumber}
-                acquiredOn={current.acquiredOn}
-                onSave={identify.mutate}
-                busy={identify.isPending}
-              />
+              <>
+                <IdentificationForm
+                  serialNumber={current.serialNumber}
+                  acquiredOn={current.acquiredOn}
+                  onSave={identify.mutate}
+                  busy={identify.isPending}
+                />
+                <ConditionForm
+                  condition={current.condition}
+                  onSave={recondition.mutate}
+                  busy={recondition.isPending}
+                />
+              </>
             )}
 
             {current.type === 'CONSUMABLE' && (
@@ -675,6 +749,51 @@ function IdentificationForm({
         Guardar
       </Button>
     </form>
+  )
+}
+
+/**
+ * El estado de conservación, que es lo único de la ficha que **cambia con el
+ * tiempo sin que nadie toque la cosa**.
+ *
+ * Va en su propia sección y no dentro de «Identificación» porque no identifica
+ * nada: el número de serie de un taladro es el mismo el día que se compra y el
+ * día que se tira, y esto es justamente lo contrario.
+ *
+ * Solo en un duradero. Una existencia de consumible no lo lleva —la API lo
+ * rechaza con un `400`— y lo que le pasa a un lote es del módulo Almacén.
+ */
+function ConditionForm({
+  condition,
+  onSave,
+  busy,
+}: {
+  condition: AssetCondition | null
+  onSave: (condition: AssetCondition | null) => void
+  busy: boolean
+}) {
+  const [value, setValue] = useState<AssetCondition | ''>(condition ?? '')
+
+  return (
+    <section className="flex max-w-form flex-col gap-2">
+      <h2 className="text-body font-medium text-ink">Estado de conservación</h2>
+      <SelectField
+        label="En qué estado está"
+        hint="Sin anotar es un valor legítimo: significa que nadie lo ha mirado."
+        value={value}
+        onChange={(event) => setValue(event.target.value as AssetCondition | '')}
+      >
+        <option value="">Sin anotar</option>
+        {CONDITIONS.map((option) => (
+          <option key={option} value={option}>
+            {CONDITION_LABELS[option]}
+          </option>
+        ))}
+      </SelectField>
+      <Button onClick={() => onSave(value || null)} busy={busy} busyLabel="Guardando…">
+        Guardar estado
+      </Button>
+    </section>
   )
 }
 

@@ -1,5 +1,6 @@
 package com.drp.core.domain.loan
 
+import com.drp.core.domain.inventory.AssetCondition
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
@@ -39,6 +40,26 @@ data class Loan(
      */
     val dueAt: Instant?,
     val returnedAt: Instant?,
+    /**
+     * En que estado salio de casa, anotado al iniciar el prestamo.
+     *
+     * **La pareja es el dato**, no cada mitad por separado: [conditionOnReturn]
+     * sin esta no dice si la cosa volvio peor, que es justo para lo que existen
+     * las dos.
+     */
+    val conditionAtStart: AssetCondition?,
+    /**
+     * En que estado volvio. **Solo se escribe al confirmar la devolucion**, que
+     * es cuando se sabe, y ninguna otra operacion la toca: un prestamo abierto
+     * con condicion de vuelta seria una afirmacion sobre algo que todavia esta
+     * fuera de casa. El `CHECK` de la tabla lo garantiza contra `returned_at`.
+     *
+     * Anotarla **no cambia el asset**. Que el taladro haya vuelto rayado es una
+     * afirmacion de quien lo devuelve --que puede ser alguien de fuera, con un
+     * token acotado-- y el estado de conservacion de la ficha lo corrige el
+     * hogar por su cuenta.
+     */
+    val conditionOnReturn: AssetCondition?,
     val notes: String?,
     val createdAt: Instant,
     val updatedAt: Instant,

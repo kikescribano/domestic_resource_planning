@@ -761,10 +761,95 @@ class AssetJourneyTest : SpringIntegrationTest() {
         http.patchJson("/api/v1/assets/$stock", """{"acquiredOn":"2026-01-01"}""", home.accessToken)
             .statusCode.shouldBe(HttpStatus.BAD_REQUEST)
 
+        // Y el estado de conservacion, que llega con el cierre de huecos y es la
+        // tercera del mismo grupo: dos kilos de azucar no estan «desgastados», y
+        // lo que le pasa a un lote es de Warehouse.
+        val condition = http.patchJson(
+            "/api/v1/assets/$stock",
+            """{"condition":"WORN"}""",
+            home.accessToken,
+        )
+        condition.statusCode.shouldBe(HttpStatus.BAD_REQUEST)
+        condition.body!!.shouldContain("condition")
+
         // Y lo que si vale sobre una existencia sigue valiendo: la negativa es
         // del campo, no del PATCH entero.
         http.patchJson("/api/v1/assets/$stock", """{"quantity":5}""", home.accessToken)
             .statusCode.shouldBe(HttpStatus.OK)
+    }
+
+    // ----------------------------------------------------------------------
+    // Estado de conservacion
+    // ----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("el estado de conservacion se anota, se corrige, se retira y se puede filtrar por el")
+    fun `el recorrido del estado de conservacion`() {
+        val home = http.registerHousehold()
+        val tools = home.category("Herramientas")
+
+        // Se puede anotar en el alta...
+        val drill = home.createAsset(
+            """{"name":"Taladro","type":"DURABLE","categoryId":"$tools","condition":"GOOD"}""",
+        )
+        http.getJson("/api/v1/assets/$drill", home.accessToken).body!!
+            .shouldContain("\"condition\":\"GOOD\"")
+
+        // ...y tambien no anotarlo, que es el caso corriente. Nulo no es un
+        // hueco: significa que nadie lo ha mirado.
+        val ladder = home.createAsset("""{"name":"Escalera","type":"DURABLE","categoryId":"$tools"}""")
+        http.getJson("/api/v1/assets/$ladder", home.accessToken).body!!
+            .shouldContain("\"condition\":null")
+
+        // Cambia con el tiempo sin que nadie toque la cosa, asi que se corrige.
+        val worse = http.patchJson("/api/v1/assets/$drill", """{"condition":"DAMAGED"}""", home.accessToken)
+        worse.statusCode.shouldBe(HttpStatus.OK)
+        worse.body!!.shouldContain("\"condition\":\"DAMAGED\"")
+
+        // El filtro, que es lo que justifica que sea un enumerado y no una nota:
+        // sobre `notes` esta pregunta no se puede hacer.
+        val damaged = http.getJson("/api/v1/assets?condition=DAMAGED", home.accessToken)
+        damaged.statusCode.shouldBe(HttpStatus.OK)
+        damaged.body!!.shouldContain("Taladro")
+        damaged.body!!.shouldNotContain("Escalera")
+
+        // Sin filtro salen los dos: lo que no se anoto no desaparece del
+        // inventario, solo de los filtros por estado.
+        val all = http.getJson("/api/v1/assets", home.accessToken).body!!
+        all.shouldContain("Taladro")
+        all.shouldContain("Escalera")
+
+        // Retirar la anotacion es distinto de anotar cualquiera de los cinco
+        // valores, y por eso el campo admite nulo.
+        val cleared = http.patchJson("/api/v1/assets/$drill", """{"condition":null}""", home.accessToken)
+        cleared.body!!.shouldContain("\"condition\":null")
+        http.getJson("/api/v1/assets?condition=DAMAGED", home.accessToken).body!!
+            .shouldNotContain("Taladro")
+    }
+
+    @Test
+    @DisplayName("un estado de conservacion inventado se rechaza con 400 y no con 500")
+    fun `la escala es cerrada`() {
+        val home = http.registerHousehold()
+        val tools = home.category("Herramientas")
+
+        // En el alta lo rechaza Jackson al leer el cuerpo...
+        http.postJson(
+            "/api/v1/assets",
+            """{"name":"Sierra","type":"DURABLE","categoryId":"$tools","condition":"REGULINCHI"}""",
+            home.accessToken,
+        ).statusCode.shouldBe(HttpStatus.BAD_REQUEST)
+
+        // ...y en el PATCH, que lee el cuerpo como arbol JSON en crudo y no pasa
+        // por Bean Validation, lo rechaza el manejador de `IllegalArgumentException`.
+        val asset = home.createAsset("""{"name":"Sierra","type":"DURABLE","categoryId":"$tools"}""")
+        http.patchJson("/api/v1/assets/$asset", """{"condition":"REGULINCHI"}""", home.accessToken)
+            .statusCode.shouldBe(HttpStatus.BAD_REQUEST)
+
+        // Y en el filtro del listado, que es un parametro de consulta y no un
+        // cuerpo: sin manejador saldria un 500.
+        http.getJson("/api/v1/assets?condition=REGULINCHI", home.accessToken)
+            .statusCode.shouldBe(HttpStatus.BAD_REQUEST)
     }
 
     // ----------------------------------------------------------------------

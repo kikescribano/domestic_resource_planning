@@ -76,6 +76,7 @@ function stockItem(overrides: Record<string, unknown> = {}) {
     unit: 'GRAM',
     serialNumber: null,
     acquiredOn: null,
+    condition: null,
     notes: null,
     warnings: [],
     ...overrides,
@@ -98,6 +99,7 @@ function durable(overrides: Record<string, unknown> = {}) {
     unit: null,
     serialNumber: null,
     acquiredOn: null,
+    condition: null,
     notes: null,
     warnings: [],
     ...overrides,
@@ -477,6 +479,26 @@ describe('existencias', () => {
     expect(screen.getByText('Disponible')).toBeInTheDocument()
     expect(screen.getByText('De baja')).toBeInTheDocument()
   })
+  it('el filtro de conservación pregunta al servidor en vez de filtrar en memoria', async () => {
+    const { calls } = await signInAndVisit('Inventario', {
+      'GET /api/v1/assets?size=200': { status: 200, body: { items: [durable()], page: 0, size: 200, total: 1 } },
+      'GET /api/v1/assets?condition=UNUSABLE&size=200': {
+        status: 200,
+        body: { items: [durable({ name: 'Ventilador', condition: 'UNUSABLE' })], page: 0, size: 200, total: 1 },
+      },
+    })
+
+    await userEvent.selectOptions(await screen.findByLabelText('Estado de conservación'), 'UNUSABLE')
+
+    await vi.waitFor(() => {
+      expect(calls.some((call) => call.url.includes('condition=UNUSABLE'))).toBe(true)
+    })
+    // Y lo que vuelve se pinta con su etiqueta en castellano y no con el valor
+    // del enumerado. Dentro de la fila, porque «Inservible» es también una de
+    // las opciones del filtro.
+    const row = await screen.findByRole('link', { name: /Ventilador/ })
+    expect(within(row).getByText('Inservible')).toBeInTheDocument()
+  })
 })
 
 describe('identificación de un duradero', () => {
@@ -539,6 +561,35 @@ describe('identificación de un duradero', () => {
     expect(await screen.findByText('3 de noviembre de 2019')).toBeInTheDocument()
   })
 
+  it('el estado de conservación se anota en la ficha y se retira mandando null', async () => {
+    const { calls } = await signInAndVisit('Inventario', {
+      ...DETAIL_ROUTES,
+      'PATCH /api/v1/assets/asset-2': { status: 200, body: durable({ condition: 'DAMAGED' }) },
+    })
+
+    await userEvent.click(await screen.findByRole('link', { name: /Taladro/ }))
+    // Mientras nadie lo anote, la ficha lo dice con palabras y no con un guion:
+    // el hueco de este campo significa algo. Se busca dentro de la lista de
+    // definición porque «Sin anotar» es también la opción vacía del desplegable,
+    // y las dos tienen que estar.
+    const fact = (await screen.findByText('Conservación')).parentElement
+    expect(fact).toHaveTextContent('Sin anotar')
+
+    await userEvent.selectOptions(screen.getByLabelText('En qué estado está'), 'DAMAGED')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar estado' }))
+
+    const saved = calls.find((call) => call.method === 'PATCH' && call.url.endsWith('/assets/asset-2'))
+    expect(saved?.body).toEqual({ condition: 'DAMAGED' })
+
+    // Y retirarlo manda `null`, que borra: dejarlo «sin anotar» no es ninguno de
+    // los cinco valores.
+    await userEvent.selectOptions(screen.getByLabelText('En qué estado está'), '')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar estado' }))
+
+    const cleared = calls.filter((call) => call.method === 'PATCH' && call.url.endsWith('/assets/asset-2'))
+    expect(cleared.at(-1)?.body).toEqual({ condition: null })
+  })
+
   it('una existencia no ofrece identificación: no hay unidad física de la que hablar', async () => {
     await signInAndVisit('Inventario', {
       'GET /api/v1/assets?size=200': { status: 200, body: { items: [stockItem()], page: 0, size: 200, total: 1 } },
@@ -555,5 +606,8 @@ describe('identificación de un duradero', () => {
 
     expect(screen.queryByLabelText('Número de serie')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Fecha de adquisición')).not.toBeInTheDocument()
+    // Ni estado de conservación, que es la tercera del mismo grupo: la API lo
+    // rechaza con un 400 y la pantalla no lo ofrece.
+    expect(screen.queryByLabelText('En qué estado está')).not.toBeInTheDocument()
   })
 })

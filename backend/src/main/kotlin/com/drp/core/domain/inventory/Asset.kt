@@ -32,6 +32,15 @@ data class Asset(
     val quantity: BigDecimal?,
     val serialNumber: String?,
     val acquiredOn: LocalDate?,
+    /**
+     * En que estado esta la cosa. **Solo un `DURABLE`**, igual que las dos de
+     * arriba y por el mismo motivo: describe una unidad fisica.
+     *
+     * Nulo es el caso normal y significa **que nadie lo anoto**, no que este
+     * bien: un inventario domestico se llena a ratos y la mayoria de las fichas
+     * no llegan a tener esta.
+     */
+    val condition: AssetCondition?,
     val photoUrl: String?,
     val photoFileId: UUID?,
     val notes: String?,
@@ -52,6 +61,26 @@ data class Asset(
 }
 
 enum class AssetType { DURABLE, CONSUMABLE }
+
+/**
+ * En que estado de conservacion esta una cosa (README 4.1.1).
+ *
+ * **Un enumerado cerrado y no texto libre**, que es la decision: texto libre ya
+ * existe --`notes`-- y un atributo que no se puede filtrar ni comparar no anade
+ * nada sobre una nota. Lo que este si permite es preguntar «que hay para tirar»
+ * y comparar dos momentos de un prestamo.
+ *
+ * **Es la misma escala en el asset y en el prestamo**, y por eso vive aqui y no
+ * en `loan`: el motivo entero de la condicion en prestamo es poder decir «salio
+ * bien y volvio rayado», y con dos escalas distintas esa frase no se puede
+ * construir.
+ *
+ * Van del mejor al peor a proposito. El orden de declaracion es el que ofrece el
+ * desplegable y el que hace que la escala signifique algo; nada del codigo
+ * depende hoy de el, y por eso no hay ningun `compareTo` escrito que haya que
+ * mantener.
+ */
+enum class AssetCondition { NEW, GOOD, WORN, DAMAGED, UNUSABLE }
 
 /** Un `CONSUMABLE` nunca esta `LENT`: no se presta, se consume o se entrega. */
 enum class AssetStatus { AVAILABLE, LENT, DECOMMISSIONED }

@@ -3,6 +3,7 @@ package com.drp.core.adapter.persistence
 import com.drp.core.domain.catalog.MeasurementUnit
 import com.drp.core.domain.file.DocumentType
 import com.drp.core.domain.household.MemberRole
+import com.drp.core.domain.inventory.AssetCondition
 import com.drp.core.domain.inventory.AssetStatus
 import com.drp.core.domain.inventory.AssetType
 import com.drp.core.domain.inventory.Capacity
@@ -250,6 +251,7 @@ class AssetEntity(
     @Enumerated(EnumType.STRING) var status: AssetStatus,
     var serialNumber: String?,
     var acquiredOn: LocalDate?,
+    @Enumerated(EnumType.STRING) var condition: AssetCondition?,
     var photoUrl: String?,
     var photoFileId: UUID?,
     var notes: String?,
@@ -318,6 +320,8 @@ class LoanEntity(
     var startedAt: Instant,
     var dueAt: Instant?,
     var returnedAt: Instant?,
+    @Enumerated(EnumType.STRING) var conditionAtStart: AssetCondition?,
+    @Enumerated(EnumType.STRING) var conditionOnReturn: AssetCondition?,
     var createdAt: Instant,
     var updatedAt: Instant,
     var createdBy: UUID?,

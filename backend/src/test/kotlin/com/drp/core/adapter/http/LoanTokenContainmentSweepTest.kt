@@ -828,8 +828,26 @@ class LoanTokenContainmentSweepTest : SpringIntegrationTest() {
 
         val METHODS_WITH_BODY = setOf("POST", "PUT", "PATCH")
 
-        /** Los siete campos de `ExternalLoanResponse`, y ninguno mas. */
-        val EXTERNAL_FIELDS = setOf("id", "assetName", "role", "status", "startedAt", "dueAt", "returnedAt")
+        /**
+         * Los **nueve** campos de `ExternalLoanResponse`, y ninguno mas.
+         *
+         * Eran siete hasta el cierre de huecos. Las dos condiciones del prestamo
+         * entran a proposito y no por descuido --describen la cosa que quien
+         * pregunta tiene en las manos, no el hogar que se la presto-- y que
+         * anadirlas obligue a tocar esta linea es justo lo que esta lista existe
+         * para conseguir.
+         */
+        val EXTERNAL_FIELDS = setOf(
+            "id",
+            "assetName",
+            "role",
+            "status",
+            "startedAt",
+            "dueAt",
+            "returnedAt",
+            "conditionAtStart",
+            "conditionOnReturn",
+        )
 
         /**
          * Campos que solo existen en `LoanResponse`. Uno solo de estos en una

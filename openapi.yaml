@@ -1035,6 +1035,13 @@ paths:
         - name: categoryId
           in: query
           schema: { type: string, format: uuid }
+        - name: condition
+          in: query
+          description: >
+            Qué hay para tirar, o qué hay que reparar. Es la pregunta que
+            justifica que el estado de conservación sea un enumerado y no una
+            nota: sobre texto libre no se puede filtrar.
+          schema: { $ref: "#/components/schemas/AssetCondition" }
         - name: withoutOwner
           in: query
           description: Devuelve los assets huérfanos que dejó una baja de usuario
@@ -1797,9 +1804,19 @@ paths:
       operationId: confirmReturn
       tags: [loans]
       summary: Confirmar la devolución de un préstamo
+      description: >
+        El cuerpo es opcional entero. Con él se anota en qué estado volvió la
+        cosa, que es la única escritura que alcanza un token acotado y solo se
+        admite aquí: es lo que alguien afirma en el momento de devolverla, no un
+        campo que se corrija después.
       security:
         - bearerAuth: []
         - loanToken: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoanReturnInput" }
       responses:
         "200":
           description: >
@@ -3794,6 +3811,21 @@ components:
       type: string
       enum: [AVAILABLE, LENT, DECOMMISSIONED]
 
+    AssetCondition:
+      type: string
+      description: >
+        Estado de conservación de un asset DURABLE, y también la condición en la
+        que un préstamo sale de casa y vuelve (ver readme.md 4.1.1 y 4.1.5). Una
+        sola escala para los tres sitios: el motivo entero del atributo es poder
+        comparar dos momentos, y dos escalas distintas no se comparan.
+
+
+        Es un enumerado cerrado y no texto libre: texto libre ya existe --notes--
+        y un atributo que no se puede filtrar ni comparar no añade nada sobre una
+        nota. Los valores van del mejor al peor. NULO no es un hueco: significa
+        que nadie lo anotó, que es el caso normal.
+      enum: [NEW, GOOD, WORN, DAMAGED, UNUSABLE]
+
     AssetType:
       type: string
       description: >
@@ -4124,6 +4156,11 @@ components:
           type: string
           format: date
           description: Solo DURABLE
+        condition:
+          allOf:
+            - $ref: "#/components/schemas/AssetCondition"
+          description: >
+            Solo DURABLE. Opcional, y su ausencia significa que nadie lo anotó.
         photoUrl:
           type: string
           format: uri
@@ -4210,6 +4247,15 @@ components:
           format: date
           nullable: true
           description: Solo sobre un DURABLE. Es procedencia, no valor.
+        condition:
+          allOf:
+            - $ref: "#/components/schemas/AssetCondition"
+          nullable: true
+          description: >
+            Solo sobre un DURABLE, como las dos anteriores. A null se borra la
+            anotación, que es lo que hace falta cuando se anotó por error: nulo
+            significa que nadie lo ha dicho, y eso no es ninguno de los cinco
+            valores.
         photoUrl: { type: string, format: uri, nullable: true }
         photoFileId:
           type: string
@@ -4249,6 +4295,13 @@ components:
               description: Nulo si su propietario causó baja y aún no se ha reasignado.
             serialNumber: { type: string, nullable: true }
             acquiredOn: { type: string, format: date, nullable: true }
+            condition:
+              allOf:
+                - $ref: "#/components/schemas/AssetCondition"
+              nullable: true
+              description: >
+                Estado de conservación. Solo presente en un DURABLE, y nulo
+                mientras nadie lo anote.
             photoUrl:
               type: string
               format: uri
@@ -4527,6 +4580,29 @@ components:
         - required: [userId]
         - required: [external]
 
+    LoanReturnInput:
+      type: object
+      description: >
+        Cuerpo OPCIONAL de la confirmación de devolución. Confirmar sin cuerpo
+        sigue siendo una petición válida y es lo corriente: ausente y vacío
+        significan lo mismo, que nadie anotó en qué estado volvió.
+
+
+        Tiene **un solo campo**, y eso importa más de lo que parece: es la única
+        escritura de toda la API que alcanza un token acotado de préstamo (ver
+        5.4.1), así que cada campo que se añadiera aquí sería algo que una
+        persona ajena al hogar puede escribir. Un enumerado cerrado no puede
+        nombrar ninguna fila de ningún hogar.
+
+
+        Lo que llegue de más se ignora, como en todo el contrato: no se lee, no
+        se guarda y no cambia la respuesta.
+      properties:
+        conditionOnReturn:
+          allOf:
+            - $ref: "#/components/schemas/AssetCondition"
+          nullable: true
+
     LoanInput:
       type: object
       required: [assetId, lender, borrower]
@@ -4538,6 +4614,12 @@ components:
           type: string
           format: date-time
           description: Opcional -- sin ella el préstamo nunca vence
+        conditionAtStart:
+          allOf:
+            - $ref: "#/components/schemas/AssetCondition"
+          description: >
+            En qué estado sale de casa. Opcional, y su ausencia significa que
+            nadie lo anotó. Es la mitad que hace comparable la de la devolución.
         notes: { type: string }
 
     Loan:
@@ -4570,6 +4652,21 @@ components:
             startedAt: { type: string, format: date-time }
             dueAt: { type: string, format: date-time, nullable: true }
             returnedAt: { type: string, format: date-time, nullable: true }
+            conditionAtStart:
+              allOf:
+                - $ref: "#/components/schemas/AssetCondition"
+              nullable: true
+              description: En qué estado salió de casa. Se anota al iniciar el préstamo.
+            conditionOnReturn:
+              allOf:
+                - $ref: "#/components/schemas/AssetCondition"
+              nullable: true
+              description: >
+                En qué estado volvió. Se anota al confirmar la devolución y no
+                hay ninguna otra operación que la escriba: es lo que alguien
+                afirmó en ese momento, no un campo de la ficha. Anotarla NO
+                cambia el estado de conservación del asset -- quien confirma
+                puede ser una persona de fuera del hogar.
             notes: { type: string, nullable: true }
         - $ref: "#/components/schemas/Authorship"
 
@@ -4614,6 +4711,23 @@ components:
           format: date-time
           nullable: true
           description: Informado tras confirmar la devolucion, para que quien la confirmo la vea hecha
+        conditionAtStart:
+          allOf:
+            - $ref: "#/components/schemas/AssetCondition"
+          nullable: true
+          description: >
+            En qué estado salió de casa. **Sí sale del hogar**, y no es una
+            fisura de la proyección acotada: describe la cosa que esta persona
+            tiene en las manos, no el hogar que se la prestó, y saber en qué
+            estado se la dieron le protege a ella.
+        conditionOnReturn:
+          allOf:
+            - $ref: "#/components/schemas/AssetCondition"
+          nullable: true
+          description: >
+            En qué estado volvió, que es lo único que esta credencial puede
+            escribir en todo el hogar. Se devuelve para que quien acaba de
+            anotarlo lo vea hecho.
 
     LoanView:
       description: >

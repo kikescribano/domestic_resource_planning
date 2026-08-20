@@ -13,6 +13,7 @@ import com.drp.core.domain.file.StoredFile
 import com.drp.platform.mail.EmailAddress
 import com.drp.core.domain.identity.Identity
 import com.drp.core.domain.inventory.Asset
+import com.drp.core.domain.inventory.AssetCondition
 import com.drp.core.domain.inventory.AssetLocation
 import com.drp.core.domain.inventory.AssetStatus
 import com.drp.core.domain.inventory.AssetType
@@ -358,6 +359,12 @@ data class AssetFilter(
     val type: AssetType? = null,
     val articleId: UUID? = null,
     val categoryId: UUID? = null,
+    /**
+     * Que hay para tirar, o que hay que reparar. Es la pregunta que justifica que
+     * el estado de conservacion sea un enumerado y no una nota: sobre texto libre
+     * no se puede filtrar.
+     */
+    val condition: AssetCondition? = null,
     /** Los huerfanos de una baja de usuario, que es la pregunta que deja abierta `DeactivateUser`. */
     val withoutOwner: Boolean = false,
 )

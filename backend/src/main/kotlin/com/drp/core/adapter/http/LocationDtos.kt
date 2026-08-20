@@ -208,6 +208,15 @@ class JsonPatch(private val body: JsonNode) {
     inline fun <reified E : Enum<E>> requiredEnum(field: String): Patch<E> =
         if (!has(field)) Patch.Absent else Patch.Set(enumValueOf(rawText(field)))
 
+    /**
+     * Un enumerado que se puede cambiar **y vaciar**, como el estado de
+     * conservacion de un asset: a nulo significa «nadie lo ha anotado», que es
+     * distinto de cualquiera de sus valores y hace falta para poder retirar una
+     * anotacion equivocada.
+     */
+    inline fun <reified E : Enum<E>> enum(field: String): Patch<E?> =
+        if (!has(field)) Patch.Absent else Patch.Set(rawNode(field)?.asText()?.let { enumValueOf<E>(it) })
+
     fun rawText(field: String): String =
         body.get(field)?.takeUnless { it.isNull }?.asText()
             ?: throw IllegalArgumentException("El campo $field no admite nulo")

@@ -280,6 +280,26 @@ export type MeasurementUnit = 'UNIT' | 'GRAM' | 'KILOGRAM' | 'MILLILITER' | 'LIT
 export type LocationType = 'HOUSE' | 'FLOOR' | 'ROOM' | 'FURNITURE' | 'SHELF' | 'OTHER'
 export type AssetType = 'DURABLE' | 'CONSUMABLE'
 export type AssetStatus = 'AVAILABLE' | 'LENT' | 'DECOMMISSIONED'
+export type AssetCondition = 'NEW' | 'GOOD' | 'WORN' | 'DAMAGED' | 'UNUSABLE'
+
+/**
+ * Cómo se escribe cada estado de conservación. Son datos que lee una persona,
+ * así que van en castellano, y **del mejor al peor**, que es el orden en el que
+ * los ofrece un desplegable.
+ *
+ * `Record` y no un `switch`: así añadir un valor al enumerado del contrato sin
+ * darle etiqueta no compila.
+ */
+export const CONDITION_LABELS: Record<AssetCondition, string> = {
+  NEW: 'Nuevo, sin usar',
+  GOOD: 'Buen estado',
+  WORN: 'Desgastado',
+  DAMAGED: 'Deteriorado',
+  UNUSABLE: 'Inservible',
+}
+
+/** El orden de la escala, para pintar los desplegables sin repetirlo en cada pantalla. */
+export const CONDITIONS: AssetCondition[] = ['NEW', 'GOOD', 'WORN', 'DAMAGED', 'UNUSABLE']
 
 /** Cómo se escribe cada unidad al mostrarla. Son datos, así que van en castellano. */
 export const UNIT_LABELS: Record<MeasurementUnit, string> = {
@@ -688,6 +708,8 @@ export interface Asset {
   serialNumber: string | null
   /** `YYYY-MM-DD`: es una fecha sin hora, no un instante. */
   acquiredOn: string | null
+  /** Solo en un `DURABLE`. Nulo significa **que nadie lo ha anotado**, no que esté bien. */
+  condition: AssetCondition | null
   notes: string | null
   photoUrl: string | null
   photoThumbnailUrl: string | null
@@ -702,6 +724,7 @@ export interface AssetFilters {
   categoryId?: string
   type?: AssetType
   status?: AssetStatus
+  condition?: AssetCondition
   withoutOwner?: boolean
 }
 
@@ -963,6 +986,8 @@ export interface Loan {
   startedAt: string
   dueAt: string | null
   returnedAt: string | null
+  conditionAtStart: AssetCondition | null
+  conditionOnReturn: AssetCondition | null
   notes: string | null
   createdBy: string | null
   updatedBy: string | null
@@ -983,6 +1008,13 @@ export interface ExternalLoan {
   startedAt: string
   dueAt: string | null
   returnedAt: string | null
+  /**
+   * Las dos condiciones **sí llegan aquí**: describen la cosa que esta persona
+   * tiene en las manos, no el hogar que se la prestó. La de vuelta es además lo
+   * que ella misma acaba de escribir.
+   */
+  conditionAtStart: AssetCondition | null
+  conditionOnReturn: AssetCondition | null
 }
 
 export interface LoanFilters {
@@ -1786,8 +1818,17 @@ export const api = {
   startLoan: (body: Record<string, unknown>, accessToken: string) =>
     request<Loan>('/loans', { method: 'POST', body, accessToken }),
 
-  confirmReturn: (id: string, accessToken: string) =>
-    request<Loan>(`/loans/${id}/return`, { method: 'POST', accessToken }),
+  /**
+   * El cuerpo es opcional, y sin `conditionOnReturn` no se manda: ausente y
+   * vacío significan lo mismo —que nadie anotó en qué estado volvió— y mandar
+   * `null` sería escribir un dato donde no lo hay.
+   */
+  confirmReturn: (id: string, accessToken: string, conditionOnReturn?: AssetCondition) =>
+    request<Loan>(`/loans/${id}/return`, {
+      method: 'POST',
+      accessToken,
+      ...(conditionOnReturn ? { body: { conditionOnReturn } } : {}),
+    }),
 
   // --- Préstamos, con el token acotado del correo ---------------------------
   // Las dos únicas llamadas de toda la API que **no van con la sesión**, y por
@@ -1797,10 +1838,11 @@ export const api = {
   getLoanWithToken: (id: string, loanToken: string) =>
     request<ExternalLoan>(`/loans/${id}`, { accessToken: loanToken, renewable: false }),
 
-  confirmReturnWithToken: (id: string, loanToken: string) =>
+  confirmReturnWithToken: (id: string, loanToken: string, conditionOnReturn?: AssetCondition) =>
     request<ExternalLoan>(`/loans/${id}/return`, {
       method: 'POST',
       accessToken: loanToken,
       renewable: false,
+      ...(conditionOnReturn ? { body: { conditionOnReturn } } : {}),
     }),
 }

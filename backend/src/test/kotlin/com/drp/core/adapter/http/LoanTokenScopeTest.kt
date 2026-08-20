@@ -153,6 +153,50 @@ class LoanTokenScopeTest : SpringIntegrationTest() {
     }
 
     @Test
+    @DisplayName("el externo anota en que estado lo devuelve, y su cuerpo no le sirve para nada mas")
+    fun `la unica escritura del token acotado`() {
+        val loan = http.lendToStranger()
+
+        // Lo que el hogar apunto al prestar tambien lo ve: describe la cosa que
+        // esta persona tiene en las manos, no el hogar que se la presto.
+        val before = http.getJson("/api/v1/loans/${loan.loanId}", loan.token)
+        before.body!!.shouldContain("\"conditionAtStart\":\"GOOD\"")
+
+        // El cuerpo lleva **campos de mas a proposito**: la pregunta es si por
+        // esta rendija se puede escribir algo que no sea la condicion. Notas y
+        // estado son campos reales del prestamo, y `assetId` es una referencia.
+        val returned = http.postJson(
+            "/api/v1/loans/${loan.loanId}/return",
+            """{"conditionOnReturn":"DAMAGED","notes":"lo dice el vecino","status":"ACTIVE",
+             "assetId":"${UUID.randomUUID()}","updatedBy":"${loan.memberId}","dueAt":"2030-01-01T00:00:00Z"}""",
+            loan.token,
+        )
+
+        returned.statusCode.shouldBe(HttpStatus.OK)
+        returned.body!!.extract("status").shouldBe("RETURNED")
+        returned.body!!.shouldContain("\"conditionOnReturn\":\"DAMAGED\"")
+        // Y la respuesta sigue siendo la acotada: anotar no ensancha lo que ve.
+        returned.body!!.shouldNotContain("\"lender\"")
+        returned.body!!.shouldNotContain("\"notes\"")
+
+        // Lo que de verdad importa, mirado desde dentro de casa: de todo lo que
+        // venia en el cuerpo, solo cambio la condicion.
+        val fromHome = http.getJson("/api/v1/loans/${loan.loanId}", loan.accessToken).body!!
+        fromHome.shouldContain("\"conditionOnReturn\":\"DAMAGED\"")
+        fromHome.shouldContain("\"notes\":\"Con la broca de widia\"")
+        fromHome.shouldContain("\"assetId\":\"${loan.assetId}\"")
+        fromHome.shouldContain("\"dueAt\":null")
+        // La autoria sigue a nulo: no hay pertenencia detras de un token acotado,
+        // y el cuerpo no puede inventarse una.
+        fromHome.shouldContain("\"updatedBy\":null")
+
+        // Y el asset no se entera de nada, que es la otra mitad de la contencion:
+        // el estado de conservacion del inventario no lo escribe alguien de fuera.
+        http.getJson("/api/v1/assets/${loan.assetId}", loan.accessToken).body!!
+            .shouldContain("\"condition\":null")
+    }
+
+    @Test
     @DisplayName("el hogar tambien puede confirmar la devolucion, y ahi si hay autoria")
     fun `la devolucion desde casa deja autoria`() {
         val loan = http.lendToStranger()
@@ -262,6 +306,7 @@ internal fun TestRestTemplate.lendToStranger(): LentToStranger {
         {"assetId":"$assetId",
          "lender":{"userId":"${home.memberId}"},
          "borrower":{"external":{"name":"Vecino del 3.º","email":"$vecino"}},
+         "conditionAtStart":"GOOD",
          "notes":"Con la broca de widia"}
         """.trimIndent(),
         home.accessToken,

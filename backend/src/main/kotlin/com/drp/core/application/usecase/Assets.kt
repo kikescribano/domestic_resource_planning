@@ -21,6 +21,7 @@ import com.drp.platform.error.ResourceNotFound
 import com.drp.platform.error.ValidationFailure
 import com.drp.core.domain.catalog.MeasurementUnit
 import com.drp.core.domain.inventory.Asset
+import com.drp.core.domain.inventory.AssetCondition
 import com.drp.core.domain.inventory.AssetLocation
 import com.drp.core.domain.inventory.AssetStatus
 import com.drp.core.domain.inventory.AssetType
@@ -76,6 +77,7 @@ data class CreateAssetCommand(
     val location: AssetLocation?,
     val serialNumber: String?,
     val acquiredOn: LocalDate?,
+    val condition: AssetCondition?,
     val photoUrl: String?,
     val photoFileId: UUID?,
     val notes: String?,
@@ -98,6 +100,7 @@ data class AssetPatch(
     val quantity: Patch<BigDecimal> = Patch.Absent,
     val serialNumber: Patch<String?> = Patch.Absent,
     val acquiredOn: Patch<LocalDate?> = Patch.Absent,
+    val condition: Patch<AssetCondition?> = Patch.Absent,
     val photoUrl: Patch<String?> = Patch.Absent,
     val photoFileId: Patch<UUID?> = Patch.Absent,
     val notes: Patch<String?> = Patch.Absent,
@@ -202,6 +205,7 @@ class CreateAsset(
                 quantity = null,
                 serialNumber = command.serialNumber,
                 acquiredOn = command.acquiredOn,
+                condition = command.condition,
                 photoUrl = command.photoUrl,
                 photoFileId = command.photoFileId,
                 notes = command.notes,
@@ -302,6 +306,9 @@ class RegisterConsumableIntake(
                 quantity = command.quantity,
                 serialNumber = null,
                 acquiredOn = null,
+                // Un consumible no lleva ninguna de las tres: son de una unidad
+                // fisica, y el CHECK de la tabla lo garantiza debajo.
+                condition = null,
                 photoUrl = null,
                 photoFileId = null,
                 notes = null,
@@ -396,6 +403,7 @@ class UpdateAsset(
                 quantity = newQuantity,
                 serialNumber = patch.serialNumber.orKeep(current.serialNumber)?.trim()?.takeIf { it.isNotEmpty() },
                 acquiredOn = patch.acquiredOn.orKeep(current.acquiredOn),
+                condition = patch.condition.orKeep(current.condition),
                 photoUrl = patch.photoUrl.orKeep(current.photoUrl),
                 photoFileId = patch.photoFileId.orKeep(current.photoFileId),
                 notes = patch.notes.orKeep(current.notes),
@@ -433,11 +441,13 @@ class UpdateAsset(
     }
 
     /**
-     * El numero de serie y la fecha de adquisicion son de una **unidad fisica**,
-     * asi que solo valen sobre un `DURABLE`. Es la simetrica de `quantity`, que
-     * solo vale sobre un `CONSUMABLE`, y por el mismo motivo: cinco kilos de
-     * azucar no tienen un numero de serie ni una fecha de entrada, porque cada
-     * reposicion suma sobre la misma fila.
+     * El numero de serie, la fecha de adquisicion y el estado de conservacion son
+     * de una **unidad fisica**, asi que solo valen sobre un `DURABLE`. Es la
+     * simetrica de `quantity`, que solo vale sobre un `CONSUMABLE`, y por el
+     * mismo motivo: cinco kilos de azucar no tienen un numero de serie, ni una
+     * fecha de entrada, ni estan «desgastados», porque cada reposicion suma sobre
+     * la misma fila. Lo que le pasa a un lote --que caduque, que se estropee-- es
+     * del modulo Warehouse y se sigue en su tabla.
      *
      * Va como `ValidationFailure` y no como codigo de negocio nuevo: es la
      * peticion la que esta mal formada --pide algo que ese tipo de asset no
@@ -449,6 +459,7 @@ class UpdateAsset(
         val offending = buildMap {
             if (patch.serialNumber is Patch.Set) put("serialNumber", "un CONSUMABLE no lleva número de serie")
             if (patch.acquiredOn is Patch.Set) put("acquiredOn", "un CONSUMABLE no lleva fecha de adquisición")
+            if (patch.condition is Patch.Set) put("condition", "un CONSUMABLE no lleva estado de conservación")
         }
         if (offending.isNotEmpty()) throw ValidationFailure(offending)
     }

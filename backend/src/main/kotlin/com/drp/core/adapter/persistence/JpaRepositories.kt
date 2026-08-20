@@ -414,7 +414,7 @@ interface AssetJpaRepository : JpaRepository<AssetEntity, UUID> {
     fun countOpenLoans(@Param("assetId") assetId: UUID): Long
 
     /**
-     * El listado con sus ocho filtros. Excluye los `DECOMMISSIONED` **salvo que
+     * El listado con sus nueve filtros. Excluye los `DECOMMISSIONED` **salvo que
      * se pida ese estado**, que es la unica forma de ver el historial.
      */
     @Query(
@@ -429,6 +429,7 @@ interface AssetJpaRepository : JpaRepository<AssetEntity, UUID> {
               AND (CAST(:type AS text) IS NULL OR type = CAST(:type AS text))
               AND (CAST(:articleId AS uuid) IS NULL OR article_id = CAST(:articleId AS uuid))
               AND (CAST(:categoryId AS uuid) IS NULL OR category_id = CAST(:categoryId AS uuid))
+              AND (CAST(:condition AS text) IS NULL OR condition = CAST(:condition AS text))
             ORDER BY created_at DESC
         """,
         countQuery = """
@@ -442,6 +443,7 @@ interface AssetJpaRepository : JpaRepository<AssetEntity, UUID> {
               AND (CAST(:type AS text) IS NULL OR type = CAST(:type AS text))
               AND (CAST(:articleId AS uuid) IS NULL OR article_id = CAST(:articleId AS uuid))
               AND (CAST(:categoryId AS uuid) IS NULL OR category_id = CAST(:categoryId AS uuid))
+              AND (CAST(:condition AS text) IS NULL OR condition = CAST(:condition AS text))
         """,
         nativeQuery = true,
     )
@@ -455,6 +457,7 @@ interface AssetJpaRepository : JpaRepository<AssetEntity, UUID> {
         @Param("type") type: String?,
         @Param("articleId") articleId: UUID?,
         @Param("categoryId") categoryId: UUID?,
+        @Param("condition") condition: String?,
         pageable: Pageable,
     ): org.springframework.data.domain.Page<AssetEntity>
 }

@@ -37,6 +37,8 @@ function loan(overrides: Record<string, unknown> = {}) {
     startedAt: '2026-08-01T09:00:00Z',
     dueAt: '2026-08-15T09:00:00Z',
     returnedAt: null,
+    conditionAtStart: null,
+    conditionOnReturn: null,
     notes: 'Con la broca de widia',
     createdBy: '22222222-2222-2222-2222-222222222222',
     updatedBy: null,
@@ -53,6 +55,8 @@ function externalLoan(overrides: Record<string, unknown> = {}) {
     startedAt: '2026-08-01T09:00:00Z',
     dueAt: '2026-08-15T09:00:00Z',
     returnedAt: null,
+    conditionAtStart: null,
+    conditionOnReturn: null,
     ...overrides,
   }
 }
@@ -102,6 +106,50 @@ describe('los préstamos del hogar', () => {
 
     const returned = stub.calls.find((call) => call.url.endsWith('/loans/loan-1/return'))
     expect(returned?.method).toBe('POST')
+  })
+
+  it('anota en qué estado vuelve, y sin anotar no manda el campo', async () => {
+    const stub = await signInAndVisit('Préstamos', {
+      'GET /api/v1/loans?open=true&size=200': {
+        status: 200,
+        body: { items: [loan({ conditionAtStart: 'GOOD' })], page: 0, size: 200, total: 1 },
+      },
+      'POST /api/v1/loans/loan-1/return': {
+        status: 200,
+        body: loan({ status: 'RETURNED', returnedAt: '2026-08-10T10:00:00Z', conditionOnReturn: 'DAMAGED' }),
+      },
+      'GET /api/v1/loans?size=200': { status: 200, body: { items: [], page: 0, size: 200, total: 0 } },
+    })
+
+    // Lo que se anotó al prestar se lee en la tarjeta: es la mitad que hace
+    // comparable lo que se anote al devolver.
+    expect(await screen.findByText(/Salió: Buen estado/)).toBeInTheDocument()
+
+    await userEvent.selectOptions(screen.getByLabelText('Vuelve en estado'), 'DAMAGED')
+    await userEvent.click(screen.getByRole('button', { name: 'Ya lo tengo' }))
+
+    const returned = stub.calls.find((call) => call.url.endsWith('/loans/loan-1/return'))
+    expect(returned?.body).toEqual({ conditionOnReturn: 'DAMAGED' })
+  })
+
+  it('confirmar sin anotar nada no manda cuerpo: ausente y vacío significan lo mismo', async () => {
+    const stub = await signInAndVisit('Préstamos', {
+      'GET /api/v1/loans?open=true&size=200': {
+        status: 200,
+        body: { items: [loan()], page: 0, size: 200, total: 1 },
+      },
+      'POST /api/v1/loans/loan-1/return': {
+        status: 200,
+        body: loan({ status: 'RETURNED', returnedAt: '2026-08-10T10:00:00Z' }),
+      },
+      'GET /api/v1/loans?size=200': { status: 200, body: { items: [], page: 0, size: 200, total: 0 } },
+    })
+
+    await screen.findByText('Taladro')
+    await userEvent.click(screen.getByRole('button', { name: 'Ya lo tengo' }))
+
+    const returned = stub.calls.find((call) => call.url.endsWith('/loans/loan-1/return'))
+    expect(returned?.body).toBeUndefined()
   })
 
   it('el formulario solo ofrece lo que se puede prestar', async () => {
@@ -175,6 +223,44 @@ describe('la vista externa', () => {
 
     expect(await screen.findByText(/ya está cerrado/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Ya lo he devuelto' })).not.toBeInTheDocument()
+  })
+
+  it('el externo dice en qué estado lo devuelve, y ve en qué estado salió', async () => {
+    goTo('/prestamo?id=loan-1&token=token-del-correo')
+    let returned = false
+    const stub = stubFetch({
+      'GET /api/v1/loans/loan-1': () => ({
+        status: 200,
+        body: returned
+          ? externalLoan({
+              status: 'RETURNED',
+              returnedAt: '2026-08-10T10:00:00Z',
+              conditionAtStart: 'GOOD',
+              conditionOnReturn: 'DAMAGED',
+            })
+          : externalLoan({ conditionAtStart: 'GOOD' }),
+      }),
+      'POST /api/v1/loans/loan-1/return': () => {
+        returned = true
+        return { status: 200, body: externalLoan({ status: 'RETURNED', conditionOnReturn: 'DAMAGED' }) }
+      },
+    })
+
+    render(<App />)
+    await screen.findByRole('heading', { level: 1, name: 'Taladro' })
+
+    // En qué estado se lo dieron: no dice nada del hogar y le protege a quien
+    // lo tiene. Se mira junto a su rótulo, porque «Buen estado» es también una
+    // de las opciones del desplegable de abajo.
+    expect(screen.getByText('Salió').parentElement).toHaveTextContent('Buen estado')
+
+    await userEvent.selectOptions(screen.getByLabelText('En qué estado lo devuelves'), 'DAMAGED')
+    await userEvent.click(screen.getByRole('button', { name: 'Ya lo he devuelto' }))
+
+    const confirmed = stub.calls.find((call) => call.url.endsWith('/loans/loan-1/return'))
+    expect(confirmed?.body).toEqual({ conditionOnReturn: 'DAMAGED' })
+    // Y lo escrito vuelve a la pantalla, para que quien lo anotó lo vea hecho.
+    expect(await screen.findByText('Volvió')).toBeInTheDocument()
   })
 
   it('quien prestó ve el texto del otro extremo', async () => {
