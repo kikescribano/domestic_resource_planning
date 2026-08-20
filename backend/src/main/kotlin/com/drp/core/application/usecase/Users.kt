@@ -1,5 +1,6 @@
 package com.drp.core.application.usecase
 
+import com.drp.core.application.event.CoreEvents
 import com.drp.core.application.port.FileStorage
 import com.drp.core.application.port.HouseholdMemberRepository
 import com.drp.core.application.port.IdentityRepository
@@ -7,6 +8,7 @@ import com.drp.platform.page.Page
 import com.drp.platform.page.Pagination
 import com.drp.core.application.port.RefreshTokenRepository
 import com.drp.core.application.port.SessionClaims
+import com.drp.core.application.port.TenantResolver
 import com.drp.platform.error.BusinessRuleViolation
 import com.drp.platform.error.ErrorCode
 import com.drp.platform.error.ResourceNotFound
@@ -92,6 +94,7 @@ class ChangeUserRole(
 class DeactivateUser(
     private val members: HouseholdMemberRepository,
     private val refreshTokens: RefreshTokenRepository,
+    private val events: CoreEvents,
     private val clock: Clock,
 ) {
 
@@ -118,6 +121,76 @@ class DeactivateUser(
         // que la baja no se hace. Se localizan despues con
         // GET /assets?withoutOwner=true, que llega con el Hito 2.
         refreshTokens.revokeAllForIdentity(member.identityId, now)
+
+        events.userDeactivated(member.id)
+    }
+}
+
+/**
+ * La vuelta de la baja: volver a encender la pertenencia que [DeactivateUser]
+ * apago. La persona regresa **con el rol que tenia**, porque la fila es la misma
+ * y el rol es suyo, no de la invitacion que ya no existe.
+ *
+ * Lo que **no** deshace, y es deliberado:
+ *
+ * - **Los refresh tokens revocados no vuelven.** Una revocacion no se puede
+ *   des-revocar sin convertir la revocacion en una promesa vacia; la persona
+ *   entra de nuevo con sus credenciales, que siguen siendo suyas.
+ * - **Sus assets siguen sin propietario.** A estas alturas pueden tener dueño
+ *   nuevo, y reasignarlos en bloque seria adivinar que todo lo huerfano era
+ *   suyo. Se localizan donde siempre: `GET /assets?withoutOwner=true`.
+ *
+ * Es **idempotente como `ActivateModule`**, no un espejo del 404 de
+ * [DeactivateUser]: reactivar a quien ya esta activo devuelve el mismo estado.
+ * Dos administradores pulsando a la vez no merecen un error.
+ *
+ * Y **no publica ningun evento**: el criterio del catalogo de 5.2.3 es que un
+ * evento entra el dia que un modulo lo necesita, no la simetria con
+ * `UserDeactivated`. Ese dia sera del planificador de tareas.
+ */
+@Service
+class ReactivateUser(
+    private val members: HouseholdMemberRepository,
+    private val identities: IdentityRepository,
+    private val tenantResolver: TenantResolver,
+    private val clock: Clock,
+) {
+
+    @Transactional
+    fun handle(session: SessionClaims, memberId: UUID): HouseholdUser {
+        val member = members.findById(memberId) ?: throw ResourceNotFound("Usuario no encontrado")
+        val identity = identities.findById(member.identityId) ?: throw ResourceNotFound("Usuario no encontrado")
+
+        if (member.isActive) {
+            return HouseholdUser(member, identity)
+        }
+
+        // Una pertenencia activa cuya identidad no puede autenticarse nunca es
+        // justo la incoherencia que `CloseAccount` evita al dar de baja las dos
+        // cosas a la vez; reactivar solo una la fabricaria.
+        if (!identity.isActive) {
+            throw BusinessRuleViolation(
+                ErrorCode.IDENTITY_CLOSED,
+                "La cuenta de esa persona está cerrada",
+            )
+        }
+
+        // Mientras el MVP admita una sola pertenencia activa, quien ya
+        // pertenece a un hogar no puede volver a este. El indice unico parcial
+        // lo impediria igualmente; se comprueba aqui para poder responder con
+        // el codigo del contrato en lugar de con un 500 -- la misma pareja
+        // comprobacion-indice que en `AcceptInvitation`.
+        if (tenantResolver.householdOfActiveMember(member.identityId) != null) {
+            throw BusinessRuleViolation(
+                ErrorCode.IDENTITY_ALREADY_MEMBER,
+                "Esa identidad ya pertenece a un hogar",
+            )
+        }
+
+        val now = clock.instant()
+        val updated = members.save(member.copy(deactivatedAt = null, updatedAt = now, updatedBy = session.memberId))
+
+        return HouseholdUser(updated, identity)
     }
 }
 
@@ -172,6 +245,7 @@ class CloseAccount(
     private val identities: IdentityRepository,
     private val refreshTokens: RefreshTokenRepository,
     private val storage: FileStorage,
+    private val events: CoreEvents,
     private val clock: Clock,
 ) {
 
@@ -204,5 +278,10 @@ class CloseAccount(
         identities.save(identity.copy(avatar = null, deactivatedAt = now, updatedAt = now))
         members.save(member.copy(deactivatedAt = now, updatedAt = now, updatedBy = session.memberId))
         refreshTokens.revokeAllForIdentity(identity.id, now)
+
+        // La pertenencia tambien se apaga aqui, asi que el evento tambien sale
+        // de aqui: quien escuche va a querer saber que la persona dejo el
+        // hogar, no por que puerta.
+        events.userDeactivated(member.id)
     }
 }

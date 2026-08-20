@@ -146,6 +146,24 @@ class CoreEvents(
         )
 
     /**
+     * Alguien deja el hogar: su **pertenencia**, no su cuenta. Lo publican los
+     * dos caminos que la apagan --la baja por un administrador y el cierre de
+     * cuenta, que tambien la da de baja--, porque quien escuche va a querer
+     * saber que la persona ya no esta, no por que puerta salio.
+     *
+     * Estaba en el catalogo inicial de 5.2.3 y el contrato lo prometia desde la
+     * Fase 1, pero hasta la reactivacion de miembros nadie lo emitia: es el
+     * evento del que colgara el planificador de tareas para repartir las
+     * rutinas de quien se va.
+     *
+     * Su vuelta --`ReactivateUser`-- **no publica nada**, y es a proposito: el
+     * criterio del catalogo es que un evento entra el dia que un modulo lo
+     * necesita, no la simetria con su contrario.
+     */
+    fun userDeactivated(memberId: UUID) =
+        publish("UserDeactivated", memberId, emptyMap())
+
+    /**
      * Empieza un prestamo. Lleva el asset porque quien reaccione va a querer
      * saber que salio de casa, no solo que hubo un prestamo.
      *

@@ -36,6 +36,7 @@ export type ApiErrorCode =
   | 'HOUSEHOLD_CLOSURE_ALREADY_REQUESTED'
   | 'HOUSEHOLD_CLOSURE_NOT_REQUESTED'
   | 'IDENTITY_ALREADY_MEMBER'
+  | 'IDENTITY_CLOSED'
   | 'INTAKE_QUANTITY_NOT_POSITIVE'
   | 'INVITATION_ALREADY_PENDING'
   | 'INVITATION_TOKEN_INVALID'
@@ -121,6 +122,10 @@ const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   // Sale en dos sitios distintos —al cambiar un rol y al cerrar la cuenta
   // propia— así que dice la regla y no el sujeto, que cambia.
   USER_LAST_ADMIN: 'Dejaría al hogar sin ninguna persona que lo administre. Nombra antes a otra.',
+  // Los dos de la vuelta de un miembro, que también salen al aceptar una
+  // invitación: dicen la regla sin el sujeto, por lo mismo que el de arriba.
+  IDENTITY_ALREADY_MEMBER: 'Esa persona ya vive en otro hogar, y de momento solo se puede estar en uno.',
+  IDENTITY_CLOSED: 'La cuenta de esa persona está cerrada y no puede volver a entrar.',
   SUPPLIER_CONTACT_REQUIRED: 'Hace falta al menos un teléfono, un correo o una web.',
   SUPPLIER_DUPLICATE: 'Ya hay un contacto de servicio con ese nombre.',
   SUPPLIER_LINK_DUPLICATE: 'Ese contacto ya está enlazado con eso.',
@@ -1553,6 +1558,14 @@ export const api = {
 
   deactivateUser: (memberId: string, accessToken: string) =>
     request<void>(`/users/${memberId}`, { method: 'DELETE', accessToken }),
+
+  /**
+   * La vuelta de `deactivateUser`: la misma pareja subrecurso que los módulos.
+   * No devuelve las sesiones revocadas ni reasigna sus cosas —la persona entra
+   * de nuevo con sus credenciales, y lo huérfano se reparte a mano.
+   */
+  reactivateUser: (memberId: string, accessToken: string) =>
+    request<User>(`/users/${memberId}/activation`, { method: 'POST', accessToken }),
 
   /**
    * Cerrar la cuenta propia. **Sin identificador**: el sujeto lo pone el token,

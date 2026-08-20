@@ -86,9 +86,10 @@ describe('renovación ante un 401', () => {
     const stub = await signIn({
       'POST /api/v1/auth/refresh': { status: 200, body: renewedPair() },
       // «Personas» pide dos cosas. Solo caduca una: así se comprueba el rescate
-      // de esa sin que la otra enturbie el recuento de renovaciones.
+      // de esa sin que la otra enturbie el recuento de renovaciones. Desde el
+      // interruptor de miembros, la pantalla pide el listado CON dados de baja.
       'GET /api/v1/invitations': { status: 200, body: { items: [], page: 0, size: 50, total: 0 } },
-      'GET /api/v1/users?includeDeactivated=false': () => {
+      'GET /api/v1/users?includeDeactivated=true': () => {
         listings += 1
         // La primera caduca; de la segunda en adelante, con el token nuevo, va.
         return listings === 1

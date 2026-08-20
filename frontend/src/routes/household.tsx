@@ -28,12 +28,23 @@ import {
   humanMessage,
   todayIn,
   type Household,
+  type User,
   type UserRole,
 } from '../api/client'
 import { useAuthenticatedSession, useSession } from '../auth/SessionProvider'
 import { useActiveModuleScreens } from './modules'
 import { Avatar } from '../ui/files'
-import { BrandMark, Button, DangerZone, Field, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primitives'
+import {
+  BrandMark,
+  Button,
+  DangerZone,
+  Field,
+  Notice,
+  PageHeading,
+  Spinner,
+  StatusBadge,
+  Switch,
+} from '../ui/primitives'
 
 /**
  * Lo que vive detrás del login.
@@ -734,8 +745,13 @@ export function UsersPage() {
   const [role, setRole] = useState<UserRole>('HOUSEHOLD_MEMBER')
 
   const users = useQuery({
-    queryKey: ['users'],
-    queryFn: () => api.listUsers(session.accessToken),
+    // La clave lleva el flag porque `['users']` a secas la comparten el avatar
+    // propio y el desplegable de préstamos, y a ninguno de los dos se le puede
+    // colar gente dada de baja. Invalidar `['users']` sigue alcanzando a todas.
+    queryKey: ['users', { includeDeactivated: isAdmin }],
+    // Quien administra ve también a los dados de baja: es lo único que permite
+    // encontrarlos para traerlos de vuelta. Quien no, solo a los de casa.
+    queryFn: () => api.listUsers(session.accessToken, isAdmin),
   })
 
   const invitations = useQuery({
@@ -774,18 +790,15 @@ export function UsersPage() {
       {users.data && (
         <ul className="flex flex-col gap-2">
           {users.data.items.map((user) => (
-            <li
+            <MemberRow
               key={user.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border-subtle bg-surface-raised p-3"
-            >
-              <div>
-                <p className="text-body text-ink">{user.name}</p>
-                <p className="text-caption text-ink-muted">{user.email}</p>
-              </div>
-              <StatusBadge tone={user.role === 'HOUSEHOLD_ADMIN' ? 'accent' : 'neutral'}>
-                {ROLE_LABEL[user.role]}
-              </StatusBadge>
-            </li>
+              user={user}
+              // El interruptor de la propia fila no se ofrece: darse de baja a
+              // uno mismo cierra la sesión que lo está pulsando, y la salida
+              // propia ya tiene su sitio en «Cuenta». Sin la guarda, además,
+              // el gesto más fácil de la pantalla sería echarse de casa.
+              canDecide={isAdmin && user.id !== session.claims.memberId}
+            />
           ))}
         </ul>
       )}
@@ -868,6 +881,110 @@ export function UsersPage() {
         </section>
       )}
     </>
+  )
+}
+
+/**
+ * La fila de una persona, con su interruptor cuando quien mira puede decidir.
+ *
+ * El interruptor es **el mismo gesto que en Módulos** —encendido es estar en el
+ * hogar— y por eso no es un botón con verbo. La diferencia está en apagar:
+ * desactivar a alguien revoca sus sesiones en el acto, así que el apagado no es
+ * inmediato sino que **arma una confirmación en la propia fila**. No es un
+ * modal a propósito: la ficha de `DangerZone` explica por qué un «¿seguro?»
+ * flotante se contesta por reflejo, y el `Dialog` del sistema de diseño sigue
+ * por construir — aquí el foco no se mueve y la decisión se lee al lado de la
+ * persona a la que afecta. Encender no confirma nada: es reversible y no
+ * revoca nada.
+ */
+function MemberRow({ user, canDecide }: { user: User; canDecide: boolean }) {
+  const session = useAuthenticatedSession()
+  const queryClient = useQueryClient()
+  const [confirming, setConfirming] = useState(false)
+  const active = user.deactivatedAt === null
+
+  const decide = useMutation({
+    // `async` con `await` en cada rama, y no un ternario que devuelva la
+    // promesa: la baja responde 204 sin cuerpo y la vuelta devuelve el User,
+    // así que el ternario tipa como una unión que a la mutación no le vale.
+    // El User tampoco se usa: la lista se refresca invalidando.
+    mutationFn: async () => {
+      if (active) {
+        await api.deactivateUser(user.id, session.accessToken)
+      } else {
+        await api.reactivateUser(user.id, session.accessToken)
+      }
+    },
+    onSuccess: () => {
+      setConfirming(false)
+      // El prefijo alcanza también al avatar propio y al desplegable de
+      // préstamos, que comparten la raíz de la clave.
+      void queryClient.invalidateQueries({ queryKey: ['users'] })
+    },
+  })
+
+  return (
+    <li className="rounded-lg border border-border-subtle bg-surface-raised p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className={`text-body ${active ? 'text-ink' : 'text-ink-muted'}`}>{user.name}</p>
+          <p className="text-caption text-ink-muted">{user.email}</p>
+        </div>
+        {/* Dos líneas y no una: los distintivos arriba y el interruptor debajo,
+            el conjunto centrado en vertical contra el nombre y las dos líneas
+            a ras del borde derecho — centrarlas entre sí dejaba el distintivo
+            a una altura distinta en cada tarjeta según lo ancho del
+            interruptor, y descolgado del borde en las filas que no lo llevan. */}
+        <div className="flex flex-col items-end justify-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {/* Estado con etiqueta y no solo con color ni solo con la posición
+                del interruptor, que es la regla de la dirección visual. */}
+            {!active && <StatusBadge tone="neutral">De baja</StatusBadge>}
+            <StatusBadge tone={active && user.role === 'HOUSEHOLD_ADMIN' ? 'accent' : 'neutral'}>
+              {ROLE_LABEL[user.role]}
+            </StatusBadge>
+          </div>
+          {canDecide && (
+            <Switch
+              checked={active}
+              onToggle={() => (active ? setConfirming(true) : decide.mutate())}
+              busy={decide.isPending}
+              aria-label={user.name}
+              title={active ? 'Dar de baja' : 'Reactivar'}
+            />
+          )}
+        </div>
+      </div>
+
+      {confirming && active && (
+        <div className="mt-3 rounded-md border border-border-subtle bg-surface p-3">
+          <p className="text-body-sm text-ink">
+            Al dar de baja a {user.name} se cierran sus sesiones y deja de poder entrar. Sus cosas
+            quedan sin responsable hasta que alguien las reasigne. Este mismo interruptor la trae
+            de vuelta.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              variant="danger"
+              onClick={() => decide.mutate()}
+              busy={decide.isPending}
+              busyLabel="Dando de baja…"
+            >
+              Dar de baja
+            </Button>
+            <Button variant="secondary" onClick={() => setConfirming(false)} disabled={decide.isPending}>
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {decide.isError && (
+        <p className="mt-2 text-caption text-danger" role="alert">
+          {humanMessage(decide.error)}
+        </p>
+      )}
+    </li>
   )
 }
 

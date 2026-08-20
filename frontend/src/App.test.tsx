@@ -4,7 +4,7 @@ import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from './App'
-import { fakeTokenPair, stubFetch } from './test/http'
+import { SESSION_CLAIMS, fakeTokenPair, stubFetch } from './test/http'
 
 /**
  * Los flujos de enrolamiento vistos desde el navegador.
@@ -220,47 +220,142 @@ describe('verificación del correo', () => {
 })
 
 describe('personas del hogar', () => {
-  it('lista a los miembros y deja invitar siendo administradora', async () => {
-    goTo('/entrar')
-    stubFetch({
-      'POST /api/v1/auth/login': { status: 200, body: fakeTokenPair() },
-      'GET /api/v1/users?includeDeactivated=false': {
-        status: 200,
-        body: {
-          items: [
-            {
-              id: 'a',
-              identityId: 'b',
-              name: 'Kike',
-              email: 'kike@example.test',
-              phone: null,
-              role: 'HOUSEHOLD_ADMIN',
-              avatarUrl: null,
-              lastLoginAt: null,
-              emailVerifiedAt: '2026-08-11T10:00:00Z',
-              deactivatedAt: null,
-            },
-          ],
-          page: 0,
-          size: 50,
-          total: 1,
-        },
-      },
-      'GET /api/v1/invitations': { status: 200, body: { items: [], page: 0, size: 50, total: 0 } },
-    })
+  /** La propia administradora, con el `memberId` del token de prueba. */
+  const self = {
+    id: SESSION_CLAIMS.memberId,
+    identityId: SESSION_CLAIMS.sub,
+    name: 'Kike',
+    email: 'kike@example.test',
+    phone: null,
+    role: 'HOUSEHOLD_ADMIN',
+    avatarUrl: null,
+    lastLoginAt: null,
+    emailVerifiedAt: '2026-08-11T10:00:00Z',
+    deactivatedAt: null,
+  }
 
+  const vecina = {
+    id: '44444444-4444-4444-4444-444444444444',
+    identityId: '55555555-5555-5555-5555-555555555555',
+    name: 'Vecina',
+    email: 'vecina@example.test',
+    phone: null,
+    role: 'HOUSEHOLD_MEMBER',
+    avatarUrl: null,
+    lastLoginAt: null,
+    emailVerifiedAt: '2026-08-11T10:00:00Z',
+    deactivatedAt: null,
+  }
+
+  function page(items: unknown[]) {
+    return { status: 200, body: { items, page: 0, size: 50, total: items.length } }
+  }
+
+  async function openUsersScreen() {
     render(<App />)
     await userEvent.type(screen.getByLabelText('Correo'), 'kike@example.test')
     await userEvent.type(screen.getByLabelText('Contraseña'), 'el gato duerme en el sofa')
     await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
-
     await userEvent.click(await screen.findByRole('link', { name: 'Personas' }))
+  }
+
+  it('lista a los miembros y deja invitar siendo administradora', async () => {
+    goTo('/entrar')
+    stubFetch({
+      'POST /api/v1/auth/login': { status: 200, body: fakeTokenPair() },
+      // La pantalla pide CON los dados de baja --es lo que permite traerlos de
+      // vuelta--; el `=false` lo siguen pidiendo el avatar y los préstamos.
+      'GET /api/v1/users?includeDeactivated=true': page([self]),
+      'GET /api/v1/users?includeDeactivated=false': page([self]),
+      'GET /api/v1/invitations': { status: 200, body: { items: [], page: 0, size: 50, total: 0 } },
+    })
+
+    await openUsersScreen()
 
     expect(await screen.findByText('kike@example.test')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Enviar la invitación' })).toBeInTheDocument()
+    // La propia fila no lleva interruptor: nadie se echa de casa desde aquí, y
+    // la salida propia vive en «Cuenta».
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
   })
 
-  it('un miembro no ve el formulario de invitar', async () => {
+  it('dar de baja pide confirmación en la fila, y el interruptor trae de vuelta sin pedirla', async () => {
+    goTo('/entrar')
+    let deactivated = false
+    const { calls } = stubFetch({
+      'POST /api/v1/auth/login': { status: 200, body: fakeTokenPair() },
+      'GET /api/v1/users?includeDeactivated=true': () =>
+        page([self, { ...vecina, deactivatedAt: deactivated ? '2026-08-20T10:00:00Z' : null }]),
+      'GET /api/v1/users?includeDeactivated=false': () => page(deactivated ? [self] : [self, vecina]),
+      'GET /api/v1/invitations': { status: 200, body: { items: [], page: 0, size: 50, total: 0 } },
+      [`DELETE /api/v1/users/${vecina.id}`]: () => {
+        deactivated = true
+        return { status: 204 }
+      },
+      [`POST /api/v1/users/${vecina.id}/activation`]: () => {
+        deactivated = false
+        return { status: 200, body: vecina }
+      },
+    })
+
+    await openUsersScreen()
+
+    // Apagar arma la confirmación en la propia fila: todavía no ha pasado nada.
+    const toggle = await screen.findByRole('switch', { name: 'Vecina' })
+    expect(toggle).toBeChecked()
+    await userEvent.click(toggle)
+    expect(await screen.findByText(/se cierran sus sesiones/)).toBeInTheDocument()
+    expect(calls.some((call) => call.method === 'DELETE')).toBe(false)
+
+    // Confirmar es lo que da de baja, y la fila pasa a decirlo con etiqueta.
+    await userEvent.click(screen.getByRole('button', { name: 'Dar de baja' }))
+    expect(await screen.findByText('De baja')).toBeInTheDocument()
+    expect(
+      calls.some((call) => call.method === 'DELETE' && call.url.endsWith(`/users/${vecina.id}`)),
+    ).toBe(true)
+
+    // La vuelta no confirma nada: no revoca ni destruye, y su efecto se deshace
+    // con el mismo interruptor.
+    const off = await screen.findByRole('switch', { name: 'Vecina' })
+    await waitFor(() => expect(off).not.toBeChecked())
+    await userEvent.click(off)
+
+    await waitFor(() => {
+      expect(
+        calls.some(
+          (call) => call.method === 'POST' && call.url.endsWith(`/users/${vecina.id}/activation`),
+        ),
+      ).toBe(true)
+    })
+    await waitFor(() => expect(screen.queryByText('De baja')).not.toBeInTheDocument())
+  })
+
+  it('si es la última administradora, la baja no pasa y se dice por qué', async () => {
+    goTo('/entrar')
+    stubFetch({
+      'POST /api/v1/auth/login': { status: 200, body: fakeTokenPair() },
+      'GET /api/v1/users?includeDeactivated=true': page([
+        self,
+        { ...vecina, role: 'HOUSEHOLD_ADMIN' },
+      ]),
+      'GET /api/v1/users?includeDeactivated=false': page([self, vecina]),
+      'GET /api/v1/invitations': { status: 200, body: { items: [], page: 0, size: 50, total: 0 } },
+      [`DELETE /api/v1/users/${vecina.id}`]: {
+        status: 409,
+        body: { code: 'USER_LAST_ADMIN', message: 'ultimo admin' },
+      },
+    })
+
+    await openUsersScreen()
+
+    await userEvent.click(await screen.findByRole('switch', { name: 'Vecina' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Dar de baja' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/Nombra antes a otra/)
+  })
+
+  it('un miembro no ve el formulario de invitar ni ningún interruptor', async () => {
     goTo('/entrar')
     stubFetch({
       'POST /api/v1/auth/login': {
@@ -272,10 +367,9 @@ describe('personas del hogar', () => {
           role: 'HOUSEHOLD_MEMBER',
         }),
       },
-      'GET /api/v1/users?includeDeactivated=false': {
-        status: 200,
-        body: { items: [], page: 0, size: 50, total: 0 },
-      },
+      // Quien no administra pide el listado SIN dados de baja: no puede traer a
+      // nadie de vuelta, así que no le hace falta verlos.
+      'GET /api/v1/users?includeDeactivated=false': page([vecina]),
     })
 
     render(<App />)
@@ -285,12 +379,14 @@ describe('personas del hogar', () => {
 
     await userEvent.click(await screen.findByRole('link', { name: 'Personas' }))
     await screen.findByRole('heading', { level: 1, name: 'Personas' })
+    await screen.findByText('vecina@example.test')
 
     // Esconderlo es cortesía, no seguridad: quien lo intente igualmente recibe un
     // 403 del backend, que es quien de verdad decide.
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Enviar la invitación' })).not.toBeInTheDocument()
     })
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
   })
 })
 
