@@ -1207,17 +1207,30 @@ function renewSession(): Promise<string | null> {
  * avatar, que tiene su propio `<input>`— y la tercera que se escriba. El coste
  * de quien no sube un HEIC es leer doce bytes.
  */
+/**
+ * Lo que reza el `Error` de una subida cancelada.
+ *
+ * Se exporta porque **quien lo compara vive en otro fichero**: `UploadField`
+ * distingue la cancelación de un fallo de verdad por este texto, y hasta hoy lo
+ * llevaba escrito a mano en los dos sitios. Una cadena repetida que decide un
+ * camino se rompe el día que alguien corrige una tilde en uno de los dos, y no
+ * da ningún error — solo un campo que se queda en «error» al cancelar.
+ *
+ * No es un `ApiError` a propósito: no hay respuesta del servidor que codificar.
+ */
+export const UPLOAD_CANCELLED = 'Subida cancelada'
+
 export async function uploadFile(
   file: File,
   accessToken: string,
   onProgress?: (fraction: number) => void,
-  options: { path?: string; method?: string; onConverting?: () => void } = {},
+  options: { path?: string; method?: string; onConverting?: () => void; signal?: AbortSignal } = {},
 ): Promise<StoredFile> {
-  const { path = '/files', method = 'POST', onConverting } = options
+  const { path = '/files', method = 'POST', onConverting, signal } = options
   const sendable = await toUploadable(file, onConverting)
 
   try {
-    return await sendFile(sendable, accessToken, onProgress, path, method)
+    return await sendFile(sendable, accessToken, onProgress, path, method, signal)
   } catch (error) {
     if (!(error instanceof ApiError) || error.status !== 401 || error.code !== 'UNAUTHORIZED') throw error
 
@@ -1226,7 +1239,7 @@ export async function uploadFile(
     // El reintento va con lo ya convertido, no con lo que eligió la persona:
     // volver al original mandaría el HEIC y lo respondería un 415 detrás de una
     // renovación que sí había funcionado.
-    return sendFile(sendable, renewed, onProgress, path, method)
+    return sendFile(sendable, renewed, onProgress, path, method, signal)
   }
 }
 
@@ -1236,11 +1249,31 @@ function sendFile(
   onProgress: ((fraction: number) => void) | undefined,
   path: string,
   method: string,
+  signal?: AbortSignal,
 ): Promise<StoredFile> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest()
     request.open(method, `${BASE_URL}${path}`)
     request.setRequestHeader('Authorization', `Bearer ${accessToken}`)
+
+    // La cancelación llega por `AbortSignal` y no por un método propio, para que
+    // sea la misma pieza que usa el resto del cliente y para que el componente no
+    // tenga que guardar el `XMLHttpRequest`. Lo único que hace es disparar el
+    // `abort()`, que ya tenía su gancho puesto desde el Hito 3 de la Fase 1
+    // esperando a que alguien lo llamara.
+    //
+    // **Se comprueba `aborted` además de escuchar**, y no sobra: una señal ya
+    // cancelada antes de llegar aquí no vuelve a emitir el evento, así que solo
+    // con el `addEventListener` la petición saldría igual. Pasa de verdad en el
+    // camino del reintento, donde entre la primera respuesta y la segunda
+    // llamada hay una renovación de sesión entera.
+    if (signal) {
+      if (signal.aborted) {
+        reject(new Error(UPLOAD_CANCELLED))
+        return
+      }
+      signal.addEventListener('abort', () => request.abort(), { once: true })
+    }
 
     // `lengthComputable` es falso si el navegador no sabe el total. Ahí no se
     // inventa un porcentaje: quien pinta la barra decide qué hacer sin dato.
@@ -1260,7 +1293,7 @@ function sendFile(
     // Un fallo de red y una cancelación no llevan cuerpo ni código: se
     // distinguen del error del contrato porque no son `ApiError`.
     request.onerror = () => reject(new Error('No se ha podido subir el fichero'))
-    request.onabort = () => reject(new Error('Subida cancelada'))
+    request.onabort = () => reject(new Error(UPLOAD_CANCELLED))
 
     const body = new FormData()
     body.append('file', file)

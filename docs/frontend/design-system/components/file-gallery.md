@@ -5,7 +5,7 @@
 | Estado | Implementado |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-13 |
+| Última revisión | 2026-08-20 |
 
 > **Esta ficha se escribió antes que el componente**, como especificación, y el
 > Hito 3 lo construyó siguiéndola: vive en
@@ -328,13 +328,22 @@ Antiusos:
 | Ampliar la celda por encima de 160 px | Se está ampliando una miniatura de 320 px y se nota |
 | Copiar una URL firmada para compartirla | Lleva credencial dentro y caduca. Compartir un fichero no está en el alcance de la Fase 1 |
 
-Evidencias de prueba: **ninguna todavía**. Lo que el hito tendrá que cubrir:
+Evidencias de prueba, en
+[`files.test.tsx`](../../../../frontend/src/routes/files.test.tsx): que un PDF
+pinta su marcador y **no** un `<img>` con `src` vacío, que quitar un fichero
+refresca también la cuota, que el `409` de un fichero en uso dice qué hacer, y que
+**cada celda se nombra por su fichero, tenga miniatura o no** — los dos casos, y
+que la miniatura no lo repite.
 
-- Que un PDF pinta su marcador y **no** un `<img>` con `src` vacío.
-- Que el `onError` de una imagen lleva al marcador y que recargar dispara la
-  invalidación de la entidad, no una segunda petición de la misma URL.
-- Que la celda es alcanzable y activable con teclado, y que su nombre accesible
-  incluye el nombre del fichero.
+Y en el recorrido vertical: **la pantalla entera pasa por axe en los dos modos**,
+con un PDF sembrado por la API para que la rejilla tenga una celda de verdad. Sin
+ese fichero la auditoría recorrería el estado vacío y diría que pasa sin haber
+mirado ninguna celda, que es exactamente como el defecto de arriba llegó a existir.
+
+Lo que se dijo al escribir la ficha y **sigue sin cubrirse**:
+
+- Que el `onError` de una imagen dispara la invalidación de la entidad y no una
+  segunda petición de la misma URL. `onStale` está cableado y nada lo mide.
 - Que la rejilla vacía pinta el vacío con su acción.
 
 Ojo con `jsdom`: no carga imágenes, así que ni `onLoad` ni `onError` se disparan
@@ -343,15 +352,28 @@ imagen que caduca en pantalla— es del recorrido con Playwright del Hito 4.
 
 ## Estado de implementación y enlace al componente real
 
-**Previsto.** No existe. Su sitio es
-[`frontend/src/ui/primitives.tsx`](../../../../frontend/src/ui/primitives.tsx),
-salvo que el fichero se haya partido antes.
+**Implementado.** Vive en
+[`files.tsx`](../../../../frontend/src/ui/files.tsx) y no en
+[`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx), que es donde esta
+ficha lo situaba antes de existir: el fichero se partió, y esta pieza se fue con
+`UploadField` y `Avatar` porque las tres llegaron con el Hito 3.
+
+Lo usan dos pantallas y con dos formas distintas de leerlas, que es justo la
+frontera que esta ficha argumenta: la documentación de un asset en
+[`assets.tsx`](../../../../frontend/src/routes/assets.tsx) —lo que cuelga de una
+cosa— y el archivo del hogar en
+[`storage.tsx`](../../../../frontend/src/routes/storage.tsx), que es el gigabyte
+entero ordenado por tamaño.
 
 ### Lo que falta
 
-- **La celda no tiene dónde vivir todavía.** La galería y la pantalla de
-  almacenamiento del hogar comparten la celda pero no la forma; conviene sacarla
-  como `FileTile` en cuanto la segunda se escriba, y no antes.
+**Dos entradas se resolvieron sin que nadie las tachara**, y se retiran diciendo
+cómo: la celda **sí** tiene dónde vivir —las dos pantallas comparten el
+componente entero y no solo la celda, así que `FileTile` no ha hecho falta—, y
+descargar un documento **está escrito**, aunque no por donde esta ficha esperaba:
+va por `window.open` sobre `/api/v1/files/{id}/content`, no por `client.ts`. Eso
+último deja en pie la mitad técnica del apunte, que se conserva más abajo.
+
 - **No hay visor de imagen.** Abrir una foto a tamaño completo pide un `Dialog` o
   una hoja, y no hay ninguno de los dos. Mientras tanto, abrir una imagen es
   descargarla, que funciona pero no es lo que se espera de tocar una foto.
@@ -365,10 +387,13 @@ salvo que el fichero se haya partido antes.
   un `photoFileId` por entidad y una lista de documentos sin orden: si algún día
   se quiere «esta es la portada», es una pregunta para el contrato antes que para
   la interfaz.
-- **La descarga de un documento no está escrita en ninguna parte.**
-  [`client.ts`](../../../../frontend/src/api/client.ts) solo sabe leer JSON:
+- **La descarga no pasa por `client.ts`, y eso sigue teniendo consecuencias.**
   `readResponse` hace `response.json()` siempre, así que una respuesta binaria no
-  cabe por ahí sin tocarlo.
+  cabe por ahí sin tocarlo; de momento se esquiva con `window.open`, que funciona
+  y **renuncia a la cabecera `Authorization`**: la descarga viaja con la cookie de
+  sesión que no existe, así que depende de que el endpoint acepte la petición
+  como navegación. El día que haga falta descargar con progreso, o renombrar el
+  fichero al vuelo, esto vuelve.
 
 ## Referencias
 
@@ -390,4 +415,6 @@ salvo que el fichero se haya partido antes.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **Arreglado el defecto que el repaso destapó, y tapado el agujero que lo escondía.** La celda lleva ahora su nombre accesible en el botón —«Abrir factura-caldera.pdf»— y la miniatura pasa a `alt=""`, que es lo que esta ficha especificaba desde el primer día y la implementación no había cumplido: el nombre salía del `alt`, y un PDF no tiene miniatura de la que sacarlo. Y **«Archivo» entra en la pasada sistemática de axe** con un PDF sembrado por la API, porque auditar esa pantalla vacía habría vuelto a no mirar ninguna celda. Comprobado quitando el arreglo: la auditoría falla con `button-name`. | Equipo DRP |
+| 2026-08-20 | **La ficha se pone al día con el código.** Decía «Previsto. No existe» de un componente construido en el Hito 3, y su «Lo que falta» arrastraba dos entradas resueltas: la celda compartida —que acabó siendo el componente entero, así que `FileTile` no hizo falta— y la descarga de un documento, que está escrita aunque no por donde esta ficha esperaba. Las evidencias de prueba pasan de «ninguna» a tres, con las tres que siguen faltando nombradas. **Y aparece un defecto que el repaso destapó**: la celda de un PDF **no tiene nombre accesible** —el `<button>` lo toma del `alt` de la miniatura y un PDF no tiene—, que ha pasado desapercibido porque **la pantalla «Archivo» no entra en la pasada sistemática de axe**. Se anota aquí y no se arregla: es código y prueba, no documentación. | Equipo DRP |
 | 2026-08-13 | Creación de la ficha al arrancar el Hito 3. El componente está **previsto**. Se documenta por qué la galería es componente y no patrón, y dónde queda su frontera con el listado. | Equipo DRP |

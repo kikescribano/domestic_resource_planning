@@ -2,10 +2,10 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Borrador |
+| Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-12 |
+| Última revisión | 2026-08-20 |
 
 ## Propósito y situaciones de uso
 
@@ -186,7 +186,10 @@ usa en ninguna pantalla todavía.**
 
 ### Lo que falta
 
-Lo que el Hito 2 va a pedir y hoy no está. Nada de esto existe:
+Se escribió como «lo que el Hito 2 va a pedir», y ese hito se cerró hace dos
+fases: los listados y las fichas se construyeron **rodeando** cada una de estas
+carencias en lugar de resolverlas. Repasado el 2026-08-20 contra el código,
+**sigue sin existir nada de esto**:
 
 - **La anchura no se conserva al pasar a ocupado.** El comentario del código dice
   que sí, y no es lo que hace: `busyLabel` sustituye a `children` sin reservar el
@@ -224,4 +227,5 @@ Lo que el Hito 2 va a pedir y hoy no está. Nada de esto existe:
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **Repasada entera contra el código y no cambia ni una afirmación**: la anchura sigue sin conservarse al pasar a ocupado —con el comentario del código diciendo que sí—, el desactivado sigue usando `opacity-60` en vez del token, y siguen sin existir la ranura de icono, el tamaño compacto y el indicador de carga. Lo único que se corrige es el marco: la lista se presentaba como «lo que el Hito 2 va a pedir», y ese hito se cerró hace dos fases. | Equipo DRP |
 | 2026-08-12 | Creación de la ficha sobre la implementación del Hito 1. | Equipo DRP |

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -126,13 +126,41 @@ describe('el almacenamiento del hogar', () => {
     expect(screen.getByText('2,3 MB')).toBeInTheDocument()
 
     // La imagen sí tiene miniatura; el PDF pinta el icono de tipo, y por eso
-    // solo hay una imagen en la rejilla.
-    const thumbnails = screen.getAllByRole('img')
+    // solo hay un `<img>` en la rejilla. Se busca por etiqueta y no por rol
+    // porque la miniatura es **decorativa** desde que el nombre lo lleva el
+    // botón: con `alt=""` sale del árbol de accesibilidad y `getAllByRole('img')`
+    // ya no la encuentra.
+    const thumbnails = document.querySelectorAll('ul[aria-label="Ficheros del hogar"] img')
     expect(thumbnails).toHaveLength(1)
-    expect(thumbnails[0]).toHaveAttribute('alt', 'estanteria.jpg')
+    expect(thumbnails[0]).toHaveAttribute('alt', '')
     // Nativa y perezosa: es lo que la URL firmada permite conservar y lo que
     // descartaba pintar desde un blob.
     expect(thumbnails[0]).toHaveAttribute('loading', 'lazy')
+  })
+
+  /**
+   * El defecto que el repaso de las fichas destapó el 2026-08-20: la celda
+   * tomaba su nombre del `alt` de la miniatura, y **un PDF no tiene miniatura**,
+   * así que su botón se quedaba mudo — «botón» y nada más, en la rejilla donde
+   * todo son facturas y manuales.
+   *
+   * Se comprueban **los dos casos**, porque el arreglo mueve el nombre de la
+   * imagen al botón y podría haber dejado la imagen anunciándolo dos veces.
+   */
+  it('cada celda se nombra por su fichero, tenga miniatura o no', async () => {
+    await signInAndVisit('Archivo', {
+      '/api/v1/storage': USAGE,
+      '/api/v1/files?size=200': FILES,
+    })
+
+    // El PDF, que es el que estaba mudo.
+    expect(await screen.findByRole('button', { name: 'Abrir manual-caldera.pdf' })).toBeInTheDocument()
+    // Y la imagen, que lo tenía por el `alt` y ahora lo tiene por el botón.
+    expect(await screen.findByRole('button', { name: 'Abrir estanteria.jpg' })).toBeInTheDocument()
+
+    // La miniatura queda decorativa: el nombre está escrito al lado y en el
+    // botón, y anunciarlo tres veces es ruido.
+    expect(screen.queryByRole('img', { name: 'estanteria.jpg' })).not.toBeInTheDocument()
   })
 
   it('borrar un fichero refresca también la cuota, porque se libera en el acto', async () => {
@@ -217,6 +245,49 @@ describe('la subida de un fichero', () => {
     expect(request.headers).toEqual({ Authorization: 'Bearer token' })
   })
 
+  /**
+   * La ficha de `upload-field` describía **Cancelar** desde el Hito 3 de la Fase
+   * 1 y el componente no lo tenía: el `AbortController` estaba declarado y nunca
+   * se le asignaba nada, así que el estado `cancelled` era inalcanzable.
+   *
+   * Se prueba entero y no a trozos —el botón, el abort que llega al
+   * `XMLHttpRequest`, la vuelta a reposo y el foco— porque las cuatro cosas
+   * juntas son lo que la ficha exige, y las tres primeras sin la cuarta dejan a
+   * quien navega con teclado en el principio de la página.
+   */
+  it('cancelar aborta la petición, vuelve a reposo y devuelve el foco al disparador', async () => {
+    const request = fakeXhr({ status: 201, body: { id: 'file-9' } })
+
+    await signInAndVisit('Archivo', {
+      '/api/v1/storage': USAGE,
+      '/api/v1/files?size=200': FILES,
+    })
+
+    const chooser = await screen.findByLabelText('Subir un fichero')
+    await userEvent.upload(chooser, new File(['x'], 'foto.jpg', { type: 'image/jpeg' }))
+
+    // Hasta que no hay bytes en vuelo no hay nada que cancelar: el botón
+    // aparece con el primer `onprogress`, que es lo que lleva al estado
+    // `uploading`.
+    await untilOpened(request)
+    // Dentro de `act` porque esto sí actualiza el estado de un componente
+    // montado, a diferencia de las dos pruebas de abajo, que llaman a
+    // `uploadFile` sin pantalla delante.
+    await act(async () => {
+      request.upload.onprogress?.({ lengthComputable: true, loaded: 5, total: 10 } as ProgressEvent)
+    })
+
+    const cancel = await screen.findByRole('button', { name: 'Cancelar' })
+    await userEvent.click(cancel)
+
+    expect(request.aborted).toBe(true)
+    expect(await screen.findByText('Subida cancelada.')).toBeInTheDocument()
+    // Y el disparador recupera el foco. Es el `<input>` y no el `<label>`: el
+    // anillo lo pinta la etiqueta con `focus-within`, pero lo focusable es el
+    // campo que lleva dentro.
+    expect(chooser).toHaveFocus()
+  })
+
   it('traduce el 409 de cuota agotada a algo que se puede hacer', async () => {
     const request = fakeXhr({
       status: 409,
@@ -263,6 +334,14 @@ function fakeXhr(response: { status: number; body: unknown }) {
       this.headers[name] = value
     },
     send() {},
+    // El doble tiene que abortar de verdad y no solo apuntarlo: lo que la prueba
+    // mide es que la señal llega hasta aquí, y con un `abort()` vacío pasaría
+    // igual el día que dejara de llegar.
+    aborted: false,
+    abort() {
+      this.aborted = true
+      this.onabort?.()
+    },
   }
 
   vi.stubGlobal(

@@ -5,7 +5,7 @@
 | Estado | Implementado |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-13 |
+| Última revisión | 2026-08-20 |
 
 > **Esta ficha se escribió antes que el componente**, como especificación, y el
 > Hito 3 lo construyó siguiéndola: vive en
@@ -187,35 +187,70 @@ Antiusos:
 | Borde y sombra en un avatar de fila | Prohibido por el presupuesto de calidez |
 | Dar por hecho que hay foto tras el `PUT` | La respuesta es `204`: hay que volver a leer a la persona |
 
-Evidencias de prueba: **ninguna todavía**. Lo que el hito tendrá que cubrir: que
-sin `src` se pintan las iniciales correctas, que con nombre de una palabra sale
-una sola letra, que la imagen rota cae a las iniciales, y que el `PUT` va seguido
-de la relectura de la persona.
+Evidencias de prueba: **ninguna, y esta vez la palabra es exacta**. El componente
+se monta en varias pruebas —cualquiera que pinte la lista de personas lo hace— y
+**ninguna afirma nada sobre él**: los usuarios de prueba llevan `avatarUrl: null`
+y lo que se comprueba es el correo o el papel. Lo que sigue sin cubrirse es lo
+mismo que se dijo al escribir la ficha:
+
+- Que sin `url` se pintan las iniciales correctas, y que con un nombre de una
+  sola palabra sale una sola letra.
+- Que la imagen rota cae a las iniciales. **Esta no se puede probar en `jsdom`**,
+  que no carga imágenes y por tanto no dispara `onError` — y hoy `Avatar` no lo
+  maneja siquiera, ver «Lo que falta».
+- Que el `PUT` va seguido de la relectura de la persona.
 
 ## Estado de implementación y enlace al componente real
 
-**Previsto.** No existe ni `Avatar` ni `AvatarField`. El dato sí:
-`User.avatarUrl` está tipado en
-[`client.ts`](../../../../frontend/src/api/client.ts) desde el Hito 1 y no lo
-consume nadie.
+**Implementado a medias, y la mitad que falta es la que esta ficha llama
+`AvatarField`.**
+
+- **`Avatar` existe**, en
+  [`files.tsx`](../../../../frontend/src/ui/files.tsx) y no en `primitives.tsx`:
+  acompaña a `UploadField` y `FileGallery` porque llegó con ellos en el Hito 3.
+  Pinta la imagen si hay `url` y las iniciales si no, con los tres tamaños que
+  esta ficha describe. Lo usa `UsersPage` y la sección «Tu foto» de
+  [`household.tsx`](../../../../frontend/src/routes/household.tsx).
+- **`AvatarField` no existe.** Lo que hay en su sitio es un `<label>` con su
+  propio `<input type="file">` escrito dentro de `household.tsx`, que llama a
+  `api.setOwnAvatar` y vuelve a leer a la persona. Hace lo que la ficha pide y
+  **no es un componente**: no se puede reutilizar, y la única razón por la que
+  eso no ha dolido todavía es que solo hay un sitio donde se cambia una foto de
+  perfil.
+
+El dato viaja desde el Hito 1: `User.avatarUrl` está tipado en
+[`client.ts`](../../../../frontend/src/api/client.ts), y desde el Hito 3 lo
+consume la pantalla.
 
 ### Lo que falta
 
-- **`api.setAvatar` y `api.deleteAvatar` no existen.** El contrato tiene las dos
-  operaciones —`PUT` y `DELETE /users/me/avatar`— y el cliente no las expone. La
-  primera necesita además la misma función de subida que
-  [`UploadField`](upload-field.md), porque `client.ts` no sabe enviar
-  `multipart/form-data`.
+**Dos entradas se han quedado atrás y se retiran diciéndolo**: `api.setAvatar` y
+`api.deleteAvatar` existen desde el Hito 3 con otro nombre —`setOwnAvatar` y
+`deleteOwnAvatar`, que dicen mejor de quién es la cara—, y quitar el avatar sí
+tiene sitio: el botón **Quitarla** de «Tu foto». Lo que queda:
+
+- **`AvatarField` no existe como componente**, según lo dicho arriba. Sacarlo de
+  `household.tsx` no urge mientras haya un solo sitio que cambie una foto, y
+  urgirá el día que haya dos.
+- **`Avatar` no cae a las iniciales cuando la imagen falla.** Con `url` pinta un
+  `<img>` sin `onError`, así que una URL firmada caducada —que caduca a los
+  quince minutos, y eso aquí es lo normal y no lo raro— deja el icono de imagen
+  rota del navegador en vez de las iniciales. `FileGallery` sí lo resuelve, con
+  `onStale`, y es de donde hay que copiar la salida.
 - **No hay `GET /users/me`.** Después del `204` hay que volver a leer a la
   persona, y la única lectura que existe es `listUsers`, que devuelve el hogar
   entero. Funciona, pero pedir la lista completa para refrescar la propia cara es
-  un rodeo que conviene mirar.
-- **Quitar el avatar no tiene sitio.** `DELETE /users/me/avatar` existe y ninguna
-  pantalla lo ofrece.
+  un rodeo que conviene mirar. **El contrato tampoco lo tiene**: en `/users/me`
+  solo hay un `delete`, que es cerrar la cuenta.
 - **El recorte no está resuelto.** El encuadre es 1:1 con recorte centrado, y una
   foto apaisada pierde media cara sin que nadie pueda elegir el encuadre.
   Recortar en el cliente es trabajo aparte y no está decidido.
-- **El par de color de las iniciales no está medido**, como se dice más arriba.
+- **El par de color de las iniciales no está medido**, como se dice más arriba, y
+  ahora se puede decir exactamente cuál: las iniciales son `accent-ink` sobre
+  `accent-soft`, y [`check-contrast.py`](../../../../scripts/check-contrast.py)
+  mide `accent-ink` sobre `surface` y sobre `surface-raised` — **este par no está
+  en su lista**. Es el único texto del producto cuyo contraste se afirma en vez
+  de comprobarse.
 - **El tope de 1 MB es estrecho para una foto de móvil**, que ronda los 3-8 MB.
   Sin reducción en el cliente, subir el avatar va a fallar más veces de las que
   va a funcionar. Es el mismo hueco que arrastra `UploadField`, y aquí se nota
@@ -225,12 +260,14 @@ consume nadie.
   y una foto de 12 MP sale de ahí en unos 240 kB — así que **el caso que menos
   cabía es el único que ahora entra con holgura**. El hueco sigue abierto para
   todo lo demás.
-- **El `accept` del avatar incluye HEIC**, con la misma distinción que explica la
-  ficha de [`upload-field`](upload-field.md#el-accept-es-una-comodidad-nunca-una-validación):
-  no es que la lista blanca del servidor haya crecido —sigue teniendo cuatro
-  tipos— sino que el cliente convierte antes de enviar. La conversión le llega
-  sola porque vive en `uploadFile`, que es por donde pasa también esta subida;
-  lo único propio de esta pantalla es decir «Convirtiendo…» mientras dura.
+
+**Y una que no falta, que estaba mal colocada aquí:** el `accept` del avatar
+incluye HEIC, con la misma distinción que explica la ficha de
+[`upload-field`](upload-field.md#el-accept-es-una-comodidad-nunca-una-validación)
+— no es que la lista blanca del servidor haya crecido, sigue teniendo cuatro
+tipos, sino que el cliente convierte antes de enviar. La conversión le llega sola
+porque vive en `uploadFile`, que es por donde pasa también esta subida; lo único
+propio de esta pantalla es decir «Convirtiendo…» mientras dura.
 
 ## Referencias
 
@@ -252,4 +289,5 @@ consume nadie.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **La ficha se pone al día con el código, siete días tarde.** Decía «Previsto. No existe ni `Avatar` ni `AvatarField`» con `Avatar` construido desde el Hito 3, y su «Lo que falta» arrastraba dos entradas hechas —`setOwnAvatar`/`deleteOwnAvatar` existen, y quitar la foto tiene su botón—. Lo que **sí** falta se queda y gana precisión: `AvatarField` no es un componente sino un `<input>` escrito dentro de `household.tsx`; `Avatar` **no cae a las iniciales cuando la imagen falla**, que con URL firmadas de quince minutos es el caso normal y no el raro; y el par de color de las iniciales se nombra por fin —`accent-ink` sobre `accent-soft`, que no está en la lista de `check-contrast.py`—. Las evidencias de prueba siguen siendo ninguna, y ahora se dice por qué eso no es lo mismo que no montarlo nunca. Se recoloca la nota del `accept` con HEIC, que el Hito 2 metió por error en «Lo que falta» describiendo algo que sí existe. | Equipo DRP |
 | 2026-08-13 | Creación de la ficha al arrancar el Hito 3. El componente está **previsto**: el dato `avatarUrl` existe y no lo pinta nadie. | Equipo DRP |

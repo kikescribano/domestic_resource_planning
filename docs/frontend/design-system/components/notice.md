@@ -2,10 +2,10 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Borrador |
+| Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-12 |
+| Última revisión | 2026-08-20 |
 
 ## Propósito y situaciones de uso
 
@@ -210,4 +210,5 @@ alta y en `HomePage`, `warning` en el login cuando el correo no está verificado
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **Repasada entera contra el código y no cambia ni una afirmación**: sigue sin poder cerrarse, sin ranura de acción, sin enseñar el código del contrato, y siguen sin existir `Toast` y el error bloqueante a pantalla completa. Lo único que se corrige es el marco temporal de la lista, que hablaba en futuro de un hito ya cerrado. | Equipo DRP |
 | 2026-08-12 | Creación de la ficha sobre la implementación del Hito 1. | Equipo DRP |
