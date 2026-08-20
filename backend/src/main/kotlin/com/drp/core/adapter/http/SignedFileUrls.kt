@@ -41,10 +41,17 @@ import java.util.Base64
 @Component
 class SignedFileUrls(
     @Value("\${drp.files.base-url}") private val baseUrl: String,
-    @Value("\${drp.files.link-secret}") private val secret: String,
+    linkProperties: FileLinkProperties,
     @Value("\${drp.security.jwt.access-token-ttl}") private val ttl: Duration,
     private val clock: Clock,
 ) {
+
+    /**
+     * El secreto llega por [FileLinkProperties] y no por `@Value` para que **no
+     * haya forma de usarlo sin haberlo validado**: quien lo construye es el bean
+     * que comprueba al arrancar que no sigue siendo el de desarrollo.
+     */
+    private val secret: String = linkProperties.secret
 
     /** El original: lo que descarga quien pulsa una foto. */
     fun original(storageKey: String): String = sign(storageKey)
@@ -107,5 +114,52 @@ class SignedFileUrls(
         const val PREFIX = "/f"
 
         private const val DIGEST = "MD5"
+    }
+}
+
+/**
+ * El secreto con el que se firman las URL de ficheros, comprobado al arrancar.
+ *
+ * Es un **secreto de despliegue** exactamente igual que la clave del JWT, y lo
+ * comparten dos procesos: lo usa la aplicacion para firmar y nginx para
+ * verificar. El valor por defecto del `application.yml` solo sirve para
+ * desarrollo --esta ademas en claro en el `compose.yaml`, porque nginx tiene que
+ * conocerlo-- y el arranque falla si en produccion sigue puesto.
+ *
+ * Existe esta clase, y no un `@Value` suelto en [SignedFileUrls], porque un
+ * secreto sin validar no se distingue de uno validado en el sitio donde se usa.
+ */
+data class FileLinkProperties(val secret: String) {
+
+    /**
+     * @param developmentEnvironment si el arranque es de desarrollo o de
+     *   pruebas, unicos sitios donde se tolera el secreto de ejemplo.
+     */
+    fun validate(developmentEnvironment: Boolean) {
+        require(secret.toByteArray(Charsets.UTF_8).size >= MINIMUM_SECRET_BYTES) {
+            "El secreto de firma de ficheros necesita al menos $MINIMUM_SECRET_BYTES bytes"
+        }
+
+        // La que de verdad importa, y la que no existia. Con el secreto de
+        // ejemplo puesto en produccion, cualquiera arma la firma de cualquier
+        // ruta con la caducidad que quiera: la URL firmada deja de autorizar
+        // nada y pasa a ser una direccion publica calculable.
+        require(developmentEnvironment || secret != DEVELOPMENT_SECRET) {
+            "El secreto de firma de ficheros sigue siendo el de desarrollo. " +
+                "Define DRP_FILES_LINK_SECRET con un secreto propio antes de arrancar."
+        }
+    }
+
+    companion object {
+        /** El mismo suelo que la clave del JWT: no hay motivo para que sea menor. */
+        const val MINIMUM_SECRET_BYTES = 32
+
+        /**
+         * El valor por defecto del `application.yml`. Vive aqui para que el
+         * arranque pueda reconocerlo y rechazarlo fuera de desarrollo; si se
+         * cambia alli --y en el `compose.yaml`, que tiene que coincidir-- hay que
+         * cambiarlo aqui.
+         */
+        const val DEVELOPMENT_SECRET = "desarrollo-local-no-usar-en-produccion"
     }
 }

@@ -70,7 +70,9 @@ La condición que **sí** hay que tomarse en serio antes de exponerlo es doble:
    del despliegue, tres de ellos *promesas que el propio código o la
    documentación hacen y que quedaron a medio cumplir*: el rate limit «cuando
    llegue nginx», la validación de secretos aplicada a un secreto sí y a otro
-   no, y el reparto imagen/documento de la ADR-005.
+   no, y el reparto imagen/documento de la ADR-005. **Tres de los cinco ya están
+   corregidos** (los dos fail-open de secretos y el rate limit tras el proxy);
+   quedan los dos de dependencias, que son subidas de versión con riesgo propio.
 2. **El despliegue todavía no existe**, y sin TLS, firewall, secretos
    inyectados, backups automatizados y un compose de producción endurecido, la
    solidez del código no basta. Eso es un bloque de trabajo propio (§ Requisitos
@@ -79,29 +81,44 @@ La condición que **sí** hay que tomarse en serio antes de exponerlo es doble:
 ## Resumen priorizado
 
 Orden de atención recomendado. La columna «Área» remite al detalle más abajo.
+**«Detectado» es la revisión que lo encontró y «Corregido» la fecha en que se
+cerró**; un guion en la segunda significa que sigue abierto.
 
-| # | Sev. | Hallazgo | Área |
-|---|---|---|---|
-| 1 | ALTA | El rate limit por IP colapsa en un cubo global detrás de nginx (DoS de toda la autenticación) | Auth |
-| 2 | ALTA | Fail-open del secreto JWT: sin perfil activo, producción arranca con la clave de ejemplo del repositorio | Infra |
-| 3 | ALTA | `DRP_FILES_LINK_SECRET` no se valida al arrancar: puede quedar el secreto de firma de desarrollo en producción | Ficheros |
-| 4 | ALTA | `webp-imageio 0.1.6` embebe libwebp anterior al fix de CVE-2023-4863 y decodifica WebP subido por usuarios | Deps |
-| 5 | ALTA | Spring Boot 3.4.x fuera de soporte OSS y sin detección continua de dependencias | Deps |
-| 6 | MEDIA | `CloseAccount` (`DELETE /users/me`) no re-autentica: un access token robado expulsa a la víctima de forma permanente | AuthZ |
-| 7 | MEDIA | Rotación de refresh sin detección de reutilización (robo indetectable) | Auth |
-| 8 | MEDIA | Sesión deslizante sin tope absoluto: renovada una vez al mes, vive para siempre | Auth |
-| 9 | MEDIA | Refresh token de 30 días en `localStorage` (decisión aplazada no revisada) | Auth |
-| 10 | MEDIA | Sin CSP ni cabeceras de seguridad para la SPA; HSTS no se emitirá sin `forward-headers-strategy` | Cabeceras |
-| 11 | MEDIA | CORS de desarrollo cableado con `allowCredentials` y `allowedHeaders("*")`, sin variante de producción | Cabeceras |
-| 12 | MEDIA | Los PDF se sirven con URL firmada de portador, contra el reparto imagen/documento de la ADR-005 | Ficheros |
-| 13 | MEDIA | `accel-redirect` es fail-open: olvidarlo reabre la entrega de bytes en el origen de la aplicación | Ficheros |
-| 14 | MEDIA | Decodificación de imágenes sin límite de concurrencia (OOM con pocos PNG de 50 Mpx) | Ficheros |
-| 15 | MEDIA | El cambio de contraseña autenticado no tiene límite de intentos (fuerza bruta + DoS de CPU) | Auth |
-| 16 | MEDIA | `AcceptInvitation` emite sesión a una identidad dada de baja (deny-by-default roto) | AuthZ |
-| 17 | MEDIA | Oráculo de tiempo en `password-reset`/`resend`: enumeración de correos por el reloj | Auth |
-| 18 | MEDIA | La URL de documento externo no valida esquema y el cliente la abre con `window.open` (XSS almacenado entre miembros) | Inyección |
-| 19 | MEDIA | El compose publica PostgreSQL, Mailpit y nginx en `0.0.0.0` | Infra |
-| — | BAJA/INFO | Quince puntos más de endurecimiento (ver detalle) | Varias |
+| # | Sev. | Hallazgo | Área | Detectado | Corregido |
+|---|---|---|---|---|---|
+| 1 | ALTA | El rate limit por IP colapsa en un cubo global detrás de nginx (DoS de toda la autenticación) | Auth | 2026-08-20 | 2026-08-20 |
+| 2 | ALTA | Fail-open del secreto JWT: sin perfil activo, producción arranca con la clave de ejemplo del repositorio | Infra | 2026-08-20 | 2026-08-20 |
+| 3 | ALTA | `DRP_FILES_LINK_SECRET` no se valida al arrancar: puede quedar el secreto de firma de desarrollo en producción | Ficheros | 2026-08-20 | 2026-08-20 |
+| 4 | ALTA | `webp-imageio 0.1.6` embebe libwebp anterior al fix de CVE-2023-4863 y decodifica WebP subido por usuarios | Deps | 2026-08-20 | — |
+| 5 | ALTA | Spring Boot 3.4.x fuera de soporte OSS y sin detección continua de dependencias | Deps | 2026-08-20 | — |
+| 6 | MEDIA | `CloseAccount` (`DELETE /users/me`) no re-autentica: un access token robado expulsa a la víctima de forma permanente | AuthZ | 2026-08-20 | — |
+| 7 | MEDIA | Rotación de refresh sin detección de reutilización (robo indetectable) | Auth | 2026-08-20 | — |
+| 8 | MEDIA | Sesión deslizante sin tope absoluto: renovada una vez al mes, vive para siempre | Auth | 2026-08-20 | — |
+| 9 | MEDIA | Refresh token de 30 días en `localStorage` (decisión aplazada no revisada) | Auth | 2026-08-20 | — |
+| 10 | MEDIA | Sin CSP ni cabeceras de seguridad para la SPA; HSTS no se emitirá sin `forward-headers-strategy` | Cabeceras | 2026-08-20 | — |
+| 11 | MEDIA | CORS de desarrollo cableado con `allowCredentials` y `allowedHeaders("*")`, sin variante de producción | Cabeceras | 2026-08-20 | — |
+| 12 | MEDIA | Los PDF se sirven con URL firmada de portador, contra el reparto imagen/documento de la ADR-005 | Ficheros | 2026-08-20 | — |
+| 13 | MEDIA | `accel-redirect` es fail-open: olvidarlo reabre la entrega de bytes en el origen de la aplicación | Ficheros | 2026-08-20 | — |
+| 14 | MEDIA | Decodificación de imágenes sin límite de concurrencia (OOM con pocos PNG de 50 Mpx) | Ficheros | 2026-08-20 | — |
+| 15 | MEDIA | El cambio de contraseña autenticado no tiene límite de intentos (fuerza bruta + DoS de CPU) | Auth | 2026-08-20 | — |
+| 16 | MEDIA | `AcceptInvitation` emite sesión a una identidad dada de baja (deny-by-default roto) | AuthZ | 2026-08-20 | — |
+| 17 | MEDIA | Oráculo de tiempo en `password-reset`/`resend`: enumeración de correos por el reloj | Auth | 2026-08-20 | — |
+| 18 | MEDIA | La URL de documento externo no valida esquema y el cliente la abre con `window.open` (XSS almacenado entre miembros) | Inyección | 2026-08-20 | — |
+| 19 | MEDIA | El compose publica PostgreSQL, Mailpit y nginx en `0.0.0.0` | Infra | 2026-08-20 | — |
+| — | BAJA/INFO | Quince puntos más de endurecimiento (ver detalle) | Varias | 2026-08-20 | — |
+
+> **Las dos fechas coinciden hoy porque la auditoría y el primer cierre son del
+> mismo día**, y la columna existe para cuando dejen de coincidir: una revisión
+> posterior añadirá filas con otra fecha de detección, y lo que hoy está abierto
+> se cerrará en otra. Sin las dos fechas no se puede decir cuánto tiempo estuvo
+> vivo un hallazgo, que es lo único que convierte esta tabla en un registro y no
+> en una foto.
+>
+> **Los tres cerrados eran los tres «a medio cumplir»**, y se cerraron juntos por
+> eso: los tres consistían en que una mitad del control estaba escrita y la otra
+> no. Los dos ALTA que siguen abiertos —`webp-imageio` y la línea de Spring
+> Boot— son subidas de dependencia con riesgo de regresión propio, así que van en
+> su propio bloque y no mezclados con estos.
 
 ---
 
@@ -137,6 +154,14 @@ desaparece.
   confianza (o `server.forward-headers-strategy=FRAMEWORK` con `set_real_ip_from`
   en nginx), con una prueba que fije que tras el proxy cada cliente tiene su
   cubo.
+- **Corregido.** `ClientIpResolver` lee la cabecera solo cuando el salto
+  inmediato casa con `drp.rate-limit.trusted-proxies` (IP o CIDR, **vacío por
+  omisión**: sin proxy declarado no se fía de nadie, que es el comportamiento
+  correcto de hoy). Toma la **última** entrada de `X-Forwarded-For`, que es la
+  que añade el proxy y la única que no puede escribir quien llama — tomar la
+  primera habría leído justo el valor que elige el atacante. Fijado por prueba en
+  las dos direcciones: detrás del proxy dos clientes no comparten cubo, y siete
+  cabeceras falsificadas distintas siguen cayendo en el mismo contador.
 
 ### 2. Fail-open del secreto JWT sin perfil activo
 
@@ -158,6 +183,14 @@ vez**, como el propio comentario del código describe (`SecurityAdapters.kt:240-
   ejemplo; mejor aún, retirar el default del `application.yml` y moverlo a un
   `application-dev.yml`, de modo que sin `DRP_JWT_SECRET` el arranque falle
   siempre.
+- **Corregido.** Criterio invertido: `isDevelopmentEnvironment` exige un perfil
+  de desarrollo **declarado**, y la ausencia de perfil pasa a ser producción. El
+  precio es que dev y pruebas tienen que declararse, y lo hacen **desde la cadena
+  de construcción y no clase a clase**: `bootRun` arranca con `dev` —lo que cubre
+  también el recorrido vertical, que arranca el backend por ahí— y la tarea de
+  pruebas fija `test`, que era la única forma sensata de cubrir las 47 clases con
+  `@SpringBootTest` sin que olvidar la anotación en la próxima se manifieste como
+  un fallo de arranque sin relación aparente con la causa.
 
 ### 3. El secreto de firma de ficheros no se valida al arrancar
 
@@ -178,6 +211,12 @@ UUID para construir y firmar la URL.
   `drp.files.link-secret` (constante reconocible + rechazo fuera de desarrollo +
   mínimo de longitud) en el mismo bean de arranque; en el compose de producción
   inyectarlo como secret, nunca literal.
+- **Corregido.** `FileLinkProperties` replica la validación del JWT —mínimo de
+  32 bytes y rechazo del valor de ejemplo fuera de desarrollo— y `SignedFileUrls`
+  lo recibe **por esa clase y no por `@Value`**, de modo que no queda ningún
+  camino que use el secreto sin haberlo validado. Sigue pendiente lo que no es
+  del código: inyectarlo como secret en el compose de producción, que es parte
+  del bloque de despliegue.
 
 ### 4. `webp-imageio 0.1.6` decodifica WebP subido con una libwebp sin parchear
 
@@ -484,7 +523,12 @@ llegue a producción.
 1. **TLS/HTTPS** (REST Security): certbot/ACME con redirección 80→443, HSTS, y el
    **segundo dominio de ficheros** también bajo TLS. Configurar
    `server.forward-headers-strategy` en el backend (sin ello Spring no sabe que
-   está tras un proxy TLS, y ni el rate limit por IP ni HSTS funcionan).
+   está tras un proxy TLS y HSTS no se emite).
+   - **Y declarar `DRP_TRUSTED_PROXIES`** con la IP o el rango del nginx que
+     tenga delante: el limitador ya sabe recuperar la IP real del cliente, pero
+     por omisión no se fía de nadie, así que sin esta variable vuelve a contar a
+     todo el mundo en el mismo cubo. Es la variable que más fácil es olvidar,
+     porque nada falla al arrancar sin ella.
 2. **Compose de producción endurecido** (Docker / IaC Security): red interna sin
    publicar PostgreSQL ni SMTP; solo 443 expuesto; `restart: unless-stopped`;
    contenedores `user:` no root, `read_only` + `tmpfs`, `cap_drop: [ALL]`,
@@ -580,3 +624,4 @@ Lo que la auditoría comprobó como correcto, para que no se toque sin querer:
 | Fecha | Cambio | Autor |
 |---|---|---|
 | 2026-08-20 | Creación: auditoría OWASP previa al despliegue en VPS, sobre las 106 operaciones y 31 tablas del cierre de huecos. Cinco superficies auditadas; sin vulnerabilidades críticas; cinco ALTA y catorce MEDIA en el código actual, más los requisitos del despliegue. | kikescribano |
+| 2026-08-20 | **Corregidos los tres ALTA acotados**, que eran los tres «a medio cumplir»: el rate limit recupera la IP del cliente tras un proxy declarado de confianza (`drp.rate-limit.trusted-proxies`, leyendo la **última** entrada de `X-Forwarded-For`), la ausencia de perfil pasa a contar como producción —con `bootRun` declarando `dev` y la tarea de pruebas `test`— y el secreto de firma de ficheros se valida al arrancar igual que el del JWT. La tabla del resumen gana **fecha de detección y de corrección** por hallazgo, para que se pueda decir cuánto tiempo estuvo vivo cada uno y no solo si está cerrado. Quedan abiertos los dos ALTA de dependencias, que van en su propio bloque. | kikescribano |

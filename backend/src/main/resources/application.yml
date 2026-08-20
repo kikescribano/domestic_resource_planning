@@ -142,6 +142,17 @@ drp:
     # casa a fotos, y suficiente para que llenar el gigabyte a base de peticiones
     # cueste horas en vez de minutos.
     per-identity-upload: 60
+    # Los proxies de confianza, por IP o por rango CIDR y separados por comas.
+    #
+    # **Vacio por omision, que es no fiarse de nadie**: sin proxy delante,
+    # `X-Forwarded-For` la escribe entera quien llama y leerla seria regalar un
+    # cubo nuevo por peticion. Con nginx delante pasa lo contrario --todas las
+    # peticiones traen la IP del proxy y el limite se vuelve uno solo para toda
+    # la instalacion-- asi que **un despliegue detras del proxy tiene que
+    # declararlo aqui**: la red de contenedores de compose, o la IP del proxy.
+    #
+    #   DRP_TRUSTED_PROXIES=172.16.0.0/12
+    trusted-proxies: ${DRP_TRUSTED_PROXIES:}
 
   storage:
     # La raiz del **volumen separado** de ficheros (5.8.1). En un despliegue de
