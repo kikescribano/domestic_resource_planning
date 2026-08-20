@@ -179,8 +179,9 @@ escrito a medias.
 **Implementado**, en
 [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx), por el Hito 0 del
 cierre de huecos. Se usa en dos sitios y con sus dos variantes: la baja del hogar
-en «Tu hogar» —con el nombre del hogar— y el cierre de cuenta en «Tu cuenta» —con
-`CERRAR`—, los dos en
+en «General» (`/configuracion`, dentro del grupo «Configuración» que solo ve
+quien administra) —con el nombre del hogar— y el cierre de cuenta en «Cuenta»
+—con `CERRAR`—, los dos en
 [`routes/household.tsx`](../../../../frontend/src/routes/household.tsx).
 
 Dos cosas que la implementación decidió y esta ficha no había fijado:
@@ -189,7 +190,7 @@ Dos cosas que la implementación decidió y esta ficha no había fijado:
   envía, que es la forma más rápida de disparar la acción sin haber mirado el
   botón — el mismo defecto que la sección de antiusos ya nombraba.
 - **La zona de peligro solo aparece cuando la acción está disponible.** Con la
-  baja ya pedida, «Tu hogar» enseña en su lugar la fecha y un botón normal de
+  baja ya pedida, «General» enseña en su lugar la fecha y un botón normal de
   cancelar: **deshacer algo destructivo no merece fricción**, y ponérsela sería
   castigar el arrepentimiento, que es justo lo que el periodo de gracia existe
   para permitir.
@@ -210,3 +211,4 @@ Dos cosas que la implementación decidió y esta ficha no había fijado:
 |---|---|
 | 2026-08-20 | Se crea, **antes que el componente**, al construir la baja de hogar y el cierre de cuenta (Hito 0 del cierre de huecos) |
 | 2026-08-20 | Pasa a **implementada** el mismo día: se corrigen los dos tokens de color que la ficha había inventado, y se anotan las dos decisiones que la construcción trajo —el `div` en lugar del `form`, y que cancelar no lleva fricción— |
+| 2026-08-20 | La baja del hogar se muda de «Hogar» a **«General»** (`/configuracion`), la pantalla del grupo «Configuración» que solo ve quien administra. Las dos variantes del componente siguen intactas |

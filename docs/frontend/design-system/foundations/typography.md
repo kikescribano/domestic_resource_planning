@@ -70,10 +70,13 @@ no obligue a renombrar nada.
 | `--text-title-sm` | 18 px | 1,35 | Título de tarjeta, cabecera de diálogo |
 | `--text-title` | 22 → 26 px | 1,25 | Título de sección |
 | `--text-display` | 28 → 40 px | 1,15 | `h1`, titular de estado vacío |
+| `--text-brand` | 44 px | 1,1 | El nombre del producto cuando la marca preside una pantalla sin sesión |
 
-Los dos últimos usan `clamp()` porque el salto de 375 px a ultrawide no se
+`title` y `display` usan `clamp()` porque el salto de 375 px a ultrawide no se
 resuelve con un valor fijo: un `h1` de 40 px aplasta un móvil y uno de 28 px se
-pierde en una pantalla de 3440 px.
+pierde en una pantalla de 3440 px. `brand` en cambio es fijo a propósito: forma
+parte de un logotipo, no de texto que fluye, y un logotipo no cambia de
+proporciones con la ventana.
 
 **16 px en los campos de formulario no es negociable.** Por debajo de eso, Safari
 en iOS hace zoom automático al enfocar un campo, y el usuario se queda con la
@@ -115,5 +118,6 @@ tamaño no se lee.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **Nace `--text-brand` (44 px, fijo)** para el nombre del producto cuando la marca preside las pantallas sin sesión, que la estrenan todas a la vez. Fijo y no `clamp()` porque es parte de un logotipo, no texto que fluye. | Equipo DRP |
 | 2026-08-20 | **La display pasa de la pila serif de sistema a Baloo 2**, la redonda gruesa del logotipo, autoalojada vía `@fontsource` en los pesos 600/700/800. Sus dos límites duros —20 px de suelo y prohibida en filas— se conservan tal cual; el peso del `h1` queda declarado en la capa base. | Equipo DRP |
 | 2026-08-10 | Creación del documento con las dos familias y la escala del Hito 1. | Equipo DRP |

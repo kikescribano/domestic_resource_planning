@@ -27,7 +27,7 @@ Se llega por dos caminos y los dos importan:
 
 | | Qué ocurre |
 |---|---|
-| **Desde la navegación** | «Proveedores» aparece en el grupo de módulos —columna en escritorio, «Más» en móvil— **solo si el módulo está activo**. Es el camino normal |
+| **Desde la navegación** | «Proveedores» aparece en el grupo «Datos maestros» —columna en escritorio, «Más» en móvil— **solo si el módulo está activo**. Es el camino normal |
 | **Escribiendo `/proveedores` a mano** | Con el módulo apagado no lleva a un error sino a la pantalla que **lo ofrece**. Es el motivo por el que el backend responde `403` y no `404`, y el único sitio del cliente donde esa diferencia sirve de algo |
 
 El segundo camino es el que fija la anatomía entera de esta ficha, y tiene una
@@ -105,11 +105,12 @@ Con esto, el `milestone` de `MODULE_SCREENS` deja de tener sentido para
 
 - **De 320 px a ultrawide**, como todo. El listado es una columna en móvil y
   gana la categoría y el teléfono en línea desde `sm`.
-- **La navegación no gana ninguna parada.** «Proveedores» entra en el grupo de
-  módulos, que en móvil vive dentro de «Más»: la barra inferior sigue en cuatro
-  paradas y «Más», que es el tope medido a 320 px. Esto **hay que volver a
-  medirlo**, no darlo por bueno: el recorrido vertical mide el ancho de cada
-  parada visible y ese es el sitio donde el defecto se caza.
+- **La navegación no gana ninguna parada en el pulgar.** «Proveedores» entra en
+  el grupo «Datos maestros», que en móvil vive dentro de «Más»: la barra
+  inferior sigue en cuatro paradas y «Más», que es el tope medido a 320 px.
+  Esto **hay que volver a medirlo**, no darlo por bueno: el recorrido vertical
+  mide el ancho de cada parada visible y ese es el sitio donde el defecto se
+  caza.
 - **Contenido extremo:** un nombre largo se envuelve y no recorta la fila; una
   web larga se corta con elipsis porque no se lee, se pulsa. La ficha desplegada
   no fuerza `overflow-x` en el documento: si algo desborda, desborda **dentro de

@@ -140,17 +140,20 @@ describe('la bandeja de avisos', () => {
     expect(await screen.findByText('No se han podido cargar los avisos.', {}, { timeout: 8000 })).toBeInTheDocument()
   })
 
-  it('vive en la navegación del hogar, y no en las paradas del pulgar', async () => {
-    // El tope medido son cinco paradas a 320 px --cuatro y «Más»--, así que una
-    // pantalla nueva gana sitio en la columna del escritorio, no un hueco en la
-    // barra inferior. Que quepan es cosa del recorrido vertical, que lo mide
-    // sobre el DOM real; aquí lo que se fija es en qué grupo está.
+  it('vive en el grupo «Tu hogar» y es una de las cuatro paradas del pulgar', async () => {
+    // Con el reagrupado del 2026-08-20 «Avisos» entró en la barra inferior y
+    // «Ubicaciones» salió: el orden de la navegación es uno solo y la barra es
+    // el recorte de las cuatro primeras paradas de «Tu hogar». La pertenencia
+    // no la dice el orden del DOM sino la clase de la parada: lo que no es de
+    // la barra va oculto hasta `md`. Que las cinco quepan a 320 px es cosa del
+    // recorrido vertical, que lo mide sobre el DOM real.
     await openInbox()
 
     const navigation = within(screen.getByRole('navigation', { name: 'Principal' }))
-    const stops = navigation.getAllByRole('link').map((link) => link.textContent)
+    const homeGroup = within(navigation.getByRole('list', { name: 'Tu hogar' }))
+    const avisos = homeGroup.getByRole('link', { name: 'Avisos' })
 
-    expect(stops).toContain('Avisos')
-    expect(stops.indexOf('Avisos')).toBeGreaterThan(stops.indexOf('Préstamos'))
+    expect(avisos.closest('li')).not.toHaveClass('hidden')
+    expect(navigation.getByRole('link', { name: 'Ubicaciones' }).closest('li')).toHaveClass('hidden')
   })
 })

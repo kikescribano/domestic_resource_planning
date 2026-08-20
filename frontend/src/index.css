@@ -187,6 +187,8 @@
   --text-title--line-height: 1.25;
   --text-display: clamp(1.75rem, 1.5rem + 1.1vw, 2.5rem);
   --text-display--line-height: 1.15;
+  --text-brand: 2.75rem;
+  --text-brand--line-height: 1.1;
 
   /* -------------------------------------------------------------------------
      Espacio
