@@ -1,6 +1,6 @@
 plugins {
     kotlin("jvm") version "2.1.20"
-    kotlin("plugin.spring") version "2.1.20"
+    kotlin("plugin.spring") version "2.4.10"
     // Genera el constructor sin argumentos que JPA exige de toda entidad y que
     // Kotlin no produce por su cuenta.
     kotlin("plugin.jpa") version "2.1.20"
