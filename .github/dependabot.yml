@@ -38,12 +38,24 @@ updates:
         patterns:
           - org.springframework*
           - org.springdoc*
-      # **Los tres plugins de Kotlin van juntos o no van.** La primera versión de
-      # este fichero se los dejó fuera y el resultado fue una trampa: Dependabot
-      # abrió el de `jvm` y el de `plugin.spring` por separado, y **cada uno pasa
-      # la integración por su cuenta** — porque en su rama sube los dos números a
-      # la vez. Fusionar solo uno deja las versiones descuadradas y rompe la
-      # construcción en `main`, que es donde ya no lo está mirando nadie.
+      # **Los tres plugins de Kotlin van juntos: son una sola decisión.** La
+      # primera versión de este fichero los dejó fuera, y Dependabot abrió el de
+      # `jvm` y el de `plugin.spring` por separado, cada uno subiendo solo su
+      # línea. Agruparlos evita que la versión de Kotlin se revise tres veces y
+      # que `main` acabe en una combinación intermedia que nadie eligió — con un
+      # plugin en una versión y los otros dos en otra.
+      #
+      # **Corrección de lo que decía aquí antes:** este comentario afirmaba que
+      # fusionar uno solo rompería la construcción. Se comprobó después y **no es
+      # cierto** — las dos propuestas pasaron la integración por separado, así
+      # que el estado mixto compila. El motivo para agrupar es el de arriba, no
+      # un fallo de construcción; y se deja escrita la corrección porque una
+      # razón inventada es peor que ninguna: sobrevive a quien la escribió y se
+      # cita como si estuviera medida.
+      #
+      # Hay además un motivo de calendario: Kotlin 2.2+ es requisito del salto a
+      # Spring Boot 4, así que esa subida conviene mirarla como un bloque y no
+      # como tres actualizaciones sueltas que entran por su cuenta.
       #
       # Los nombres son los cortos del DSL de Kotlin (`kotlin("jvm")`), que es
       # como los ve Dependabot, y no `org.jetbrains.kotlin.*`: con el patrón de
