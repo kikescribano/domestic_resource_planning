@@ -33,42 +33,51 @@ describe('la guía de la herramienta', () => {
   beforeEach(() => localStorage.clear())
   afterEach(() => vi.unstubAllGlobals())
 
-  it('tiene un bloque por pantalla, cada uno con su enlace', async () => {
+  it('tiene una sección por pantalla, cada una con su enlace y sus tarjetas', async () => {
     await openHelp()
 
     // Una muestra de cada grupo de la navegación —Tu hogar, Datos maestros,
-    // Configuración— y un módulo. Si la lista de pantallas crece, el bloque
-    // nuevo se añade a `HELP_TOPICS` y esta prueba no se toca.
+    // Configuración— y un módulo. Si la lista de pantallas crece, la sección
+    // nueva se añade a `HELP_TOPICS` y esta prueba no se toca.
     for (const title of ['Inventario', 'Catálogo', 'General', 'Mantenimiento']) {
-      expect(screen.getByRole('article', { name: title })).toBeInTheDocument()
+      expect(screen.getByRole('region', { name: title })).toBeInTheDocument()
       expect(screen.getByRole('link', { name: `Ir a ${title}` })).toBeInTheDocument()
     }
 
     expect(screen.getByRole('link', { name: 'Ir a Almacén' })).toHaveAttribute('href', '/almacen')
+
+    // Dentro de una sección: la tarjeta de la explicación general y una por
+    // caso de uso, cada caso con su ejemplo práctico rotulado.
+    const loans = within(screen.getByRole('region', { name: 'Préstamos' }))
+    expect(loans.getByRole('article', { name: 'Explicación general' })).toBeInTheDocument()
+    const firstCase = within(loans.getByRole('article', { name: 'Registrar un préstamo' }))
+    expect(firstCase.getByText('Ejemplo:')).toBeInTheDocument()
   })
 
-  it('cada bloque se reparte en explicación general y casos de uso con su ejemplo', async () => {
-    await openHelp()
-
-    // El patrón de subtítulos es el contrato del bloque: las dos partes son
-    // `h3` bajo el `h2` de la pantalla —la jerarquía no se salta niveles— y
-    // cada caso de uso lleva su ejemplo práctico rotulado.
-    const card = within(screen.getByRole('article', { name: 'Préstamos' }))
-    expect(card.getByRole('heading', { level: 3, name: 'Explicación general' })).toBeInTheDocument()
-    expect(card.getByRole('heading', { level: 3, name: 'Casos de uso' })).toBeInTheDocument()
-    expect(card.getByText('Registrar un préstamo.')).toBeInTheDocument()
-    expect(card.getAllByText('Ejemplo:').length).toBeGreaterThan(1)
-  })
-
-  it('el buscador filtra bloques enteros y no distingue acentos', async () => {
+  it('el buscador filtra tarjeta a tarjeta y no distingue acentos', async () => {
     await openHelp()
 
     // «prestamo» sin tilde tiene que encontrar «Préstamos»: es la promesa que
     // la pista del campo deja escrita, la misma comparación del catálogo.
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar' }), 'prestamo')
 
-    expect(screen.getByRole('article', { name: 'Préstamos' })).toBeInTheDocument()
-    expect(screen.queryByRole('article', { name: 'Proveedores' })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Préstamos' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Proveedores' })).not.toBeInTheDocument()
+  })
+
+  it('una palabra que solo vive en un caso deja esa tarjeta sola bajo su sección', async () => {
+    await openHelp()
+
+    // La granularidad es el motivo del reparto en tarjetas: «guirnalda» solo
+    // aparece en el ejemplo de un caso de Ubicaciones, así que sobrevive esa
+    // tarjeta, con la cabecera de su sección encima y sin la explicación
+    // general al lado.
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar' }), 'guirnalda')
+
+    const section = within(screen.getByRole('region', { name: 'Ubicaciones' }))
+    expect(section.getAllByRole('article')).toHaveLength(1)
+    expect(section.getByRole('article', { name: 'Declarar cuánto cabe' })).toBeInTheDocument()
+    expect(screen.getAllByRole('region')).toHaveLength(1)
   })
 
   it('cuando nada coincide lo dice, en lugar de dejar la lista vacía', async () => {
@@ -76,7 +85,7 @@ describe('la guía de la herramienta', () => {
 
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar' }), 'zzzz')
 
-    expect(screen.getByText('Ningún bloque coincide')).toBeInTheDocument()
+    expect(screen.getByText('Ninguna tarjeta coincide')).toBeInTheDocument()
     expect(screen.queryByRole('article')).not.toBeInTheDocument()
   })
 

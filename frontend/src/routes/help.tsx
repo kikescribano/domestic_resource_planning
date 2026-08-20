@@ -25,14 +25,18 @@ import { EmptyState, Field, PageHeading } from '../ui/primitives'
 /**
  * La guía de la herramienta, pantalla a pantalla.
  *
- * Cada pantalla es un bloque con dos partes bajo subtítulo: la **explicación
- * general** —qué es y cómo se usa— y los **casos de uso**, uno por
- * funcionalidad y cada uno con su ejemplo práctico en situación doméstica. El
- * contenido es estático a propósito —no pide nada a la API—, así que la
- * pantalla sirve igual con el hogar recién creado que con años de histórico.
+ * Cada pantalla es una **sección** con su cabecera —icono, nombre y el enlace
+ * para ir— y debajo sus **tarjetas**: una con la explicación general —qué es y
+ * cómo se usa— y una por cada caso de uso, con su ejemplo práctico en
+ * situación doméstica. El contenido es estático a propósito —no pide nada a la
+ * API—, así que la pantalla sirve igual con el hogar recién creado que con
+ * años de histórico.
  *
- * El buscador filtra bloques enteros: escribir «caducidad» deja a la vista
- * solo las pantallas cuyo texto la menciona, casos de uso incluidos. La
+ * El buscador filtra **tarjeta a tarjeta**, no secciones enteras: escribir
+ * «caducidad» deja a la vista solo las tarjetas que la mencionan, cada una
+ * bajo la cabecera de su pantalla; una sección sin ninguna tarjeta que
+ * coincida desaparece. El nombre de la pantalla cuenta para todas sus
+ * tarjetas, así que buscar «préstamos» enseña la sección entera. La
  * comparación es la misma que la del catálogo —sin mayúsculas ni acentos—,
  * para que «prestamo» encuentre «Préstamos».
  */
@@ -57,7 +61,7 @@ interface HelpTopic {
 }
 
 /**
- * Un bloque por pantalla, en el orden de la navegación —Tu hogar, Datos
+ * Una sección por pantalla, en el orden de la navegación —Tu hogar, Datos
  * maestros y Configuración, con sus paradas tal y como se enseñan— y al final
  * «Cuenta», que no es una parada de la lista porque acompaña a la marca. Los
  * títulos y los iconos son los del menú: la ayuda no estrena nombres.
@@ -528,110 +532,130 @@ const HELP_TOPICS: HelpTopic[] = [
 // «prestamo» encuentre «Préstamos» y «almacen» encuentre «Almacén».
 const normalized = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
-function matches(topic: HelpTopic, query: string) {
-  const haystack = normalized(
-    [
-      topic.title,
-      topic.overview,
-      ...topic.useCases.flatMap((useCase) => [useCase.title, useCase.description, useCase.example]),
-    ].join(' '),
+/**
+ * Una tarjeta ya aplanada para pintar: la general lleva `example` a null. El
+ * `id` ancla el `aria-labelledby` del `article` y tiene que ser único en la
+ * página, así que sale de la ruta más el índice del caso.
+ */
+interface HelpCardData {
+  id: string
+  title: string
+  body: string
+  example: string | null
+}
+
+/**
+ * El nombre de la pantalla cuenta en el pajar de TODAS sus tarjetas: buscar
+ * «préstamos» tiene que enseñar la sección entera, no obligar a que cada caso
+ * repita la palabra.
+ */
+function cardsOf(topic: HelpTopic, query: string): HelpCardData[] {
+  const needle = normalized(query.trim())
+  const cards: HelpCardData[] = [
+    { id: `ayuda-${topic.path}-general`, title: 'Explicación general', body: topic.overview, example: null },
+    ...topic.useCases.map((useCase, index) => ({
+      id: `ayuda-${topic.path}-${index}`,
+      title: useCase.title,
+      body: useCase.description,
+      example: useCase.example,
+    })),
+  ]
+  if (!needle) return cards
+
+  return cards.filter((card) =>
+    normalized([topic.title, card.title, card.body, card.example ?? ''].join(' ')).includes(needle),
   )
-  return haystack.includes(normalized(query.trim()))
 }
 
 export function HelpPage() {
   const [query, setQuery] = useState('')
 
-  const visible = HELP_TOPICS.filter((topic) => matches(topic, query))
+  const sections = HELP_TOPICS.map((topic) => ({ topic, cards: cardsOf(topic, query) })).filter(
+    ({ cards }) => cards.length > 0,
+  )
 
   return (
     <>
       <PageHeading title="Ayuda" icon={CircleHelp} />
 
-      <div className="flex flex-col gap-6">
-        <p className="max-w-prose text-body text-ink-muted">
-          Qué hace cada pantalla de la herramienta y qué problema resuelve, caso a caso y con su ejemplo. Cada
-          bloque lleva su enlace para ir directamente.
-        </p>
+      <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-6">
+          <p className="max-w-prose text-body text-ink-muted">
+            Qué hace cada pantalla de la herramienta y qué problema resuelve, caso a caso y con su ejemplo. Cada
+            sección lleva su enlace para ir directamente.
+          </p>
 
-        <Field
-          label="Buscar"
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          hint="Filtra los bloques, casos de uso incluidos. No distingue mayúsculas ni acentos."
-        />
+          <Field
+            label="Buscar"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            hint="Filtra tarjeta a tarjeta, casos de uso incluidos. No distingue mayúsculas ni acentos."
+          />
+        </div>
 
-        {visible.length === 0 ? (
-          <EmptyState title="Ningún bloque coincide">Prueba con otras palabras.</EmptyState>
+        {sections.length === 0 ? (
+          <EmptyState title="Ninguna tarjeta coincide">Prueba con otras palabras.</EmptyState>
         ) : (
-          <ul className="flex flex-col gap-3">
-            {visible.map((topic) => (
-              <HelpCard key={topic.path} topic={topic} />
-            ))}
-          </ul>
+          sections.map(({ topic, cards }) => <HelpSection key={topic.path} topic={topic} cards={cards} />)
         )}
       </div>
     </>
   )
 }
 
-/**
- * El subtítulo que reparte el bloque en sus dos partes. Es un `h3` bajo el
- * `h2` del bloque —la jerarquía del documento se conserva— y con la anatomía
- * del rótulo de grupo de la navegación: `text-caption` apagado, porque
- * estructura sin competir con el contenido.
- */
-function CardSubtitle({ children }: { children: string }) {
-  return <h3 className="text-caption font-medium uppercase text-ink-subtle">{children}</h3>
-}
-
-function HelpCard({ topic }: { topic: HelpTopic }) {
+function HelpSection({ topic, cards }: { topic: HelpTopic; cards: HelpCardData[] }) {
   const Icon = topic.icon
 
   return (
-    <li>
-      {/* `article` con su `aria-labelledby`: cada bloque es una pieza con
-          nombre, y un lector de pantalla puede saltar de una a otra. */}
+    <section aria-labelledby={`ayuda-${topic.path}`} className="flex flex-col gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id={`ayuda-${topic.path}`} className="flex items-center gap-2 text-title-sm text-ink">
+          <Icon size={20} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-accent-ink" />
+          {topic.title}
+        </h2>
+        {/* El nombre accesible dice adónde va: quince enlaces que digan
+            solo «Abrir» son indistinguibles en una lista de enlaces. */}
+        <Link
+          to={topic.path}
+          className="min-h-touch inline-flex items-center rounded-md px-2 text-body-sm font-medium text-accent-ink hover:underline"
+        >
+          Ir a {topic.title}
+        </Link>
+      </header>
+
+      {/* Dos columnas desde `md`: con una tarjeta por caso, la columna única
+          hacía la página un pergamino en escritorio. La general abre la
+          sección a todo el ancho, que es su jerarquía. */}
+      <ul className="grid gap-3 md:grid-cols-2">
+        {cards.map((card) => (
+          <HelpCard key={card.id} card={card} spanFull={card.example === null} />
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function HelpCard({ card, spanFull }: { card: HelpCardData; spanFull: boolean }) {
+  return (
+    <li className={spanFull ? 'md:col-span-2' : ''}>
+      {/* `article` con su `aria-labelledby`: cada tarjeta es una pieza con
+          nombre —el del caso de uso—, y un lector de pantalla salta de una a
+          otra. El `h-full` iguala las tarjetas de una misma fila de la
+          rejilla. */}
       <article
-        aria-labelledby={`ayuda-${topic.path}`}
-        className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-surface-raised p-4"
+        aria-labelledby={card.id}
+        className="flex h-full flex-col gap-1.5 rounded-lg border border-border-subtle bg-surface-raised p-4"
       >
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id={`ayuda-${topic.path}`} className="flex items-center gap-2 text-title-sm text-ink">
-            <Icon size={20} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-accent-ink" />
-            {topic.title}
-          </h2>
-          {/* El nombre accesible dice adónde va: quince enlaces que digan
-              solo «Abrir» son indistinguibles en una lista de enlaces. */}
-          <Link
-            to={topic.path}
-            className="min-h-touch inline-flex items-center rounded-md px-2 text-body-sm font-medium text-accent-ink hover:underline"
-          >
-            Ir a {topic.title}
-          </Link>
-        </header>
-
-        <section className="flex flex-col gap-1.5">
-          <CardSubtitle>Explicación general</CardSubtitle>
-          <p className="max-w-prose text-body-sm text-ink-muted">{topic.overview}</p>
-        </section>
-
-        <section className="flex flex-col gap-2">
-          <CardSubtitle>Casos de uso</CardSubtitle>
-          <ul className="flex flex-col gap-2.5">
-            {topic.useCases.map((useCase) => (
-              <li key={useCase.title} className="max-w-prose text-body-sm text-ink-muted">
-                <p>
-                  <span className="font-medium text-ink">{useCase.title}.</span> {useCase.description}
-                </p>
-                <p className="mt-0.5">
-                  <span className="italic">Ejemplo:</span> {useCase.example}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <h3 id={card.id} className="text-body-sm font-medium text-ink">
+          {card.title}
+        </h3>
+        <p className="max-w-prose text-body-sm text-ink-muted">{card.body}</p>
+        {card.example && (
+          <p className="max-w-prose text-body-sm text-ink-muted">
+            <span className="italic">Ejemplo:</span> {card.example}
+          </p>
+        )}
       </article>
     </li>
   )
