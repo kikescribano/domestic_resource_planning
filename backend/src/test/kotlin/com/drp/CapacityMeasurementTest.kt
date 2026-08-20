@@ -6,6 +6,7 @@ import com.drp.test.DrpPostgres
 import com.drp.test.SpringIntegrationTest
 import com.drp.test.extract
 import com.drp.test.getJson
+import com.drp.test.patchJson
 import com.drp.test.postJson
 import com.drp.test.registerHousehold
 import com.drp.test.seededCategory
@@ -226,6 +227,27 @@ class CapacityMeasurementTest : SpringIntegrationTest() {
         val tools = http.seededCategory(home.accessToken, "Herramientas")
         val food = http.seededCategory(home.accessToken, "Alimentación")
 
+        // Con cara, que es lo que el Hito 4 del cierre de huecos dejó elegir: un
+        // hogar de verdad pinta sus categorías, así que la medición también.
+        http.patchJson(
+            "/api/v1/categories/$tools",
+            """{"name":"Herramientas","icon":"TOOL","color":"SKY"}""",
+            home.accessToken,
+        )
+        http.patchJson(
+            "/api/v1/categories/$food",
+            """{"name":"Alimentación","icon":"UTENSILS","color":"MOSS"}""",
+            home.accessToken,
+        )
+
+        val tags = (1..TAGS).map { index ->
+            http.postJson(
+                "/api/v1/tags",
+                """{"name":"Etiqueta $index"}""",
+                home.accessToken,
+            ).body!!.extract("id")
+        }
+
         val rooms = (1..ROOMS).map { room ->
             http.postJson(
                 "/api/v1/locations",
@@ -242,10 +264,19 @@ class CapacityMeasurementTest : SpringIntegrationTest() {
             ).body!!.extract("id")
         }
 
+        // Con estado de conservación en la mayoría —uno de cada cinco sin anotar,
+        // porque nulo significa «nadie lo apuntó» y una casa de verdad tiene de
+        // eso— y dos etiquetas en la mitad, que es el perfil de quien clasifica
+        // lo que le importa y no todo.
         val durables = (1..DURABLES).map { index ->
+            val condition =
+                if (index % 5 == 0) "" else """"condition":"${CONDITIONS[index % CONDITIONS.size]}","""
+            val tagged =
+                if (index % 2 == 0) """"tagIds":["${tags[index % tags.size]}","${tags[(index + 1) % tags.size]}"],"""
+                else ""
             http.postJson(
                 "/api/v1/assets",
-                """{"name":"Cosa $index","type":"DURABLE","categoryId":"$tools",
+                """{"name":"Cosa $index","type":"DURABLE","categoryId":"$tools",$condition$tagged
                     "location":{"type":"LOCATION","id":"${rooms[index % rooms.size]}"}}""",
                 home.accessToken,
             ).body!!.extract("id")
@@ -409,11 +440,15 @@ class CapacityMeasurementTest : SpringIntegrationTest() {
         const val CONSUMPTIONS_PER_DAY = 3
         const val SHOPPING_LINES_PER_DAY = 2
 
-        // El perfil de un hogar de verdad.
+        // El perfil de un hogar de verdad. Las etiquetas y el estado de
+        // conservación llegan con el cierre de huecos: seis etiquetas de
+        // vocabulario —como la demo— y el resto, repartido al sembrar.
         const val ROOMS = 8
         const val ARTICLES = 40
         const val DURABLES = 50
         const val DOCUMENTS = 15
         const val LOANS = 5
+        const val TAGS = 6
+        val CONDITIONS = listOf("GOOD", "WORN", "DAMAGED", "GOOD", "GOOD")
     }
 }

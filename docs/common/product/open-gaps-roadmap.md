@@ -2,10 +2,15 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | En curso — Hitos 0, 1, 2, 3, 4 y 5 cerrados |
+| Estado | Cerrado — **completado el 2026-08-20**, con sus siete hitos |
 | Responsable | Equipo DRP |
 | Ámbito | Los cuatro huecos que las Fases 1 y 2 dejaron abiertos a propósito, más el quinto que apareció ejecutándolos |
 | Última revisión | 2026-08-20 |
+
+> **El bloque está completo.** Este documento se conserva como historia de cómo
+> se hizo, igual que [`roadmap.md`](roadmap.md) y
+> [`phase-2-roadmap.md`](phase-2-roadmap.md); lo que sigue —la Fase 3— no está
+> planificado, y planificarlo es su propia sesión de trabajo.
 
 > El estado de **las fases** vive en la sección 8 del
 > [`README principal`](../../../README.md), y solo allí. Este documento baja al
@@ -769,26 +774,64 @@ dominio** y el Hito 6 no añade producto.
 > abriendo `spring.main.allow-bean-definition-overriding` para toda la clase —un
 > interruptor que además taparía el próximo choque de nombres que sí sea un error.
 
-### Hito 6 — Cierre del bloque · **Pendiente**
+### Hito 6 — Cierre del bloque · **Hecho** (2026-08-20)
 
 No añade producto. Es corto a propósito, y existe porque las dos fases anteriores
 enseñaron que lo que se deja para «al final de otro hito» no se cierra:
 
-- [ ] **La capacidad, vuelta a medir** en sus dos magnitudes, con las tablas nuevas
-      dentro y con el criterio de retención al día.
-- [ ] **La lista de pantallas de la auditoría de accesibilidad**, que se llama
-      `PHASE_TWO_SCREENS` y ya no contiene solo pantallas de la Fase 2: o se
-      renombra, o deja de describir lo que contiene. **El Hito 0 lo agravó a
-      propósito**, metiendo en ella «Tu hogar» y «Tu cuenta», que son del core:
-      el nombre ya es directamente falso.
-- [ ] **Los punteros hacia adelante** de [`roadmap.md`](roadmap.md) y
-      [`phase-2-roadmap.md`](phase-2-roadmap.md), que pasan de «hay un plan» a «está
-      hecho», sin reescribir lo que aquellas fases dejaron dicho.
-- [ ] **[`decisions.md`](decisions.md)**, con las preguntas de este bloque resueltas
-      y su alternativa descartada.
-- [ ] **El README**: la sección 8, la 4.1.7 y la fila de historial de la 10.
-- [ ] **El deck de [marketing](../marketing/README.md)**, que resume el README y no
-      avisa cuando se queda atrás.
+- [x] **La capacidad, vuelta a medir** en sus dos magnitudes, con las tablas nuevas
+      dentro y con el criterio de retención al día. La siembra gana lo que el
+      bloque añadió —seis etiquetas con la mitad de los duraderos etiquetados,
+      estado de conservación en cuatro de cada cinco y las categorías con icono y
+      color— y la pendiente pasa de 116 394 a **141 994 B por hogar** y de 2457 a
+      **2525 B por día**. **VPS-3 sigue en pie y sigue decidiéndolo el disco**, y
+      el criterio de retención sigue como estaba: cerrado para cuatro tablas por
+      la baja del hogar, abierto solo para `household_notices`, y `event_outbox`
+      sin ser una sexta. La medición destapó además una precisión que faltaba:
+      la cola del outbox aparece quinta en la tabla por tamaño **sin retener
+      nada** — es la huella física del pico de la siembra, porque PostgreSQL no
+      devuelve las páginas que una tabla llegó a ocupar.
+- [x] **La lista de pantallas de la auditoría de accesibilidad**, renombrada:
+      `PHASE_TWO_SCREENS` pasa a **`AUDITED_SCREENS`**, el rótulo de la prueba
+      deja de decir «las diez pantallas» —eran once— y el docstring que describía
+      «las seis pantallas de la Fase 2» —que además había quedado huérfano
+      delante de otra prueba— se muda junto a la suya y describe lo que hay.
+- [x] **Y las dos pantallas que faltaban entran, que la ficha no pedía y se
+      decide aquí**: «Sitios» y «Personas» eran las dos últimas del core sin
+      auditar, y un hito que existe porque «lo que se deja no se cierra» no deja
+      una deuda contada en un comentario. Con una ubicación sembrada para Sitios
+      —una pantalla vacía se audita sola— y a un coste de ~4 s de CI. **Desde
+      este hito no queda ninguna pantalla de la navegación fuera de la pasada
+      sistemática.**
+- [x] **Los punteros hacia adelante** de [`roadmap.md`](roadmap.md) y
+      [`phase-2-roadmap.md`](phase-2-roadmap.md), que pasan de «hay un plan» a
+      «está hecho» con una nota nueva cada uno y su fila de historial, sin
+      reescribir lo que aquellas fases dejaron dicho.
+- [x] **[`decisions.md`](decisions.md), comprobado y sin nada que escribir**: las
+      cinco preguntas del bloque están resueltas, cada una en su hito y con su
+      alternativa descartada, y la tabla de más abajo las tiene tachadas con su
+      fecha. El trabajo aquí era verificar que está completo, y lo está.
+- [x] **El README**: la línea de «Fase actual», la fila del bloque en la sección
+      8 —de «En curso» a **Completado**—, el cierre en la 8.4 y la fila de
+      historial de la 10. La 4.1.7 ya estaba al día, hito a hito.
+- [x] **`CLAUDE.md`, que la ficha no listaba y es parte del cierre**: es el
+      fichero que lee toda sesión nueva y seguía contando el repositorio de antes
+      del bloque — 98 operaciones, 28 tablas, siete recorridos, «las nueve ADR» y
+      un `PHASE_TWO_SCREENS` que ya no existe. Ahora dice 106, 31, diez, quince y
+      `AUDITED_SCREENS`, y cuenta el bloque como cerrado.
+- [x] **El hogar de demostración, comprobado y sin nada que tocar**: ya trae las
+      etiquetas, las categorías con cara y el estado de conservación desde los
+      Hitos 3 y 4, y su zona de calendario fijada con `SET LOCAL` desde el 5.
+      Este hito no añade producto, así que tampoco le añade nada que enseñar.
+- [x] **El deck de [marketing](../marketing/README.md)**, que son cuatro piezas y
+      no una, regeneradas desde sus generadores —nunca a mano— con las cifras de
+      hoy verificadas contra el repositorio: `grep -c operationId` da 106, las
+      migraciones crean 31 tablas y las ADR son quince. La pieza comercial
+      mantiene su decisión escrita de **no contar el bloque** —queda por debajo
+      de la altura a la que habla— y las cuatro conservan la diapositiva de
+      agradecimiento que la licencia de Slidesgo exige. Verificadas con
+      `qa-deck.py` y `preview-pptx.py`, y mirando el render: el único desborde
+      nuevo —un pie de cifra en tres líneas— se corrigió en el generador.
 
 ## Criterio de aceptación
 
@@ -851,6 +894,7 @@ no aquí.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | **Hito 6 cerrado, y con él el bloque entero**: siete hitos y siete pull requests en dos días, con las quince ADR del proyecto escritas y los cuatro huecos —más el quinto que apareció por el camino— saldados. El hito no añade producto: consolida, y lo que consolidar destapó esta vez no fueron defectos de código sino **medidas y nombres que ya no describían lo que había**. La capacidad, vuelta a medir con lo que el bloque añadió dentro: **141 994 B por hogar y 2525 B por día** —desde 116 394 y 2457—, con VPS-3 en pie, el criterio de retención intacto y una precisión nueva: `event_outbox` aparece quinta en la tabla de tamaños **sin retener nada**, porque el tamaño físico de una cola es el de su pico y no el de su contenido. `PHASE_TWO_SCREENS` pasa a **`AUDITED_SCREENS`** —el nombre era falso por partida doble y el rótulo «las diez pantallas» contaba once— **y entran «Sitios» y «Personas»**, que la ficha no pedía y se decide aquí: eran las dos últimas pantallas del core sin auditar, y con ellas **la pasada sistemática cubre la navegación entera**, trece pantallas. Los punteros hacia adelante de las dos fases pasan de «hay un plan» a «está hecho» sin reescribir nada; `decisions.md` se comprueba y estaba completo; el README pasa el bloque a **Completado** en sus cuatro sitios; **`CLAUDE.md` deja de contar el repositorio de antes del bloque** —98, 28, siete y nueve donde hoy son 106, 31, diez y quince—; y las cuatro piezas del deck se regeneran desde sus generadores con las cifras verificadas contra el repositorio, la atribución de Slidesgo en su sitio y la decisión de la pieza comercial —no contar el bloque— mantenida y dicha |
 | 2026-08-20 | **Hito 5 cerrado**: el «hoy» de las reglas de calendario pasa a ser **el del hogar**. Es el único hito del bloque que no venía del plan —salió de ejecutar el Hito 1— y el más pequeño: **sin migración, sin operación nueva y sin pantalla nueva**, con el modelo quieto en 31 tablas y el contrato en 106 operaciones. **La pregunta se decide por lo que significa el tipo** y no por venir recomendada: `performedOn` y `nextDueOn` son `LocalDate`, y un día de calendario no significa nada sin una zona; UTC parece la opción neutral y no lo es, porque es la del despliegue. **No hay ADR nueva y eso es parte de la decisión**: la **ADR-011 se amplía** con una sección hacia adelante que separa lo que su sección 7 confundía —a qué hora corre el recorrido es del despliegue, **qué día mira es del hogar**— y la decisión del 2026-08-17 sobre el vencimiento **no se reabre**, porque su frontera real era `Instant` frente a `LocalDate`. Llega `HouseholdCalendar`, un puerto que declara plataforma y implementa el core leyendo `households.time_zone`, con la misma inversión que `HouseholdDirectory` y `NoticeRecipients` y **con la lista de excepciones de ArchUnit intacta**; se descarta llevar la zona en `SessionClaims`, que la engordaría y no sirve en el recorrido diario, que no tiene sesión. Con las tres líneas idénticas se va el `?: ZoneId.systemDefault()`, que era código muerto y prometía un respaldo imposible: el puerto **falla ruidosamente** sin contexto de inquilino. En el cliente cambian `today()`, `inMonths()` y **un cuarto sitio que el plan no había visto**, `dueStatus()`, que restaba un día de calendario menos `Date.now()`. La regresión se fija **con el reloj parado** —23:30 UTC, hogar en `Europe/Madrid`—, comprobada dando `400` sin el cambio, y con dos pruebas que ninguna suite tenía: que el instante elegido de verdad cambia de día, y que **el mismo instante da dos días en dos hogares**. El recorrido vertical de CMMS gana el caso, y con él lo único que el backend no puede decir: **desde un navegador que está en otro día, el campo sigue enseñando el del hogar**. Se corrigen las **tres** frases que justificaban `timeZone` por «el proceso diario de vencidos» —el plan había localizado una— y el hogar de demostración gana una línea: sus `CURRENT_DATE` salían de la zona del servidor |
 | 2026-08-20 | **Hito 4 cerrado**: las **etiquetas libres** y el **icono y color de una categoría**, que son los dos atributos que quedaban de los cuatro que 4.1.7 llevaba desde el 2026-08-09 dejando fuera — con lo que esa propuesta queda cerrada entera. Trae la **ADR-015**, que extiende la ADR-006 sin reescribirla y le añade su sección hacia adelante, la migración `V17` que lleva el modelo de **29 a 31 tablas** y **cuatro operaciones** que llevan el contrato de 102 a **106**. **La pregunta del hito se resuelve con las tres cosas medidas**: la etiqueta es un **catálogo por hogar** porque el texto libre no se puede renombrar de una vez, ni deduplicar sin distinguir mayúsculas ni acentos —no hay ninguna fila común donde poner la restricción—, ni autocompletar sin recorrer los assets enteros. Etiquetar **no gana operación**: viaja en `tagIds`, que es absoluto como la cantidad de una existencia, porque una operación más sería una segunda escritura sobre el inventario para hacer lo que el `PATCH` ya hace. El icono y el color van dentro de un **juego cerrado** —dieciséis y seis— y esa es la ADR entera: un color libre no está en ningún token, así que **no lo mide nadie** y sería lo único de la interfaz cuyo contraste se afirma en vez de comprobarse; `check-contrast.py` pasa de **36 pares a 48** y tres de los doce valores nuevos nacieron fuera del gamut sRGB. Se cierra además la decisión abierta de **`lucide-react`**, con el número delante —5,88 kB sobre la primera carga, 2,63 comprimidos— y se migran los cuatro iconos que llevaban dos fases dibujados a mano; detrás aparece una contradicción que la dependencia tapaba y que **no se resuelve aquí**: `iconography.md` y `status-badge.md` dicen lo contrario sobre el icono de estado. **«Catálogo» entra en la auditoría sistemática** con una categoría de color puesto, y el recorrido **mide el contraste ya aplicado** en los dos modos, que es lo único que demuestra que el par medido es el que llega. Lo que la implementación destapó: el índice de `tags` **no puede ser parcial por retirada** y lo que lo sustituye es que crear una retirada **la revive**; **Chrome conserva `oklch()` en `getComputedStyle`**, lo que hizo que la primera versión del medidor diera 1,00:1 para todo; y dos defectos de accesibilidad que solo aparecieron al escribir las pruebas —JSX se come el espacio inicial de la línea, y el selector puede estar dos veces en la misma pantalla—. La categoría **no entra en la navegación móvil**, que el plan pedía, porque en la navegación no hay ninguna categoría; a cambio se cumple la promesa que `iconography.md` llevaba desde la Fase 1 sobre el hueco de una foto que falta |
 | 2026-08-20 | **Hito 3 cerrado**: el **estado de conservación** de un asset y la **condición en la entrega y la devolución** de un préstamo, que son dos de los cuatro atributos que 4.1.7 llevaba desde el 2026-08-09 dejando fuera. **Sin ADR y sin operación nueva**: tres columnas anulables en la `V16`, seis esquemas ensanchados y el contrato quieto en **102 operaciones**, que era la condición del plan. Lo que sí trae son ocho decisiones de producto. **Una sola escala de cinco valores** para los tres campos, porque el motivo entero de la condición en préstamo es poder decir «salió bien y volvió rayado» y dos escalas distintas no se comparan; **solo sobre un `DURABLE`**, ampliando la restricción que ya cubría el número de serie en vez de añadir una segunda; y **la devolución no toca el asset**, que es la decisión que más se discutió: propagarla le daría a un token acotado —el de quien no tiene cuenta— una escritura sobre el inventario, y CMMS ya había declarado que registrar una intervención «no toca el asset». La vista externa **se ensancha por primera vez** desde que se escribió, de siete campos a nueve, y con su motivo: las dos condiciones describen la cosa que quien pregunta tiene en las manos, no el hogar que se la prestó. La devolución gana un **cuerpo opcional** en lugar de una operación nueva, porque una operación más sería una segunda escritura que el token acotado tendría que alcanzar; hay una prueba que le manda cinco campos de más y comprueba desde dentro de casa que ninguno se escribió. **La condición no se pinta con color** —dos distintivos en una fila es antiuso declarado, y la paleta de dominio tiene cinco tonos elegidos para sobrevivir a una deuteranopia— así que `check-contrast.py` sigue midiendo 36 pares. «Inventario» entra en la auditoría sistemática, con un asset sembrado, y el hogar de demostración trae las tres columnas puestas con diez duraderos sin anotar a propósito. Y se destapa algo ajeno: **la pantalla de Préstamos era el único fichero del frontend pintado con tokens que no existen**, `text-muted` y `border-line`, que no generan ni una regla de CSS |

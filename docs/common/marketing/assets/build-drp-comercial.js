@@ -16,23 +16,23 @@
  * proyecto, no lee el repositorio y no quiere tecnicismos: inversión,
  * colaboradores y primeros hogares piloto.
  *
- * PROCEDENCIA: refleja el estado del README a **2026-08-19**, verificado contra
+ * PROCEDENCIA: refleja el estado del README a **2026-08-20**, verificado contra
  * el repositorio ese mismo día:
  *
- *   - Fase: **Fases 1 y 2 completadas** (2026-08-17 y 2026-08-19); la Fase 3
- *     está pendiente y **sin planificar**.
- *   - ADR: **once** (ADR-001 a ADR-011).
- *   - Operaciones del contrato: **98** (`grep -c operationId: openapi.yaml`).
+ *   - Fase: **Fases 1 y 2 completadas** (2026-08-17 y 2026-08-19) y el **cierre
+ *     de huecos completado** (2026-08-20); la Fase 3 está pendiente y **sin
+ *     planificar**.
+ *   - ADR: **quince** (ADR-001 a ADR-015).
+ *   - Operaciones del contrato: **106** (`grep -c operationId: openapi.yaml`).
  *   - Módulos construidos: **cuatro de trece** (proveedores, warehouse, compras
  *     y mantenimiento), todos en estado «En desarrollo» porque no hay despliegue.
  *
- * Vuelto a comprobar el mismo día contra un README que había avanzado: la sección
- * 8 ganó una fila, **«Cierre de huecos»**, y los cuatro datos siguen en pie porque
- * esa fila **no es una fase** —lo dice ella misma, y por eso no renumera nada—, de
- * modo que las fases siguen siendo cuatro con tres cerradas. Las cuatro ADR que
- * ese bloque planea (012 a 015) **no están escritas**, así que el recuento sigue
- * siendo once. El bloque no entra en el deck: es saldo de deuda interna, no avance
- * de producto, y queda por debajo de la altura a la que habla esta presentación.
+ * El cierre de huecos **no entra en el deck**, y la decisión se tomó cuando esa
+ * fila apareció en la sección 8 y se mantiene ahora que está completada: no es
+ * una fase —lo dice ella misma, y por eso no renumera nada—, de modo que las
+ * fases siguen siendo cuatro con tres cerradas y las diapositivas de estado
+ * siguen siendo ciertas tal cual. Es saldo de deuda interna, no avance de
+ * producto, y queda por debajo de la altura a la que habla esta presentación.
  *
  * Esos cuatro son los datos que más rápido caducan y **hay que repasarlos cada
  * vez**: este fichero no falla ni avisa cuando se queda atrás, simplemente sigue
@@ -235,7 +235,7 @@ function echo(slide, x, y, w, text, size, color, align) {
     x: 7.72, y: 6.2, w: 5.0, h: 0.4, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 12, italic: true, color: TEALLT,
   });
 
-  s.addNotes("Portada. Presentación comercial de DRP, dirigida a quien no conoce el proyecto: inversión, colaboradores y primeros hogares piloto. Procede del README §1 y refleja su estado a 2026-08-19: Fases 1 y 2 cerradas, cuatro de trece módulos construidos y ningún despliegue todavía.");
+  s.addNotes("Portada. Presentación comercial de DRP, dirigida a quien no conoce el proyecto: inversión, colaboradores y primeros hogares piloto. Procede del README §1 y refleja su estado a 2026-08-20: Fases 1 y 2 y el cierre de huecos cerrados, cuatro de trece módulos construidos y ningún despliegue todavía.");
 }
 
 // ═══ 2 · El problema ══════════════════════════════════════════════════════════

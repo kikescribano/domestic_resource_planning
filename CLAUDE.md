@@ -2,11 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Lo primero: el core y los cuatro primeros módulos están implementados
+## Lo primero: el core, los cuatro primeros módulos y el cierre de huecos están implementados
 
-**La Fase 1 (Core MVP) se cerró el 2026-08-17** y **la Fase 2 (Módulos
-activables) el 2026-08-19**, en cinco y siete hitos, un pull request cada uno. Lo
-que hay es un monorepo con `backend/` (Kotlin, Gradle con Kotlin DSL) y
+**La Fase 1 (Core MVP) se cerró el 2026-08-17**, **la Fase 2 (Módulos
+activables) el 2026-08-19** y **el cierre de huecos —un bloque entre fases que no
+es una fase— el 2026-08-20**, en cinco, siete y siete hitos, un pull request cada
+uno. Lo que hay es un monorepo con `backend/` (Kotlin, Gradle con Kotlin DSL) y
 `frontend/` (TypeScript, React sobre Vite), más `compose.yaml`, `scripts/` y
 `.github/workflows/`, y dentro:
 
@@ -16,9 +17,16 @@ que hay es un monorepo con `backend/` (Kotlin, Gradle con Kotlin DSL) y
   comprobaciones periódicas y entrega los avisos.
 - **Los cuatro módulos de prioridad alta** de la sección 4.2: Proveedores,
   Warehouse, Compras y Mantenimiento (CMMS).
+- **Lo que las dos fases dejaron a deber, ya saldado**: la baja de un hogar con
+  treinta días de gracia y el cierre de cuenta (ADR-012), el Transactional Outbox
+  con su relay sin `BYPASSRLS` (ADR-013), la conversión de HEIC en el cliente
+  (ADR-014), los cuatro atributos propuestos —estado de conservación, condición
+  en préstamo, etiquetas, e icono y color de categoría dentro de un juego
+  certificado (ADR-015)— y el «hoy» de las reglas de calendario resuelto con la
+  zona del hogar vía el puerto `HouseholdCalendar` (ADR-011 ampliada).
 
-En cifras: **98 operaciones** en el contrato, **28 tablas** con RLS y `FORCE`, y
-**siete recorridos verticales** en un navegador de verdad.
+En cifras: **106 operaciones** en el contrato, **31 tablas** con RLS y `FORCE`, y
+**diez recorridos verticales** en un navegador de verdad.
 
 Así que la advertencia es la contraria a la que había aquí: **no supongas que algo
 no existe**. Antes de escribir un caso de uso, una tabla o una pantalla, busca si
@@ -28,10 +36,13 @@ que lo explican.
 **Lo siguiente es la Fase 3 —los nueve módulos restantes de 4.2— y todavía no está
 planificada.** Convertir una fase en un plan es su propia sesión de trabajo y su
 propio pull request, como lo fue para la 2: no se improvisa al final de otra cosa.
-Lo que la Fase 2 dejó dicho sobre lo que le queda al proyecto está al final de
-[`phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md), que es también
-donde vive el detalle de cómo se hizo. **El estado de las fases vive en la sección
-8 del README y solo allí**; el de cada módulo, en la 4.2.
+Entre la Fase 2 y la 3 hubo un bloque más, **ya cerrado**: el
+[cierre de huecos](docs/common/product/open-gaps-roadmap.md), que saldó lo que
+las dos fases dejaron abierto a propósito y cuyo documento se conserva como
+historia, igual que [`roadmap.md`](docs/common/product/roadmap.md) y
+[`phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md). **El estado de
+las fases vive en la sección 8 del README y solo allí**; el de cada módulo, en
+la 4.2.
 
 Lo que sí conviene tener presente antes de tocar nada es lo que las dos fases
 dejaron montado, porque condiciona todo lo que venga. El backend está empaquetado
@@ -74,20 +85,21 @@ Dos cosas que conviene tener presentes al tocar esto:
   —como `ScheduledCheck`, `HouseholdDirectory` y `NoticeRecipients`—, nunca con un
   import.
 
-Ninguna de las dos fases tiene continuación pendiente; lo que se dejó abierto a
-propósito está listado al final de [`roadmap.md`](docs/common/product/roadmap.md)
-y de [`phase-2-roadmap.md`](docs/common/product/phase-2-roadmap.md), cada cosa con
-su motivo y su destinatario.
+Ni las dos fases ni el cierre de huecos tienen continuación pendiente; lo único
+que sigue abierto a propósito —el análisis antivirus, la Fase 3 sin planificar y
+el despliegue— está listado al final de cada documento de fase, cada cosa con su
+motivo.
 
-Y tres cosas que el cierre de la Fase 2 dejó fijadas y conviene no volver a abrir:
+Y tres cosas que los dos cierres dejaron fijadas y conviene no volver a abrir:
 
 - **El barrido de aislamiento cubre el contrato entero**, en
   `TenantIsolationSweepTest`, organizado **por forma de ataque y no por recurso**.
   Una operación nueva se añade ahí, con el criterio de inclusión que la cabecera
   de esa clase explica; no nace una clase de barrido nueva.
 - **La auditoría de accesibilidad de una pantalla nueva se hereda**: se añade a
-  la lista `PHASE_TWO_SCREENS` del recorrido vertical y con eso pasa teclado,
-  reflujo y axe en los dos modos. No hace falta escribir nada más.
+  la lista `AUDITED_SCREENS` del recorrido vertical y con eso pasa teclado,
+  reflujo y axe en los dos modos. No hace falta escribir nada más. Desde el
+  cierre de huecos **no queda ninguna pantalla de la navegación fuera**.
 - **La capacidad se mide en dos magnitudes**, no en una: lo que crece con lo que
   el hogar *tiene* y lo que crece con lo que *hace*. Están en
   [`capacity-measurements.md`](docs/backend/operations/capacity-measurements.md),
@@ -151,7 +163,8 @@ python scripts/check-links.py
 ```
 
 Comprobar el contraste de los tokens de color: lee los valores `oklch()` reales de
-`frontend/src/index.css` y mide los 36 pares **en los dos modos**, así que un
+`frontend/src/index.css` y mide los 48 pares **en los dos modos** —los doce
+últimos son los colores de categoría que el usuario puede elegir—, así que un
 retoque de paleta que baje de WCAG AA rompe la construcción en lugar de
 descubrirse en una auditoría:
 
@@ -280,13 +293,18 @@ La Fase 0 terminó sin decisiones de diseño abiertas. Están fijadas:
 - **Testing:** 60 % unitario de dominio, 25 % integración de casos de uso, 15 %
   contrato de adaptadores y E2E.
 
-Las **nueve ADR** en [`docs/common/architecture/decisions/`](docs/common/architecture/decisions/README.md)
+Las **quince ADR** en [`docs/common/architecture/decisions/`](docs/common/architecture/decisions/README.md)
 recogen el porqué y las alternativas descartadas: las cuatro de la Fase 0 —línea
-base, multi-tenancy, RLS y migraciones— más las cinco que llegaron con la Fase 1:
-ficheros locales, stack de frontend y sistema de diseño, el contrato como fuente de
-verdad, monorepo y cadena de construcción, y correo saliente. Léelas antes de
-proponer un cambio estructural, y recuerda que **una ADR aceptada no se
-reescribe**.
+base, multi-tenancy, RLS y migraciones—, las cinco de la Fase 1 —ficheros
+locales, stack de frontend y sistema de diseño, el contrato como fuente de
+verdad, monorepo y cadena de construcción, y correo saliente—, las dos de la
+Fase 2 —fronteras de módulo y activación por hogar, y programación de
+comprobaciones y entrega de avisos— y las cuatro del cierre de huecos: supresión
+de datos, Transactional Outbox, conversión de HEIC, y color e icono elegidos por
+el usuario dentro de un juego certificado. Léelas antes de proponer un cambio
+estructural, y recuerda que **una ADR aceptada no se reescribe** — se amplía con
+una sección hacia adelante, como hicieron la ADR-002, la ADR-005, la ADR-006 y
+la ADR-011.
 
 ## Dos invariantes que condicionan todo el código futuro
 

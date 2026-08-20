@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Ejecución de la Fase 1 |
-| Última revisión | 2026-08-19 |
+| Última revisión | 2026-08-20 |
 
 > El estado de **las fases** vive en la sección 8 del
 > [`README principal`](../../../README.md), y solo allí. Este documento baja al
@@ -361,11 +361,19 @@ para sostener.
 > [cierre de huecos](open-gaps-roadmap.md), que no es una fase y se dice allí por
 > qué. **El análisis antivirus sigue fuera**, con el mismo motivo que aquí: es la
 > defensa que toca añadir el día que un fichero pueda salir del hogar que lo subió.
+>
+> **Y desde el 2026-08-20 los tres están hechos**, con el
+> [cierre de huecos](open-gaps-roadmap.md) completo: la baja de un hogar se lleva
+> sus filas y sus ficheros —y el avatar se va con el cierre de cuenta—, la foto
+> que hace un iPhone con los ajustes de fábrica se sube y se ve, y los cuatro
+> atributos propuestos existen, los cuatro. El único de esta lista que sigue
+> fuera es el análisis antivirus, y sigue siendo a propósito.
 
 ## Historial
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | Se anota, sin tocar lo que la fase decidió, que **los tres huecos con plan están hechos**: el [cierre de huecos](open-gaps-roadmap.md) se completó con sus siete hitos. El análisis antivirus sigue fuera, con el mismo motivo de siempre. |
 | 2026-08-19 | Se anota, sin tocar lo que la fase decidió, que **tres de los cuatro huecos abiertos a propósito ya tienen plan**: la baja de un hogar, la conversión de HEIC y los cuatro atributos propuestos se ejecutan en el [cierre de huecos](open-gaps-roadmap.md). El análisis antivirus sigue fuera, con el mismo motivo de siempre. |
 | 2026-08-17 | **Cierre documental de la Fase 1**, que el Hito 4 dejó a medias: seis documentos del frontend seguían diciendo «esto llega en el Hito 4». Se completa la batería E2E con lo que la ADR-006 exigía y no estaba —teclado, foco visible en cada parada, reflujo a 320 px y en ultrawide, y axe en los dos modos—, con lo que `look-and-feel.md` pasa a `Vigente`. Se corrigen los estados de la ficha de la pantalla externa, del registro de componentes y de dos patrones, y se anotan los tres hallazgos de la medición. `CLAUDE.md` deja de describir un repositorio recién arrancado. |
 | 2026-08-17 | **Hito 4 completado, y con él la Fase 1.** Las 4 operaciones que faltaban —contrato al 54 de 54—, el token acotado de dos capas con su alcance comprobado en el filtro, la proyección por rol declarada en el contrato, el tercer proceso diario, la sexta migración, el cliente web con la vista externa sin sesión, el recorrido vertical con Playwright y axe, y la medición que elige el VPS. Se anotan las cinco decisiones tomadas al implementar y los dos agujeros de concurrencia que encontraron los barridos. |

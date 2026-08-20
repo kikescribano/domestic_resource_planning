@@ -837,34 +837,6 @@ test.describe('recorrido vertical', () => {
   })
 
   /**
-   * **La pasada sistemática de accesibilidad de las seis pantallas de la Fase 2**,
-   * que es lo que le faltaba a la fase y no la primera visita.
-   *
-   * Los seis recorridos de arriba tocan las seis pantallas —módulos, avisos,
-   * proveedores, almacén, compras y mantenimiento— y cada uno audita **la suya**
-   * en el momento en que llega a ella: axe en los dos modos, reflujo, y el
-   * tabulador hasta el control que ese recorrido necesita. Eso es la primera
-   * visita, y deja tres huecos que solo se ven mirando las seis juntas:
-   *
-   * 1. **El teclado se comprueba hasta un control y no hasta el final.** `tabTo`
-   *    para en cuanto llega, así que lo que hay *después* de ese control no lo ha
-   *    recorrido nadie: un botón de la última fila de una tabla que no se puede
-   *    enfocar no lo delata ningún recorrido.
-   * 2. **El reflujo no llegó a dos de las seis.** La pantalla de módulos y la
-   *    ruta de un módulo apagado se auditaron con axe pero sin los tres anchos.
-   * 3. **Ninguna se auditó con las doce paradas puestas.** Cada recorrido
-   *    enciende un módulo, así que la navegación que midieron tenía nueve o diez
-   *    entradas. Doce es el caso peor de la fase, y es el único que decide si la
-   *    reorganización del Hito 0 aguantó.
-   *
-   * Por eso esta prueba **no es un recorrido**: enciende los cuatro módulos por
-   * la API —el ciclo de la activación ya tiene el suyo, y repetirlo aquí sería
-   * medir dos veces lo mismo— y recorre las seis pantallas aplicándoles a todas
-   * exactamente lo mismo. Que sea la misma comprobación en las seis es el punto:
-   * lo que se olvida en una pantalla nueva no es la comprobación difícil sino la
-   * de siempre.
-   */
-  /**
    * La baja del hogar: pedirla, ver el aviso, cancelarla y comprobar que sigue
    * todo (ADR-012).
    *
@@ -1145,7 +1117,35 @@ test.describe('recorrido vertical', () => {
     await expect(page.getByRole('link', { name: /Sofá/ })).toHaveCount(0)
   })
 
-  test('la pasada sistemática: las diez pantallas de la lista, con teclado, reflujo y axe', async ({
+  /**
+   * **La pasada sistemática de accesibilidad de la lista entera**, que es lo que
+   * le faltaba a la Fase 2 y no la primera visita — y que desde el cierre de
+   * huecos audita también el core, porque la deuda era la misma.
+   *
+   * Los recorridos de arriba tocan cada pantalla y cada uno audita **la suya**
+   * en el momento en que llega a ella: axe en los dos modos, reflujo, y el
+   * tabulador hasta el control que ese recorrido necesita. Eso es la primera
+   * visita, y deja tres huecos que solo se ven mirándolas todas juntas:
+   *
+   * 1. **El teclado se comprueba hasta un control y no hasta el final.** `tabTo`
+   *    para en cuanto llega, así que lo que hay *después* de ese control no lo ha
+   *    recorrido nadie: un botón de la última fila de una tabla que no se puede
+   *    enfocar no lo delata ningún recorrido.
+   * 2. **El reflujo no llega solo a todas.** En la Fase 2, dos pantallas se
+   *    auditaron con axe pero sin los tres anchos.
+   * 3. **Ninguna se audita sola con las doce paradas puestas.** Cada recorrido
+   *    enciende un módulo, así que la navegación que miden tiene nueve o diez
+   *    entradas. Doce es el caso peor, y es el único que decide si la
+   *    reorganización de la navegación aguantó.
+   *
+   * Por eso esta prueba **no es un recorrido**: enciende los cuatro módulos por
+   * la API —el ciclo de la activación ya tiene el suyo, y repetirlo aquí sería
+   * medir dos veces lo mismo— y recorre las pantallas de [AUDITED_SCREENS]
+   * aplicándoles a todas exactamente lo mismo. Que sea la misma comprobación en
+   * todas es el punto: lo que se olvida en una pantalla nueva no es la
+   * comprobación difícil sino la de siempre.
+   */
+  test('la pasada sistemática: la lista entera de pantallas, con teclado, reflujo y axe', async ({
     page,
     request,
   }) => {
@@ -1238,11 +1238,20 @@ test.describe('recorrido vertical', () => {
     })
     expect(asset.status(), 'no se pudo sembrar el asset de la auditoría').toBe(201)
 
+    // **Y una ubicación, por el mismo motivo que el asset.** «Sitios» entra en
+    // la lista con el Hito 6, y vacía pintaría su estado vacío: axe diría que
+    // pasa sin haber mirado ni una fila de la jerarquía.
+    const location = await request.post('/api/v1/locations', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { name: 'Trastero', type: 'ROOM' },
+    })
+    expect(location.status(), 'no se pudo sembrar la ubicación de la auditoría').toBe(201)
+
     // El caso peor de la fase, medido una sola vez porque la navegación es una:
     // doce paradas a 320 px, con su suelo de 44 px y sin desbordar.
     await checkTouchTargets(page)
 
-    for (const screen of PHASE_TWO_SCREENS) {
+    for (const screen of AUDITED_SCREENS) {
       await navigateTo(page, screen.link, screen.path, screen.exact ?? false)
       await expect(
         page.getByRole('heading', { level: 1, name: screen.heading }),
@@ -1257,32 +1266,35 @@ test.describe('recorrido vertical', () => {
 })
 
 /**
- * Las pantallas que la Fase 2 añadió, más las tres del core que se han ido
- * metiendo aquí porque no tenían auditoría propia, con el nombre por el que se
- * llega a ellas desde la navegación.
+ * Las pantallas que audita la pasada sistemática, con el nombre por el que se
+ * llega a ellas desde la navegación. Empezó siendo «las de la Fase 2» y dejó de
+ * serlo: hoy están las de la fase, las del core que no tenían auditoría propia y
+ * las que el cierre de huecos tocó, y por eso se llama por lo que hace y no por
+ * quién la trajo — el renombrado era tarea apuntada del Hito 6 de ese bloque.
  *
- * Es una lista y no seis llamadas sueltas a propósito: **una pantalla nueva se
- * añade aquí y hereda la auditoría entera**, que es lo contrario de lo que pasó
- * en la Fase 1, donde el criterio de accesibilidad se dio por cubierto pantalla a
+ * Es una lista y no llamadas sueltas a propósito: **una pantalla nueva se añade
+ * aquí y hereda la auditoría entera**, que es lo contrario de lo que pasó en la
+ * Fase 1, donde el criterio de accesibilidad se dio por cubierto pantalla a
  * pantalla y una se quedó sin él.
  *
- * **Y el nombre ya es directamente falso**, que es lo que el Hito 6 del cierre de
- * huecos tiene apuntado: aquí dentro hay tres pantallas del core —«Tu hogar»,
- * «Tu cuenta» y «Archivo»— y ninguna es de la Fase 2. Se deja el renombrado a ese
- * hito en vez de hacerlo de paso, pero conviene saber que la lista describe hoy
- * «lo que se audita» y no «lo que trajo la Fase 2».
- *
- * **Lo que sigue sin auditar son dos pantallas del core**: Sitios y Personas.
- * Inventario y Catálogo dejaron de estarlo con el cierre de huecos, y Préstamos y
- * Avisos sí tienen su llamada suelta en los recorridos de arriba.
+ * Desde el cierre del bloque **no queda ninguna pantalla de la navegación sin
+ * auditar**: «Sitios» y «Personas» eran las dos últimas del core y entraron con
+ * el Hito 6. Préstamos y Avisos tienen además su llamada suelta en los
+ * recorridos de arriba.
  */
-const PHASE_TWO_SCREENS = [
+const AUDITED_SCREENS = [
   { link: 'Módulos del hogar', path: '/modulos', heading: 'Módulos' },
   // «Inventario» entra el 2026-08-20, con el estado de conservación: es una de
   // las cuatro pantallas del core que seguían sin auditar, y el hito la toca en
   // sus tres sitios --el filtro del listado, la ficha y el alta--. Se siembra un
   // asset antes, porque una pantalla vacía se audita sola y no dice nada.
   { link: 'Inventario', path: '/inventario', heading: 'Inventario' },
+  // «Sitios» y «Personas» entran con el Hito 6 del cierre de huecos: eran las
+  // dos últimas pantallas del core sin auditar, y un hito que consolida no deja
+  // una deuda contada en un comentario. Sitios con una ubicación sembrada
+  // --una pantalla vacía se audita sola--; en Personas ya está quien la mira.
+  { link: 'Sitios', path: '/ubicaciones', heading: 'Ubicaciones' },
+  { link: 'Personas', path: '/usuarios', heading: 'Personas' },
   // Las dos que la baja de hogar (ADR-012) llenó de contenido nuevo: «Tu hogar»
   // estrena la zona de peligro y «Tu cuenta», el cierre de cuenta. No son rutas
   // nuevas, pero lo que hay dentro sí lo es, y la auditoría se hereda por estar

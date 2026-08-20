@@ -8,9 +8,9 @@
  *   npm install pptxgenjs
  *   node build-drp-resumen.js ../presentations/DRP-resumen.pptx
  *
- * Refleja el estado del README a 2026-08-19: **Fase 1 (core) y Fase 2 (módulos
- * activables) cerradas**. Al cambiar el README de forma sustantiva, actualiza el
- * contenido de aquí y vuelve a ejecutarlo.
+ * Refleja el estado del README a 2026-08-20: **Fase 1 (core), Fase 2 (módulos
+ * activables) y el cierre de huecos cerrados**. Al cambiar el README de forma
+ * sustantiva, actualiza el contenido de aquí y vuelve a ejecutarlo.
  *
  * Ojo con una trampa de este fichero: no falla ni avisa cuando se queda atrás,
  * simplemente sigue generando un deck que ya no es cierto. Pasó: al cerrar la
@@ -118,9 +118,9 @@ function lines(items, o = {}) {
   });
 
   const chips = [
-    ["Fases 1 y 2 cerradas", TEAL],
+    ["Fases 1 y 2 + cierre de huecos", TEAL],
     ["Core + 4 módulos", "24534F"],
-    ["2026-08-19", "24534F"],
+    ["2026-08-20", "24534F"],
   ];
   let cx = 0.95;
   chips.forEach(([t, c]) => {
@@ -156,7 +156,7 @@ function lines(items, o = {}) {
     x: 7.75, y: 6.25, w: 4.95, h: 0.72, margin: 0, valign: "top", fontFace: SANS, fontSize: 10.5, italic: true, color: "7E9895", lineSpacing: 15,
   });
 
-  s.addNotes("Portada. Resumen del README.md de DRP (estado 2026-08-19): Fases 0, 1 y 2 cerradas. El core completo y los cuatro módulos de prioridad alta, activables hogar por hogar.");
+  s.addNotes("Portada. Resumen del README.md de DRP (estado 2026-08-20): Fases 0, 1 y 2 y el cierre de huecos cerrados. El core completo y los cuatro módulos de prioridad alta, activables hogar por hogar.");
 }
 
 // ═══ 2 · Problema y visión ════════════════════════════════════════════════════
@@ -827,7 +827,7 @@ function lines(items, o = {}) {
     ["Migraciones", "Flyway", "SQL plano versionado, esquema y políticas juntos"],
     ["Comunicación BE", "Event bus in-process", "Puerto propio sobre Spring, sin dependencia añadida"],
     ["Comunicación FE ↔ BE", "API REST + JWT", "Spring Security; tokens acotados de préstamo"],
-    ["Contratos", "OpenAPI 3.0", "openapi.yaml, 98 operaciones, fuente de verdad"],
+    ["Contratos", "OpenAPI 3.0", "openapi.yaml, 106 operaciones, fuente de verdad"],
     ["Frontend", "React sobre Vite", "Mobile-first, de 375 px a ultrawide; WCAG 2.2 AA"],
     ["Testing", "JUnit 5 + Testcontainers", "Vitest y Playwright en el frontend"],
   ];
@@ -911,17 +911,20 @@ function lines(items, o = {}) {
     s.addText(f[3], { x: x + 0.28, y: cy + 2.95, w: 1.55, h: 0.36, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 10.5, bold: true, color: done ? WHITE : MUTED });
   });
 
-  s.addText("Criterio de validación (ADR-001), cumplido en las dos fases entregadas: un recorrido vertical que atraviesa frontend, API autenticada, aplicación, dominio y PostgreSQL. Hoy son siete, en un navegador de verdad.", {
-    x: M, y: 5.65, w: CW, h: 0.55, margin: 0, valign: "top", fontFace: SANS, fontSize: 13, italic: true, color: TEAL, lineSpacing: 19,
+  s.addText("Entre la Fase 2 y la 3, un bloque sin número completado el 2026-08-20 — el cierre de huecos: baja de hogar y de cuenta, Transactional Outbox, conversión de HEIC, los cuatro atributos propuestos y el «hoy» del hogar.", {
+    x: M, y: 5.52, w: CW, h: 0.5, margin: 0, valign: "top", fontFace: SANS, fontSize: 12, color: MUTED, lineSpacing: 17,
+  });
+  s.addText("Criterio de validación (ADR-001), cumplido en todo lo entregado: un recorrido vertical que atraviesa frontend, API autenticada, aplicación, dominio y PostgreSQL. Hoy son diez, en un navegador de verdad.", {
+    x: M, y: 6.1, w: CW, h: 0.5, margin: 0, valign: "top", fontFace: SANS, fontSize: 12, italic: true, color: TEAL, lineSpacing: 17,
   });
   foot(s);
-  s.addNotes("README §8: roadmap y estado. Fase 0 cerrada el 2026-08-07, Fase 1 el 2026-08-17 y Fase 2 el 2026-08-19. El detalle de cada una vive en su propio roadmap, en docs/common/product/.");
+  s.addNotes("README §8: roadmap y estado. Fase 0 cerrada el 2026-08-07, Fase 1 el 2026-08-17, Fase 2 el 2026-08-19 y el cierre de huecos —que no es una fase y por eso no lleva tarjeta numerada— el 2026-08-20. El detalle de cada bloque vive en su propio roadmap, en docs/common/product/.");
 }
 
 // ═══ 19 · Cierre ══════════════════════════════════════════════════════════════
 {
   const s = newSlide(true);
-  head(s, "SIGUIENTE PASO", "El core y los cuatro primeros módulos, entregados", true);
+  head(s, "SIGUIENTE PASO", "El core, cuatro módulos y el cierre de huecos, entregados", true);
   s.addText("Lo que queda es la Fase 3: los nueve módulos restantes de la sección 4.2, sobre un mecanismo de activación que ya existe y una plataforma de avisos que ya entrega.", {
     x: M, y: 1.45, w: 9.5, h: 0.62, margin: 0, valign: "top", fontFace: SANS, fontSize: 15, color: "C4D4D1", lineSpacing: 21,
   });
@@ -941,7 +944,7 @@ function lines(items, o = {}) {
   });
 
   const closing = [
-    ["Lo entregado", "El core completo y cuatro módulos, sobre activación por hogar y avisos programados. 98 operaciones en el contrato, 28 tablas con Row-Level Security y siete recorridos verticales."],
+    ["Lo entregado", "El core completo, cuatro módulos y el cierre de huecos, sobre activación por hogar y avisos programados. 106 operaciones en el contrato, 31 tablas con Row-Level Security y diez recorridos verticales."],
     ["Lo que queda", "Los nueve módulos restantes, por orden de prioridad. Ninguno pide arquitectura nueva: el camino de un módulo está recorrido cuatro veces."],
   ];
   closing.forEach((c, i) => {
@@ -951,11 +954,11 @@ function lines(items, o = {}) {
     s.addText(c[1], { x: x + 0.38, y: 5.0, w: 5.1, h: 0.9, margin: 0, valign: "top", fontFace: SANS, fontSize: 12.5, color: "BFD3D0", lineSpacing: 18 });
   });
 
-  s.addText("Fuente: README.md · documento vivo, última actualización 2026-08-19", {
+  s.addText("Fuente: README.md · documento vivo, última actualización 2026-08-20", {
     x: M, y: 6.35, w: CW, h: 0.35, margin: 0, valign: "middle", fontFace: SANS, fontSize: 11, color: "7E9895",
   });
   foot(s, true);
-  s.addNotes("README §8, §9 y §11: cierre de la Fase 2 y lo que queda para la Fase 3, que todavía no está planificada.");
+  s.addNotes("README §8, §9 y §11: cierre de la Fase 2 y del cierre de huecos, y lo que queda para la Fase 3, que todavía no está planificada.");
 }
 
 const out = process.argv[2] || "DRP-resumen.pptx";
