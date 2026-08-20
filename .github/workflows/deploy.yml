@@ -1,0 +1,72 @@
+name: Imagenes de despliegue
+
+# Construye y publica en GHCR las dos imagenes de produccion (ADR-016):
+# ghcr.io/kikescribano/drp-backend y ghcr.io/kikescribano/drp-web. El VPS no
+# compila nada: hace `docker compose pull` de lo que este trabajo publico.
+#
+# Corre en cada push a main --lo que la CI valido es lo que se publica-- y a
+# demanda con workflow_dispatch. Cada imagen sale con dos etiquetas: `latest` y
+# el SHA del commit, que es lo que permite fijar una version o volver atras
+# desde el .env del servidor sin tocar nada mas.
+#
+# **La primera publicacion deja el paquete PRIVADO** aunque el repositorio sea
+# publico: hay que hacerlo publico una vez, a mano, en los ajustes del paquete
+# en GitHub, o el `pull` anonimo del VPS fallara con 401.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Lo minimo que este trabajo necesita: leer el codigo y escribir paquetes.
+permissions:
+  contents: read
+  packages: write
+
+# Un push nuevo sobre main cancela la publicacion anterior si seguia en curso.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  images:
+    name: Construir y publicar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Entrar en GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # El contexto es la raiz del repositorio en los dos casos: el backend
+      # necesita openapi.yaml del raiz (ADR-007) y el web, frontend/ y
+      # deploy/nginx/. La cache de capas vive en la propia cache de Actions.
+      - name: Imagen del backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/backend.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/drp-backend:latest
+            ghcr.io/${{ github.repository_owner }}/drp-backend:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+      - name: Imagen del web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/web.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/drp-web:latest
+            ghcr.io/${{ github.repository_owner }}/drp-web:${{ github.sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max

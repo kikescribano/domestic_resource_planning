@@ -10,6 +10,10 @@
 -- puesto desde el primer arranque en lugar de depender de que alguien lo
 -- recuerde al desplegar. La otra condicion --FORCE ROW LEVEL SECURITY-- viaja
 -- en las migraciones de Flyway, junto a las politicas.
+--
+-- Este fichero es el canonico y el que ejecutan las pruebas (DrpPostgres). El
+-- despliegue usa deploy/postgres/init/01-app-role.sh, que es esto mismo con
+-- las contrasenas venidas del entorno: si se toca esto, hay que mirar aquel.
 
 CREATE ROLE drp_app WITH
     LOGIN

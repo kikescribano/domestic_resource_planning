@@ -1,0 +1,126 @@
+# Despliegue de produccion en el VPS (ADR-016). NO es el compose.yaml de
+# desarrollo: aquel levanta dependencias para trabajar; este ejecuta DRP entero.
+#
+#   cp .env.example .env   # y rellenar; chmod 600 .env
+#   docker compose build   # primera vez o sin acceso a GHCR
+#   docker compose pull    # camino normal: las imagenes las publica la CI
+#   docker compose up -d
+#
+# Tres decisiones de puertos que conviene no deshacer:
+#
+# - **Solo `web` publica puertos.** PostgreSQL y el backend viven en la red
+#   interna de compose y no se alcanzan desde fuera de la maquina.
+# - **Los puertos publicados por Docker PUENTEAN UFW** (Docker escribe sus
+#   reglas de iptables por delante). Que aqui solo se publiquen 80 y 8081 es
+#   por tanto EL cortafuegos efectivo de la aplicacion, no una comodidad.
+# - **El 8081 es deliberado**: es el otro origen desde el que se sirven los
+#   ficheros (ADR-005). Sin dominio, otro origen solo puede ser otro puerto.
+#
+# Y una premisa operativa (ADR-011): **una sola instancia del backend**, con el
+# programador y el relay del outbox encendidos, que es su valor por omision.
+# Escalar a dos replicas sin apagarlos en una duplicaria la pasada diaria.
+
+name: drp
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: drp
+      # Propietario del esquema: es quien ejecuta las migraciones de Flyway.
+      # La aplicacion NO usa este usuario; ver postgres/init/01-app-role.sh.
+      POSTGRES_USER: drp_owner
+      POSTGRES_PASSWORD: ${DRP_DB_OWNER_PASSWORD:?falta DRP_DB_OWNER_PASSWORD en .env}
+      # La lee el script de inicializacion para crear drp_app. Solo se usa en
+      # el PRIMER arranque, con el volumen de datos vacio.
+      DRP_DB_APP_PASSWORD: ${DRP_DB_APP_PASSWORD:?falta DRP_DB_APP_PASSWORD en .env}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U drp_owner -d drp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: ghcr.io/kikescribano/drp-backend:${DRP_VERSION:-latest}
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Sin placeholder en application.yml no hay problema: en Spring Boot el
+      # entorno tiene precedencia sobre el YAML, y el relaxed binding hace que
+      # SPRING_DATASOURCE_URL sea spring.datasource.url.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/drp
+      SPRING_DATASOURCE_USERNAME: drp_app
+      SPRING_DATASOURCE_PASSWORD: ${DRP_DB_APP_PASSWORD:?}
+      SPRING_FLYWAY_USER: drp_owner
+      SPRING_FLYWAY_PASSWORD: ${DRP_DB_OWNER_PASSWORD:?}
+
+      # El SMTP real (ADR-009 preveia sustituirlo sin tocar codigo, y es esto).
+      SPRING_MAIL_HOST: ${DRP_SMTP_HOST:?falta DRP_SMTP_HOST en .env}
+      SPRING_MAIL_PORT: ${DRP_SMTP_PORT:-587}
+      SPRING_MAIL_USERNAME: ${DRP_SMTP_USERNAME:?}
+      SPRING_MAIL_PASSWORD: ${DRP_SMTP_PASSWORD:?}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED: "true"
+      DRP_MAIL_FROM: ${DRP_MAIL_FROM:?}
+      # Los enlaces de los correos apuntan al frontend publico.
+      DRP_MAIL_BASE_URL: ${DRP_PUBLIC_URL:?falta DRP_PUBLIC_URL en .env}
+
+      # Secretos de despliegue. El arranque FALLA si alguno sigue siendo el del
+      # repositorio (SecurityConfig): no declarar aqui ningun perfil de
+      # desarrollo es lo que mantiene esa comprobacion viva.
+      DRP_JWT_SECRET: ${DRP_JWT_SECRET:?falta DRP_JWT_SECRET en .env}
+      DRP_FILES_LINK_SECRET: ${DRP_FILES_LINK_SECRET:?falta DRP_FILES_LINK_SECRET en .env}
+
+      # La entrega de ficheros, con nginx delante (ADR-005): la firma la
+      # verifica nginx y los bytes los entrega nginx desde el otro origen.
+      DRP_FILES_BASE_URL: ${DRP_FILES_PUBLIC_URL:?falta DRP_FILES_PUBLIC_URL en .env}
+      DRP_FILES_ACCEL_REDIRECT: "true"
+      DRP_STORAGE_ROOT: /srv/drp/files
+
+      # Detras del proxy es OBLIGATORIO declararlo, o el limitador de
+      # frecuencia veria la IP del contenedor de nginx en todas las peticiones
+      # y se volveria un cubo unico para toda la instalacion. El rango cubre
+      # las redes que compose reparte.
+      DRP_TRUSTED_PROXIES: 172.16.0.0/12
+
+      # El tope de hogares del dimensionado. El valor vive en el .env del
+      # servidor, nunca en el repositorio; vacio o ausente es sin tope.
+      DRP_MAX_HOUSEHOLDS: ${DRP_MAX_HOUSEHOLDS:-0}
+
+      # La documentacion interactiva del contrato no pinta nada en produccion.
+      SPRINGDOC_API_DOCS_ENABLED: "false"
+      SPRINGDOC_SWAGGER_UI_ENABLED: "false"
+    volumes:
+      # El volumen de ficheros, compartido con nginx. El backend escribe; el
+      # uid 1000 de la imagen coincide con `ubuntu` en el anfitrion.
+      - ./data/files:/srv/drp/files
+
+  web:
+    image: ghcr.io/kikescribano/drp-web:${DRP_VERSION:-latest}
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      DRP_UPSTREAM: backend:8080
+      # El mismo secreto que firma la aplicacion. Si no coinciden, **todas**
+      # las imagenes dan 403 y ninguna otra cosa falla.
+      DRP_FILES_LINK_SECRET: ${DRP_FILES_LINK_SECRET:?}
+    ports:
+      - "80:80"    # la aplicacion
+      - "8081:81"  # los ficheros: el otro origen (ADR-005)
+    volumes:
+      # De solo lectura: nginx entrega bytes y no escribe ninguno.
+      - ./data/files:/srv/drp/files:ro

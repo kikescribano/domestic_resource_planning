@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Registro vivo de decisiones de diseno del core |
-| Última revisión | 2026-08-20 |
+| Última revisión | 2026-08-21 |
 
 > Trasladado desde la sección 4.1.7 del [`README principal`](../../../README.md) al iniciar la Fase 1. **Los números de sección se conservan**: hay más de cien referencias cruzadas del tipo «ver 4.1.1» repartidas por el repositorio, y renumerarlas las rompería todas.
 
@@ -524,5 +524,9 @@ Las cuatro primeras son las que la definición dejaba abiertas y este hito tení
 - **El interruptor de «Personas» es el mismo gesto que el de Módulos** —encendido es estar en el hogar, solo lo ve quien administra— con dos diferencias decididas. **Apagar arma una confirmación en la propia fila**, porque revoca las sesiones de esa persona en el acto; no es un modal a propósito —la ficha de `DangerZone` explica por qué un «¿seguro?» flotante se contesta por reflejo, y el `Dialog` del sistema de diseño sigue en «por construir», que no se estrena de rebote— y encender no confirma nada, porque no revoca ni destruye y se deshace con el mismo interruptor. **Y la propia fila no lleva interruptor**: darse de baja a uno mismo cierra la sesión que lo está pulsando, y la salida propia ya tiene su sitio en «Cuenta».
 
 - **El listado del administrador pide `includeDeactivated=true`**, que es lo único que permite encontrar a quien traer de vuelta; quien no administra sigue pidiendo —y viendo— solo a los activos, porque no puede reactivar a nadie.
+
+Con el bloque de despliegue (2026-08-21, [ADR-016](../architecture/decisions/ADR-016-production-deployment.md)), la única pieza de producto nueva:
+
+- **Tope de hogares de la instalación** (`maxHouseholds`, ver 4.1.4): `CreateHousehold` responde `409 HOUSEHOLD_LIMIT_REACHED` cuando la instalación está llena, **como primerísima comprobación e idéntico exista o no el correo** — la instalación llena no puede convertirse en un comprobador de direcciones, que es el mismo principio que el `202` constante. Cero es sin tope y es el valor del repositorio; el valor real es configuración de despliegue y vive solo en el `.env` del servidor. Cuentan **todos** los hogares existentes —sin verificar y en gracia de baja incluidos, porque ocupan sitio y sus purgas liberan el hueco solas— y es una **cota de dimensionado, no un invariante**: dos altas cruzadas en el último hueco pueden colarse las dos y la purga reabsorbe el exceso. Se descartó contar solo los verificados —dejaría inflar la instalación con altas sin verificar— y se descartó el `202` silencioso sin crear nada, que convertiría el tope en hogares que desaparecen sin explicación.
 
 > Si en el futuro surgen nuevas decisiones de diseño pendientes de validar, se recomienda añadirlas aquí siguiendo el mismo formato (pregunta + decisión + referencia a la sección afectada) hasta que se resuelvan.

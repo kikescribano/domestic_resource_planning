@@ -1,0 +1,30 @@
+# Contexto de construccion de las imagenes de deploy/. Se excluye todo lo que
+# las dos imagenes no necesitan: el historial, los artefactos de otra maquina y
+# --sobre todo-- cualquier .env que anduviera cerca.
+.git
+.gitignore
+.github
+.claude
+.data
+.idea
+.vscode
+docs
+scripts
+
+# Artefactos locales: cada imagen construye los suyos dentro.
+.gradle
+backend/build
+backend/bin
+backend/out
+backend/.kotlin
+frontend/node_modules
+frontend/dist
+frontend/coverage
+frontend/playwright-report
+frontend/test-results
+
+# Secretos, por si existieran en el arbol de trabajo. Nunca entran en una imagen.
+.env
+.env.*
+**/.env
+deploy/data

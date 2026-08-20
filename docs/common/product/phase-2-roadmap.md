@@ -824,6 +824,14 @@ resolver sin hogares reales dentro**, y su responsable pasó a ser la primera
 revisión de operación que exista. Es el único punto donde el proyecto no puede
 avanzar leyendo su propio código.
 
+> **La decisión se tomó el 2026-08-21.** DRP corre en producción en el VPS que
+> esta fase eligió con consumo medido, con la
+> [ADR-016](../architecture/decisions/ADR-016-production-deployment.md) y su
+> manual de operación
+> ([`deployment.md`](../../backend/operations/deployment.md)). La primera
+> revisión de operación que las dos decisiones aplazadas esperaban ya tiene
+> dónde ocurrir.
+
 Y **una cosa que no le queda**: la Fase 2 no tiene continuación pendiente. Lo que
 se dejó abierto a propósito está listado abajo, cada cosa con su motivo.
 
@@ -904,6 +912,7 @@ conocido.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-21 | Se anota, sin tocar lo que la fase decidió, que **el despliegue existe**: la decisión que «Qué le queda al proyecto» señalaba como no tomada se tomó en la [ADR-016](../architecture/decisions/ADR-016-production-deployment.md), y DRP corre en producción en el VPS elegido con el consumo medido de esta fase. |
 | 2026-08-20 | Se anota, sin tocar lo que la fase decidió, que **los tres huecos que dejó fuera están hechos**: el [cierre de huecos](open-gaps-roadmap.md) se completó con sus siete hitos, el Transactional Outbox incluido. |
 | 2026-08-19 | Se anota, sin tocar lo que la fase decidió, que **los tres huecos que dejó fuera ya tienen plan y no esperan a la Fase 3**: la baja de un hogar, la conversión de HEIC y el Transactional Outbox se ejecutan en el [cierre de huecos](open-gaps-roadmap.md), junto con los cuatro atributos propuestos. |
 | 2026-08-19 | **Hito 6 completado, y con él la Fase 2.** El hito no añade producto: consolida — y consolidar destapó **cuatro defectos que ninguna prueba de recorrido podía ver**, porque los tres barridos preguntan por lo que *no* se hizo. El **barrido de aislamiento** pasa de las treinta y ocho operaciones de la Fase 1 al **contrato entero**, con 313 comprobaciones y sin una desviación, y con **el criterio de inclusión escrito**: entra la operación que puede nombrar o devolver algo del hogar de al lado; queda fuera la que no acepta ningún identificador ni devuelve ninguna fila, porque esa prueba no podría fallar. De las cuarenta y cuatro nuevas —**el número que este documento tenía mal, que decía cuarenta y una**— cuarenta y una entran por las cuatro formas de ataque y tres por el cierre. Destapó dos `500` de Warehouse donde el contrato declara `404` y que **recibir una compra ignoraba en silencio** una línea ajena. La **auditoría de accesibilidad** recorre las seis pantallas enteras con los cuatro módulos encendidos —doce paradas, el caso peor— y encontró que **`input[type=date]` no dibujaba anillo de foco**, porque Chromium delega el foco a su shadow DOM y el campo no casa ni con `:focus-visible` ni con `:focus`. La **capacidad, vuelta a medir**, obliga a partir la medición en dos: por hogar pasa de 61 kB a **116 kB**, y aparece lo que crece con lo que el hogar *hace* —**2457 B/día**—; **VPS-3 sigue en pie y sigue decidiéndolo el disco**. Se cierra la **purga de las cinco tablas** con un número delante en vez de por aplazamiento, se resuelven o reafirman las **cinco decisiones abiertas** —la antelación del aviso eran dos preguntas y es una: será de plataforma— y **la prueba del reloj se retira**, porque la propiedad se cuenta y no se cronometra. El deck de marketing, regenerado desde su script. **Los cuatro módulos se quedan en «En desarrollo», y se dice por qué**: no hay ningún despliegue, y decir lo contrario sería decirlo también del core. Doce decisiones que la definición no preveía |

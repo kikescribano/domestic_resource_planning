@@ -34,3 +34,4 @@ Usa [`ADR-template.md`](ADR-template.md) para crear una entrada.
 | [ADR-013](ADR-013-transactional-outbox.md) | Transactional Outbox | accepted | — |
 | [ADR-014](ADR-014-heic-conversion.md) | Conversión de HEIC | accepted | — |
 | [ADR-015](ADR-015-user-chosen-category-identity.md) | Color e icono elegidos por el usuario, dentro de un juego certificado | accepted | — |
+| [ADR-016](ADR-016-production-deployment.md) | Despliegue de producción en un VPS | accepted | — |
