@@ -1,0 +1,77 @@
+# Analisis de codigo con CodeQL.
+#
+# **Sustituye a la configuracion por defecto**, y el motivo es uno concreto: la
+# por defecto analiza `java-kotlin` con `build-mode: autobuild`, es decir,
+# **construyendo el backend otra vez** por su cuenta y con su instrumentacion
+# encima. Eso se rompio en cuanto el proyecto subio a Kotlin 2.4, que compila a
+# traves de la Build Tools API: el demonio de Kotlin se quedaba sin memoria y el
+# analisis fallaba **incluso en pull requests que no tocaban el backend**,
+# mientras el trabajo `Backend` de la integracion pasaba sin quejarse.
+#
+# El modo de construccion no se puede elegir desde la configuracion por defecto
+# --su API solo expone lenguajes, suite y planificacion--, y de ahi que esto sea
+# un workflow propio.
+#
+# **`build-mode: none` para todo.** CodeQL extrae el codigo sin construirlo, que
+# es lo razonable aqui por dos motivos: la construccion de verdad ya la hace
+# `ci.yml` --con sus pruebas, que es donde un fallo significa algo-- y repetirla
+# solo para extraer no aporta cobertura, solo una segunda forma de fallar. Para
+# Kotlin la extraccion sin construccion es ademas la modalidad que GitHub
+# recomienda desde que existe.
+#
+# El precio esta anotado para que nadie lo descubra por sorpresa: sin construir,
+# CodeQL no resuelve dependencias externas, asi que pierde de vista los flujos
+# que atraviesan una biblioteca de terceros. Los que empiezan y acaban en codigo
+# del repositorio --que son los que este analisis busca-- se siguen viendo.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Semanal, como lo tenia la configuracion por defecto. Los lunes temprano:
+    # una vulnerabilidad nueva en una consulta de CodeQL aparece sin que nadie
+    # haya tocado el codigo, y conviene verla al empezar la semana.
+    - cron: '17 6 * * 1'
+
+# Minimo privilegio, igual que en `ci.yml`. `security-events: write` es lo unico
+# que se anade, y es lo que permite subir el resultado a la pestana de seguridad.
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      # Que un lenguaje falle no debe ocultar el resultado de los otros tres.
+      fail-fast: false
+      matrix:
+        language:
+          - actions
+          - java-kotlin
+          - javascript-typescript
+          - python
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Preparar CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - name: Analizar
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}
