@@ -620,6 +620,11 @@ paths:
       operationId: listTags
       tags: [tags]
       summary: Listar las etiquetas del hogar
+      description: >
+        El catálogo entero para la pantalla, o filtrado por q para el
+        autocompletado del campo de etiquetas de un asset. Un hogar nace SIN
+        ninguna, al contrario que con las categorías: no hay vocabulario por
+        omisión que acertar.
       parameters:
         - name: q
           in: query

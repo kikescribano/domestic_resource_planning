@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Previsto** — ficha escrita antes que el componente |
+| Estado | **Implementado** — ficha escrita antes que el componente |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
 | Última revisión | 2026-08-20 |
@@ -13,6 +13,14 @@
 > cinco anteriores encontraron algo cuando todavía no había código que rehacer:
 > un hueco del contrato, un rótulo que chocaba en nombre accesible, dos tokens
 > que no existen.
+>
+> **Y esta encontró dos cosas.** Que la entrada de un consumible no puede llevar
+> el campo —está abajo, en «Propósito»— y que el desplegable del filtro y el
+> combobox del campo comparten nombre accesible con su `listbox`, así que buscarlo
+> por rótulo casa dos elementos. Lo segundo no es un defecto sino el patrón de
+> ARIA 1.2, pero obliga a que las pruebas lo busquen por rol.
+>
+> Los valores de esta ficha son ya los del componente construido.
 
 ## Propósito y situaciones de uso
 
@@ -50,6 +58,13 @@ Tres piezas en columna, dentro de un `<div>` con la misma anatomía que
    `aria-activedescendant`, `Escape` cierra sin elegir.
 3. **La pista**, que dice lo único que no se deduce mirando: que escribir un
    nombre que no existe **lo crea**.
+
+Y una cuarta pieza que salió al construirlo y que no estaba en esta ficha:
+**`TagChip`**, la pastilla de solo lectura con la que una etiqueta se pinta en
+una fila del listado y en la ficha de un asset. No es la del campo —aquella lleva
+un botón dentro— y no es un [`StatusBadge`](status-badge.md): aquel dice **en qué
+estado está** una cosa y tiene cinco tonos de dominio detrás, así que pintar una
+etiqueta con uno de ellos diría algo que no significa nada.
 
 Estados:
 
@@ -151,9 +166,13 @@ propio de este campo:
 
 ## Estado de implementación y enlace al componente real
 
-**Previsto.** Lo construye el Hito 4 del cierre de huecos, en
+**Implementado** en el Hito 4 del cierre de huecos (2026-08-20), en
 [`frontend/src/ui/catalog.tsx`](../../../../frontend/src/ui/catalog.tsx) —y no en
 `primitives.tsx`, porque hace peticiones, ni en `files.tsx`, que es de ficheros—.
+
+Lo único que la implementación añadió a esta ficha es `TagChip`, arriba. La
+opción de crear se distingue por un identificador centinela que no es un `uuid`,
+así que no puede chocar con el de ninguna etiqueta.
 
 ## Referencias
 
@@ -166,4 +185,5 @@ propio de este campo:
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | El componente existe: la ficha pasa a **implementada** y gana `TagChip`, que salió al construirlo. | Equipo DRP |
 | 2026-08-20 | Creación de la ficha, **antes que el componente** (cierre de huecos, Hito 4). | Equipo DRP |

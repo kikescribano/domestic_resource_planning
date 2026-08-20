@@ -95,12 +95,14 @@ con sus siete puntos. No se reordena ni se recorta.
 | `DangerZone` | [`danger-zone.md`](danger-zone.md) | **Implementado** — ficha escrita antes que el componente, cierre de huecos Hito 0 | [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) |
 | `LoanExternalPage` | [`loan-external-page.md`](loan-external-page.md) | **Implementado** como `ExternalLoanPage` | [`routes/loans.tsx`](../../../../frontend/src/routes/loans.tsx) |
 | `SuppliersPage` | [`suppliers-page.md`](suppliers-page.md) | **Implementada** — ficha escrita antes que la pantalla, Fase 2 Hito 2 | [`routes/suppliers.tsx`](../../../../frontend/src/routes/suppliers.tsx) |
-| `TagField` | [`tag-field.md`](tag-field.md) | **Previsto** — ficha escrita antes que el componente, cierre de huecos Hito 4 | [`ui/catalog.tsx`](../../../../frontend/src/ui/catalog.tsx) |
-| `CategoryMarker` e `IconColorPicker` | [`category-identity.md`](category-identity.md) | **Previstos** — ficha escrita antes que los componentes, cierre de huecos Hito 4 | [`ui/catalog.tsx`](../../../../frontend/src/ui/catalog.tsx) |
+| `TagField` y `TagChip` | [`tag-field.md`](tag-field.md) | **Implementados** — ficha escrita antes que el componente, cierre de huecos Hito 4 | [`ui/catalog.tsx`](../../../../frontend/src/ui/catalog.tsx) |
+| `CategoryMarker` e `IconColorPicker` | [`category-identity.md`](category-identity.md) | **Implementados** — ficha escrita antes que los componentes, cierre de huecos Hito 4 | [`ui/catalog.tsx`](../../../../frontend/src/ui/catalog.tsx) |
 
-**Diecisiete componentes reutilizables —diez en `primitives.tsx`, cuatro en
-`files.tsx` y tres en `catalog.tsx`— más dos pantallas, y quince de las
-diecinueve filas tienen ficha**:
+**Dieciocho componentes reutilizables —diez en `primitives.tsx`, cuatro en
+`files.tsx` y cuatro en `catalog.tsx`— más dos pantallas, en dieciocho filas
+—`CategoryMarker` y su selector comparten una, y `TagField` otra con su pastilla,
+porque en los dos casos son mitades de una sola anatomía— y catorce de ellas
+tienen ficha**:
 `SelectField`, `PageHeading` y `EmptyState` entraron con el Hito 2 sin la suya, y
 `QuotaMeter` con el Hito 3, documentado como variante dentro de la ficha de
 `UploadField` y acabando en pieza aparte.

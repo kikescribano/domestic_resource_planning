@@ -2,13 +2,21 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | **Previsto** — ficha escrita antes que los componentes |
+| Estado | **Implementado** — ficha escrita antes que los componentes |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
 | Última revisión | 2026-08-20 |
 
 > **Esta ficha se escribió antes de que existieran los componentes**, como las de
 > [`danger-zone.md`](danger-zone.md) y [`tag-field.md`](tag-field.md).
+>
+> **Y volvió a pagar en el sitio de siempre, aunque tardó una prueba en verse.**
+> La anatomía de aquí daba a cada botón el nombre del icono o del color a secas
+> —«Bicicleta», «Musgo»— y esta pantalla puede tener **dos selectores a la vez**:
+> el del alta y el de la fila que se está editando. Eran cuarenta y cuatro botones
+> con veintidós nombres repetidos, que es exactamente el fallo que
+> [`suppliers-page.md`](suppliers-page.md) encontró en su día. Se arregla con la
+> propiedad `context`, que está abajo y que la ficha original no tenía.
 >
 > **Y son dos piezas en una ficha porque son las dos mitades de una sola cosa**:
 > cómo se elige la identidad visual de una categoría y cómo se pinta. El selector
@@ -96,6 +104,7 @@ un hogar que acaba de empezar.
 <IconColorPicker
   icon={draft.icon}
   color={draft.color}
+  context="categoría nueva"
   onChange={(identity) => setDraft({ ...draft, ...identity })}
 />
 ```
@@ -106,6 +115,7 @@ un hogar que acaba de empezar.
 | `color` | `CategoryColor \| null` | Uno de los seis, o nada |
 | `size` | `'sm' \| 'md' \| 'lg'` | Solo en el marcador; `sm` por omisión |
 | `label` | `string?` | Solo en el marcador de tamaño `lg`: el nombre de la categoría, para su nombre accesible |
+| `context` | `string` | Solo en el selector, y **obligatorio**: de quién es la cara que se está eligiendo —«categoría nueva», o el nombre de la que se edita—. Entra en el nombre accesible de cada botón, y es lo que impide que dos selectores en la misma pantalla den veintidós nombres repetidos |
 | `onChange` | `(v: { icon, color }) => void` | Solo en el selector. Devuelve **los dos**, como `TagField` devuelve la lista entera |
 
 **Las clases de color se escriben enteras en un `Record` y no se componen.**
@@ -135,7 +145,9 @@ defecto que el Hito 3 destapó en la pantalla de Préstamos.
   marcado es un estado que el control nativo no representa bien, y aquí es el
   estado inicial de toda categoría.
 - **Cada botón de color dice el nombre del color en castellano** —«Musgo»,
-  «Índigo»—, nunca solo «color 4». Es lo único que tiene quien no lo ve.
+  «Índigo»—, nunca solo «color 4». Es lo único que tiene quien no lo ve. Y detrás
+  va el `context`, así que lo que se anuncia es «Musgo, Herramientas»: sin él, dos
+  selectores en la misma pantalla dan el mismo nombre a controles distintos.
 - Ningún botón declara foco propio: lo pone la capa base de `index.css`.
 - El marcador es `aria-hidden` salvo en `lg`, donde es `role="img"` con nombre.
 
@@ -172,7 +184,7 @@ defecto que el Hito 3 destapó en la pantalla de Préstamos.
 
 ## Estado de implementación y enlace al componente real
 
-**Previstos.** Los construye el Hito 4 del cierre de huecos, en
+**Implementados** en el Hito 4 del cierre de huecos (2026-08-20), en
 [`frontend/src/ui/catalog.tsx`](../../../../frontend/src/ui/catalog.tsx), junto a
 [`TagField`](tag-field.md).
 
@@ -200,4 +212,5 @@ componente, y metida en `primitives.tsx` acabaría con lo que el registro llama
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | Los componentes existen: la ficha pasa a **implementada** y gana la propiedad `context`, que la versión escrita por delante no tenía y que destapó la prueba de la fila en edición. | Equipo DRP |
 | 2026-08-20 | Creación de la ficha, **antes que los componentes** (cierre de huecos, Hito 4). | Equipo DRP |
