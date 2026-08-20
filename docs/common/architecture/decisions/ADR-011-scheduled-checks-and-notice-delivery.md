@@ -450,3 +450,37 @@ alcanzado.
   programador **a propósito** para medir que la pasada diaria queda registrada, y
   con el relay colgando de aquella propiedad empezaría a repartir eventos cada
   cinco segundos dentro de ese contexto y sobre la base que toda la suite comparte.
+
+- **A qué hora corre el recorrido es del despliegue; qué día mira, del hogar.**
+  La sección 7 dice que la hora es «una decisión de despliegue y no de dominio», y
+  lo sigue siendo. Lo que no separaba —y el Hito 5 del cierre de huecos tuvo que
+  separar— es que **el día de calendario que una comprobación considera «hoy» sí
+  es de dominio, y es el del hogar**. El razonamiento de aquella frase apuntaba a
+  los préstamos, donde es exacto: `dueAt` es un `timestamptz` y comparar instantes
+  no necesita zona. Pero las reglas que llegaron después comparan `LocalDate`
+  —`MaintenancePlan.stageOn(hoy)`, `StockLot.stageOn(hoy, antelación)`— y un día
+  de calendario no significa nada sin una zona.
+
+  Derivándolo del reloj de la aplicación, que es `Clock.systemUTC()`, esa zona era
+  **la del despliegue**: un hogar en Auckland recibía con un día de retraso el
+  aviso de lo que le tocaba hoy, y uno en Honolulu con un día de adelanto. La
+  misma línea gobernaba además la regla que rechaza una intervención «del futuro»,
+  y ahí el efecto era inmediato y visible: entre la medianoche local y la de
+  Greenwich, un hogar peninsular **no podía apuntar lo que acababa de hacer**.
+
+  **La respuesta es la misma inversión que esta ADR ya usa dos veces**, y por eso
+  no hay ADR nueva: plataforma declara `HouseholdCalendar` y el core lo implementa
+  leyendo `households.time_zone`, exactamente como `HouseholdDirectory` y
+  `NoticeRecipients`. Se descartó llevar la zona en `SessionClaims` —engordaría la
+  única excepción nombrada de la tercera regla de ArchUnit, que tiene una prueba
+  afirmando que sigue teniendo un solo nombre, y además no sirve aquí: el
+  recorrido diario no tiene sesión—, y se descartó cambiar la zona del bean
+  `Clock`, que es la del despliegue y no la de nadie: un hogar por instancia no es
+  el modelo. La alternativa descartada de fondo —dejarlo en UTC— está razonada en
+  la sección 4.1.7 del [registro de decisiones](../../product/decisions.md).
+
+  **El coste que esto deja escrito** es que el recorrido diario sigue corriendo a
+  una sola hora para toda la instalación, así que un hogar muy lejos de esa hora
+  recibe su resumen a una hora rara de su día. Eso es exactamente lo que la
+  sección 7 llama decisión de despliegue, y no cambia: lo que se ha corregido es
+  que el **contenido** del aviso ya no se equivoca de día.
