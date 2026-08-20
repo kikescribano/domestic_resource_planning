@@ -4,7 +4,15 @@ plugins {
     // Genera el constructor sin argumentos que JPA exige de toda entidad y que
     // Kotlin no produce por su cuenta.
     kotlin("plugin.jpa") version "2.1.20"
-    id("org.springframework.boot") version "3.4.5"
+    // **Peldano hacia la linea 4.x, no destino.** La 3.5 esta fuera de soporte
+    // OSS desde el 2026-06-30 y la 3.5.16 es su ultimo parche publicado; se para
+    // aqui porque es lo que la guia de migracion de Spring exige antes de saltar
+    // a la 4 --«upgrade to the latest available 3.5.x version» -- y porque este
+    // salto ya cierra por si solo las CVE que la auditoria localizo en Spring
+    // Security, Tomcat y Spring Framework. El salto a la 4.1 va aparte: arrastra
+    // Jackson 3 con cambio de groupId, Kotlin 2.2+, Spring Security 7 y
+    // Hibernate 7, y mezclarlo con esto haria imposible saber que rompio que.
+    id("org.springframework.boot") version "3.5.16"
     id("io.spring.dependency-management") version "1.1.7"
 }
 
@@ -34,14 +42,25 @@ dependencies {
     // Argon2id (README 4.1.4). El Argon2PasswordEncoder de Spring Security
     // delega en BouncyCastle, que no entra con el starter ni lo gestiona el BOM
     // de Spring Boot: de ahi la version explicita.
-    implementation("org.bouncycastle:bcprov-jdk18on:1.80")
+    // La 1.80 estaba en el rango de CVE-2025-8885 y CVE-2025-8916 --denegacion de
+    // servicio parseando ASN.1 manipulado--, que aqui no eran alcanzables porque
+    // BC solo respalda a Argon2 y el codigo no parsea ASN.1 de entrada ajena. Se
+    // sube igual: el hallazgo era de severidad baja por el vector, no por la
+    // vulnerabilidad, y mantener una version en rango obliga a repetir ese
+    // razonamiento cada vez que alguien lea el informe.
+    implementation("org.bouncycastle:bcprov-jdk18on:1.85.2")
     // Firma y verificacion del JWT (README 5.4.1). Se toma por esta via, y no
     // declarando nimbus-jose-jwt a pelo, porque asi la version la fija Spring
     // Security y no hay que mantenerla a mano.
     implementation("org.springframework.security:spring-security-oauth2-jose")
 
-    // Swagger UI - documentacion interactiva de la API (README 5.4.2)
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5")
+    // Swagger UI - documentacion interactiva de la API (README 5.4.2).
+    //
+    // Acompana a Spring Boot y no se elige aparte: la 2.8.5 salio para la linea
+    // 3.4 y el soporte de la 3.5 llega despues, asi que subir Boot sin subir esto
+    // es la forma habitual de que Swagger deje de responder. La linea 3.x de
+    // springdoc es la del Boot 4 y entra con el, no antes.
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.0")
 
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
