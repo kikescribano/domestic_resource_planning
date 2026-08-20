@@ -34,6 +34,14 @@ tags:
     description: Catálogo de artículos del hogar (definición reutilizable, ver readme.md 4.1.1)
   - name: categories
     description: Catálogo de categorías del hogar (clasificación funcional, ver readme.md 4.1.1)
+  - name: tags
+    description: >
+      Etiquetas libres del hogar (ver readme.md 4.1.1). Es la clasificación que
+      la categoría no puede dar, porque la categoría es una: el taladro es de
+      Herramientas, y a la vez es camping y heredado del abuelo. Poner y quitar
+      etiquetas a un asset NO está aquí -- viaja en tagIds dentro de
+      POST /assets y PATCH /assets/{id}, porque etiquetar es corregir la ficha de
+      un asset y no una operación del catálogo.
   - name: documents
     description: Documentación asociada a assets y artículos -- un enlace externo o un fichero subido
   - name: files
@@ -607,6 +615,125 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         default: { $ref: "#/components/responses/ServerError" }
 
+  /tags:
+    get:
+      operationId: listTags
+      tags: [tags]
+      summary: Listar las etiquetas del hogar
+      parameters:
+        - name: q
+          in: query
+          description: >
+            Búsqueda por nombre, sin distinguir mayúsculas ni acentos. Es lo que
+            alimenta el autocompletado del campo de etiquetas de un asset.
+          schema: { type: string }
+        - name: includeRetired
+          in: query
+          schema: { type: boolean, default: false }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+      responses:
+        "200":
+          description: Listado de etiquetas vigentes
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TagPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+    post:
+      operationId: createTag
+      tags: [tags]
+      summary: Crear una etiqueta, o revivir la que existiera retirada con ese nombre
+      description: >
+        Responde 201 si la creó y 200 si ya existía -- viva, o retirada y
+        revivida. La diferencia la decide el servidor, no el cliente: quien
+        escribe un nombre en el campo de etiquetas no tiene por qué saber cuál de
+        las dos cosas va a pasar.
+
+
+        Que revivir sea aquí y no una operación aparte sale del índice único de
+        tags, que a diferencia del de categorías NO es parcial por retirada: dos
+        etiquetas del mismo nombre podrían acabar sobre el mismo asset y pintarlo
+        dos veces. Con el índice completo, crear "Camping" teniendo una "camping"
+        retirada sería un 409 sobre una fila que el usuario no ve.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TagInput" }
+      responses:
+        "200":
+          description: La etiqueta ya existía; si estaba retirada, vuelve a estar vigente
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tag" }
+        "201":
+          description: Etiqueta creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tag" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /tags/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateTag
+      tags: [tags]
+      summary: Renombrar una etiqueta
+      description: >
+        No toca a los assets que la llevan: la referencian por identificador, no
+        por texto. Es literalmente la razón por la que la etiqueta es un catálogo
+        y no una columna de texto -- con texto, corregir una falta de ortografía
+        obligaría a recorrer todos los assets del hogar.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TagInput" }
+      responses:
+        "200":
+          description: Etiqueta renombrada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tag" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Ya hay otra etiqueta con ese nombre (TAG_DUPLICATE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+    delete:
+      operationId: retireTag
+      tags: [tags]
+      summary: Retirar una etiqueta
+      description: >
+        Retirada lógica, como la de una categoría y por un motivo más fuerte:
+        borrarla se llevaría por delante la clasificación de todos los assets que
+        la tuvieran, y eso no se puede deshacer. Deja de ofrecerse al etiquetar y
+        de sugerirse al escribir; los assets que ya la llevaban la conservan.
+        Quitársela a uno es un PATCH sobre ese asset.
+
+
+        Volver a crearla con el mismo nombre la revive, así que esto tiene
+        deshacer sin necesitar una operación propia.
+      responses:
+        "204":
+          description: Etiqueta retirada
+        "404": { $ref: "#/components/responses/NotFound" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+
   /documents:
     get:
       operationId: listDocuments
@@ -1042,6 +1169,17 @@ paths:
             justifica que el estado de conservación sea un enumerado y no una
             nota: sobre texto libre no se puede filtrar.
           schema: { $ref: "#/components/schemas/AssetCondition" }
+        - name: tagId
+          in: query
+          description: >
+            Qué hay etiquetado como camping. Es la mitad por la que existe el
+            atributo: clasificar sin poder preguntar después no clasifica nada.
+
+
+            UNA etiqueta y no varias: con dos habría que decidir si se cruzan en
+            AND o en OR, que son dos preguntas distintas y ninguna pantalla ha
+            pedido todavía ninguna de las dos.
+          schema: { type: string, format: uuid }
         - name: withoutOwner
           in: query
           description: Devuelve los assets huérfanos que dejó una baja de usuario
@@ -3842,17 +3980,55 @@ components:
         existencia: todas las existencias de un mismo artículo se llevan en ella.
       enum: [UNIT, GRAM, KILOGRAM, MILLILITER, LITER, METER, PACK]
 
+    CategoryIcon:
+      type: string
+      description: >
+        El icono de una categoría, dentro de un juego CERRADO de dieciséis (ver
+        ADR-015). Cerrado y no un buscador sobre las mil y pico de Lucide: eso
+        obligaría a mantener una traducción de mil nombres al castellano y
+        dejaría elegir una papelera para "Alimentación". BOX es además el que se
+        pinta cuando no hay ninguno elegido.
+      enum: [BOX, SOFA, UTENSILS, SPRAY, TOOL, FRAME, PLUG, POT, PILL, MONITOR, SHIRT, BIKE, PENCIL, CAR, LEAF, PAW]
+
+    CategoryColor:
+      type: string
+      description: >
+        El color de una categoría, dentro de un juego CERRADO de seis (ver
+        ADR-015). La razón de que sea cerrado es de accesibilidad y no de gusto:
+        un color libre no está en ningún token del sistema de diseño, así que no
+        lo mide scripts/check-contrast.py y sería lo único de la interfaz cuyo
+        contraste se afirma en vez de comprobarse. Los seis producen doce pares
+        medidos en los dos modos.
+
+
+        Ninguno cae encima de los cinco tonos de estado del dominio ni del
+        acento, y el color NUNCA es el único portador: el nombre de la categoría
+        va siempre al lado.
+      enum: [ROSE, PLUM, INDIGO, SKY, TEAL, MOSS]
+
     CategoryInput:
       type: object
       description: >
         Clasificación funcional del hogar. Cada hogar arranca con un juego
-        sembrado y lo edita a su gusto.
+        sembrado -- con su icono y su color puestos -- y lo edita a su gusto.
+
+
+        El cuerpo es la categoría entera y no un parche campo a campo: un campo
+        ausente se QUITA, que es como se retira un icono elegido por error.
       required: [name]
       properties:
         name:
           type: string
           description: Único entre las categorías vigentes del hogar, comparado normalizado
         notes: { type: string }
+        icon:
+          allOf:
+            - $ref: "#/components/schemas/CategoryIcon"
+          description: Opcional. Ausente significa que nadie lo eligió, que es el caso normal.
+        color:
+          allOf:
+            - $ref: "#/components/schemas/CategoryColor"
+          description: Opcional. Ausente significa que nadie lo eligió.
 
     Category:
       allOf:
@@ -3866,6 +4042,38 @@ components:
               format: date-time
               nullable: true
               description: Informado si la categoría está retirada
+        - $ref: "#/components/schemas/Authorship"
+
+    TagInput:
+      type: object
+      description: >
+        Etiqueta libre del hogar. Solo tiene nombre: no lleva icono ni color, y
+        eso es una decisión -- un asset lleva varias, así que darles cara
+        multiplicaría por veinte lo que hay que medir para decir lo que el texto
+        ya dice.
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 60
+          description: >
+            Único en el hogar, comparado sin distinguir mayúsculas ni acentos, y
+            contando también las retiradas. A diferencia de una categoría, un
+            asset puede llevar varias etiquetas: dos con el mismo nombre podrían
+            acabar sobre el mismo asset y pintarlo dos veces.
+
+    Tag:
+      allOf:
+        - $ref: "#/components/schemas/TagInput"
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            createdAt: { type: string, format: date-time }
+            retiredAt:
+              type: string
+              format: date-time
+              nullable: true
+              description: Informado si la etiqueta está retirada
         - $ref: "#/components/schemas/Authorship"
 
     DocumentType:
@@ -4174,6 +4382,15 @@ components:
           format: uuid
           description: Foto subida al servidor. Excluyente con photoUrl
         notes: { type: string }
+        tagIds:
+          type: array
+          description: >
+            Las etiquetas con las que nace. Vacío es lo normal. No existe en
+            POST /assets/intake: dar entrada suma sobre una existencia que puede
+            llevar ya las suyas, así que el cuerpo tendría que decidir si las
+            reemplaza o las funde, y ninguna de las dos respuestas es evidente.
+            Se etiqueta después, con el PATCH.
+          items: { type: string, format: uuid }
       # name y categoryId son obligatorios salvo que se herede del articulo.
       anyOf:
         - required: [articleId]
@@ -4266,6 +4483,13 @@ components:
             el fichero para su retirada: la cuota se libera en el acto y los
             bytes los desenlaza el proceso diario.
         notes: { type: string }
+        tagIds:
+          type: array
+          description: >
+            La lista ENTERA, no un delta: sustituye lo que hubiera, igual que la
+            cantidad de una existencia. Ausente no toca nada y [] las quita
+            todas, que es como se desetiqueta.
+          items: { type: string, format: uuid }
 
     Asset:
       allOf:
@@ -4283,6 +4507,27 @@ components:
             category:
               type: string
               description: Nombre de la categoría, resuelto para lectura.
+            categoryIcon:
+              allOf:
+                - $ref: "#/components/schemas/CategoryIcon"
+              nullable: true
+              description: >
+                La cara de su categoría, resuelta al leer igual que el nombre.
+                Nula mientras el hogar no la elija.
+            categoryColor:
+              allOf:
+                - $ref: "#/components/schemas/CategoryColor"
+              nullable: true
+              description: Ídem. Nula mientras el hogar no la elija.
+            tags:
+              type: array
+              description: >
+                Las etiquetas puestas, ordenadas por nombre. Con identificador y
+                nombre, y no solo el nombre, porque el filtro del listado va por
+                identificador: devolver solo el texto obligaría a la pantalla a
+                buscar la etiqueta en el catálogo para poder filtrar por lo que
+                acaba de pintar.
+              items: { $ref: "#/components/schemas/Tag" }
             articleId:
               type: string
               format: uuid
@@ -4783,6 +5028,16 @@ components:
             items:
               type: array
               items: { $ref: "#/components/schemas/Category" }
+
+    TagPage:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Tag" }
 
     DocumentPage:
       allOf:

@@ -2,6 +2,7 @@ package com.drp.core.application.usecase
 
 import com.drp.core.application.EnrollmentEmails
 import com.drp.core.application.port.CategoryRepository
+import com.drp.core.application.port.SeededCategory
 import com.drp.core.application.port.EmailVerificationTokenRepository
 import com.drp.core.application.port.HouseholdMemberRepository
 import com.drp.core.application.port.HouseholdRepository
@@ -224,7 +225,8 @@ class CreateHouseholdHashesBothWaysTest {
     }
 
     private object ForbiddenCategories : CategoryRepository {
-        override fun seed(names: List<String>, at: Instant) = error("La rama del correo conocido sembró categorías")
+        override fun seed(categories: List<SeededCategory>, at: Instant) =
+            error("La rama del correo conocido sembró categorías")
         override fun countCurrent(): Long = 0
         override fun save(category: Category): Category = error("no se usa")
         override fun findById(categoryId: UUID): Category? = null
@@ -262,7 +264,7 @@ class CreateHouseholdHashesBothWaysTest {
     }
 
     private object TolerantCategories : CategoryRepository {
-        override fun seed(names: List<String>, at: Instant) = Unit
+        override fun seed(categories: List<SeededCategory>, at: Instant) = Unit
         override fun countCurrent(): Long = 0
         override fun save(category: Category): Category = error("no se usa")
         override fun findById(categoryId: UUID): Category? = null

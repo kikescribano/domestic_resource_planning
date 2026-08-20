@@ -3,7 +3,11 @@ package com.drp.core.adapter.http
 import com.drp.core.application.TokenPair
 import com.drp.platform.page.Page
 import com.drp.core.application.usecase.HouseholdUser
+import com.drp.core.application.usecase.CategoryCommand
 import com.drp.core.domain.catalog.Category
+import com.drp.core.domain.catalog.CategoryColor
+import com.drp.core.domain.catalog.CategoryIcon
+import com.drp.core.domain.catalog.Tag
 import com.drp.core.domain.household.Household
 import com.drp.core.domain.household.MemberRole
 import com.drp.core.domain.invitation.Invitation
@@ -198,12 +202,23 @@ data class UserResponse(
 data class CategoryInput(
     @field:NotBlank @field:Size(max = 120) val name: String,
     val notes: String? = null,
-)
+    /**
+     * La cara de la categoria. Los dos son opcionales y **ausente es quitar**,
+     * no conservar: el cuerpo de esta operacion es la categoria entera y no un
+     * parche campo a campo, igual que ya pasaba con `notes` desde el Hito 2.
+     */
+    val icon: CategoryIcon? = null,
+    val color: CategoryColor? = null,
+) {
+    fun toCommand() = CategoryCommand(name = name, notes = notes, icon = icon, color = color)
+}
 
 data class CategoryResponse(
     val id: UUID,
     val name: String,
     val notes: String?,
+    val icon: CategoryIcon?,
+    val color: CategoryColor?,
     val createdAt: Instant,
     val retiredAt: Instant?,
     val createdBy: UUID?,
@@ -214,10 +229,42 @@ data class CategoryResponse(
             id = category.id,
             name = category.name,
             notes = category.notes,
+            icon = category.icon,
+            color = category.color,
             createdAt = category.createdAt,
             retiredAt = category.retiredAt,
             createdBy = category.createdBy,
             updatedBy = category.updatedBy,
+        )
+    }
+}
+
+data class TagInput(@field:NotBlank @field:Size(max = 60) val name: String)
+
+/**
+ * Una etiqueta tal y como sale del catalogo.
+ *
+ * **Dentro de un asset se devuelve la misma forma**, con su identificador y su
+ * nombre, y no solo el nombre: el filtro del listado va por identificador, asi
+ * que devolver solo el texto obligaria a la pantalla a buscar la etiqueta en el
+ * catalogo para poder filtrar por lo que acaba de pintar.
+ */
+data class TagResponse(
+    val id: UUID,
+    val name: String,
+    val createdAt: Instant,
+    val retiredAt: Instant?,
+    val createdBy: UUID?,
+    val updatedBy: UUID?,
+) {
+    companion object {
+        fun of(tag: Tag) = TagResponse(
+            id = tag.id,
+            name = tag.name,
+            createdAt = tag.createdAt,
+            retiredAt = tag.retiredAt,
+            createdBy = tag.createdBy,
+            updatedBy = tag.updatedBy,
         )
     }
 }

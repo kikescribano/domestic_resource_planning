@@ -30,8 +30,8 @@ import java.util.UUID
  * El barrido de aislamiento del contrato entero: las **treinta y ocho**
  * operaciones de la Fase 1, las **cuarenta y cuatro** que trajo la Fase 2 --tres
  * de activacion, tres de avisos, siete de Proveedores, diez de Warehouse, diez de
- * Compras y once de Mantenimiento-- y las **cuatro** de la baja de hogar y el
- * cierre de cuenta (ADR-012).
+ * Compras y once de Mantenimiento--, las **cuatro** de la baja de hogar y el
+ * cierre de cuenta (ADR-012) y las **cuatro** del catalogo de etiquetas.
  *
  * No sustituye a las pruebas de recorrido de cada recurso ni a las de gate de
  * cada modulo: comprueba una sola cosa --la de la ADR-002-- sobre todas ellas y
@@ -72,6 +72,18 @@ import java.util.UUID
  * asi que **entran por el cierre**: B las ejecuta durante el barrido y el retrato
  * de A tiene que seguir siendo el mismo al terminar. Estan por tanto cubiertas las
  * cuarenta y cuatro, con dos instrumentos distintos y no con uno forzado.
+ *
+ * **De las cuatro de etiquetas, tres entran por las cuatro secciones y una no.**
+ * `PATCH /tags/{id}` y `DELETE /tags/{id}` llevan identificador en la ruta
+ * --seccion 1--, `POST /tags` puede delatar por unicidad --seccion 4-- y
+ * `GET /tags` devuelve filas del hogar --seccion 3--. Y el hito trae ademas dos
+ * referencias nuevas **dentro del cuerpo**, que es la seccion 2 y la forma que
+ * la clave ajena no detiene limpiamente: el `tagIds` de `POST /assets` y el de
+ * `PATCH /assets/{id}`. Van **dentro de un array**, que es lo que las hace
+ * distintas de todas las anteriores: la referencia no es el campo sino cada uno
+ * de sus elementos, asi que hay un caso con una etiqueta propia delante de la
+ * ajena --si el resolutor solo mirase la primera, la de A pasaria detras de una
+ * legitima y ninguna prueba de recorrido lo notaria.
  *
  * **Las cuatro de la baja de hogar caen todas en ese segundo grupo**, y con mas
  * motivo que ninguna: ni `getCurrentHousehold`, ni las dos de la baja, ni
@@ -136,6 +148,8 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     private lateinit var docA: String
     private lateinit var loanA: String
     private lateinit var lentAssetA: String
+    private lateinit var tagA: String
+    private lateinit var tagA2: String
 
     /** Lo que el hogar A tiene **en los cuatro modulos**, con los cuatro encendidos. */
     private lateinit var supA: String
@@ -160,6 +174,8 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     private lateinit var fileB: String
     private lateinit var lendableB: String
     private lateinit var docB: String
+    private lateinit var tagB: String
+    private lateinit var tagB2: String
 
     /** Y lo propio de B en los cuatro modulos, con lo que se hacen los controles positivos. */
     private lateinit var supB: String
@@ -196,6 +212,14 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         stockA = a.intake(artA, locA, 1000)
         stockA2 = a.intake(artA, locA2, 500)
 
+        // Las etiquetas del Hito 4 del cierre de huecos. La de A va **puesta** en
+        // un asset suyo, que es lo que hace que el filtro `tagId` tenga algo que
+        // devolver si cruzara: un filtro sobre una etiqueta que nadie lleva
+        // devolveria vacio pase lo que pase.
+        tagA = a.createTag("EtiquetaDeA")
+        tagA2 = a.createTag("SegundaEtiquetaDeA")
+        a.tagAsset(durA, tagA)
+
         catB = b.createCategory("""{"name":"CategoriaDeB"}""")
         catB2 = b.createCategory("""{"name":"SegundaCategoriaDeB"}""")
         artB = b.createArticle("""{"name":"AzucarDeB","categoryId":"$catB","unit":"GRAM","barcode":"8400000000002"}""")
@@ -229,6 +253,9 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         // Y B necesita un DURABLE libre para su control positivo, porque el suyo
         // de siempre lo usan otras secciones.
         lendableB = b.createAsset("""{"name":"PrestableDeB","type":"DURABLE","categoryId":"$catB"}""")
+
+        tagB = b.createTag("EtiquetaDeB")
+        tagB2 = b.createTag("SegundaEtiquetaDeB")
 
         // -----------------------------------------------------------------
         // Los cuatro modulos de la Fase 2, encendidos en los dos hogares
@@ -275,6 +302,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
 
         listOf(
             "/api/v1/categories?includeRetired=true",
+            "/api/v1/tags?includeRetired=true",
             "/api/v1/articles?includeRetired=true",
             "/api/v1/articles/$artA",
             "/api/v1/locations",
@@ -320,7 +348,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("las cuarenta y dos operaciones con identificador en la ruta se niegan ante uno de otro hogar")
+    @DisplayName("las cuarenta y cuatro operaciones con identificador en la ruta se niegan ante uno de otro hogar")
     fun `barrido por identificador del recurso`() {
         val section = "ruta"
 
@@ -374,6 +402,15 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         val category = http.getJson("$CATEGORIES?includeRetired=true", a.accessToken)
         expectPresent("$section la categoria de A sigue viva", catA, category)
         expectPresent("$section la categoria de A conserva su nombre", "CategoriaDeA", category)
+
+        val tags = http.getJson("$TAGS?includeRetired=true", a.accessToken)
+        expectPresent("$section la etiqueta de A sigue vigente", "\"retiredAt\":null", tags)
+        expectPresent("$section la etiqueta de A conserva su nombre", "EtiquetaDeA", tags)
+        expectPresent(
+            "$section el asset de A sigue llevandola puesta",
+            tagA,
+            http.getJson("$ASSETS/$durA", a.accessToken),
+        )
 
         val article = http.getJson("$ARTICLES/$artA", a.accessToken)
         expectStatus("$section el articulo de A sigue existiendo", HttpStatus.OK, article)
@@ -537,6 +574,27 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             )
         }
 
+        // Las etiquetas del Hito 4. Van **dentro de un array**, que es la forma
+        // que mas facil es dejar sin resolver: la referencia no es el campo sino
+        // cada uno de sus elementos, y un bucle que se olvide de uno no falla en
+        // ninguna prueba de recorrido.
+        bothWays("POST /assets tagIds", own = tagB, foreign = tagA, ok = CREATED) { id ->
+            http.postJson(
+                ASSETS,
+                """{"name":"Sonda${short()}","type":"DURABLE","categoryId":"$catB","tagIds":["$id"]}""",
+                b.accessToken,
+            )
+        }
+        // Y con una propia delante: si el resolutor solo mirase la primera, la de
+        // A pasaria detras de una legitima.
+        bothWays("POST /assets tagIds con una propia delante", own = tagB2, foreign = tagA, ok = CREATED) { id ->
+            http.postJson(
+                ASSETS,
+                """{"name":"Sonda${short()}","type":"DURABLE","categoryId":"$catB","tagIds":["$tagB","$id"]}""",
+                b.accessToken,
+            )
+        }
+
         // --- POST /assets/intake. El `ok` admite 200 y 201 porque la entrada suma
         // sobre la existencia que ya haya en esa ubicacion en vez de crear otra.
         bothWays("POST /assets/intake articleId", own = artB, foreign = artA, ok = INTAKE_OK) { id ->
@@ -602,6 +660,9 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         }
         bothWays("PATCH /assets photoFileId", own = b.uploadImage(), foreign = fileA, ok = OK) { id ->
             http.patchJson("$ASSETS/${freshDurableB()}", """{"photoFileId":"$id"}""", b.accessToken)
+        }
+        bothWays("PATCH /assets tagIds", own = tagB, foreign = tagA, ok = OK) { id ->
+            http.patchJson("$ASSETS/${freshDurableB()}", """{"tagIds":["$id"]}""", b.accessToken)
         }
 
         // --- POST /assets/{id}/merge. El origen es propio y solo cambia el
@@ -989,7 +1050,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("los veinte listados no devuelven nada de otro hogar, ni filtrando por sus identificadores")
+    @DisplayName("los veintiun listados no devuelven nada de otro hogar, ni filtrando por sus identificadores")
     fun `barrido de listados`() {
         val section = "listado"
 
@@ -1041,6 +1102,24 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         expectEmpty("$section GET /assets?ownerId de A", http.getJson("$ASSETS?ownerId=${a.memberId}", b.accessToken))
         expectEmpty("$section GET /assets?articleId de A", http.getJson("$ASSETS?articleId=$artA", b.accessToken))
         expectEmpty("$section GET /assets?categoryId de A", http.getJson("$ASSETS?categoryId=$catA", b.accessToken))
+        // El del Hito 4. Se mide por vacio y no por ausencia: B no tiene ningun
+        // asset con la etiqueta de A --no puede-- asi que cualquier fila aqui es
+        // una fuga.
+        expectEmpty("$section GET /assets?tagId de A", http.getJson("$ASSETS?tagId=$tagA", b.accessToken))
+        expectAbsent("$section GET /tags", tagA, http.getJson(TAGS, b.accessToken))
+        expectAbsent(
+            "$section GET /tags?includeRetired=true",
+            tagA,
+            http.getJson("$TAGS?includeRetired=true", b.accessToken),
+        )
+        // El `q` es el filtro que mas tienta como oraculo de este recurso: una
+        // etiqueta es texto que alguien escribio, asi que adivinarla es facil y
+        // que aparezca diria que el vecino la tiene.
+        expectAbsent(
+            "$section GET /tags?q con el nombre de una de A",
+            tagA,
+            http.getJson("$TAGS?q=EtiquetaDeA", b.accessToken),
+        )
         expectAbsent(
             "$section GET /assets?status=DECOMMISSIONED",
             stockA,
@@ -1363,6 +1442,21 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             HttpStatus.OK,
             http.patchJson("$CATEGORIES/${freshCategoryB()}", """{"name":"SegundaCategoriaDeA"}""", b.accessToken),
         )
+        // La etiqueta tiene un matiz propio: su indice unico **no es parcial por
+        // retirada**, asi que el 409 tiene mas superficie que el de una categoria
+        // --tambien choca contra las retiradas-- y por tanto mas por donde
+        // delatar. `201` y no `200`: B no tiene ninguna con ese nombre, ni viva ni
+        // retirada, asi que la crea de verdad.
+        expectStatus(
+            "$section POST /tags con el nombre de una de A",
+            HttpStatus.CREATED,
+            http.postJson(TAGS, """{"name":"EtiquetaDeA"}""", b.accessToken),
+        )
+        expectStatus(
+            "$section PATCH /tags renombrando al nombre de otra de A",
+            HttpStatus.OK,
+            http.patchJson("$TAGS/$tagB2", """{"name":"SegundaEtiquetaDeA"}""", b.accessToken),
+        )
         expectStatus(
             "$section POST /articles con el nombre y el codigo de barras de A",
             HttpStatus.CREATED,
@@ -1436,7 +1530,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         println(
             """
 
-            ========== BARRIDO DE AISLAMIENTO DE LAS 98 OPERACIONES DEL CONTRATO ==========
+            ========== BARRIDO DE AISLAMIENTO DE LAS 106 OPERACIONES DEL CONTRATO ==========
             Comprobaciones ejecutadas: ${checks.size}
             Desviaciones: ${deviations.size}
 
@@ -1457,9 +1551,9 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     // ------------------------------------------------------------------
 
     /**
-     * Las **cuarenta y dos** operaciones con identificador en la ruta --veinte de
-     * la Fase 1 y veintidos de la Fase 2--, cada una como una llamada que solo
-     * espera el identificador. Es lo que permite ejecutarlas dos veces --con el de
+     * Las **cuarenta y cuatro** operaciones con identificador en la ruta --veinte
+     * de la Fase 1, veintidos de la Fase 2 y las dos de etiquetas del cierre de
+     * huecos--, cada una como una llamada que solo espera el identificador. Es lo que permite ejecutarlas dos veces --con el de
      * A y con uno inventado-- sin repetir el cuerpo.
      */
     private fun operationsWithPathId(): List<Pair<String, (String) -> ResponseEntity<String>>> = listOf(
@@ -1467,6 +1561,14 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             http.patchJson("$CATEGORIES/$id", """{"name":"Sonda${short()}"}""", b.accessToken)
         },
         "DELETE /categories/{id}" to { id -> http.deleteJson("$CATEGORIES/$id", b.accessToken) },
+        // Las dos del Hito 4 del cierre de huecos. La de retirada es la que mas
+        // dano haria: retirar la etiqueta de otro hogar la quitaria de todo lo
+        // que la lleve alli, sin devolver ni una fila y por tanto sin que ninguna
+        // otra comprobacion lo notara.
+        "PATCH /tags/{id}" to { id ->
+            http.patchJson("$TAGS/$id", """{"name":"Sonda${short()}"}""", b.accessToken)
+        },
+        "DELETE /tags/{id}" to { id -> http.deleteJson("$TAGS/$id", b.accessToken) },
         "GET /articles/{id}" to { id -> http.getJson("$ARTICLES/$id", b.accessToken) },
         "PATCH /articles/{id}" to { id ->
             http.patchJson("$ARTICLES/$id", """{"name":"Sonda${short()}"}""", b.accessToken)
@@ -1612,6 +1714,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         operation.contains("/maintenance/machines") -> durA
         operation.contains("/maintenance/plans") -> planA
         operation.contains("/categories") -> catA
+        operation.contains("/tags") -> tagA
         operation.contains("/articles") -> artA
         operation.contains("/locations") -> locA
         operation.contains("/merge") -> stockA
@@ -1778,6 +1881,16 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
 
     private fun TestHousehold.createArticle(body: String) = created(ARTICLES, body)
 
+    /** `POST /tags` responde `201` al crear y `200` al revivir; aqui siempre crea. */
+    private fun TestHousehold.createTag(name: String) = created(TAGS, """{"name":"$name"}""")
+
+    private fun TestHousehold.tagAsset(assetId: String, tagId: String) {
+        val response = http.patchJson("$ASSETS/$assetId", """{"tagIds":["$tagId"]}""", accessToken)
+        check(response.statusCode == HttpStatus.OK) {
+            "No se pudo etiquetar el asset: ${response.statusCode} ${response.body}"
+        }
+    }
+
     private fun TestHousehold.createLocation(body: String) = created(LOCATIONS, body)
 
     private fun TestHousehold.createAsset(body: String) = created(ASSETS, body)
@@ -1869,6 +1982,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
 
     private companion object {
         const val CATEGORIES = "/api/v1/categories"
+        const val TAGS = "/api/v1/tags"
         const val ARTICLES = "/api/v1/articles"
         const val LOCATIONS = "/api/v1/locations"
         const val ASSETS = "/api/v1/assets"

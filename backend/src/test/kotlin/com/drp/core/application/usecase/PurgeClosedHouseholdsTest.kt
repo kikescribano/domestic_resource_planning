@@ -347,6 +347,15 @@ class PurgeClosedHouseholdsTest : SpringIntegrationTest() {
             token,
         ).body!!.extract("id")
 
+        // Una etiqueta y un asset que la lleva, que son las dos tablas que anade
+        // el Hito 4. `asset_tags` es de las que mas facil se olvidan en una
+        // cascada: no la referencia nadie, asi que quedarse fuera no rompe
+        // ninguna clave ajena --solo deja filas de un hogar que se fue--.
+        val tag = http.postJson("/api/v1/tags", """{"name":"Camping"}""", token)
+            .body!!.extract("id")
+        http.patchJson("/api/v1/assets/$drill", """{"tagIds":["$tag"]}""", token)
+            .statusCode.shouldBe(HttpStatus.OK)
+
         // Los cuatro modulos, **despues** de que exista el estado: activarlos
         // siembra desde lo que hay --la ficha de maquina del taladro, la apertura
         // de la existencia-- que es la regla de la ADR-010.

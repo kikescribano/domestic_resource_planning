@@ -7,13 +7,17 @@ import com.drp.core.application.usecase.ArticlePatch
 import com.drp.core.application.usecase.ArticleView
 import com.drp.core.application.usecase.CreateArticle
 import com.drp.core.application.usecase.CreateCategory
+import com.drp.core.application.usecase.CreateTag
 import com.drp.core.application.usecase.GetArticle
 import com.drp.core.application.usecase.ListArticles
 import com.drp.core.application.usecase.ListCategories
+import com.drp.core.application.usecase.ListTags
 import com.drp.core.application.usecase.RetireArticle
 import com.drp.core.application.usecase.RetireCategory
+import com.drp.core.application.usecase.RetireTag
 import com.drp.core.application.usecase.UpdateArticle
 import com.drp.core.application.usecase.UpdateCategory
+import com.drp.core.application.usecase.UpdateTag
 import com.drp.platform.page.Page
 import com.drp.platform.page.PageResponse
 import com.drp.platform.page.Pagination
@@ -21,6 +25,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import jakarta.validation.Valid
 import java.util.UUID
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -66,14 +71,14 @@ class CategoryController(
     fun create(
         @AuthenticationPrincipal session: SessionClaims,
         @Valid @RequestBody input: CategoryInput,
-    ): CategoryResponse = CategoryResponse.of(createCategory.handle(session, input.name, input.notes))
+    ): CategoryResponse = CategoryResponse.of(createCategory.handle(session, input.toCommand()))
 
     @PatchMapping("/{id}")
     fun update(
         @AuthenticationPrincipal session: SessionClaims,
         @PathVariable id: UUID,
         @Valid @RequestBody input: CategoryInput,
-    ): CategoryResponse = CategoryResponse.of(updateCategory.handle(session, id, input.name, input.notes))
+    ): CategoryResponse = CategoryResponse.of(updateCategory.handle(session, id, input.toCommand()))
 
     /** Retirada logica, no borrado: los assets y los articulos que la tenian la conservan. */
     @DeleteMapping("/{id}")
@@ -82,6 +87,69 @@ class CategoryController(
         @AuthenticationPrincipal session: SessionClaims,
         @PathVariable id: UUID,
     ) = retireCategory.handle(session, id)
+}
+
+/**
+ * El catalogo de etiquetas: las mismas cuatro operaciones que el de categorias.
+ *
+ * **Poner y quitar etiquetas a un asset no esta aqui**: viaja en `tagIds` dentro
+ * de `POST /assets` y `PATCH /assets/{id}`. Etiquetar es corregir la ficha de un
+ * asset, no una operacion del catalogo, y una operacion propia habria sido una
+ * segunda escritura sobre el inventario para hacer lo que el `PATCH` ya hace.
+ */
+@RestController
+@RequestMapping("/api/v1/tags")
+class TagController(
+    private val listTags: ListTags,
+    private val createTag: CreateTag,
+    private val updateTag: UpdateTag,
+    private val retireTag: RetireTag,
+) {
+
+    /** El `q` alimenta el autocompletado del campo de etiquetas de un asset. */
+    @GetMapping
+    fun list(
+        @RequestParam(required = false) q: String?,
+        @RequestParam(defaultValue = "false") includeRetired: Boolean,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "50") size: Int,
+    ): PageResponse<TagResponse> =
+        PageResponse.of(listTags.handle(includeRetired, q, Pagination(page, size)), TagResponse::of)
+
+    /**
+     * `201` si la creo y `200` si ya existia --viva, o **retirada y revivida**--.
+     *
+     * Es la misma forma que la entrada de un consumible, y por el mismo motivo:
+     * quien la pide no tiene por que saber cual de las dos cosas va a pasar. El
+     * indice unico de `tags` no es parcial por retirada, asi que sin esto crear
+     * «Camping» teniendo una «camping» retirada seria un `409` sobre una fila que
+     * el usuario no ve.
+     */
+    @PostMapping
+    fun create(
+        @AuthenticationPrincipal session: SessionClaims,
+        @Valid @RequestBody input: TagInput,
+    ): ResponseEntity<TagResponse> {
+        val result = createTag.handle(session, input.name)
+        return ResponseEntity
+            .status(if (result.created) HttpStatus.CREATED else HttpStatus.OK)
+            .body(TagResponse.of(result.tag))
+    }
+
+    @PatchMapping("/{id}")
+    fun update(
+        @AuthenticationPrincipal session: SessionClaims,
+        @PathVariable id: UUID,
+        @Valid @RequestBody input: TagInput,
+    ): TagResponse = TagResponse.of(updateTag.handle(session, id, input.name))
+
+    /** Retirada logica: los assets que la llevaban la conservan. */
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun retire(
+        @AuthenticationPrincipal session: SessionClaims,
+        @PathVariable id: UUID,
+    ) = retireTag.handle(session, id)
 }
 
 @RestController

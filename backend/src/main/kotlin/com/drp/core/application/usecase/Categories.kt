@@ -8,10 +8,27 @@ import com.drp.platform.error.BusinessRuleViolation
 import com.drp.platform.error.ErrorCode
 import com.drp.platform.error.ResourceNotFound
 import com.drp.core.domain.catalog.Category
+import com.drp.core.domain.catalog.CategoryColor
+import com.drp.core.domain.catalog.CategoryIcon
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.util.UUID
+
+/**
+ * Lo que el hogar dice de una categoria: su nombre, sus notas y **su cara**.
+ *
+ * Va como un comando y no como cuatro parametros sueltos porque las dos
+ * operaciones que lo reciben --crear y modificar-- comparten la lista entera, y
+ * con cuatro argumentos posicionales dos `String?` seguidos son un intercambio
+ * silencioso esperando a ocurrir.
+ */
+data class CategoryCommand(
+    val name: String,
+    val notes: String?,
+    val icon: CategoryIcon?,
+    val color: CategoryColor?,
+)
 
 /**
  * Las cuatro operaciones del catalogo de categorias.
@@ -37,15 +54,17 @@ class CreateCategory(
 ) {
 
     @Transactional
-    fun handle(session: SessionClaims, name: String, notes: String?): Category {
-        requireNameAvailable(categories, name, exceptId = null)
+    fun handle(session: SessionClaims, command: CategoryCommand): Category {
+        requireNameAvailable(categories, command.name, exceptId = null)
 
         val now = clock.instant()
         return categories.save(
             Category(
                 id = UUID.randomUUID(),
-                name = name.trim(),
-                notes = notes,
+                name = command.name.trim(),
+                notes = command.notes,
+                icon = command.icon,
+                color = command.color,
                 createdAt = now,
                 updatedAt = now,
                 retiredAt = null,
@@ -67,14 +86,20 @@ class UpdateCategory(
 ) {
 
     @Transactional
-    fun handle(session: SessionClaims, categoryId: UUID, name: String, notes: String?): Category {
+    fun handle(session: SessionClaims, categoryId: UUID, command: CategoryCommand): Category {
         val category = categories.findById(categoryId) ?: throw ResourceNotFound("Categoría no encontrada")
-        requireNameAvailable(categories, name, exceptId = categoryId)
+        requireNameAvailable(categories, command.name, exceptId = categoryId)
 
         return categories.save(
             category.copy(
-                name = name.trim(),
-                notes = notes,
+                name = command.name.trim(),
+                notes = command.notes,
+                // Ausente es **quitar**, no conservar, igual que las notas desde
+                // el Hito 2: el cuerpo de esta operacion es la categoria entera
+                // y no un parche campo a campo. Es lo que permite retirar un
+                // icono elegido por error sin inventar un valor «ninguno».
+                icon = command.icon,
+                color = command.color,
                 updatedAt = clock.instant(),
                 updatedBy = session.memberId,
             ),
