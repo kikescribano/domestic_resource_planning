@@ -13,6 +13,13 @@ comunes.
   [`README principal`](../../../README.md). El mecanismo que los rodea está en
   [`../architecture/file-storage.md`](../architecture/file-storage.md).
 
+## Seguridad transversal
+
+La auditoría OWASP que cruza backend, frontend, infraestructura y despliegue vive
+en [`docs/common/security/owasp-audit.md`](../../common/security/owasp-audit.md),
+porque no es solo de backend. Ahí están los hallazgos por severidad y los
+requisitos del despliegue en la VPS; aquí, los controles internos.
+
 ## Contenido previsto
 
 - Límites de confianza y superficies de ataque.

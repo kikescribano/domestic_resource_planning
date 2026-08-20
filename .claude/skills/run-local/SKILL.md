@@ -19,6 +19,12 @@ desarrollo hace de proxy de `/api` hacia el backend, así que el frontend no tie
 que saber nada de CORS ni de dominios. nginx solo sirve para la entrega de
 ficheros, y en desarrollo no hace falta pasar por él.
 
+Vite escucha también en la red local (`server.host` en `vite.config.ts`), así
+que otro dispositivo de la misma red —un móvil— entra por
+`http://<IP del equipo>:5173` sin flags ni cambios: el CORS del backend admite
+los orígenes `192.168.*` en desarrollo. Si no llega, lo que suele faltar es la
+regla del cortafuegos de Windows para el puerto 5173 en redes privadas.
+
 ## Arranque
 
 **1. Los contenedores, y esperar a que PostgreSQL esté sano.**
