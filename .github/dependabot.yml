@@ -130,8 +130,24 @@ updates:
       # El utillaje de desarrollo no llega al artefacto que se sirve, así que sus
       # subidas no son urgentes y sí numerosas: agruparlas las separa de lo que
       # sí viaja al navegador.
+      #
+      # **Solo `minor` y `patch`, y eso se aprendió por las malas.** La primera
+      # versión agrupaba por tipo de dependencia sin mirar la magnitud del salto,
+      # y el resultado fue un pull request con **siete versiones mayores a la
+      # vez** —TypeScript 5→7, Vite 7→8, Vitest 3→4, jsdom, plugin-react y
+      # jest-dom— que además fallaba. El error era pequeño y localizado
+      # (TypeScript 7 endurece los imports de CSS por efecto secundario), pero
+      # dentro de un cambio con siete mayores no hay forma de saber qué rompió
+      # qué, ni de arreglar uno sin cargar con los otros seis.
+      #
+      # Agrupar lo rutinario es el objetivo; agrupar lo que hay que decidir es lo
+      # contrario. Los mayores pasan a llegar **de uno en uno**, con su propia
+      # integración y su propia decisión.
       tooling:
         dependency-type: development
+        update-types:
+          - minor
+          - patch
     commit-message:
       prefix: build
 
