@@ -322,6 +322,106 @@ test.describe('recorrido vertical', () => {
   })
 
   /**
+   * La baja de un miembro y su vuelta, desde la pantalla «Personas».
+   *
+   * Es la mitad que ninguna prueba de componente puede dar: la invitación llega
+   * por el Mailpit real y quien la acepta elige su contraseña en un navegador
+   * **sin sesión**; la baja corta la sesión de verdad —recargar echa a la
+   * persona apagada, y su login rebota en el filtro real—; y la vuelta se
+   * comprueba entrando de nuevo con las mismas credenciales, que es exactamente
+   * lo que la reactivación promete no tocar.
+   *
+   * La pasada sistemática audita «Personas» con una sola persona y sin ningún
+   * interruptor en el DOM; aquí se audita la otra variante —una segunda fila,
+   * el interruptor y la confirmación armada—, igual que el recorrido de Módulos
+   * audita la suya.
+   */
+  test('a una persona se la da de baja con confirmación y el mismo interruptor la trae de vuelta', async ({
+    page,
+    browser,
+    request,
+  }) => {
+    const email = `admin-${Date.now()}@example.test`
+    const password = 'el gato duerme en el sofa'
+    const invitada = `invitada-${Date.now()}@example.test`
+    const invitadaPassword = 'la lluvia cae sobre el tejado'
+
+    // --- 1. El hogar, y una invitación enviada desde la pantalla -------------
+    await page.goto('/crear-hogar')
+    await page.getByLabel('Nombre del hogar').fill('Casa de las Personas')
+    await page.getByLabel('Tu nombre').fill('Kike')
+    await page.getByLabel('Correo').fill(email)
+    await page.getByLabel('Contraseña', { exact: true }).fill(password)
+    await page.getByRole('button', { name: /crear/i }).click()
+    await page.goto(await linkFromEmail(email))
+    await expect(page.getByRole('heading', { level: 1, name: 'Hogar' })).toBeVisible()
+
+    await navigateTo(page, 'Personas', '/usuarios')
+    await page.getByLabel('Correo').fill(invitada)
+    await page.getByRole('button', { name: 'Enviar la invitación' }).click()
+    await expect(page.getByText('Invitación enviada.')).toBeVisible()
+
+    // --- 2. La invitada acepta en un navegador sin sesión --------------------
+    const guestContext = await browser.newContext()
+    const guest = await guestContext.newPage()
+    await guest.goto(await linkFromEmail(invitada))
+    await guest.getByLabel('Tu nombre').fill('Invitada')
+    await guest.getByLabel('Contraseña', { exact: true }).fill(invitadaPassword)
+    await guest.getByRole('button', { name: 'Aceptar la invitación' }).click()
+    await expect(guest.getByRole('heading', { level: 1, name: 'Hogar' })).toBeVisible()
+
+    // --- 3. Dos personas en la lista, y el interruptor solo en la ajena ------
+    // Recargando, no navegando: la caché de la sesión tiene 30 s de frescura
+    // (`staleTime` global, App.tsx) y la aceptación acaba de ocurrir en otro
+    // navegador, así que volver a la pantalla serviría la lista de antes. La
+    // recarga estrena caché, que es lo que haría quien espera a alguien.
+    // Y la fila se busca por el NOMBRE del miembro, no por su correo, que
+    // seguiría encontrándose en la lista de invitaciones aunque la aceptación
+    // no hubiera llegado a la de personas.
+    await page.reload()
+    await expect(page.getByRole('heading', { level: 1, name: 'Personas' })).toBeVisible()
+    // `exact`, o casaría también con su correo, que empieza por «invitada-».
+    await expect(page.getByText('Invitada', { exact: true })).toBeVisible()
+    // La propia fila no lleva interruptor: el único de la pantalla es el de la
+    // invitada, así que contar es afirmar las dos cosas a la vez.
+    await expect(page.getByRole('switch')).toHaveCount(1)
+    await expect(page.getByRole('switch', { name: 'Invitada' })).toBeChecked()
+
+    // La variante de la pantalla que la pasada sistemática no ve: con fila
+    // ajena, interruptor y la confirmación armada.
+    await page.getByRole('switch', { name: 'Invitada' }).click()
+    await expect(page.getByText(/se cierran sus sesiones/)).toBeVisible()
+    await checkAccessibility(page, 'personas con la confirmación armada')
+    await checkTouchTargets(page)
+
+    // --- 4. La baja: confirmar, y la sesión de la invitada muere -------------
+    await page.getByRole('button', { name: 'Dar de baja' }).click()
+    // `exact`: «De baja» es también subcadena del botón y de la confirmación.
+    await expect(page.getByText('De baja', { exact: true })).toBeVisible()
+    await expect(page.getByRole('switch', { name: 'Invitada' })).not.toBeChecked()
+
+    // En el otro navegador la sesión está revocada: recargar echa a la pantalla
+    // de entrar, y volver a entrar rebota en el filtro real.
+    await guest.reload()
+    await expect(guest.getByRole('heading', { level: 1, name: 'Entrar' })).toBeVisible()
+    const refused = await request.post('/api/v1/auth/login', {
+      data: { email: invitada, password: invitadaPassword },
+    })
+    expect(refused.status(), 'la persona dada de baja aún puede entrar').toBe(401)
+
+    // --- 5. La vuelta: sin confirmación, con las credenciales de siempre -----
+    await page.getByRole('switch', { name: 'Invitada' }).click()
+    await expect(page.getByText('De baja', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('switch', { name: 'Invitada' })).toBeChecked()
+
+    await guest.getByLabel('Correo').fill(invitada)
+    await guest.getByLabel('Contraseña', { exact: true }).fill(invitadaPassword)
+    await guest.getByRole('button', { name: 'Entrar' }).click()
+    await expect(guest.getByRole('heading', { level: 1, name: 'Hogar' })).toBeVisible()
+    await guestContext.close()
+  })
+
+  /**
    * El recorrido del **primer módulo con dominio**, de encenderlo a enlazar un
    * contacto con un sitio de la casa.
    *
@@ -1298,6 +1398,9 @@ const AUDITED_SCREENS = [
   // dos últimas pantallas del core sin auditar, y un hito que consolida no deja
   // una deuda contada en un comentario. Sitios con una ubicación sembrada
   // --una pantalla vacía se audita sola--; en Personas ya está quien la mira.
+  // Su otra variante --una fila ajena, el interruptor de la baja y la
+  // confirmación armada-- se audita en el recorrido de miembros de arriba, que
+  // es el único sitio con un segundo miembro de verdad.
   { link: 'Ubicaciones', path: '/ubicaciones', heading: 'Ubicaciones' },
   { link: 'Personas', path: '/usuarios', heading: 'Personas' },
   // Las dos que la baja de hogar (ADR-012) llenó de contenido nuevo: «Hogar»

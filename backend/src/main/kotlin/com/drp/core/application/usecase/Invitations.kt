@@ -209,6 +209,17 @@ class AcceptInvitation(
                 ),
             )
         } else {
+            // Una cuenta cerrada no vuelve por la puerta de una invitacion:
+            // reabrir una identidad es una decision que nadie ha tomado aqui, y
+            // crear la pertenencia sin reabrirla fabricaria un miembro activo
+            // que no puede autenticarse nunca -- lo mismo que `ReactivateUser`
+            // rechaza, y con su mismo codigo.
+            if (!existing.isActive) {
+                throw BusinessRuleViolation(
+                    ErrorCode.IDENTITY_CLOSED,
+                    "Esa cuenta está cerrada",
+                )
+            }
             // Mientras el MVP admita una sola pertenencia activa, quien ya
             // pertenece a un hogar no puede entrar en otro. El indice unico
             // parcial lo impediria igualmente; se comprueba aqui para poder
@@ -222,8 +233,23 @@ class AcceptInvitation(
             existing
         }
 
+        // Si ya fue miembro de ESTE hogar, su pertenencia dada de baja REVIVE
+        // con el rol de la invitacion en lugar de nacer una segunda fila:
+        // `household_members_identity_unique` --nadie pertenece dos veces al
+        // mismo hogar-- convertiria el insert en un 500. Es la misma
+        // reviviscencia que una etiqueta retirada, y conserva identificador e
+        // historial: sus prestamos y su autoria siguen apuntando a la misma
+        // persona. Por RLS, aqui solo se ve la pertenencia de este hogar.
+        val former = members.findByIdentity(identity.id)
+
         val member = members.save(
-            HouseholdMember(
+            former?.copy(
+                role = invitation.role,
+                deactivatedAt = null,
+                updatedAt = now,
+                // Lo atribuye quien invito, que es quien tomo la decision.
+                updatedBy = invitation.createdBy,
+            ) ?: HouseholdMember(
                 id = UUID.randomUUID(),
                 householdId = invitation.householdId,
                 identityId = identity.id,

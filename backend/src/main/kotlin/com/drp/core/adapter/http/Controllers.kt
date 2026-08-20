@@ -19,6 +19,7 @@ import com.drp.core.application.usecase.ListInvitations
 import com.drp.core.application.usecase.ListUsers
 import com.drp.core.application.usecase.Login
 import com.drp.core.application.usecase.LoginCommand
+import com.drp.core.application.usecase.ReactivateUser
 import com.drp.core.application.usecase.RefreshSession
 import com.drp.core.application.usecase.RequestHouseholdClosure
 import com.drp.core.application.usecase.RequestPasswordReset
@@ -209,6 +210,7 @@ class UserController(
     private val listUsers: ListUsers,
     private val changeUserRole: ChangeUserRole,
     private val deactivateUser: DeactivateUser,
+    private val reactivateUser: ReactivateUser,
     private val closeAccount: CloseAccount,
     private val setAvatar: SetIdentityAvatar,
     private val deleteAvatar: DeleteIdentityAvatar,
@@ -239,6 +241,20 @@ class UserController(
         @AuthenticationPrincipal session: SessionClaims,
         @PathVariable id: UUID,
     ) = deactivateUser.handle(session, id)
+
+    /**
+     * La activacion como **subrecurso** y no un `PATCH` del estado, la misma
+     * pareja que `/modules/{key}/activation` y por su mismo motivo: encender es
+     * una operacion con su propio `operationId`, no un efecto que dependa del
+     * cuerpo. El apagado se queda en el `DELETE` de arriba, que ya estaba
+     * publicado y significa lo que significa.
+     */
+    @PostMapping("/{id}/activation")
+    @PreAuthorize("hasRole('HOUSEHOLD_ADMIN')")
+    fun reactivate(
+        @AuthenticationPrincipal session: SessionClaims,
+        @PathVariable id: UUID,
+    ): UserResponse = reactivateUser.handle(session, id).withAvatar()
 
     /**
      * Cerrar la cuenta propia. **Sin identificador en la ruta**, y no es un

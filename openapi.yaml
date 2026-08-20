@@ -1737,6 +1737,14 @@ paths:
         identidad ya VERIFICADA, porque haber recibido el token prueba el
         control de esa direccion, o vincula la que ya exista. name y password
         solo hacen falta si la identidad no existia.
+
+
+        Si quien acepta ya fue miembro de ESTE hogar, su pertenencia dada de
+        baja REVIVE con el rol de la invitacion en lugar de nacer una segunda
+        fila -- la misma reviviscencia que una etiqueta retirada, y por la
+        misma restriccion: nadie pertenece dos veces al mismo hogar. Conserva
+        su historial y su identificador, asi que sus prestamos y su autoria
+        siguen apuntando a la misma persona.
       security: []
       requestBody:
         required: true
@@ -1751,8 +1759,11 @@ paths:
               schema: { $ref: "#/components/schemas/TokenPair" }
         "409":
           description: >
-            Token caducado, ya usado o revocado (INVITATION_TOKEN_INVALID), o
-            la identidad ya pertenece a otro hogar (IDENTITY_ALREADY_MEMBER)
+            Token caducado, ya usado o revocado (INVITATION_TOKEN_INVALID), la
+            identidad ya pertenece a otro hogar (IDENTITY_ALREADY_MEMBER), o
+            esa cuenta esta cerrada (IDENTITY_CLOSED) -- una invitacion no
+            reabre una cuenta, y crear la pertenencia sin reabrirla fabricaria
+            un miembro activo que no puede autenticarse nunca
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -1794,7 +1805,8 @@ paths:
         usuario e impide que vuelva a autenticarse. Sus assets quedan SIN
         PROPIETARIO, no se reasignan: se localizan después con
         GET /assets?withoutOwner=true. Sus préstamos se conservan. Publica
-        UserDeactivated.
+        UserDeactivated. La vuelta es reactivateUser, o aceptar una
+        invitación nueva.
       responses:
         "204":
           description: Usuario dado de baja
@@ -1804,6 +1816,56 @@ paths:
           description: >
             Es el único HOUSEHOLD_ADMIN activo del hogar
             (USER_LAST_ADMIN)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        default: { $ref: "#/components/responses/ServerError" }
+
+  /users/{id}/activation:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: reactivateUser
+      tags: [users]
+      summary: Reactivar a un usuario dado de baja (solo HOUSEHOLD_ADMIN)
+      description: >
+        Deshace la baja lógica de deactivateUser sobre la PERTENENCIA: limpia
+        deactivatedAt y la persona vuelve al hogar con el rol que tenía. Es la
+        misma pareja que los módulos --el subrecurso activation con su propio
+        operationId-- y no un deshacer del DELETE de al lado, que ya estaba
+        publicado y significa lo que significa.
+
+
+        Lo que NO deshace, y es deliberado: los refresh tokens revocados no
+        vuelven --la persona entra de nuevo con sus credenciales-- y sus
+        assets siguen SIN PROPIETARIO, porque a estas alturas pueden tener
+        dueño nuevo y reasignarlos en bloque sería adivinar. Se localizan
+        donde siempre, con GET /assets?withoutOwner=true.
+
+
+        Es idempotente como activateModule: reactivar a quien ya está activo
+        devuelve el mismo estado.
+      responses:
+        "200":
+          description: Usuario activo en el hogar
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: >
+            La identidad entró en otro hogar después de esta baja
+            (IDENTITY_ALREADY_MEMBER, el mismo código y por el mismo índice
+            único que al aceptar una invitación), o su cuenta está cerrada
+            (IDENTITY_CLOSED): reactivar esa pertenencia fabricaría un
+            miembro activo que no puede autenticarse nunca, justo la
+            incoherencia que CloseAccount evita al dar de baja las dos cosas.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -3753,6 +3815,7 @@ components:
             - HOUSEHOLD_CLOSURE_ALREADY_REQUESTED
             - HOUSEHOLD_CLOSURE_NOT_REQUESTED
             - IDENTITY_ALREADY_MEMBER
+            - IDENTITY_CLOSED
             - INTAKE_QUANTITY_NOT_POSITIVE
             - INTERNAL_ERROR
             - INVITATION_ALREADY_PENDING
