@@ -21,6 +21,7 @@ import com.drp.platform.error.ErrorCode
 import com.drp.platform.error.ResourceNotFound
 import com.drp.platform.error.ValidationFailure
 import com.drp.platform.mail.EmailAddress
+import com.drp.core.domain.inventory.AssetCondition
 import com.drp.core.domain.inventory.AssetStatus
 import com.drp.core.domain.loan.ExternalParty
 import com.drp.core.domain.loan.Loan
@@ -65,6 +66,15 @@ data class ExternalLoanView(
     val startedAt: Instant,
     val dueAt: Instant?,
     val returnedAt: Instant?,
+    /**
+     * Las dos condiciones **si salen de casa**, y no es un descuido de la
+     * proyeccion acotada: ninguna dice nada del hogar. La de entrega describe la
+     * cosa que esta persona tiene en las manos --y saber en que estado se la
+     * dieron le protege a ella-- y la de vuelta es lo que acaba de escribir ella
+     * misma, devuelto para que lo vea hecho.
+     */
+    val conditionAtStart: AssetCondition?,
+    val conditionOnReturn: AssetCondition?,
 )
 
 /** Un extremo del prestamo tal y como llega del cliente: uno de los dos, nunca ambos. */
@@ -75,6 +85,7 @@ data class StartLoanCommand(
     val lender: LoanParticipantCommand,
     val borrower: LoanParticipantCommand,
     val dueAt: Instant?,
+    val conditionAtStart: AssetCondition?,
     val notes: String?,
 )
 
@@ -168,6 +179,10 @@ class StartLoan(
             startedAt = now,
             dueAt = command.dueAt,
             returnedAt = null,
+            conditionAtStart = command.conditionAtStart,
+            // Se anota al confirmar la devolucion y en ningun otro sitio: aqui la
+            // cosa acaba de salir de casa.
+            conditionOnReturn = null,
             notes = command.notes,
             createdAt = now,
             updatedAt = now,
@@ -390,6 +405,8 @@ class GetLoanForExternal(
             startedAt = loan.startedAt,
             dueAt = loan.dueAt,
             returnedAt = loan.returnedAt,
+            conditionAtStart = loan.conditionAtStart,
+            conditionOnReturn = loan.conditionOnReturn,
         )
     }
 }
@@ -405,6 +422,13 @@ class GetLoanForExternal(
  *
  * Un `OVERDUE` se devuelve igual que un `ACTIVE`: vencer no es un callejon sin
  * salida sino el estado en el que mas falta hace poder cerrarlo.
+ *
+ * **Aqui y solo aqui se anota en que estado volvio.** No hay `PATCH` que la
+ * corrija despues, y es deliberado: es lo que alguien afirmo en el momento de
+ * devolverlo, no un campo de la ficha. Por el mismo motivo **no toca el asset**:
+ * quien confirma puede ser una persona de fuera con un token acotado, y dejarle
+ * escribir el estado de conservacion del inventario seria darle una fila del
+ * hogar que su credencial no alcanza.
  */
 @Service
 class ConfirmReturn(
@@ -417,15 +441,20 @@ class ConfirmReturn(
 
     /** Desde el hogar. */
     @Transactional
-    fun handle(session: SessionClaims, loanId: UUID): LoanView {
-        val returned = close(loanId, session.memberId, usedTokenId = null)
+    fun handle(session: SessionClaims, loanId: UUID, conditionOnReturn: AssetCondition?): LoanView {
+        val returned = close(loanId, session.memberId, usedTokenId = null, conditionOnReturn = conditionOnReturn)
         return LoanView(returned, loans.assetNameOf(returned))
     }
 
     /** Desde el enlace del correo, sin sesion. */
     @Transactional
-    fun handle(access: LoanAccess): ExternalLoanView {
-        val returned = close(access.loanId, memberId = null, usedTokenId = access.tokenId)
+    fun handle(access: LoanAccess, conditionOnReturn: AssetCondition?): ExternalLoanView {
+        val returned = close(
+            access.loanId,
+            memberId = null,
+            usedTokenId = access.tokenId,
+            conditionOnReturn = conditionOnReturn,
+        )
 
         return ExternalLoanView(
             id = returned.id,
@@ -435,10 +464,17 @@ class ConfirmReturn(
             startedAt = returned.startedAt,
             dueAt = returned.dueAt,
             returnedAt = returned.returnedAt,
+            conditionAtStart = returned.conditionAtStart,
+            conditionOnReturn = returned.conditionOnReturn,
         )
     }
 
-    private fun close(loanId: UUID, memberId: UUID?, usedTokenId: UUID?): Loan {
+    private fun close(
+        loanId: UUID,
+        memberId: UUID?,
+        usedTokenId: UUID?,
+        conditionOnReturn: AssetCondition?,
+    ): Loan {
         val now = clock.instant()
 
         // **Bloqueando la fila**, y solo aqui. El enlace del correo se abre desde
@@ -462,6 +498,12 @@ class ConfirmReturn(
             loan.copy(
                 status = LoanStatus.RETURNED,
                 returnedAt = now,
+                // Lo unico que la devolucion escribe ademas del cierre, y lo unico
+                // que un token acotado puede escribir en todo el hogar. Nulo
+                // cuando no se anoto, que es lo corriente: no hay valor por
+                // defecto, porque un desplegable preseleccionado convertiria en
+                // dato lo que nadie llego a mirar.
+                conditionOnReturn = conditionOnReturn,
                 updatedAt = now,
                 // Nulo cuando lo confirma un externo: no hay pertenencia a la que
                 // atribuirlo, y eso es exactamente lo que nulo significa.

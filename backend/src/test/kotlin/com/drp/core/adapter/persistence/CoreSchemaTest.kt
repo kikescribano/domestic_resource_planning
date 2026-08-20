@@ -354,6 +354,80 @@ class CoreSchemaTest {
     }
 
     @Test
+    @DisplayName("la condicion de devolucion no existe sin devolucion")
+    fun `lo que se anota al devolver exige que haya devolucion`() {
+        val asset = connection.insertDurable(home, "Sierra de calar")
+
+        // Un prestamo abierto con condicion de vuelta seria una afirmacion sobre
+        // algo que todavia esta fuera de casa. La escribe `ConfirmReturn` y no
+        // hay ninguna otra operacion que la toque, pero eso es la primera capa:
+        // esta es la segunda.
+        val rejected = assertThrows<SQLException> {
+            connection.execute(
+                "INSERT INTO loans (id, household_id, asset_id, lender_member_id, borrower_member_id, " +
+                    "status, condition_on_return) VALUES (?, ?, ?, ?, ?, 'ACTIVE', 'DAMAGED')",
+                UUID.randomUUID(),
+                home.householdId,
+                asset,
+                home.memberId,
+                home.memberId,
+            )
+        }
+
+        rejected.message!!.shouldContain("loans_condition_on_return_needs_return")
+
+        // Con la devolucion puesta, la misma fila entra.
+        connection.execute(
+            "INSERT INTO loans (id, household_id, asset_id, lender_member_id, borrower_member_id, " +
+                "status, returned_at, condition_at_start, condition_on_return) " +
+                "VALUES (?, ?, ?, ?, ?, 'RETURNED', now(), 'GOOD', 'DAMAGED')",
+            UUID.randomUUID(),
+            home.householdId,
+            asset,
+            home.memberId,
+            home.memberId,
+        )
+    }
+
+    @Test
+    @DisplayName("la escala de conservacion es cerrada en las tres columnas que la usan")
+    fun `una condicion inventada no entra en ninguna de las tres`() {
+        val asset = connection.insertDurable(home, "Ventilador")
+
+        assertThrows<SQLException> {
+            connection.execute("UPDATE assets SET condition = 'REGULINCHI' WHERE id = ?", asset)
+        }.message!!.shouldContain("assets_condition_valid")
+
+        assertThrows<SQLException> {
+            connection.execute(
+                "INSERT INTO loans (id, household_id, asset_id, lender_member_id, borrower_member_id, " +
+                    "status, condition_at_start) VALUES (?, ?, ?, ?, ?, 'ACTIVE', 'REGULINCHI')",
+                UUID.randomUUID(),
+                home.householdId,
+                asset,
+                home.memberId,
+                home.memberId,
+            )
+        }.message!!.shouldContain("loans_condition_at_start_valid")
+    }
+
+    @Test
+    @DisplayName("una existencia de consumible no lleva estado de conservacion")
+    fun `la conservacion es de una unidad fisica`() {
+        val article = connection.insertArticle(home, "Lejia")
+        val stockItem = connection.insertStockItem(home, article, quantity = 3)
+
+        // La misma restriccion que ya cubria el numero de serie y la fecha de
+        // adquisicion: se amplio en vez de anadir una segunda, porque la regla es
+        // una sola.
+        val rejected = assertThrows<SQLException> {
+            connection.execute("UPDATE assets SET condition = 'WORN' WHERE id = ?", stockItem)
+        }
+
+        rejected.message!!.shouldContain("assets_durable_only_attributes")
+    }
+
+    @Test
     @DisplayName("un externo sin forma de contactarlo no vale: el enlace del token tiene que llegarle")
     fun `el contacto externo exige nombre y un canal`() {
         val asset = connection.insertDurable(home, "Escalera")

@@ -105,7 +105,7 @@ class LocationController(
             id,
             LocationPatch(
                 name = patch.requiredText("name"),
-                type = patch.enum("type"),
+                type = patch.requiredEnum("type"),
                 parentLocationId = patch.uuid("parentLocationId"),
                 capacity = patch.capacity(),
                 environmentalConditions = patch.environmentalConditions(),

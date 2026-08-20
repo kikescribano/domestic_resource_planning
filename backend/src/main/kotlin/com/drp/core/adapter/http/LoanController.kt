@@ -48,6 +48,7 @@ class LoanController(
                 lender = input.lender!!.toCommand(),
                 borrower = input.borrower!!.toCommand(),
                 dueAt = input.dueAt,
+                conditionAtStart = input.conditionAtStart,
                 notes = input.notes,
             ),
         ),
@@ -92,13 +93,21 @@ class LoanController(
         else -> LoanResponse.of(getLoan.handle(id))
     }
 
+    /**
+     * El cuerpo es **opcional entero**, y sigue siendolo despues de ganar un
+     * campo: confirmar sin decir en que estado volvio la cosa es lo corriente, y
+     * era lo unico que se podia hacer hasta el cierre de huecos. Un cuerpo
+     * ausente y uno vacio significan lo mismo --nadie lo anoto--, que es lo que
+     * evita romper a un cliente que ya llamaba a esta ruta.
+     */
     @PostMapping("/{id}/return")
     fun confirmReturn(
         @AuthenticationPrincipal principal: Any,
         @PathVariable id: UUID,
+        @RequestBody(required = false) input: LoanReturnInput?,
     ): Any = when (principal) {
-        is LoanAccess -> ExternalLoanResponse.of(confirmReturn.handle(principal))
-        is SessionClaims -> LoanResponse.of(confirmReturn.handle(principal, id))
+        is LoanAccess -> ExternalLoanResponse.of(confirmReturn.handle(principal, input?.conditionOnReturn))
+        is SessionClaims -> LoanResponse.of(confirmReturn.handle(principal, id, input?.conditionOnReturn))
         else -> throw IllegalStateException("Principal no reconocido: ${principal::class.simpleName}")
     }
 }

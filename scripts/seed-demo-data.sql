@@ -274,10 +274,23 @@ FROM (VALUES
 -- guardado aquí no se vería nunca. De ahí que solo tengan artículo las cosas
 -- cuyo modelo ES su nombre --la caldera, la lavadora, el taladro-- y que el
 -- portátil de Lucía o la bici de Hugo lleven nombre propio y ninguno.
+--
+-- **El estado de conservación va puesto en 36 y a nulo en diez**, y las dos
+-- mitades son a propósito: nulo significa que nadie lo anotó, que es el caso
+-- corriente de un inventario doméstico, y un juego de datos en el que todo
+-- estuviera anotado enseñaría una aplicación que nadie usa así. Ninguna cosa
+-- está `NEW`: lo más joven de esta casa tiene once meses, y «nuevo, sin usar»
+-- después de un año sería mentira.
+--
+-- Los que no están en `GOOD` tienen su motivo escrito al lado cuando lo hay --al
+-- ventilador se le rompió el motor y la tienda perdió una piqueta-- y **cuadran
+-- con lo que dicen los préstamos** de más abajo: el patinete volvió con un
+-- arañazo y su ficha dice `WORN`, que es lo que alguien habría corregido al
+-- recibirlo.
 
 INSERT INTO assets (id, household_id, article_id, category_id, name, type, owner_id,
                     location_asset_id, location_id, quantity, status, serial_number, acquired_on,
-                    notes, created_at, updated_at, created_by, updated_by)
+                    condition, notes, created_at, updated_at, created_by, updated_by)
 SELECT pg_temp.demo_id('asset:' || v.clave), pg_temp.demo_id('hogar'),
        CASE WHEN v.articulo   IS NULL THEN NULL ELSE pg_temp.demo_id('articulo:'  || v.articulo)   END,
        CASE WHEN v.categoria  IS NULL THEN NULL ELSE pg_temp.demo_id('categoria:' || v.categoria)  END,
@@ -286,65 +299,65 @@ SELECT pg_temp.demo_id('asset:' || v.clave), pg_temp.demo_id('hogar'),
        CASE WHEN v.ubicacion  IS NULL THEN NULL ELSE pg_temp.demo_id('ubicacion:' || v.ubicacion)  END,
        NULL, v.estado, v.serie,
        (CURRENT_DATE - (v.antiguedad || ' months')::interval)::date,
-       v.notas,
+       v.condicion, v.notas,
        now() - (v.antiguedad || ' months')::interval - interval '1 day',
        now() - interval '20 days',
        pg_temp.demo_id('miembro:marta'), pg_temp.demo_id('miembro:marta')
 FROM (VALUES
     -- Cocina
-    ('frigorifico',    NULL,                               'art-frigorifico',  NULL,                'marta',  NULL,                'cocina',          '804KRQD2Z311',    36,  'AVAILABLE', NULL),
-    ('lavadora',       NULL,                               'art-lavadora',     NULL,                'marta',  NULL,                'cocina',          'FD9912-004521',   48,  'AVAILABLE', NULL),
-    ('lavavajillas',   NULL,                               'art-lavavajillas', NULL,                'javier', NULL,                'cocina',          'FD0104-771120',   26,  'AVAILABLE', NULL),
-    ('horno',          NULL,                               'art-horno',        NULL,                'javier', NULL,                'cocina',          NULL,              72,  'AVAILABLE', 'Vino con la cocina'),
-    ('microondas',     NULL,                               'art-microondas',   NULL,                'marta',  NULL,                'cocina',          NULL,              14,  'AVAILABLE', NULL),
-    ('campana',        'Campana extractora',               NULL,               'electrodomesticos', 'javier', NULL,                'cocina',          NULL,              72,  'AVAILABLE', NULL),
-    ('cafetera',       'Cafetera de cápsulas',             NULL,               'electrodomesticos', 'marta',  NULL,                'cocina',          NULL,              25,  'AVAILABLE', NULL),
-    ('batidora',       'Batidora de mano',                 NULL,               'electrodomesticos', 'marta',  NULL,                'armario-cocina',  NULL,              60,  'AVAILABLE', NULL),
-    ('tostadora',      'Tostadora',                        NULL,               'electrodomesticos', 'javier', NULL,                'cocina',          NULL,              33,  'AVAILABLE', NULL),
-    ('olla',           'Olla a presión',                   NULL,               'menaje',            'marta',  NULL,                'armario-cocina',  NULL,              96,  'AVAILABLE', 'La goma se cambió en primavera'),
-    ('vajilla',        'Vajilla de diario',                NULL,               'menaje',            'marta',  NULL,                'cocina',          NULL,              96,  'AVAILABLE', 'Doce piezas, faltan dos platos hondos'),
+    ('frigorifico',    NULL,                               'art-frigorifico',  NULL,                'marta',  NULL,                'cocina',          '804KRQD2Z311',    36,  'AVAILABLE', NULL, 'GOOD'),
+    ('lavadora',       NULL,                               'art-lavadora',     NULL,                'marta',  NULL,                'cocina',          'FD9912-004521',   48,  'AVAILABLE', NULL, 'GOOD'),
+    ('lavavajillas',   NULL,                               'art-lavavajillas', NULL,                'javier', NULL,                'cocina',          'FD0104-771120',   26,  'AVAILABLE', NULL, NULL),
+    ('horno',          NULL,                               'art-horno',        NULL,                'javier', NULL,                'cocina',          NULL,              72,  'AVAILABLE', 'Vino con la cocina', 'WORN'),
+    ('microondas',     NULL,                               'art-microondas',   NULL,                'marta',  NULL,                'cocina',          NULL,              14,  'AVAILABLE', NULL, 'GOOD'),
+    ('campana',        'Campana extractora',               NULL,               'electrodomesticos', 'javier', NULL,                'cocina',          NULL,              72,  'AVAILABLE', NULL, 'WORN'),
+    ('cafetera',       'Cafetera de cápsulas',             NULL,               'electrodomesticos', 'marta',  NULL,                'cocina',          NULL,              25,  'AVAILABLE', NULL, 'GOOD'),
+    ('batidora',       'Batidora de mano',                 NULL,               'electrodomesticos', 'marta',  NULL,                'armario-cocina',  NULL,              60,  'AVAILABLE', NULL, NULL),
+    ('tostadora',      'Tostadora',                        NULL,               'electrodomesticos', 'javier', NULL,                'cocina',          NULL,              33,  'AVAILABLE', NULL, 'WORN'),
+    ('olla',           'Olla a presión',                   NULL,               'menaje',            'marta',  NULL,                'armario-cocina',  NULL,              96,  'AVAILABLE', 'La goma se cambió en primavera', 'GOOD'),
+    ('vajilla',        'Vajilla de diario',                NULL,               'menaje',            'marta',  NULL,                'cocina',          NULL,              96,  'AVAILABLE', 'Doce piezas, faltan dos platos hondos', 'WORN'),
     -- Instalación
-    ('caldera',        NULL,                               'art-caldera',      NULL,                'javier', NULL,                'cocina',          'VA-2019-887413',  84,  'AVAILABLE', 'En el hueco junto a la ventana'),
-    ('aire',           NULL,                               'art-aire',         NULL,                'javier', NULL,                'salon',           'DK-3325-01188',   26,  'AVAILABLE', 'El del salón; los dormitorios no tienen'),
+    ('caldera',        NULL,                               'art-caldera',      NULL,                'javier', NULL,                'cocina',          'VA-2019-887413',  84,  'AVAILABLE', 'En el hueco junto a la ventana', 'GOOD'),
+    ('aire',           NULL,                               'art-aire',         NULL,                'javier', NULL,                'salon',           'DK-3325-01188',   26,  'AVAILABLE', 'El del salón; los dormitorios no tienen', 'GOOD'),
     -- Salón
-    ('tv',             NULL,                               'art-tv',           NULL,                'javier', NULL,                'salon',           NULL,              13,  'AVAILABLE', NULL),
-    ('barra-sonido',   'Barra de sonido',                  NULL,               'electronica',       'javier', NULL,                'mueble-salon',    NULL,              13,  'AVAILABLE', NULL),
-    ('router',         NULL,                               'art-router',       NULL,                'javier', NULL,                'mueble-salon',    NULL,              38,  'AVAILABLE', 'Es del operador: si se cambia de compañía hay que devolverlo'),
-    ('consola',        'Consola de videojuegos',           NULL,               'electronica',       'lucia',  NULL,                'mueble-salon',    NULL,              24,  'AVAILABLE', NULL),
-    ('sofa',           'Sofá de tres plazas',              NULL,               'mobiliario',        'marta',  NULL,                'salon',           NULL,              62,  'AVAILABLE', NULL),
-    ('mesa-centro',    'Mesa de centro',                   NULL,               'mobiliario',        'marta',  NULL,                'salon',           NULL,              62,  'AVAILABLE', NULL),
-    ('estanteria-libros','Estantería de libros',           NULL,               'mobiliario',        'marta',  NULL,                'salon',           NULL,              62,  'AVAILABLE', NULL),
-    ('robot',          NULL,                               'art-robot',        NULL,                'marta',  NULL,                'salon',           NULL,              18,  'AVAILABLE', NULL),
+    ('tv',             NULL,                               'art-tv',           NULL,                'javier', NULL,                'salon',           NULL,              13,  'AVAILABLE', NULL, 'GOOD'),
+    ('barra-sonido',   'Barra de sonido',                  NULL,               'electronica',       'javier', NULL,                'mueble-salon',    NULL,              13,  'AVAILABLE', NULL, NULL),
+    ('router',         NULL,                               'art-router',       NULL,                'javier', NULL,                'mueble-salon',    NULL,              38,  'AVAILABLE', 'Es del operador: si se cambia de compañía hay que devolverlo', NULL),
+    ('consola',        'Consola de videojuegos',           NULL,               'electronica',       'lucia',  NULL,                'mueble-salon',    NULL,              24,  'AVAILABLE', NULL, 'GOOD'),
+    ('sofa',           'Sofá de tres plazas',              NULL,               'mobiliario',        'marta',  NULL,                'salon',           NULL,              62,  'AVAILABLE', NULL, 'WORN'),
+    ('mesa-centro',    'Mesa de centro',                   NULL,               'mobiliario',        'marta',  NULL,                'salon',           NULL,              62,  'AVAILABLE', NULL, 'WORN'),
+    ('estanteria-libros','Estantería de libros',           NULL,               'mobiliario',        'marta',  NULL,                'salon',           NULL,              62,  'AVAILABLE', NULL, NULL),
+    ('robot',          NULL,                               'art-robot',        NULL,                'marta',  NULL,                'salon',           NULL,              18,  'AVAILABLE', NULL, 'GOOD'),
     -- Dormitorios
-    ('cama',           'Cama de matrimonio',               NULL,               'mobiliario',        'marta',  NULL,                'dormitorio',      NULL,              110, 'AVAILABLE', NULL),
-    ('escritorio-lucia','Escritorio de Lucía',             NULL,               'mobiliario',        'lucia',  NULL,                'cuarto-lucia',    NULL,              50,  'AVAILABLE', NULL),
-    ('portatil-lucia', 'Portátil de Lucía',                NULL,               'electronica',       'lucia',  NULL,                'cuarto-lucia',    'PF3K8821',        13,  'AVAILABLE', 'Lenovo IdeaPad Slim 3, del programa del instituto'),
-    ('tablet-hugo',    'Tablet de Hugo',                   NULL,               'electronica',       'hugo',   NULL,                'cuarto-hugo',     NULL,              11,  'AVAILABLE', NULL),
-    ('litera',         'Cama de Hugo',                     NULL,               'mobiliario',        'hugo',   NULL,                'cuarto-hugo',     NULL,              50,  'AVAILABLE', NULL),
+    ('cama',           'Cama de matrimonio',               NULL,               'mobiliario',        'marta',  NULL,                'dormitorio',      NULL,              110, 'AVAILABLE', NULL, 'GOOD'),
+    ('escritorio-lucia','Escritorio de Lucía',             NULL,               'mobiliario',        'lucia',  NULL,                'cuarto-lucia',    NULL,              50,  'AVAILABLE', NULL, 'WORN'),
+    ('portatil-lucia', 'Portátil de Lucía',                NULL,               'electronica',       'lucia',  NULL,                'cuarto-lucia',    'PF3K8821',        13,  'AVAILABLE', 'Lenovo IdeaPad Slim 3, del programa del instituto', 'GOOD'),
+    ('tablet-hugo',    'Tablet de Hugo',                   NULL,               'electronica',       'hugo',   NULL,                'cuarto-hugo',     NULL,              11,  'AVAILABLE', NULL, 'GOOD'),
+    ('litera',         'Cama de Hugo',                     NULL,               'mobiliario',        'hugo',   NULL,                'cuarto-hugo',     NULL,              50,  'AVAILABLE', NULL, 'GOOD'),
     -- Baño y pasillo
-    ('secador',        'Secador de pelo',                  NULL,               'electrodomesticos', 'marta',  NULL,                'armario-bano',    NULL,              33,  'AVAILABLE', NULL),
-    ('aspirador',      'Aspirador de trineo',              NULL,               'electrodomesticos', 'marta',  NULL,                'armario-pasillo', NULL,              70,  'AVAILABLE', NULL),
-    ('plancha',        'Plancha de vapor',                 NULL,               'electrodomesticos', 'javier', NULL,                'armario-pasillo', NULL,              45,  'AVAILABLE', NULL),
+    ('secador',        'Secador de pelo',                  NULL,               'electrodomesticos', 'marta',  NULL,                'armario-bano',    NULL,              33,  'AVAILABLE', NULL, NULL),
+    ('aspirador',      'Aspirador de trineo',              NULL,               'electrodomesticos', 'marta',  NULL,                'armario-pasillo', NULL,              70,  'AVAILABLE', NULL, 'WORN'),
+    ('plancha',        'Plancha de vapor',                 NULL,               'electrodomesticos', 'javier', NULL,                'armario-pasillo', NULL,              45,  'AVAILABLE', NULL, 'GOOD'),
     -- Terraza
-    ('barbacoa',       'Barbacoa de gas portátil',         NULL,               'deporte',           'javier', NULL,                'terraza',         NULL,              25,  'AVAILABLE', NULL),
-    ('mesa-terraza',   'Mesa de terraza con cuatro sillas',NULL,               'mobiliario',        'marta',  NULL,                'terraza',         NULL,              37,  'AVAILABLE', NULL),
-    ('sombrilla',      'Sombrilla',                        NULL,               'decoracion',        'marta',  NULL,                'terraza',         NULL,              37,  'AVAILABLE', NULL),
+    ('barbacoa',       'Barbacoa de gas portátil',         NULL,               'deporte',           'javier', NULL,                'terraza',         NULL,              25,  'AVAILABLE', NULL, 'GOOD'),
+    ('mesa-terraza',   'Mesa de terraza con cuatro sillas',NULL,               'mobiliario',        'marta',  NULL,                'terraza',         NULL,              37,  'AVAILABLE', NULL, 'WORN'),
+    ('sombrilla',      'Sombrilla',                        NULL,               'decoracion',        'marta',  NULL,                'terraza',         NULL,              37,  'AVAILABLE', NULL, NULL),
     -- Trastero: la caja de herramientas hace de ubicación de lo que lleva dentro
-    ('taladro',        NULL,                               'art-taladro',      NULL,                'javier', NULL,                'banco-trabajo',   '3601JB4000',      62,  'AVAILABLE', NULL),
-    ('caja-herramientas','Caja de herramientas',           NULL,               'herramientas',      'javier', NULL,                'banco-trabajo',   NULL,              96,  'AVAILABLE', 'La de plástico rojo'),
-    ('destornilladores','Juego de destornilladores',       NULL,               'herramientas',      'javier', 'caja-herramientas', NULL,              NULL,              96,  'AVAILABLE', NULL),
-    ('llave-inglesa',  'Llave inglesa',                    NULL,               'herramientas',      'javier', 'caja-herramientas', NULL,              NULL,              96,  'AVAILABLE', NULL),
-    ('metro',          'Cinta métrica',                    NULL,               'herramientas',      'javier', 'caja-herramientas', NULL,              NULL,              96,  'AVAILABLE', NULL),
-    ('escalera',       'Escalera de tijera de cuatro peldaños', NULL,          'herramientas',      'javier', NULL,                'trastero',        NULL,              70,  'LENT',      NULL),
-    ('bici-hugo',      'Bicicleta de Hugo',                NULL,               'deporte',           'hugo',   NULL,                'trastero',        NULL,              24,  'AVAILABLE', 'Orbea MX 24; se le queda pequeña'),
-    ('patinete',       'Patinete de Lucía',                NULL,               'deporte',           'lucia',  NULL,                'trastero',        NULL,              37,  'AVAILABLE', NULL),
-    ('maleta',         'Maleta grande',                    NULL,               'deporte',           'marta',  NULL,                'estanteria',      NULL,              80,  'AVAILABLE', NULL),
-    ('nevera-portatil','Nevera portátil',                  NULL,               'deporte',           'javier', NULL,                'estanteria',      NULL,              50,  'LENT',      NULL),
-    ('bomba-bici',     'Bomba de aire para bicicleta',     NULL,               'deporte',           'hugo',   NULL,                'banco-trabajo',   NULL,              24,  'AVAILABLE', NULL),
-    ('tienda-campana', 'Tienda de campaña',                NULL,               'deporte',           'javier', NULL,                'estanteria',      NULL,              75,  'AVAILABLE', 'Cuatro plazas, le falta una piqueta'),
-    ('arbol-navidad',  'Árbol de Navidad artificial',      NULL,               'decoracion',        'marta',  NULL,                'estanteria',      NULL,              88,  'AVAILABLE', NULL),
-    ('ventilador',     'Ventilador de pie',                NULL,               'electrodomesticos', 'marta',  NULL,                'trastero',        NULL,              62,  'DECOMMISSIONED', 'Se le rompió el motor el verano pasado')
-) AS v(clave, nombre, articulo, categoria, propietario, contenedor, ubicacion, serie, antiguedad, estado, notas);
+    ('taladro',        NULL,                               'art-taladro',      NULL,                'javier', NULL,                'banco-trabajo',   '3601JB4000',      62,  'AVAILABLE', NULL, 'GOOD'),
+    ('caja-herramientas','Caja de herramientas',           NULL,               'herramientas',      'javier', NULL,                'banco-trabajo',   NULL,              96,  'AVAILABLE', 'La de plástico rojo', NULL),
+    ('destornilladores','Juego de destornilladores',       NULL,               'herramientas',      'javier', 'caja-herramientas', NULL,              NULL,              96,  'AVAILABLE', NULL, 'WORN'),
+    ('llave-inglesa',  'Llave inglesa',                    NULL,               'herramientas',      'javier', 'caja-herramientas', NULL,              NULL,              96,  'AVAILABLE', NULL, 'GOOD'),
+    ('metro',          'Cinta métrica',                    NULL,               'herramientas',      'javier', 'caja-herramientas', NULL,              NULL,              96,  'AVAILABLE', NULL, NULL),
+    ('escalera',       'Escalera de tijera de cuatro peldaños', NULL,          'herramientas',      'javier', NULL,                'trastero',        NULL,              70,  'LENT',      NULL, 'GOOD'),
+    ('bici-hugo',      'Bicicleta de Hugo',                NULL,               'deporte',           'hugo',   NULL,                'trastero',        NULL,              24,  'AVAILABLE', 'Orbea MX 24; se le queda pequeña', 'GOOD'),
+    ('patinete',       'Patinete de Lucía',                NULL,               'deporte',           'lucia',  NULL,                'trastero',        NULL,              37,  'AVAILABLE', NULL, 'WORN'),
+    ('maleta',         'Maleta grande',                    NULL,               'deporte',           'marta',  NULL,                'estanteria',      NULL,              80,  'AVAILABLE', NULL, 'WORN'),
+    ('nevera-portatil','Nevera portátil',                  NULL,               'deporte',           'javier', NULL,                'estanteria',      NULL,              50,  'LENT',      NULL, 'GOOD'),
+    ('bomba-bici',     'Bomba de aire para bicicleta',     NULL,               'deporte',           'hugo',   NULL,                'banco-trabajo',   NULL,              24,  'AVAILABLE', NULL, NULL),
+    ('tienda-campana', 'Tienda de campaña',                NULL,               'deporte',           'javier', NULL,                'estanteria',      NULL,              75,  'AVAILABLE', 'Cuatro plazas, le falta una piqueta', 'DAMAGED'),
+    ('arbol-navidad',  'Árbol de Navidad artificial',      NULL,               'decoracion',        'marta',  NULL,                'estanteria',      NULL,              88,  'AVAILABLE', NULL, 'WORN'),
+    ('ventilador',     'Ventilador de pie',                NULL,               'electrodomesticos', 'marta',  NULL,                'trastero',        NULL,              62,  'DECOMMISSIONED', 'Se le rompió el motor el verano pasado', 'UNUSABLE')
+) AS v(clave, nombre, articulo, categoria, propietario, contenedor, ubicacion, serie, antiguedad, estado, notas, condicion);
 
 
 -- =====================================================================
@@ -473,10 +486,18 @@ FROM (VALUES
 -- El prestatario puede ser del hogar o de fuera. Cuando es de fuera va como JSON
 -- con al menos un canal de contacto, porque es por donde se le manda el enlace
 -- con el token acotado.
+--
+-- **La condición de entrega y la de devolución son la pareja que hace legible el
+-- historial**: por separado no dicen nada, y juntas dicen si la cosa volvió peor.
+-- La de vuelta solo la llevan los devueltos --un `CHECK` de la tabla lo exige, y
+-- es que anotar cómo volvió algo que sigue fuera de casa no significa nada-- y
+-- la maleta no lleva ninguna de las dos, que es el caso más frecuente de todos:
+-- nadie lo anotó.
 
 INSERT INTO loans (id, household_id, asset_id, lender_member_id, lender_external,
                    borrower_member_id, borrower_external, status, notes,
-                   started_at, due_at, returned_at, created_at, updated_at, created_by, updated_by)
+                   started_at, due_at, returned_at, condition_at_start, condition_on_return,
+                   created_at, updated_at, created_by, updated_by)
 SELECT pg_temp.demo_id('prestamo:' || v.clave), pg_temp.demo_id('hogar'),
        pg_temp.demo_id('asset:' || v.asset),
        pg_temp.demo_id('miembro:' || v.prestador), NULL,
@@ -486,20 +507,22 @@ SELECT pg_temp.demo_id('prestamo:' || v.clave), pg_temp.demo_id('hogar'),
        now() - (v.inicio || ' days')::interval,
        CASE WHEN v.plazo IS NULL THEN NULL ELSE now() - (v.plazo || ' days')::interval END,
        CASE WHEN v.devuelto IS NULL THEN NULL ELSE now() - (v.devuelto || ' days')::interval END,
+       v.salida, v.vuelta,
        now() - (v.inicio || ' days')::interval,
        now() - (coalesce(v.devuelto, v.inicio) || ' days')::interval,
        pg_temp.demo_id('miembro:' || v.prestador), pg_temp.demo_id('miembro:' || v.prestador)
 FROM (VALUES
-    ('taladro',   'taladro',         'javier', NULL,    '{"name":"Rubén Castaño (4.º B)","email":"ruben@vecinos.test","phone":"+34 633 44 55 66"}', 'RETURNED', 'Para colgar unas baldas',                    300, 286, 288),
-    ('escalera',  'escalera',        'javier', NULL,    '{"name":"Nuria Peña (2.º B)","email":"nuria@vecinos.test"}',                               'ACTIVE',   'Está pintando el pasillo',                     9, -12, NULL),
-    ('nevera',    'nevera-portatil', 'javier', NULL,    '{"name":"Álvaro Gómez","email":"alvaro@familia.test","phone":"+34 644 55 66 77"}',          'OVERDUE',  'Se la llevó a la playa y no ha vuelto',       60,  19, NULL),
-    ('tienda',    'tienda-campana',  'javier', 'lucia', NULL,                                                                                       'RETURNED', 'Campamento del instituto',                   150, 130, 122),
-    ('bici',      'bici-hugo',       'hugo',   NULL,    '{"name":"Iván Ruiz","email":"ivan@familia.test"}',                                          'RETURNED', 'Mientras la suya estaba en el taller',        210, 190, 185),
-    ('maleta',    'maleta',          'marta',  NULL,    '{"name":"Carmen Alonso","phone":"+34 655 66 77 88"}',                                       'RETURNED', 'Viaje de mi madre a Galicia',                150, 130, 128),
-    ('patinete',  'patinete',        'lucia',  'hugo',  NULL,                                                                                       'RETURNED', 'Una semana, y volvió con un arañazo',         40,  33,  30),
-    ('barbacoa',  'barbacoa',        'javier', NULL,    '{"name":"Familia del 3.º A","email":"tercero-a@vecinos.test"}',                             'RETURNED', 'Comida de la comunidad',                      60,  55,  55),
-    ('aspirador', 'aspirador',       'marta',  NULL,    '{"name":"Rosa Iglesias (1.º C)","phone":"+34 666 77 88 99"}',                               'RETURNED', 'Se le había roto el suyo',                   390, 380, 376)
-) AS v(clave, asset, prestador, receptor_miembro, receptor_externo, estado, notas, inicio, plazo, devuelto);
+    ('taladro',   'taladro',         'javier', NULL,    '{"name":"Rubén Castaño (4.º B)","email":"ruben@vecinos.test","phone":"+34 633 44 55 66"}', 'RETURNED', 'Para colgar unas baldas',                    300, 286, 288, 'GOOD', 'GOOD'),
+    ('escalera',  'escalera',        'javier', NULL,    '{"name":"Nuria Peña (2.º B)","email":"nuria@vecinos.test"}',                               'ACTIVE',   'Está pintando el pasillo',                     9, -12, NULL, 'GOOD', NULL),
+    ('nevera',    'nevera-portatil', 'javier', NULL,    '{"name":"Álvaro Gómez","email":"alvaro@familia.test","phone":"+34 644 55 66 77"}',          'OVERDUE',  'Se la llevó a la playa y no ha vuelto',       60,  19, NULL, 'GOOD', NULL),
+    ('tienda',    'tienda-campana',  'javier', 'lucia', NULL,                                                                                       'RETURNED', 'Campamento del instituto',                   150, 130, 122, 'GOOD', 'DAMAGED'),
+    ('bici',      'bici-hugo',       'hugo',   NULL,    '{"name":"Iván Ruiz","email":"ivan@familia.test"}',                                          'RETURNED', 'Mientras la suya estaba en el taller',        210, 190, 185, 'GOOD', 'GOOD'),
+    ('maleta',    'maleta',          'marta',  NULL,    '{"name":"Carmen Alonso","phone":"+34 655 66 77 88"}',                                       'RETURNED', 'Viaje de mi madre a Galicia',                150, 130, 128, NULL, NULL),
+    ('patinete',  'patinete',        'lucia',  'hugo',  NULL,                                                                                       'RETURNED', 'Una semana, y volvió con un arañazo',         40,  33,  30, 'GOOD', 'WORN'),
+    ('barbacoa',  'barbacoa',        'javier', NULL,    '{"name":"Familia del 3.º A","email":"tercero-a@vecinos.test"}',                             'RETURNED', 'Comida de la comunidad',                      60,  55,  55, NULL, 'GOOD'),
+    ('aspirador', 'aspirador',       'marta',  NULL,    '{"name":"Rosa Iglesias (1.º C)","phone":"+34 666 77 88 99"}',                               'RETURNED', 'Se le había roto el suyo',                   390, 380, 376, 'GOOD', 'GOOD')
+) AS v(clave, asset, prestador, receptor_miembro, receptor_externo, estado, notas, inicio, plazo, devuelto,
+       salida, vuelta);
 
 
 -- =====================================================================

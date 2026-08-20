@@ -251,6 +251,93 @@ class LoanJourneyTest : SpringIntegrationTest() {
         byAsset.shouldContain(prestado)
     }
 
+    @Test
+    @DisplayName("la condicion se anota en los dos momentos, y la de vuelta solo al devolver")
+    fun `los dos momentos del prestamo`() {
+        val home = http.registerHousehold()
+        val assetId = http.createDurable(home.accessToken, "Cortacésped")
+
+        val created = http.postJson(
+            "/api/v1/loans",
+            """{"assetId":"$assetId",
+             "lender":{"userId":"${home.memberId}"},
+             "borrower":{"userId":"${home.memberId}"},
+             "conditionAtStart":"GOOD"}""",
+            home.accessToken,
+        )
+        created.statusCode.shouldBe(HttpStatus.CREATED)
+        created.body!!.shouldContain("\"conditionAtStart\":\"GOOD\"")
+        // La de vuelta todavia no existe, y eso es una regla y no un descuido: la
+        // cosa acaba de salir de casa.
+        created.body!!.shouldContain("\"conditionOnReturn\":null")
+
+        val loanId = created.body!!.extract("id")
+
+        // No hay ninguna operacion que la escriba antes de la devolucion: el
+        // `PATCH` de assets no la toca y el prestamo no tiene `PATCH`.
+        val returned = http.postJson(
+            "/api/v1/loans/$loanId/return",
+            """{"conditionOnReturn":"DAMAGED"}""",
+            home.accessToken,
+        )
+        returned.statusCode.shouldBe(HttpStatus.OK)
+        returned.body!!.shouldContain("\"conditionOnReturn\":\"DAMAGED\"")
+        // Y la pareja se lee junta, que es de donde sale «volvio peor».
+        returned.body!!.shouldContain("\"conditionAtStart\":\"GOOD\"")
+
+        // **El asset no se entera**: lo que se afirma al devolver es del
+        // prestamo, y el estado de conservacion de la ficha lo corrige el hogar.
+        http.getJson("/api/v1/assets/$assetId", home.accessToken).body!!
+            .shouldContain("\"condition\":null")
+
+        // Y se releen las dos: se guardaron, no se quedaron en la respuesta.
+        val read = http.getJson("/api/v1/loans/$loanId", home.accessToken).body!!
+        read.shouldContain("\"conditionAtStart\":\"GOOD\"")
+        read.shouldContain("\"conditionOnReturn\":\"DAMAGED\"")
+    }
+
+    @Test
+    @DisplayName("confirmar sin decir nada sigue valiendo: el cuerpo entero es opcional")
+    fun `la devolucion sin cuerpo sigue siendo una peticion valida`() {
+        val home = http.registerHousehold()
+        val assetId = http.createDurable(home.accessToken, "Manguera")
+        val loanId = http.startSimpleLoan(home.accessToken, home.memberId, assetId).body!!.extract("id")
+
+        // Es como llamaba el cliente antes de que este campo existiera, y tiene
+        // que seguir funcionando: ausente y vacio significan lo mismo.
+        val returned = http.postJson("/api/v1/loans/$loanId/return", "", home.accessToken)
+
+        returned.statusCode.shouldBe(HttpStatus.OK)
+        returned.body!!.shouldContain("\"conditionOnReturn\":null")
+    }
+
+    @Test
+    @DisplayName("una condicion inventada se rechaza con 400 y no la guarda nadie")
+    fun `la escala del prestamo es cerrada`() {
+        val home = http.registerHousehold()
+        val assetId = http.createDurable(home.accessToken, "Carretilla de mano")
+
+        http.postJson(
+            "/api/v1/loans",
+            """{"assetId":"$assetId",
+             "lender":{"userId":"${home.memberId}"},
+             "borrower":{"userId":"${home.memberId}"},
+             "conditionAtStart":"REGULINCHI"}""",
+            home.accessToken,
+        ).statusCode.shouldBe(HttpStatus.BAD_REQUEST)
+
+        val loanId = http.startSimpleLoan(home.accessToken, home.memberId, assetId).body!!.extract("id")
+        http.postJson(
+            "/api/v1/loans/$loanId/return",
+            """{"conditionOnReturn":"REGULINCHI"}""",
+            home.accessToken,
+        ).statusCode.shouldBe(HttpStatus.BAD_REQUEST)
+
+        // Y el prestamo sigue abierto: el 400 no dejo la devolucion a medias.
+        http.getJson("/api/v1/loans/$loanId", home.accessToken).body!!
+            .shouldContain("\"status\":\"ACTIVE\"")
+    }
+
     private fun countTokensOf(loanId: String): Int =
         DrpPostgres.instance.ownerConnection().use { connection ->
             connection.prepareStatement(

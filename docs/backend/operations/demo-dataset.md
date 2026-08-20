@@ -74,6 +74,18 @@ son los que enseñan para qué sirve cada módulo.
   semanas y ocho más repartidos por el año.
 - Un préstamo **vencido** que sigue ocupando su asset, porque vencer no es
   devolver.
+- **Estados de conservación puestos en 36 de los 46 duraderos y a nulo en los
+  otros diez**, que es como se ve un inventario doméstico de verdad: nulo significa
+  que nadie lo anotó, y un juego de datos con todo anotado enseñaría una
+  aplicación que nadie usa así. Ninguna cosa está `NEW` —lo más joven de la casa
+  tiene once meses— y las que no están bien tienen su motivo al lado: al
+  ventilador de baja se le rompió el motor y a la tienda de campaña le falta una
+  piqueta.
+- **Las dos condiciones del préstamo**, que solo dicen algo juntas: seis de
+  los siete devueltos con la de vuelta puesta —**dos de ellos peor de lo que
+  salieron**, el patinete que «volvió con un arañazo» y cuya ficha dice desde
+  entonces `WORN`, y la tienda de campaña a la que le falta una piqueta— y uno,
+  la maleta, **sin ninguna de las dos**, que es el caso más frecuente de todos.
 - Una compra abierta con tres líneas dentro, dos recibidas con las existencias
   que resultaron, y una anulada —sin líneas, porque anular las devuelve a la
   lista—.

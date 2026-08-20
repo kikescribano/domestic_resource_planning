@@ -4,11 +4,14 @@ import { useSearchParams } from 'react-router'
 
 import {
   ApiError,
+  CONDITIONS,
+  CONDITION_LABELS,
   LOAN_STATUS_LABELS,
   api,
   formatDate,
   humanMessage,
   type Asset,
+  type AssetCondition,
   type ExternalLoan,
   type Loan,
   type LoanStatus,
@@ -61,7 +64,8 @@ export function LoansPage() {
   })
 
   const confirmReturn = useMutation({
-    mutationFn: (loanId: string) => api.confirmReturn(loanId, accessToken),
+    mutationFn: ({ loanId, condition }: { loanId: string; condition?: AssetCondition }) =>
+      api.confirmReturn(loanId, accessToken, condition),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['loans'] })
       // El asset vuelve a AVAILABLE, así que el inventario también cambia.
@@ -107,8 +111,8 @@ export function LoansPage() {
           <LoanCard
             key={loan.id}
             loan={loan}
-            onReturn={() => confirmReturn.mutate(loan.id)}
-            isReturning={confirmReturn.isPending && confirmReturn.variables === loan.id}
+            onReturn={(condition) => confirmReturn.mutate({ loanId: loan.id, condition })}
+            isReturning={confirmReturn.isPending && confirmReturn.variables?.loanId === loan.id}
           />
         ))}
       </ul>
@@ -122,36 +126,63 @@ function LoanCard({
   isReturning,
 }: {
   loan: Loan
-  onReturn: () => void
+  onReturn: (condition?: AssetCondition) => void
   isReturning: boolean
 }) {
   const isOpen = loan.status === 'ACTIVE' || loan.status === 'OVERDUE'
+  const [condition, setCondition] = useState<AssetCondition | ''>('')
 
   return (
-    <li className="rounded-lg border border-line bg-surface p-4">
+    <li className="rounded-lg border border-border-subtle bg-surface-raised p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="font-medium">{loan.assetName ?? 'Sin nombre'}</p>
-          <p className="text-sm text-muted">
+          <p className="text-body-sm text-ink-muted">
             {describeParticipant(loan, 'borrower')} · desde el {formatDate(loan.startedAt)}
           </p>
           {loan.dueAt && (
-            <p className="text-sm text-muted">
+            <p className="text-body-sm text-ink-muted">
               {loan.status === 'RETURNED' ? 'Vencía' : 'Vence'} el {formatDate(loan.dueAt)}
             </p>
           )}
-          {loan.returnedAt && <p className="text-sm text-muted">Devuelto el {formatDate(loan.returnedAt)}</p>}
-        </div>
-
-        <div className="flex items-center gap-3">
-          <StatusBadge tone={toneOf(loan.status)}>{LOAN_STATUS_LABELS[loan.status]}</StatusBadge>
-          {isOpen && (
-            <Button variant="secondary" onClick={onReturn} disabled={isReturning}>
-              {isReturning ? 'Guardando…' : 'Ya lo tengo'}
-            </Button>
+          {loan.returnedAt && (
+            <p className="text-body-sm text-ink-muted">Devuelto el {formatDate(loan.returnedAt)}</p>
+          )}
+          {/* Las dos juntas y en una sola línea: por separado no dicen nada, y
+              lo que se quiere leer de un vistazo es si volvió peor de lo que
+              salió. En tinta y no en un distintivo, que ya lo gasta el estado. */}
+          {(loan.conditionAtStart || loan.conditionOnReturn) && (
+            <p className="text-body-sm text-ink-muted">
+              {loan.conditionAtStart && `Salió: ${CONDITION_LABELS[loan.conditionAtStart]}`}
+              {loan.conditionAtStart && loan.conditionOnReturn && ' · '}
+              {loan.conditionOnReturn && `Volvió: ${CONDITION_LABELS[loan.conditionOnReturn]}`}
+            </p>
           )}
         </div>
+
+        <StatusBadge tone={toneOf(loan.status)}>{LOAN_STATUS_LABELS[loan.status]}</StatusBadge>
       </div>
+
+      {isOpen && (
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <SelectField
+            label="Vuelve en estado"
+            className="w-auto"
+            value={condition}
+            onChange={(event) => setCondition(event.target.value as AssetCondition | '')}
+          >
+            <option value="">Sin anotar</option>
+            {CONDITIONS.map((value) => (
+              <option key={value} value={value}>
+                {CONDITION_LABELS[value]}
+              </option>
+            ))}
+          </SelectField>
+          <Button variant="secondary" onClick={() => onReturn(condition || undefined)} disabled={isReturning}>
+            {isReturning ? 'Guardando…' : 'Ya lo tengo'}
+          </Button>
+        </div>
+      )}
     </li>
   )
 }
@@ -181,6 +212,7 @@ function StartLoanForm({ onDone }: { onDone: () => void }) {
   const [externalName, setExternalName] = useState('')
   const [externalEmail, setExternalEmail] = useState('')
   const [dueAt, setDueAt] = useState('')
+  const [conditionAtStart, setConditionAtStart] = useState<AssetCondition | ''>('')
   const [notes, setNotes] = useState('')
 
   const isExternal = borrowerId === EXTERNAL
@@ -206,6 +238,7 @@ function StartLoanForm({ onDone }: { onDone: () => void }) {
             ? { external: { name: externalName, email: externalEmail || undefined } }
             : { userId: borrowerId },
           dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
+          conditionAtStart: conditionAtStart || undefined,
           notes: notes || undefined,
         },
         accessToken,
@@ -225,7 +258,7 @@ function StartLoanForm({ onDone }: { onDone: () => void }) {
   const error = start.error instanceof ApiError ? start.error : null
 
   return (
-    <form onSubmit={submit} className="space-y-4 rounded-lg border border-line bg-surface p-4">
+    <form onSubmit={submit} className="space-y-4 rounded-lg border border-border-subtle bg-surface-raised p-4">
       <SelectField
         label="Qué prestas"
         value={assetId}
@@ -298,6 +331,23 @@ function StartLoanForm({ onDone }: { onDone: () => void }) {
         error={error?.fieldError('dueAt')}
       />
 
+      {/* Se anota al prestar y no después, que es cuando se tiene la cosa
+          delante. Sin preselección: dejarlo en «buen estado» por defecto haría
+          que la mitad de los préstamos afirmaran algo que nadie miró. */}
+      <SelectField
+        label="En qué estado sale (opcional)"
+        hint="Es la mitad que hace comparable lo que se anote al devolverlo."
+        value={conditionAtStart}
+        onChange={(event) => setConditionAtStart(event.target.value as AssetCondition | '')}
+      >
+        <option value="">Sin anotar</option>
+        {CONDITIONS.map((value) => (
+          <option key={value} value={value}>
+            {CONDITION_LABELS[value]}
+          </option>
+        ))}
+      </SelectField>
+
       <Field label="Notas (opcional)" value={notes} onChange={(event) => setNotes(event.target.value)} />
 
       {start.isError && <Notice tone="danger">{humanMessage(start.error)}</Notice>}
@@ -338,7 +388,7 @@ export function ExternalLoanPage() {
   })
 
   const confirm = useMutation({
-    mutationFn: () => api.confirmReturnWithToken(loanId, token),
+    mutationFn: (condition?: AssetCondition) => api.confirmReturnWithToken(loanId, token, condition),
     onSuccess: (updated) => loan.refetch().catch(() => updated),
   })
 
@@ -354,7 +404,13 @@ export function ExternalLoanPage() {
   // puede decir si el préstamo existe sin convertir el enlace en un oráculo.
   if (loan.isError) return <BrokenLink />
 
-  return <ExternalLoanView loan={loan.data} onConfirm={() => confirm.mutate()} confirming={confirm} />
+  return (
+    <ExternalLoanView
+      loan={loan.data}
+      onConfirm={(condition) => confirm.mutate(condition)}
+      confirming={confirm}
+    />
+  )
 }
 
 function ExternalLoanView({
@@ -363,11 +419,12 @@ function ExternalLoanView({
   confirming,
 }: {
   loan: ExternalLoan
-  onConfirm: () => void
+  onConfirm: (condition?: AssetCondition) => void
   confirming: { isPending: boolean; isError: boolean; error: unknown; isSuccess: boolean }
 }) {
   const isOpen = loan.status === 'ACTIVE' || loan.status === 'OVERDUE'
   const isLender = loan.role === 'LENDER'
+  const [condition, setCondition] = useState<AssetCondition | ''>('')
 
   return (
     <main className="flex min-h-dvh items-center justify-center px-gutter py-10">
@@ -378,21 +435,36 @@ function ExternalLoanView({
         <div className="space-y-4">
           <StatusBadge tone={toneOf(loan.status)}>{LOAN_STATUS_LABELS[loan.status]}</StatusBadge>
 
-          <dl className="space-y-2 text-sm">
+          <dl className="space-y-2 text-body-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-muted">Desde</dt>
+              <dt className="text-ink-muted">Desde</dt>
               <dd>{formatDate(loan.startedAt)}</dd>
             </div>
             {loan.dueAt && (
               <div className="flex justify-between gap-4">
-                <dt className="text-muted">{loan.status === 'RETURNED' ? 'Vencía' : 'Hasta'}</dt>
+                <dt className="text-ink-muted">{loan.status === 'RETURNED' ? 'Vencía' : 'Hasta'}</dt>
                 <dd>{formatDate(loan.dueAt)}</dd>
               </div>
             )}
             {loan.returnedAt && (
               <div className="flex justify-between gap-4">
-                <dt className="text-muted">Devuelto</dt>
+                <dt className="text-ink-muted">Devuelto</dt>
                 <dd>{formatDate(loan.returnedAt)}</dd>
+              </div>
+            )}
+            {/* En qué estado salió de casa. No dice nada del hogar: describe la
+                cosa que quien lee tiene en las manos, y saber en qué estado se
+                la dieron le protege a ella. */}
+            {loan.conditionAtStart && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-ink-muted">Salió</dt>
+                <dd>{CONDITION_LABELS[loan.conditionAtStart]}</dd>
+              </div>
+            )}
+            {loan.conditionOnReturn && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-ink-muted">Volvió</dt>
+                <dd>{CONDITION_LABELS[loan.conditionOnReturn]}</dd>
               </div>
             )}
           </dl>
@@ -407,12 +479,27 @@ function ExternalLoanView({
               parada de tabulador, que es su estado final correcto. */}
           {isOpen ? (
             <>
-              <p className="text-sm text-muted">
+              <p className="text-body-sm text-ink-muted">
                 {isLender
                   ? 'Cuando te lo devuelvan, avísalo aquí y se cerrará el préstamo.'
                   : 'Cuando se lo devuelvas, avísalo aquí y se cerrará el préstamo.'}
               </p>
-              <Button onClick={onConfirm} disabled={confirming.isPending}>
+              {/* Lo único que esta credencial puede escribir en todo el hogar, y
+                  sigue siendo opcional: quien no quiera decirlo confirma igual,
+                  que es como funcionaba antes de que este campo existiera. */}
+              <SelectField
+                label={isLender ? 'En qué estado te lo devuelven' : 'En qué estado lo devuelves'}
+                value={condition}
+                onChange={(event) => setCondition(event.target.value as AssetCondition | '')}
+              >
+                <option value="">Prefiero no decirlo</option>
+                {CONDITIONS.map((value) => (
+                  <option key={value} value={value}>
+                    {CONDITION_LABELS[value]}
+                  </option>
+                ))}
+              </SelectField>
+              <Button onClick={() => onConfirm(condition || undefined)} disabled={confirming.isPending}>
                 {confirming.isPending ? 'Guardando…' : isLender ? 'Ya me lo han devuelto' : 'Ya lo he devuelto'}
               </Button>
             </>
@@ -439,7 +526,7 @@ function BrokenLink() {
   return (
     <main className="flex min-h-dvh items-center justify-center px-gutter py-10">
       <AuthCard title="Este enlace ya no vale">
-        <p className="text-sm text-muted">
+        <p className="text-body-sm text-ink-muted">
           Puede que haya caducado o que se haya sustituido por otro. Habla con la persona que te prestó la
           cosa: puede volver a enviártelo o apuntar la devolución por su cuenta.
         </p>

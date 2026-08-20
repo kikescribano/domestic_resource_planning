@@ -5,7 +5,7 @@
 | Estado | Implementado |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-17 |
+| Última revisión | 2026-08-20 |
 
 > **Esta ficha se escribió antes que la pantalla**, como especificación de lo que
 > el Hito 4 tenía que construir, y **la pantalla ya existe**: vive en
@@ -68,7 +68,7 @@ Encaja además en el segundo tipo de ficha que admite
 [`components/`](README.md): una anatomía entera **prevista**, escrita para que la
 implementación se guíe por ella.
 
-## Los cinco datos que salen de casa, y los que no
+## Los siete datos que salen de casa, y los que no
 
 Es lo primero que hay que fijar, antes de la anatomía, porque decide qué se puede
 pintar. El contrato lo declara como esquema propio —`LoanExternalView`, cerrado
@@ -82,6 +82,16 @@ lo que lleva.
 | `startedAt` | Desde cuándo |
 | `dueAt` | Para cuándo, si se fijó fecha. Puede ser nula: un préstamo sin fecha no vence nunca |
 | `returnedAt` | Informado tras confirmar, para que quien lo confirmó lo vea hecho |
+| `conditionAtStart` | En qué estado salió de casa. **Describe la cosa que quien lee tiene en las manos**, no el hogar que se la prestó, y saber en qué estado se la dieron le protege a ella |
+| `conditionOnReturn` | En qué estado volvió: lo que esta misma persona acaba de escribir, devuelto para que lo vea hecho |
+
+**Las dos últimas llegaron el 2026-08-20**, y son **la primera vez que esta
+proyección se ensancha** desde que se escribió la ficha. Que la lista pasara de
+cinco campos a siete no fue un descuido de nadie: hay una prueba en el barrido de
+contención del token que compara los campos servidos contra una lista **cerrada**,
+así que añadir uno obliga a tocarla y a decidirlo. El criterio con el que se
+decidió es el mismo de la tabla —¿dice esto algo del hogar?— y la respuesta para
+las dos es que no.
 
 Y lo que **no sale, y la pantalla no debe intentar averiguar**: quién presta,
 quién recibe, el `assetId`, las notas, la autoría, y absolutamente nada del
@@ -105,7 +115,7 @@ Acotar en el cliente es la segunda barrera, no la primera.
 ## Anatomía, variantes y estados
 
 Una columna centrada sobre el papel de la página, con **un dato importante, una
-acción y nada más**. De arriba abajo, seis piezas, y las dos últimas no siempre
+acción y nada más**. De arriba abajo, ocho piezas, y las tres del final no siempre
 están:
 
 1. **La línea de procedencia** — `text-caption text-ink-muted`: «Un préstamo
@@ -124,10 +134,18 @@ están:
    debajo, la frase que lo explica en cristiano.
 5. **Las fechas** — un `<dl>` con dos o tres pares: «Prestado el», «Devolución
    prevista» y, cuando existe, «Devuelto el».
-6. **La acción** — un [`Button`](button.md) `variant="primary"`, y bajo él, en
+6. **El estado en el que se devuelve** — un [`SelectField`](field.md) con la
+   escala de conservación (4.1.1) y la opción vacía elegida: «Prefiero no
+   decirlo». Llegó el 2026-08-20 y desaparece con la acción, porque es parte de
+   ella: es **la única escritura que esta credencial alcanza en todo el hogar**.
+   Sin preselección a propósito —un desplegable con «buen estado» puesto
+   convertiría en dato lo que nadie miró— y con `SelectField` y no un `<select>` a
+   mano, que es quien pone la pista en `aria-describedby` en vez de dentro del
+   nombre accesible.
+7. **La acción** — un [`Button`](button.md) `variant="primary"`, y bajo él, en
    `text-caption`, la consecuencia de pulsarlo. Desaparece en cuanto el préstamo
    está devuelto.
-7. **El pie** — una línea: «Este enlace es personal, no lo compartas».
+8. **El pie** — una línea: «Este enlace es personal, no lo compartas».
 
 | Rasgo | Valor | Token |
 |---|---|---|
@@ -519,8 +537,9 @@ informa de nada y suena a reproche.
   se anuncia, nunca las dos cosas para el mismo cambio**. La región viva se
   reserva para lo que no mueve el foco —el fin de la carga y el fallo de red—.
 - **El recorrido de teclado es cortísimo, y en un estado es de longitud cero.**
-  Con el préstamo abierto: una parada, el botón, y la siguiente tabulación sale
-  del documento. Con el préstamo devuelto: **ninguna parada**. Una página sin un
+  Con el préstamo abierto: **dos** paradas desde el 2026-08-20 —el estado en el
+  que se devuelve y el botón—, y la siguiente tabulación sale del documento. Con
+  el préstamo devuelto: **ninguna parada**. Una página sin un
   solo elemento enfocable es correcta cuando es un documento —se lee con el cursor
   del lector, no con el tabulador—, y decirlo evita que alguien «arregle» el
   problema añadiendo un enlace que la pantalla no debe tener.
@@ -741,4 +760,5 @@ opcional y no estar copiado en cada ruta que lo necesite.
 | Fecha | Cambio | Autor |
 |---|---|---|
 | 2026-08-16 | Creación de la ficha al arrancar el Hito 4. La pantalla está **prevista**: no existe ni la ruta ni la llamada. Se documenta por qué la vista externa es componente y no patrón, la regla de que el enlace roto no delate nada, la ausencia de diálogo de confirmación y el papel que falta en la vista acotada. Se propone una primitiva nueva, `BlockingError`. | Equipo DRP |
+| 2026-08-20 | La pantalla gana **la única escritura que un token acotado alcanza en todo el hogar**: en qué estado se devuelve la cosa, con la escala de conservación de 4.1.1 y sin preselección. Con ella, la proyección acotada pasa de cinco datos a siete —`conditionAtStart` y `conditionOnReturn`, que describen la cosa y no el hogar— y el recorrido de teclado del préstamo abierto, de una parada a dos. Lo que contiene esa escritura es que el cuerpo tiene **un solo campo** y es un enumerado cerrado: no puede nombrar ninguna fila de ningún hogar, y hay una prueba que le manda cinco campos de más y comprueba desde dentro de casa que ninguno se escribió. Anotarlo **no cambia el estado de conservación del asset**, y ese es el motivo: quien confirma es alguien de fuera. | Equipo DRP |
 | 2026-08-17 | La pantalla existe: pasa a **Implementado** y la ficha describe el código. Se anotan las dos separaciones entre lo especificado y lo construido —el enlace roto sin error bloqueante y el anuncio en lugar del movimiento de foco—, el defecto de las dos regiones vivas que la regla del anuncio único delató y su arreglo, las seis piezas del sistema que el hito resolvió y las cuatro que siguen faltando. `BlockingError` no se construyó: queda con tres sitios esperándola y uno resuelto a mano. | Equipo DRP |

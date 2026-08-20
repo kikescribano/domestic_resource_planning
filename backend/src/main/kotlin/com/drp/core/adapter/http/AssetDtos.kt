@@ -4,6 +4,7 @@ import com.drp.core.application.usecase.AssetView
 import com.drp.core.application.usecase.OperationWarning
 import com.drp.core.application.usecase.Patch
 import com.drp.core.domain.catalog.MeasurementUnit
+import com.drp.core.domain.inventory.AssetCondition
 import com.drp.core.domain.inventory.AssetLocation
 import com.drp.core.domain.inventory.AssetStatus
 import com.drp.core.domain.inventory.AssetType
@@ -39,6 +40,7 @@ data class AssetInput(
     @field:Valid val location: LocationRefInput? = null,
     val serialNumber: String? = null,
     val acquiredOn: LocalDate? = null,
+    val condition: AssetCondition? = null,
     val photoUrl: String? = null,
     val photoFileId: UUID? = null,
     val notes: String? = null,
@@ -88,6 +90,7 @@ data class AssetResponse(
     val unit: MeasurementUnit?,
     val serialNumber: String?,
     val acquiredOn: LocalDate?,
+    val condition: AssetCondition?,
     val photoUrl: String?,
     val photoThumbnailUrl: String?,
     val photoFileId: UUID?,
@@ -112,6 +115,7 @@ data class AssetResponse(
             unit = view.unit,
             serialNumber = view.asset.serialNumber,
             acquiredOn = view.asset.acquiredOn,
+            condition = view.asset.condition,
             photoUrl = view.asset.photoUrl,
             photoThumbnailUrl = photoThumbnailUrl,
             photoFileId = view.asset.photoFileId,

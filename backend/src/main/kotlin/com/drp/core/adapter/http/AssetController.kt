@@ -14,6 +14,7 @@ import com.drp.core.application.usecase.ListAssets
 import com.drp.core.application.usecase.MergeStockItems
 import com.drp.core.application.usecase.RegisterConsumableIntake
 import com.drp.core.application.usecase.UpdateAsset
+import com.drp.core.domain.inventory.AssetCondition
 import com.drp.core.domain.inventory.AssetStatus
 import com.drp.core.domain.inventory.AssetType
 import com.drp.platform.page.Page
@@ -59,11 +60,22 @@ class AssetController(
         @RequestParam(required = false) type: AssetType?,
         @RequestParam(required = false) articleId: UUID?,
         @RequestParam(required = false) categoryId: UUID?,
+        @RequestParam(required = false) condition: AssetCondition?,
         @RequestParam(defaultValue = "false") withoutOwner: Boolean,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "50") size: Int,
     ): PageResponse<AssetResponse> = listAssets.handle(
-        AssetFilter(locationId, parentAssetId, ownerId, status, type, articleId, categoryId, withoutOwner),
+        AssetFilter(
+            locationId,
+            parentAssetId,
+            ownerId,
+            status,
+            type,
+            articleId,
+            categoryId,
+            condition,
+            withoutOwner,
+        ),
         Pagination(page, size),
     ).withThumbnails()
 
@@ -100,6 +112,7 @@ class AssetController(
                 location = input.location?.toDomain(),
                 serialNumber = input.serialNumber,
                 acquiredOn = input.acquiredOn,
+            condition = input.condition,
             photoUrl = input.photoUrl,
             photoFileId = input.photoFileId,
             notes = input.notes,
@@ -171,6 +184,7 @@ class AssetController(
                 quantity = patch.requiredDecimal("quantity"),
                 serialNumber = patch.text("serialNumber"),
                 acquiredOn = patch.date("acquiredOn"),
+                condition = patch.enum<AssetCondition>("condition"),
                 photoUrl = patch.text("photoUrl"),
                 photoFileId = patch.uuid("photoFileId"),
                 notes = patch.text("notes"),

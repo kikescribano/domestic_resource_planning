@@ -114,6 +114,10 @@ test.describe('recorrido vertical', () => {
     await page.getByRole('link', { name: 'Dar de alta' }).click()
     await page.getByLabel('Nombre').fill('Taladro')
     await page.getByLabel('Categoría').selectOption({ label: 'Herramientas' })
+    // El estado de conservación, que nace aquí y llega hasta la pantalla que se
+    // abre sin sesión. Es la mitad del hito que solo se puede comprobar de punta
+    // a punta: el desplegable, el `POST`, la columna y la lectura de vuelta.
+    await page.getByLabel('Estado de conservación (opcional)').selectOption('GOOD')
     await page.getByRole('button', { name: 'Dar de alta' }).click()
     // A la ficha del asset recién creado, y **esperando a que llegue**. El alta
     // navega desde el `onSuccess` de la mutación, así que salir de aquí antes de
@@ -122,6 +126,7 @@ test.describe('recorrido vertical', () => {
     // diagnóstico: la URL era la correcta un instante y la pantalla, otra.
     await page.waitForURL('**/inventario/*')
     await expect(page.getByRole('heading', { level: 1, name: 'Taladro' })).toBeVisible()
+    await expect(page.getByText('Buen estado').first()).toBeVisible()
 
     // --- 3. Prestarlo a alguien de fuera ------------------------------------
     await navigateTo(page, 'Préstamos', '/prestamos')
@@ -144,6 +149,7 @@ test.describe('recorrido vertical', () => {
     await page.getByLabel('A quién').selectOption({ label: 'Otra persona' })
     await page.getByLabel('Su nombre').fill('Vecino del 3.º')
     await page.getByLabel('Su correo').fill(vecino)
+    await page.getByLabel('En qué estado sale (opcional)').selectOption('GOOD')
     await page.getByRole('button', { name: 'Prestar', exact: true }).click()
 
     await expect(page.getByText('Prestado').first()).toBeVisible()
@@ -171,12 +177,27 @@ test.describe('recorrido vertical', () => {
     // es terminal. Si no se llega a ella tabulando, para quien no usa el ratón
     // el préstamo no se puede cerrar y no hay otro camino —ni menú, ni sesión,
     // ni segunda pantalla— por el que rodearlo.
+    // En qué estado salió de casa: lo ve quien lo tiene, y no dice nada del
+    // hogar que se lo prestó.
+    await expect(stranger.getByText('Salió')).toBeVisible()
+
     const confirmar = stranger.getByRole('button', { name: 'Ya lo he devuelto' })
     await startKeyboardAtTop(stranger, confirmar)
+
+    // Y en qué estado lo devuelve, que es **la única escritura que alcanza esta
+    // credencial**. Se elige con el teclado y **después de recargar**, que es lo
+    // que hace `startKeyboardAtTop`: elegirlo antes lo perdería, y la prueba
+    // pasaría por el camino de no anotar nada sin que se notase.
+    const volviendo = stranger.getByLabel('En qué estado lo devuelves')
+    await tabTo(stranger, volviendo, 'el estado en el que se devuelve')
+    await volviendo.selectOption('DAMAGED')
+
     await tabTo(stranger, confirmar, 'la confirmación de devolución')
     await stranger.keyboard.press('Enter')
 
     await expect(stranger.getByText(/ya está cerrado/)).toBeVisible()
+    // Lo que acaba de escribir, devuelto para que lo vea hecho.
+    await expect(stranger.getByText('Volvió')).toBeVisible()
     // El cambio no mueve el foco —al desaparecer el botón la pantalla se queda sin
     // paradas—, así que tiene que anunciarse. Y **una sola vez**: aquí había dos
     // regiones vivas dando la misma noticia, que es lo que la ficha de la
@@ -191,6 +212,22 @@ test.describe('recorrido vertical', () => {
     await navigateTo(page, 'Inventario', '/inventario')
     await page.getByText('Taladro').first().click()
     await expect(page.getByText('Disponible').first()).toBeVisible()
+    // **El asset no se entera de lo que dijo el vecino**, y eso es la decisión y
+    // no un olvido: lo que se afirma al devolver es del préstamo, y el estado de
+    // conservación de la ficha lo corrige el hogar. Sigue como lo dejó el alta.
+    //
+    // Dentro de la lista de datos y no en la pantalla entera: las cinco etiquetas
+    // de la escala están también en el desplegable que hay más abajo para
+    // corregirla, así que buscarlas sueltas encontraría siempre las dos.
+    const ficha = page.locator('dl').first()
+    await expect(ficha.getByText('Buen estado')).toBeVisible()
+    await expect(ficha.getByText('Deteriorado')).toHaveCount(0)
+
+    // Y en el préstamo cerrado sí están las dos, que es de donde sale «volvió
+    // peor de lo que salió».
+    await navigateTo(page, 'Préstamos', '/prestamos')
+    await page.getByRole('button', { name: 'Todos' }).click()
+    await expect(page.getByText('Salió: Buen estado · Volvió: Deteriorado')).toBeVisible()
 
     // --- 6. La bandeja de avisos --------------------------------------------
     // La pantalla que trae la plataforma de avisos. Sale vacía a propósito: lo
@@ -965,7 +1002,7 @@ test.describe('recorrido vertical', () => {
     expect(bytes.includes(Buffer.from('GPS'))).toBe(false)
   })
 
-  test('la pasada sistemática: las ocho pantallas de la lista, con teclado, reflujo y axe', async ({
+  test('la pasada sistemática: las nueve pantallas de la lista, con teclado, reflujo y axe', async ({
     page,
     request,
   }) => {
@@ -1015,6 +1052,23 @@ test.describe('recorrido vertical', () => {
     })
     expect(seeded.status(), 'no se pudo sembrar el fichero de la auditoría').toBe(201)
 
+    // **Y un asset, por el mismo motivo que el fichero.** «Inventario» entra en
+    // la lista de abajo con el cierre de huecos, y era una de las cuatro
+    // pantallas del core que nadie auditaba. Vacía pintaría su estado vacío
+    // —cuatro elementos— y axe diría que pasa sin haber mirado ninguna fila.
+    //
+    // Con estado de conservación puesto, que es el campo que este hito añade a
+    // esa pantalla: auditar la fila sin él sería auditar la de ayer.
+    const categories = await request.get('/api/v1/categories', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const seededCategory = ((await categories.json()) as { items: Array<{ id: string }> }).items[0]!.id
+    const asset = await request.post('/api/v1/assets', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { name: 'Taladro', type: 'DURABLE', categoryId: seededCategory, condition: 'WORN' },
+    })
+    expect(asset.status(), 'no se pudo sembrar el asset de la auditoría').toBe(201)
+
     // El caso peor de la fase, medido una sola vez porque la navegación es una:
     // doce paradas a 320 px, con su suelo de 44 px y sin desbordar.
     await checkTouchTargets(page)
@@ -1049,12 +1103,17 @@ test.describe('recorrido vertical', () => {
  * hito en vez de hacerlo de paso, pero conviene saber que la lista describe hoy
  * «lo que se audita» y no «lo que trajo la Fase 2».
  *
- * **Lo que sigue sin auditar son cuatro pantallas del core**: Inventario, Sitios,
- * Catálogo y Personas. Préstamos y Avisos sí tienen su llamada suelta en los
- * recorridos de arriba.
+ * **Lo que sigue sin auditar son tres pantallas del core**: Sitios, Catálogo y
+ * Personas. Inventario dejó de estarlo con el cierre de huecos, y Préstamos y
+ * Avisos sí tienen su llamada suelta en los recorridos de arriba.
  */
 const PHASE_TWO_SCREENS = [
   { link: 'Módulos del hogar', path: '/modulos', heading: 'Módulos' },
+  // «Inventario» entra el 2026-08-20, con el estado de conservación: es una de
+  // las cuatro pantallas del core que seguían sin auditar, y el hito la toca en
+  // sus tres sitios --el filtro del listado, la ficha y el alta--. Se siembra un
+  // asset antes, porque una pantalla vacía se audita sola y no dice nada.
+  { link: 'Inventario', path: '/inventario', heading: 'Inventario' },
   // Las dos que la baja de hogar (ADR-012) llenó de contenido nuevo: «Tu hogar»
   // estrena la zona de peligro y «Tu cuenta», el cierre de cuenta. No son rutas
   // nuevas, pero lo que hay dentro sí lo es, y la auditoría se hereda por estar

@@ -3,6 +3,7 @@ package com.drp.core.adapter.http
 import com.drp.core.application.usecase.ExternalLoanView
 import com.drp.core.application.usecase.LoanParticipantCommand
 import com.drp.core.application.usecase.LoanView
+import com.drp.core.domain.inventory.AssetCondition
 import com.drp.core.domain.loan.ExternalParty
 import com.drp.core.domain.loan.LoanRole
 import com.drp.core.domain.loan.LoanStatus
@@ -19,8 +20,22 @@ data class LoanInput(
     @field:NotNull @field:Valid val lender: LoanParticipantInput?,
     @field:NotNull @field:Valid val borrower: LoanParticipantInput?,
     val dueAt: Instant? = null,
+    val conditionAtStart: AssetCondition? = null,
     @field:Size(max = 2000) val notes: String? = null,
 )
+
+/**
+ * El cuerpo de la devolucion, que **es opcional entero**: confirmar sin decir
+ * nada sigue siendo una peticion valida, y era la unica forma que habia hasta
+ * hoy.
+ *
+ * Tiene un solo campo y no admite ningun otro, que es lo que hace que sirva para
+ * esto y para nada mas. Importa mas de lo que parece: esta es la unica escritura
+ * de toda la API que alcanza un **token acotado de prestamo**, asi que cada campo
+ * que se anadiera aqui seria algo que una persona de fuera del hogar puede
+ * escribir. Un enumerado cerrado no puede nombrar ninguna fila.
+ */
+data class LoanReturnInput(val conditionOnReturn: AssetCondition? = null)
 
 /**
  * Un extremo del prestamo. El contrato lo declara con un `oneOf` de dos ramas
@@ -64,6 +79,8 @@ data class LoanResponse(
     val startedAt: Instant,
     val dueAt: Instant?,
     val returnedAt: Instant?,
+    val conditionAtStart: AssetCondition?,
+    val conditionOnReturn: AssetCondition?,
     val notes: String?,
     val createdBy: UUID?,
     val updatedBy: UUID?,
@@ -79,6 +96,8 @@ data class LoanResponse(
             startedAt = view.loan.startedAt,
             dueAt = view.loan.dueAt,
             returnedAt = view.loan.returnedAt,
+            conditionAtStart = view.loan.conditionAtStart,
+            conditionOnReturn = view.loan.conditionOnReturn,
             notes = view.loan.notes,
             createdBy = view.loan.createdBy,
             updatedBy = view.loan.updatedBy,
@@ -117,6 +136,8 @@ data class ExternalLoanResponse(
     val startedAt: Instant,
     val dueAt: Instant?,
     val returnedAt: Instant?,
+    val conditionAtStart: AssetCondition?,
+    val conditionOnReturn: AssetCondition?,
 ) {
     companion object {
         fun of(view: ExternalLoanView) = ExternalLoanResponse(
@@ -127,6 +148,8 @@ data class ExternalLoanResponse(
             startedAt = view.startedAt,
             dueAt = view.dueAt,
             returnedAt = view.returnedAt,
+            conditionAtStart = view.conditionAtStart,
+            conditionOnReturn = view.conditionOnReturn,
         )
     }
 }

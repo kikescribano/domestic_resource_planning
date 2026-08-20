@@ -117,7 +117,7 @@ class SupplierController(
                 id,
                 SupplierPatch(
                     name = patch.requiredText("name"),
-                    serviceCategory = patch.enum("serviceCategory"),
+                    serviceCategory = patch.requiredEnum("serviceCategory"),
                     contactName = patch.text("contactName"),
                     phone = patch.text("phone"),
                     email = patch.text("email"),

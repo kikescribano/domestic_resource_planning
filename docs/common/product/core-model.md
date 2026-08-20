@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Assets, articulos, ubicaciones y documentacion del core |
-| Última revisión | 2026-08-19 |
+| Última revisión | 2026-08-20 |
 
 > Trasladado desde las secciones 4.1.1 a 4.1.3 del [`README principal`](../../../README.md) al iniciar la Fase 1. **Los números de sección se conservan**: hay más de cien referencias cruzadas del tipo «ver 4.1.1» repartidas por el repositorio, y renumerarlas las rompería todas.
 
@@ -73,6 +73,7 @@ graph TD
 | Cantidad (`quantity`) | Solo `CONSUMABLE` | Existencia actual, expresada en la unidad de su artículo |
 | Número de serie (`serialNumber`) | Solo `DURABLE`, opcional | Lo que distingue dos unidades por lo demás idénticas, y lo que pide un fabricante al reclamar una garantía. **Se corrige después del alta**, que es cuando se sabe: la etiqueta está pegada detrás del aparato |
 | Fecha de adquisición (`acquiredOn`) | Solo `DURABLE`, opcional | Cuándo entró en el hogar. Es procedencia, no valor: el importe pertenece al módulo de gastos. Se corrige después del alta, igual que el número de serie |
+| Estado de conservación (`condition`) | Solo `DURABLE`, opcional | En qué estado está la cosa: `NEW`, `GOOD`, `WORN`, `DAMAGED`, `UNUSABLE`. **Nulo significa que nadie lo ha anotado**, que es el caso normal, y no que esté bien. Se corrige cuando cambia, que es lo que lo distingue de los dos anteriores: el número de serie de un taladro es el mismo el día que se compra y el día que se tira |
 | Foto (`photoUrl` / `photoFileId`) | Ambos, opcional | Una imagen, en forma de **enlace externo o de fichero guardado en el servidor** —nunca las dos a la vez— igual que en la documentación (ver «Ficheros almacenados»). Reconocer una cosa de un vistazo es la mitad de un inventario doméstico |
 | Notas (`notes`) | Ambos, opcional | Texto libre |
 | Fecha de alta (`createdAt`) | Ambos | — |
@@ -80,6 +81,33 @@ graph TD
 | Creado por (`createdBy`) | Ambos | Ver «Autoría de los cambios» |
 | Modificado por (`updatedBy`) | Ambos | Ídem |
 | Documentación asociada | Opcional, típicamente `DURABLE` | Facturas, garantías, manuales. No es un campo del asset sino una entidad propia (ver más abajo): un paquete de arroz no tiene manual |
+
+**El estado de conservación es del core, y es un enumerado cerrado.** Las dos
+mitades se decidieron juntas (ver 4.1.7). Es **del core** porque describe la cosa
+y no su mantenimiento: un hogar con todos los módulos apagados sigue queriendo
+saber que el taladro está para tirarlo, igual que guarda su número de serie —y
+una regla del core no puede depender de un módulo que se puede apagar. Y es un
+**enumerado** y no texto libre porque texto libre ya existe, es `notes`: un
+atributo que no se puede filtrar ni comparar no añadiría nada sobre una nota, y
+lo que este permite es preguntar «qué hay para tirar».
+
+| Valor | Qué dice |
+|---|---|
+| `NEW` | Nuevo, sin usar |
+| `GOOD` | Buen estado |
+| `WORN` | Desgastado: funciona y se nota el uso |
+| `DAMAGED` | Deteriorado: tiene algo roto o le falta una pieza |
+| `UNUSABLE` | Inservible: no sirve para lo que era |
+
+Solo aplica a un `DURABLE`, como el número de serie y la fecha de adquisición, y
+por el mismo motivo: describe **una unidad física**. Trescientos gramos de harina
+no están «desgastados», y lo que le pasa a un lote —que caduque, que se
+estropee— es del módulo Warehouse y se sigue en su tabla.
+
+**La misma escala se usa en los dos momentos de un préstamo** (ver 4.1.5), y esa
+es la razón de que sea una sola: el motivo entero de la condición en préstamo es
+poder decir «salió bien y volvió rayado», y con dos escalas distintas esa frase
+no se puede construir.
 
 **Atributos mínimos de un Articulo:**
 
