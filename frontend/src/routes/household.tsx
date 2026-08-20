@@ -11,6 +11,8 @@ import {
   House,
   LogOut,
   MapPin,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   Users,
 } from 'lucide-react'
@@ -159,31 +161,39 @@ function useSignOut() {
  * para que se lean como parte del bloque de identidad y no como dos entradas
  * más de la lista.
  */
-function AccountControls({ className = '' }: { className?: string }) {
+function AccountControls({ compact = false, className = '' }: { compact?: boolean; className?: string }) {
   const exit = useSignOut()
-  const itemClass = 'flex min-h-touch flex-1 items-center justify-center gap-2 rounded-md px-3 text-body-sm'
+  const itemClass = compact
+    ? 'flex min-h-touch min-w-touch items-center justify-center rounded-md'
+    : 'flex min-h-touch flex-1 items-center justify-center gap-2 rounded-md px-3 text-body-sm'
 
   return (
-    <div className={['items-center gap-1', className].join(' ')}>
-      <NavLink
-        to="/cuenta"
-        className={({ isActive }) =>
-          [
-            itemClass,
-            isActive ? 'bg-accent-soft font-medium text-accent-ink' : 'text-ink-muted hover:bg-surface-hover',
-          ].join(' ')
-        }
-      >
-        <CircleUserRound {...NAV_ICON} />
-        <span>Cuenta</span>
-      </NavLink>
+    <div className={[compact ? 'flex-col gap-1' : 'items-center gap-1', className].join(' ')}>
+      {/* Encogida, del par queda solo la salida: «Cuenta» es un destino, y a
+          icono junto al sello se confundía con una parada más. El detalle de
+          la cuenta se recupera ensanchando la columna. */}
+      {!compact && (
+        <NavLink
+          to="/cuenta"
+          className={({ isActive }) =>
+            [
+              itemClass,
+              isActive ? 'bg-accent-soft font-medium text-accent-ink' : 'text-ink-muted hover:bg-surface-hover',
+            ].join(' ')
+          }
+        >
+          <CircleUserRound {...NAV_ICON} />
+          <span>Cuenta</span>
+        </NavLink>
+      )}
       <button
         type="button"
         onClick={exit}
+        title={compact ? 'Salir' : undefined}
         className={[itemClass, 'text-ink-muted hover:bg-surface-hover'].join(' ')}
       >
         <LogOut {...NAV_ICON} />
-        <span>Salir</span>
+        <span className={compact ? 'sr-only' : ''}>Salir</span>
       </button>
     </div>
   )
@@ -303,9 +313,26 @@ export function RequireSession() {
  * lado —en escritorio bajo el sello, dentro del banner y fuera del landmark de
  * navegación; en móvil, en el apartado que cierra «Más»—.
  */
+/**
+ * Dónde se guarda si la columna va encogida. La misma casa que `drp.theme`:
+ * es una preferencia del dispositivo, no del hogar, así que no viaja a la API.
+ */
+const NAV_STATE_KEY = 'drp.nav'
+
 function HouseholdShell() {
   const groups = useNavigationGroups()
   const household = useHousehold()
+
+  // Solo escritorio: en móvil la barra inferior no tiene nada que encoger.
+  // La elección sobrevive a la recarga, porque quien la encoge lo hace para
+  // trabajar así y volver a ensancharla en cada visita sería no haber elegido.
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(NAV_STATE_KEY) === 'collapsed')
+
+  function toggleCollapsed() {
+    const next = !collapsed
+    setCollapsed(next)
+    localStorage.setItem(NAV_STATE_KEY, next ? 'collapsed' : 'expanded')
+  }
 
   return (
     <div className="flex min-h-dvh flex-col bg-surface md:flex-row">
@@ -322,15 +349,18 @@ function HouseholdShell() {
       <header
         className={[
           'fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-surface-raised',
-          'md:static md:flex md:w-64 md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-t-0 md:p-gutter-lg',
+          'md:static md:flex md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-t-0',
+          collapsed ? 'md:w-20 md:p-3' : 'md:w-64 md:p-gutter-lg',
         ].join(' ')}
       >
         {/* La marca y la cuenta comparten bloque con un aire más corto que el
             de la columna: son la identidad —quién es DRP y quién está dentro—
             y no dos vecinos casuales de la lista de paradas. */}
-        <div className="hidden md:flex md:flex-col md:gap-2">
-          <BrandMark className="flex" />
-          <AccountControls className="flex" />
+        <div className={['hidden md:flex md:flex-col md:gap-3', collapsed ? 'md:items-center' : ''].join(' ')}>
+          {/* Centrada en la anchura de la columna, como preside «Hogar» en
+              móvil: alineada a la izquierda parecía una parada más. */}
+          <BrandMark className="flex justify-center" compact={collapsed} />
+          <AccountControls className="flex" compact={collapsed} />
         </div>
 
         <nav aria-label="Principal" className="flex md:flex-col md:gap-6">
@@ -347,8 +377,22 @@ function HouseholdShell() {
               jerarquía entera —div, ul, li—, así que las listas siguen siendo
               listas para el lector de pantalla. */}
           {groups.map((group) => (
-            <div key={group.id} className="contents md:block">
-              <p id={group.id} className="hidden text-caption text-ink-subtle md:block">
+            <div
+              key={group.id}
+              className={[
+                'contents md:block',
+                // Encogida no hay rótulos, y sin ellos los grupos se pegan: el
+                // filete es la frontera que el rótulo ya no puede marcar.
+                // También sobre el primero, que separa «Salir» de «Hogar».
+                collapsed ? 'md:border-t md:border-border-subtle md:pt-2' : '',
+              ].join(' ')}
+            >
+              {/* El rótulo se lee siempre: encogida la columna sigue existiendo
+                  para `aria-labelledby`, solo que sin hueco en pantalla. */}
+              <p
+                id={group.id}
+                className={['hidden text-caption text-ink-subtle', collapsed ? '' : 'md:block'].join(' ')}
+              >
                 {group.label}
               </p>
               <ul className="contents md:mt-1 md:flex md:flex-col md:gap-1" aria-labelledby={group.id}>
@@ -357,9 +401,14 @@ function HouseholdShell() {
                     key={item.to}
                     className={THUMB_STOPS.has(item.to) ? 'flex flex-1 md:flex-none' : 'hidden md:flex'}
                   >
-                    <NavLink to={item.to} end={item.end} className={navLinkClass}>
+                    <NavLink
+                      to={item.to}
+                      end={item.end}
+                      title={collapsed ? item.label : undefined}
+                      className={navLinkClass(collapsed)}
+                    >
                       <item.icon {...NAV_ICON} />
-                      <span>{item.label}</span>
+                      <span className={collapsed ? 'md:sr-only' : ''}>{item.label}</span>
                     </NavLink>
                   </li>
                 ))}
@@ -371,13 +420,35 @@ function HouseholdShell() {
               hay nada detrás de ella que no esté ya en la columna. */}
           <ul className="contents">
             <li className="flex flex-1 md:hidden">
-              <NavLink to="/mas" className={navLinkClass}>
+              <NavLink to="/mas" className={navLinkClass(false)}>
                 <Ellipsis {...NAV_ICON} />
                 <span>Más</span>
               </NavLink>
             </li>
           </ul>
         </nav>
+
+        {/* El conmutador cierra la columna, y es lo único de esta cabecera que
+            no navega: encoger es ganar sitio para el contenido sin perder las
+            paradas, que se quedan en icono con su nombre en sr-only y su
+            `title`. Solo escritorio: la barra inferior no tiene nada que
+            encoger. */}
+        {/* En `caption`, como los rótulos de grupo: es utillaje de la columna
+            y no una parada, y al tamaño de las paradas les disputaba el peso. */}
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          title={collapsed ? 'Ensanchar la navegación' : 'Encoger la navegación'}
+          className={[
+            'hidden whitespace-nowrap text-ink-muted md:mt-auto md:flex md:min-h-touch md:items-center md:rounded-md md:text-caption md:hover:bg-surface-hover',
+            collapsed ? 'md:justify-center md:px-0' : 'md:justify-start md:gap-2.5 md:px-3',
+          ].join(' ')}
+        >
+          {collapsed ? <PanelLeftOpen {...NAV_ICON} /> : <PanelLeftClose {...NAV_ICON} />}
+          <span className={collapsed ? 'sr-only' : ''}>
+            {collapsed ? 'Ensanchar la navegación' : 'Encoger la navegación'}
+          </span>
+        </button>
       </header>
 
       <main id="contenido" className="mx-auto w-full max-w-shell flex-1 px-gutter py-6 pb-24 md:pb-6">
@@ -408,20 +479,25 @@ function HouseholdShell() {
  * ahí cada píxel de relleno se paga cinco veces. En la barra lateral, donde
  * sobra sitio, sigue siendo `px-3`.
  */
-function navLinkClass({ isActive }: { isActive: boolean }) {
-  return [
-    // En móvil el icono va encima de la etiqueta —columna— y el texto baja a
-    // `caption`: es lo que deja convivir las dos piezas dentro de los 44 px de
-    // alto sin renunciar a la etiqueta, que nunca se quita (el icono orienta,
-    // no nombra). Desde `md` vuelve a fila, icono delante.
-    'flex min-h-touch min-w-touch w-full flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-caption',
-    'md:flex-none md:flex-row md:justify-start md:gap-2.5 md:rounded-md md:px-3 md:py-2.5 md:text-body',
-    // El estado activo no se dice solo con color: además del acento lleva peso
-    // tipográfico y `aria-current`, que NavLink pone por su cuenta.
-    isActive
-      ? 'font-medium text-accent-ink md:bg-accent-soft'
-      : 'text-ink-muted md:hover:bg-surface-hover',
-  ].join(' ')
+function navLinkClass(collapsed: boolean) {
+  return ({ isActive }: { isActive: boolean }) =>
+    [
+      // En móvil el icono va encima de la etiqueta —columna— y el texto baja a
+      // `caption`: es lo que deja convivir las dos piezas dentro de los 44 px de
+      // alto sin renunciar a la etiqueta, que nunca se quita (el icono orienta,
+      // no nombra). Desde `md` vuelve a fila, icono delante — y con la columna
+      // encogida, el icono solo y centrado: la etiqueta no se va, pasa a
+      // sr-only en el propio enlace.
+      'flex min-h-touch min-w-touch w-full flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-caption',
+      collapsed
+        ? 'md:flex-none md:flex-row md:justify-center md:gap-0 md:rounded-md md:px-0 md:py-2.5 md:text-body'
+        : 'md:flex-none md:flex-row md:justify-start md:gap-2.5 md:rounded-md md:px-3 md:py-2.5 md:text-body',
+      // El estado activo no se dice solo con color: además del acento lleva peso
+      // tipográfico y `aria-current`, que NavLink pone por su cuenta.
+      isActive
+        ? 'font-medium text-accent-ink md:bg-accent-soft'
+        : 'text-ink-muted md:hover:bg-surface-hover',
+    ].join(' ')
 }
 
 /**

@@ -41,6 +41,7 @@ Hito 0 de la Fase 2 lo obligó a admitir doce.
 |---|---|
 | Shell responsive con navegación única | **Implementado** |
 | Reparto en tres grupos con orden único y tope de cinco paradas en móvil | **Implementado** (Fase 2, Hito 0; reagrupado el 2026-08-20) |
+| Columna encogible a iconos en escritorio | **Implementado** (2026-08-20) |
 | Salto al contenido | **Implementado** |
 | Cabecera de pantalla con ranura de acción | **Implementada, y la ranura sin usar** |
 | Sitio de la acción principal en móvil | **Sin resolver**: la banda inferior ya está ocupada |
@@ -157,6 +158,29 @@ Lo comprueba el recorrido vertical midiendo **la caja de cada parada visible a
 320 px**. Es la única forma de que el defecto no vuelva con el módulo siguiente:
 un enlace de 40 px no se distingue de uno de 44 px a simple vista.
 
+### La columna encogida a iconos
+
+Solo en escritorio —la barra inferior no tiene nada que encoger— la columna se
+pliega de 256 px a 80 px con el conmutador que la cierra por abajo, para que
+quien trabaja con el contenido gane ese sitio. Las reglas del pliegue:
+
+- **La etiqueta no se va: pasa a `sr-only` dentro del propio enlace.** El
+  nombre accesible no cambia, así que el enlace se sigue encontrando por él, y
+  el `title` hace de recordatorio para el puntero. Es la versión encogida de
+  la regla de siempre: el icono orienta, no nombra.
+- **Los rótulos de grupo dejan la pantalla pero no el documento**: siguen
+  existiendo para `aria-labelledby`, y su frontera visual la marca un filete
+  entre grupos — también entre la identidad y «Hogar», que sin él se pegaban.
+- **La marca queda en el sello** —el nombre pasa a sr-only— y del bloque de la
+  cuenta queda **solo «Salir»**: «Cuenta» es un destino, y a icono junto al
+  sello se confundía con una parada más. El detalle de la cuenta se recupera
+  ensanchando la columna.
+- **La elección persiste en `localStorage` (`drp.nav`)**, la misma casa que
+  `drp.theme`: es una preferencia del dispositivo, no del hogar, así que no
+  viaja a la API.
+- **El conmutador va en `caption`**, como los rótulos: es utillaje de la
+  columna y no una parada, y al tamaño de las paradas les disputaba el peso.
+
 ### El salto al contenido
 
 Primer elemento tabulable de la página, invisible hasta que recibe el foco
@@ -268,6 +292,7 @@ tiene ranura para ninguna de las dos.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **La columna se puede encoger a iconos en escritorio** (256 → 80 px), con el conmutador cerrándola por abajo: etiquetas a `sr-only` sin perder el nombre accesible, `title` como recordatorio, filetes donde había rótulos —también entre «Salir» y «Hogar»—, la marca en el sello, solo «Salir» del bloque de la cuenta, y la elección persistida en `drp.nav`. Ensanchada, la marca pasa a centrarse en la anchura de la columna. | Equipo DRP |
 | 2026-08-20 | **Reagrupado en tres** —Tu hogar, Datos maestros y Configuración— con un orden único para columna, barra y «Más»: «Avisos» entra en el pulgar y «Ubicaciones» sale hacia «Datos maestros», los módulos pierden su grupo y viven donde su contenido pertenece, y «Configuración» —solo para quien administra— estrena «General» (`/configuracion`), que hereda la baja del hogar de la pantalla «Hogar». | Equipo DRP |
 | 2026-08-20 | **«Cuenta» deja de ser una parada y se va con la marca**, con la salida directa al lado: en escritorio bajo el sello —en el banner, fuera del landmark de navegación—; en móvil, en el apartado que cierra «Más», que además abre con la marca igual que «Hogar». La lista queda para lo que es del hogar, y «Salir» sigue sin pisar la lista de paradas. | Equipo DRP |
 | 2026-08-18 | Fase 2, Hito 0: la navegación se parte en dos grupos —el hogar y los módulos— dentro del mismo `<nav>`, y la barra inferior de móvil baja a cuatro paradas más «Más». Queda resuelta la decisión abierta de cuántos destinos caben abajo: cinco a 320 px, medido y comprobado en el recorrido vertical. | Equipo DRP |

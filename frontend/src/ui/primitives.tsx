@@ -343,9 +343,12 @@ const BRAND_SIZES = {
 
 export function BrandMark({
   size = 'nav',
+  compact = false,
   className = '',
 }: {
   size?: keyof typeof BRAND_SIZES
+  /** Solo el sello, para la columna encogida: el nombre pasa a sr-only en vez de irse. */
+  compact?: boolean
   className?: string
 }) {
   const s = BRAND_SIZES[size]
@@ -354,7 +357,7 @@ export function BrandMark({
       <span className={['flex shrink-0 items-center justify-center rounded-full bg-accent text-ink-inverse', s.seal].join(' ')}>
         <House strokeWidth={1.75} aria-hidden="true" className={s.icon} />
       </span>
-      <span className="flex flex-col">
+      <span className={compact ? 'sr-only' : 'flex flex-col'}>
         <span className={['font-display font-extrabold text-ink', s.name].join(' ')}>DRP</span>
         <span className={['text-ink-muted', s.motto].join(' ')}>El ERP doméstico</span>
       </span>
