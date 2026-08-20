@@ -453,7 +453,7 @@ function MachineRow({ machine }: { machine: MaintenanceMachine }) {
             ? 'Sin planes'
             : `${machine.planCount} ${machine.planCount === 1 ? 'plan' : 'planes'}`}
         </StatusBadge>
-        {machine.manualDocumentId && <StatusBadge tone="info">Con manual</StatusBadge>}
+        {machine.manualDocumentId && <StatusBadge tone="accent">Con manual</StatusBadge>}
       </div>
       <p className="mt-1 text-body-sm text-ink-muted">
         {machine.nextDueOn

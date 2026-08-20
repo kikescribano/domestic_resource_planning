@@ -93,8 +93,8 @@
   /* Feedback del sistema: lo que la aplicación le responde a una acción. */
   --color-success: light-dark(oklch(45% 0.1 152), oklch(78% 0.11 152));
   --color-success-soft: light-dark(oklch(94.5% 0.028 152), oklch(28% 0.04 152));
-  --color-warning: light-dark(oklch(48% 0.09 70), oklch(80% 0.1 80));
-  --color-warning-soft: light-dark(oklch(95% 0.033 80), oklch(29% 0.04 80));
+  --color-warning: light-dark(oklch(48% 0.095 90), oklch(82% 0.11 90));
+  --color-warning-soft: light-dark(oklch(95% 0.035 95), oklch(29% 0.045 90));
   --color-danger: light-dark(oklch(48% 0.16 27), oklch(72% 0.14 27));
   --color-danger-soft: light-dark(oklch(94.5% 0.022 27), oklch(28% 0.05 27));
   --color-info: light-dark(oklch(45% 0.12 250), oklch(76% 0.1 250));
@@ -113,8 +113,8 @@
      que sí confunde verde, ámbar y rojo. */
   --color-state-available: light-dark(oklch(45% 0.1 152), oklch(78% 0.11 152));
   --color-state-available-soft: light-dark(oklch(94.5% 0.028 152), oklch(28% 0.04 152));
-  --color-state-lent: light-dark(oklch(48% 0.09 70), oklch(80% 0.1 80));
-  --color-state-lent-soft: light-dark(oklch(95% 0.033 80), oklch(29% 0.04 80));
+  --color-state-lent: light-dark(oklch(48% 0.095 90), oklch(82% 0.11 90));
+  --color-state-lent-soft: light-dark(oklch(95% 0.035 95), oklch(29% 0.045 90));
   --color-state-overdue: light-dark(oklch(48% 0.16 27), oklch(72% 0.14 27));
   --color-state-overdue-soft: light-dark(oklch(94.5% 0.022 27), oklch(28% 0.05 27));
   --color-state-decommissioned: light-dark(oklch(52% 0.012 190), oklch(68% 0.012 190));
@@ -129,7 +129,7 @@
      `--color-category-3` seria ilegible en la migracion, en el contrato y aqui.
 
      Seis y no mas, y ninguno cae encima de los cinco estados del dominio: los
-     tonos tomados son 27 (error y vencido), 75 (aviso y prestado), 152 (exito y
+     tonos tomados son 27 (error y vencido), 90 (aviso y prestado), 152 (exito y
      disponible), 185 (acento) y 250 (informacion y sin existencias). Los que mas
      se acercan --moss al verde de disponible, sky al azul de sin existencias y
      teal al acento, que desde que el acento es teal queda a solo 10 grados-- se

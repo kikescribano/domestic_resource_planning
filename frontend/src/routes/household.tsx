@@ -545,7 +545,7 @@ export function UsersPage() {
                 <p className="text-body text-ink">{user.name}</p>
                 <p className="text-caption text-ink-muted">{user.email}</p>
               </div>
-              <StatusBadge tone={user.role === 'HOUSEHOLD_ADMIN' ? 'info' : 'neutral'}>
+              <StatusBadge tone={user.role === 'HOUSEHOLD_ADMIN' ? 'accent' : 'neutral'}>
                 {ROLE_LABEL[user.role]}
               </StatusBadge>
             </li>
