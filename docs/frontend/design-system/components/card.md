@@ -10,14 +10,14 @@
 ## Propósito y situaciones de uso
 
 La plantilla de las pantallas de **una sola cosa**: una columna centrada en la
-ventana, con un titular en serif, un subtítulo opcional y lo que haga falta
+ventana, con un titular en la display, un subtítulo opcional y lo que haga falta
 debajo. Es lo que ven las siete pantallas anteriores al login —alta de hogar,
 verificación, reenvío, entrada, recuperación, contraseña nueva e invitación—, y
 ninguna otra.
 
 Resuelve tres cosas de golpe, y por eso es un componente y no un `<div>` copiado
 siete veces: el `<main>` de la página, la anchura de lectura de un formulario y
-la única aparición de la serif por pantalla.
+la única aparición de la display por pantalla.
 
 **El nombre engaña y conviene decirlo antes que nada: no es una tarjeta.** No
 tiene fondo elevado, ni borde, ni sombra, ni esquinas redondeadas. Es una columna
@@ -47,16 +47,16 @@ pantalla lo pida.
 | Alto mínimo | La ventana entera | `min-h-dvh` |
 | Colocación | Centrada verticalmente | `justify-center` |
 | Separación entre bloques | 24 px | `gap-6` |
-| Titular | 28 → 40 px, serif | `text-display text-ink` |
+| Titular | 28 → 40 px, la display | `text-display text-ink` |
 | Subtítulo | 17 px, tinta secundaria | `text-lead text-ink-muted` |
 
 Dos detalles que no se ven leyendo las clases:
 
-- **La serif no se pide aquí.** El componente no lleva `font-display`: la trae el
+- **La display no se pide aquí.** El componente no lleva `font-display`: la trae el
   `h1 { font-family: var(--font-display) }` de la capa base de
   [`index.css`](../../../../frontend/src/index.css). Es la aplicación literal de
   la regla de [`typography.md`](../foundations/typography.md) —un `h1` por
-  pantalla, y la serif atada a él— y significa que quien cambie ese elemento por
+  pantalla, y la display atada a él— y significa que quien cambie ese elemento por
   un `<div role="heading">` pierde la tipografía sin enterarse.
 - **`min-h-dvh` es un suelo, no una altura.** Cuando el contenido no llena la
   ventana, `justify-center` lo centra; cuando la pasa, la columna crece y la
@@ -93,7 +93,7 @@ No acepta `className`, ni `id`, ni atributos de `<main>`.
   reparte el sobrante en margen, que es la regla del sobrante de
   [`space.md`](../foundations/space.md) aplicada al caso más simple.
 - **Titular largo**: se parte en varias líneas y crece hacia abajo. A 40 px y en
-  serif, un titular de ocho palabras ocupa media pantalla de móvil, así que la
+  la display, un titular de ocho palabras ocupa media pantalla de móvil, así que la
   contención está en el texto y no en el componente.
 - **Contenido más alto que la ventana** —el alta de hogar, que son cuatro campos,
   un botón y dos párrafos—: la columna crece por encima de `min-h-dvh` y la
@@ -213,7 +213,7 @@ distinta con su propio titular.
 - [`../README.md`](../README.md): la ficha mínima.
 - [`foundations/space.md`](../foundations/space.md): las anchuras de composición
   y la regla del sobrante.
-- [`foundations/typography.md`](../foundations/typography.md): la serif, el `h1`
+- [`foundations/typography.md`](../foundations/typography.md): la display, el `h1`
   y por qué no baja de 20 px.
 - [`patterns/form.md`](../patterns/form.md): lo que va dentro.
 - [`patterns/navigation.md`](../patterns/navigation.md): la otra plantilla, la de

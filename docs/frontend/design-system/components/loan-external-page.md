@@ -123,7 +123,7 @@ están:
    porque una página sin ningún contexto que pide confirmar algo se lee como una
    estafa; no lleva enlace porque la pantalla es terminal y llevar a alguien sin
    cuenta a un formulario de acceso no es ayudarle, es publicidad.
-2. **El `<h1>` con el nombre del asset** — serif, `text-display`. **Es el único
+2. **El `<h1>` con el nombre del asset** — la display, `text-display`. **Es el único
    dato importante de la pantalla y por eso es el titular**: no se pone «Detalle
    del préstamo» arriba y el nombre pequeño debajo, que es el reparto de una
    aplicación con navegación y esta no la tiene.
@@ -153,7 +153,7 @@ están:
 | Anchura de la columna | 544 px, centrada | `max-w-form`, `mx-auto` |
 | Margen lateral | 16 px | `px-gutter` |
 | Separación entre bloques | 24 px | `gap-6` |
-| Titular | 28 → 40 px, serif | `text-display text-ink` |
+| Titular | 28 → 40 px, la display | `text-display text-ink` |
 | Frase de encuadre | 17 px, tinta secundaria | `text-lead text-ink-muted` |
 | Etiquetas del `<dl>` | 13 px, tinta secundaria | `text-caption text-ink-muted` |
 | Valores del `<dl>` | 14 px, tinta principal | `text-body-sm text-ink` |
@@ -163,7 +163,7 @@ están:
 **El lienzo es [`AuthCard`](card.md) y no un `<div>` nuevo.** Resuelve las cuatro
 cosas que esta pantalla necesita y ya están decididas: el `<main>` de la página
 —que aquí puede declararse sin conflicto, porque no hay shell con el suyo—, la
-anchura de composición, el centrado vertical y la única aparición de la serif.
+anchura de composición, el centrado vertical y la única aparición de la display.
 Que se llame `AuthCard` y esto no sea ni una tarjeta ni autenticación es el
 segundo argumento para el renombrado que su propia ficha pide; no es motivo para
 copiarlo.
@@ -312,7 +312,7 @@ las operaciones destructivas de
 —nombrando el objeto y la consecuencia—, y aun así **la respuesta aquí es que no
 hay paso intermedio**. Los tres motivos, en orden de peso:
 
-1. **La pantalla ya es la confirmación.** El objeto está en el `<h1>` en serif a
+1. **La pantalla ya es la confirmación.** El objeto está en el `<h1>` en la display a
    40 px, la consecuencia está escrita bajo el botón antes de pulsarlo, y no hay
    nada más en la página. Un diálogo encima repetiría la misma pregunta sobre la
    misma pregunta, y lo que enseña ese patrón es a pulsar dos veces sin leer.
@@ -726,7 +726,7 @@ opcional y no estar copiado en cada ruta que lo necesite.
 ## Referencias
 
 - [`../README.md`](../README.md): la ficha mínima de un componente.
-- [`card.md`](card.md): el lienzo, el `main`, la anchura y el `h1` en serif.
+- [`card.md`](card.md): el lienzo, el `main`, la anchura y el `h1` en la display.
 - [`status-badge.md`](status-badge.md): el distintivo, y por qué sus tonos no son
   los del dominio todavía.
 - [`notice.md`](notice.md): la frontera entre feedback del sistema y estado del
@@ -745,7 +745,7 @@ opcional y no estar copiado en cada ruta que lo necesite.
   `state-*` y el icono fijo de cada estado.
 - [`foundations/space.md`](../foundations/space.md) y
   [`foundations/typography.md`](../foundations/typography.md): la regla del
-  sobrante y la serif del titular.
+  sobrante y la display del titular.
 - [`look-and-feel.md`](../../product-design/look-and-feel.md): el escenario
   ultrawide, el error bloqueante y las operaciones destructivas.
 - [`loans.md`](../../../common/product/loans.md): el préstamo, sus estados y por

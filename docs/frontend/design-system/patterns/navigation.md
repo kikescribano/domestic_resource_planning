@@ -74,7 +74,7 @@ Anatomía, tal y como está escrita:
 |---|---|---|
 | Contenedor | Columna | Fila (`md:flex-row`) |
 | `<header>` | Fijo abajo, con `border-t` | Estático, 256 px de ancho, con `border-r` |
-| Marca «DRP» | Oculta | Visible, en serif |
+| Marca «DRP» | Oculta en la barra —la enseña la cabecera de «Hogar»— | Visible: el sello de la marca con nombre y lema |
 | `<nav aria-label="Principal">` | Fila con cuatro paradas del core y «Más» | Columna con dos grupos: el hogar y los módulos |
 | Rótulo de grupo | Oculto | Visible, en `text-caption`, y siempre referenciado con `aria-labelledby` |
 | Enlace | `min-h-touch`, `flex-1`, centrado | Alineado a la izquierda, con radio y fondo al pasar |
@@ -191,8 +191,12 @@ tiene ranura para ninguna de las dos.
 - **Dónde va la acción principal en móvil**, con lo dicho más arriba.
 - ~~**Cómo caben seis destinos en la barra inferior**~~ — **resuelta en la Fase 2,
   Hito 0**: no caben. Cinco es el tope a 320 px, así que hay cuatro y «Más». Sin
-  iconos, que era la otra salida: una etiqueta corta se lee y un icono hay que
-  aprendérselo.
+  iconos *en lugar de* la etiqueta, que era la otra salida: una etiqueta corta se
+  lee y un icono hay que aprendérselo. **Ampliación del 2026-08-20:** los iconos
+  llegaron después, pero *acompañando* a la etiqueta y nunca en su lugar — en
+  móvil el icono va encima de la etiqueta en columna, con el suelo de 44 px por
+  parada intacto y medido, y cada sección repite su icono en la cabecera. El
+  rechazo original era al icono solo, y sigue en pie.
 - **Cómo se vuelve de una vista de detalle** a 375 px.
 - **Dónde vive el shell.** `HouseholdShell`, `navLinkClass` y `PageHeading` están
   dentro de `household.tsx`, que es un fichero de rutas.

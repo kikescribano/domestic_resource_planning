@@ -59,7 +59,7 @@ async function signIn(responses: Record<string, StubbedRoute>) {
   await userEvent.type(screen.getByLabelText('Correo'), 'kike@example.test')
   await userEvent.type(screen.getByLabelText('Contraseña'), 'el gato duerme en el sofa')
   await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
-  await screen.findByRole('heading', { level: 1, name: 'Tu hogar' })
+  await screen.findByRole('heading', { level: 1, name: 'Hogar' })
 
   return stub
 }
@@ -160,7 +160,7 @@ describe('renovación ante un 401', () => {
       'GET /api/v1/locations?size=200': EXPIRED,
     })
 
-    await userEvent.click(screen.getByRole('link', { name: 'Sitios' }))
+    await userEvent.click(screen.getByRole('link', { name: 'Ubicaciones' }))
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Entrar' })).toBeInTheDocument()
     expect(
@@ -193,7 +193,7 @@ describe('renovación ante un 401', () => {
 
     expect(stub.calls.filter((call) => call.url.endsWith('/auth/refresh'))).toHaveLength(0)
     // Sigue dentro: no se le ha echado por equivocarse tecleando.
-    expect(screen.getByRole('heading', { level: 1, name: 'Tu cuenta' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Cuenta' })).toBeInTheDocument()
   })
 })
 
@@ -210,7 +210,7 @@ describe('reanudar al cargar la página', () => {
 
     render(<App />)
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Tu hogar' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Hogar' })).toBeInTheDocument()
   })
 
   it('mientras reanuda espera, en vez de redirigir a la pantalla de entrar', async () => {
@@ -250,7 +250,7 @@ describe('reanudar al cargar la página', () => {
 
     completeRefresh?.()
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Tu hogar' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Hogar' })).toBeInTheDocument()
   })
 
   it('con un token guardado que ya no vale, lleva a entrar y en silencio', async () => {

@@ -85,6 +85,8 @@ con sus siete puntos. No se reordena ni se recorta.
 | `Notice` | [`notice.md`](notice.md) | **Implementado** | [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) |
 | `StatusBadge` | [`status-badge.md`](status-badge.md) | **Implementado** | [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) |
 | `Spinner` | [`spinner.md`](spinner.md) | **Implementado** | [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) |
+| `Switch` | Sin ficha | **Implementado** en los ajustes del 2026-08-20: `role="switch"`, `aria-checked`, texto de estado propio y objetivo de 44 px | [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) |
+| `FieldAlignedSlot` | Sin ficha | **Implementado** en los ajustes del 2026-08-20: alinea un control sin etiqueta con la fila de inputs de un formulario en línea | [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) |
 | `AuthCard` | [`card.md`](card.md) | **Implementado** | [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) |
 | `PageHeading` | Sin ficha | **Implementado** en el Hito 2 | [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) |
 | `EmptyState` | Sin ficha | **Implementado** en el Hito 2 | [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) |
@@ -196,7 +198,7 @@ porque es donde se incumplen:
 4. **44 px de objetivo táctil** en todo lo pulsable (`min-h-touch`).
 5. **Una acción principal por pantalla.** Solo `variant="primary"` pinta el
    relleno de acento.
-6. **La serif no entra en una fila de listado.**
+6. **La display no entra en una fila de listado.**
 
 ## Decisiones abiertas
 

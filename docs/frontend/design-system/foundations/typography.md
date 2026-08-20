@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-10 |
+| Última revisión | 2026-08-20 |
 
 ## Propósito
 
@@ -32,28 +32,29 @@ partes.
 
 | Token | Pila | Dónde va |
 |---|---|---|
-| `--font-display` | `Iowan Old Style` → `Palatino Linotype` → `Palatino` → `Book Antiqua` → `Georgia` → `Noto Serif` → serif | El `h1` de cada página, los titulares de sección cuando abren un bloque, el texto grande de un estado vacío y el nombre del producto |
+| `--font-display` | `Baloo 2` → `ui-rounded` → `Segoe UI` → `system-ui` → sans-serif | El `h1` de cada página, los titulares de sección cuando abren un bloque, el texto grande de un estado vacío y el nombre del producto |
 | `--font-sans` | `ui-sans-serif` → `system-ui` → `Segoe UI` → `Roboto` → … | Todo lo demás: interfaz, formularios, tablas, avisos |
 | `--font-mono` | `ui-monospace` → `Cascadia Mono` → `SFMono-Regular` → `Menlo` → `Consolas` | Número de serie, código de barras, identificadores y códigos de error |
 
-La serif es lo que hace que DRP se lea como una casa y no como un panel de
-control, y por eso tiene **dos límites duros**: no baja de 20 px y **no entra
-nunca en una fila de listado**. Un titular serif es carácter; trescientas filas
-en serif son ruido. Por eso solo el `h1` la lleva atada en la capa base —es único
-por página y jamás cae dentro de una fila—; del `h2` hacia abajo se pide a mano
-con la clase `font-display`, y solo cuando titula una sección.
+La display es **Baloo 2, la redonda gruesa del logotipo**: es lo que hace que
+DRP se lea como una casa —la misma letra de la marca— y no como un panel de
+control. Sustituyó a la pila serif de sistema el 2026-08-20, y conserva los
+**dos límites duros** de aquella: no baja de 20 px y **no entra nunca en una
+fila de listado**. Un titular con carácter es carácter; trescientas filas con él
+son ruido. Solo el `h1` la lleva atada en la capa base —es único por página y
+jamás cae dentro de una fila—, con peso 700 declarado ahí mismo (el preflight
+de Tailwind deja los encabezados en `font-weight: inherit`); del `h2` hacia
+abajo se pide a mano con la clase `font-display`, y solo cuando titula una
+sección, donde resuelve al peso 600.
 
-**Las pilas son de sistema y no descargan nada.** Es una decisión, no una
-provisionalidad: cero bytes, cero salto de fuente al cargar, cero dependencia de
-un dominio externo en una aplicación que la [ADR-006](../../../common/architecture/decisions/ADR-006-frontend-stack-and-design-system.md)
-despliega como estáticos detrás de nginx. El día que se autoalojen unas fuentes
-propias, se cambia el valor del token y ningún componente se entera; esa es la
-razón de que el token se llame `display` y no `georgia`.
-
-Aviso de realidad: la serif no se ve idéntica en Windows (`Palatino Linotype`),
-macOS (`Iowan Old Style`) y Android (`Noto Serif`). Es aceptable porque las tres
-comparten el rasgo que interesa —serif humanista, cálida— y ninguna es la
-diferencia entre entender la pantalla y no entenderla.
+**La display se autoaloja y las demás siguen siendo de sistema.** Baloo 2 se
+sirve desde `node_modules` vía `@fontsource` —los pesos 600, 700 y 800 y nada
+más—, así que sigue sin haber dependencia de ningún dominio externo en una
+aplicación que la [ADR-006](../../../common/architecture/decisions/ADR-006-frontend-stack-and-design-system.md)
+despliega como estáticos detrás de nginx: los `woff2` viajan con el propio
+build. La sans de trabajo y la mono conservan sus pilas de sistema: cero bytes
+donde el carácter no se juega. Y como el token se llama `display` y no
+`baloo`, el día que la marca cambie de letra ningún componente se entera.
 
 ### La escala, nombrada por papel
 
@@ -98,11 +99,11 @@ tamaño no se lee.
 
 ## Decisiones abiertas
 
-- **Autoalojar una serif propia** en lugar de la pila de sistema, si algún día se
-  quiere que DRP se vea igual en las tres plataformas. Implica servir dos o tres
-  ficheros `woff2` desde nginx y aceptar el coste de carga; no se hace en la
-  Fase 1 porque el beneficio es de identidad y el coste es de rendimiento en el
-  primer render, que ya depende de JavaScript.
+- Ninguna. La que hubo —autoalojar una fuente propia para que DRP se viera
+  igual en todas las plataformas— se resolvió el 2026-08-20 con Baloo 2 vía
+  `@fontsource`, con un matiz sobre lo previsto: se autoaloja **solo la
+  display**, que es donde se juega la identidad, y la sans y la mono siguen
+  siendo de sistema.
 
 ## Referencias
 
@@ -114,4 +115,5 @@ tamaño no se lee.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **La display pasa de la pila serif de sistema a Baloo 2**, la redonda gruesa del logotipo, autoalojada vía `@fontsource` en los pesos 600/700/800. Sus dos límites duros —20 px de suelo y prohibida en filas— se conservan tal cual; el peso del `h1` queda declarado en la capa base. | Equipo DRP |
 | 2026-08-10 | Creación del documento con las dos familias y la escala del Hito 1. | Equipo DRP |

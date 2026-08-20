@@ -23,7 +23,9 @@ import { fakeTokenPair, stubFetch, type StubbedRoute } from '../test/http'
  * sus dos mitades comprobadas en `modules.test.tsx`, que es donde vive.
  */
 
-const LIST = 'GET /api/v1/purchasing/list?size=200'
+// Con los tres estados que la pantalla pide desde que los descartados se
+// quedan a la vista, apagados y con su chip.
+const LIST = 'GET /api/v1/purchasing/list?status=NEEDED&status=IN_PURCHASE&status=DISMISSED&size=200'
 const PURCHASES = 'GET /api/v1/purchasing/purchases?size=200'
 const SHOPS = 'GET /api/v1/purchasing/suppliers'
 const ARTICLES = 'GET /api/v1/articles?size=200'

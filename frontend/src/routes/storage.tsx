@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { HardDrive } from 'lucide-react'
 import { useState } from 'react'
 
 import { api, formatBytes, humanMessage, type StoredFile } from '../api/client'
@@ -52,7 +53,7 @@ export function StoragePage() {
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
-      <PageHeading title="Almacenamiento" />
+      <PageHeading title="Archivo" icon={HardDrive} />
 
       {usage.data && <QuotaMeter usedBytes={usage.data.usedBytes} quotaBytes={usage.data.quotaBytes} />}
 

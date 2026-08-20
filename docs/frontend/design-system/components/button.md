@@ -26,6 +26,7 @@ Situaciones de uso, con la variante que le toca a cada una:
 | Cualquier otra acción con peso: cancelar, salir, una segunda opción real | `secondary` |
 | Acción terciaria, de las que acompañan sin competir | `ghost` |
 | Acción destructiva o que retira algo | `danger` |
+| Lo destructivo dentro de una fila, donde el borde del `danger` pesaría | `ghost-danger` |
 
 ## Anatomía, variantes y estados
 
@@ -43,7 +44,7 @@ Medidas, todas por token:
 | Texto | 16 px, peso medio | `text-body font-medium` |
 | Transición | `transition-colors`, 140 ms por defecto | `--duration-fast` |
 
-Las cuatro variantes, tal y como están escritas en `BUTTON_VARIANTS`:
+Las cinco variantes, tal y como están escritas en `BUTTON_VARIANTS`:
 
 | Variante | Clases |
 |---|---|
@@ -51,14 +52,18 @@ Las cuatro variantes, tal y como están escritas en `BUTTON_VARIANTS`:
 | `secondary` | `border border-border bg-surface-raised text-ink hover:bg-surface-hover` |
 | `ghost` | `text-accent-ink hover:bg-surface-hover` |
 | `danger` | `border border-danger text-danger hover:bg-danger-soft` |
+| `ghost-danger` | `text-danger hover:bg-danger-soft` |
 
-Tres cosas que se leen de esa tabla y conviene no perder:
+Cuatro cosas que se leen de esa tabla y conviene no perder:
 
 - **`danger` no tiene relleno.** Es un borde rojo sobre la superficie, no un
   bloque rojo. Un relleno sólido de peligro competiría con el acento y rompería
   la regla del único relleno por pantalla.
 - **`ghost` usa `accent-ink` y no `accent`**, porque ahí el acento es texto y el
   texto necesita 4,5:1 contra el papel, no los 3:1 de un relleno.
+- **`ghost-danger` es el `ghost` de lo destructivo**: mismo silencio, en el rojo
+  del esquema. Nació con los iconos de borrar y retirar de las filas, donde un
+  borde rojo por fila sería ruido.
 - **`secondary` es el valor por defecto.** Escribir `<Button>` sin variante da un
   botón secundario, que es la elección segura: para que un botón sea el principal
   hay que decirlo.
@@ -80,7 +85,7 @@ clásico.
 ## API pública
 
 ```ts
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'ghost-danger'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant   // por defecto 'secondary'
@@ -159,7 +164,7 @@ Antiusos:
 | Dos `variant="primary"` en la misma pantalla | Una de las dos no era la principal. Es la regla que el componente existe para hacer visible |
 | Un `Button` que navega | Usa un enlace. `Cerrar sesión` es una acción y va en botón; `Personas` es un sitio y va en `NavLink` |
 | `busy` sin `busyLabel` en una operación de más de 400 ms | El botón queda desactivado y mudo, que se percibe como aplicación colgada |
-| Un icono como única etiqueta | El componente no da nombre accesible por su cuenta; hoy quedaría un botón sin nombre |
+| Un icono como única etiqueta **sin `aria-label`** | El componente no da nombre accesible por su cuenta. Los botones de solo-icono existen desde los ajustes del 2026-08-20 y todos llevan el objeto dentro del nombre: «Editar Despensa», no «Editar» |
 | Sobrescribir el color con `className` | Si hace falta otro color, falta una variante |
 
 Evidencias de prueba, en
@@ -179,10 +184,13 @@ Evidencias de prueba, en
 [`frontend/src/ui/primitives.tsx`](../../../../frontend/src/ui/primitives.tsx),
 función `Button`.
 
-En uso hoy en [`enrollment.tsx`](../../../../frontend/src/routes/enrollment.tsx)
-y [`household.tsx`](../../../../frontend/src/routes/household.tsx), con las
-variantes `primary`, `secondary` y `danger`. **`ghost` está implementada y no se
-usa en ninguna pantalla todavía.**
+En uso hoy por todas las pantallas, con las cinco variantes: `ghost` dejó de
+estar huérfana con los botones de icono —el lápiz de editar, el sobre de marcar
+leído— y `ghost-danger` llegó con la papelera y el archivador. El patrón del
+botón de solo-icono es `className="w-11 px-0"` más `shrink-0` en el icono: la
+anchura explícita hace la caja determinista —el `px-0` no gana nunca al `px-4`
+de la base, que Tailwind ordena las utilidades en la hoja y no en el atributo—
+y el `shrink-0` impide que el SVG se encoja como item flex.
 
 ### Lo que falta
 
@@ -227,5 +235,6 @@ carencias en lugar de resolverlas. Repasado el 2026-08-20 contra el código,
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | Entra la variante **`ghost-danger`** —el `ghost` de lo destructivo, nacido con los iconos de borrar y retirar de las filas— y se documenta el patrón del botón de solo-icono (`w-11 px-0` más `shrink-0` en el icono, con nombre accesible que lleva el objeto dentro). `ghost` deja de estar sin uso. | Equipo DRP |
 | 2026-08-20 | **Repasada entera contra el código y no cambia ni una afirmación**: la anchura sigue sin conservarse al pasar a ocupado —con el comentario del código diciendo que sí—, el desactivado sigue usando `opacity-60` en vez del token, y siguen sin existir la ranura de icono, el tamaño compacto y el indicador de carga. Lo único que se corrige es el marco: la lista se presentaba como «lo que el Hito 2 va a pedir», y ese hito se cerró hace dos fases. | Equipo DRP |
 | 2026-08-12 | Creación de la ficha sobre la implementación del Hito 1. | Equipo DRP |

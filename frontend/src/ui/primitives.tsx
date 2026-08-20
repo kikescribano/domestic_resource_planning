@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, Info, TriangleAlert } from 'lucide-react'
+import { CircleAlert, CircleCheck, Info, TriangleAlert, type LucideIcon } from 'lucide-react'
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -26,7 +26,7 @@ import { useId, useState } from 'react'
  * `index.css`, para que ninguno pueda olvidarlo.
  */
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'ghost-danger'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant
@@ -39,6 +39,10 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   secondary: 'border border-border bg-surface-raised text-ink hover:bg-surface-hover',
   ghost: 'text-accent-ink hover:bg-surface-hover',
   danger: 'border border-danger text-danger hover:bg-danger-soft',
+  // El ghost de lo destructivo: mismo silencio que `ghost` pero en el rojo del
+  // esquema, para la acción de borrar que vive dentro de una fila y no puede
+  // cargar con el borde del `danger` en cada una.
+  'ghost-danger': 'text-danger hover:bg-danger-soft',
 }
 
 export function Button({
@@ -68,6 +72,67 @@ export function Button({
       {/* El botón conserva su anchura al pasar a ocupado: si encogiera, la
           maquetación daría un salto justo cuando el usuario acaba de pulsar. */}
       {busy && busyLabel ? busyLabel : children}
+    </button>
+  )
+}
+
+interface SwitchProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'> {
+  checked: boolean
+  onToggle: () => void
+  busy?: boolean
+}
+
+/**
+ * Un interruptor: encender y apagar algo que ya existe, sin verbo que traducir.
+ *
+ * `role="switch"` y `aria-checked` llevan la semántica —el nombre accesible es
+ * la cosa que se conmuta, no la acción—, y **el estado nunca lo dice solo la
+ * posición**: quien lo monta pone al lado su etiqueta de estado, igual que un
+ * estado del dominio lleva la suya. El objetivo táctil de 44 px lo pone el
+ * propio botón; la pista visual es más pequeña y vive dentro. Encendida viste
+ * el teal del acento y apagada, superficie hundida con el borde de control,
+ * los mismos pares medidos que el resto de controles.
+ */
+export function Switch({ checked, onToggle, busy = false, disabled, className = '', ...props }: SwitchProps) {
+  return (
+    <button
+      {...props}
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-busy={busy || undefined}
+      disabled={disabled || busy}
+      onClick={onToggle}
+      className={[
+        'inline-flex min-h-touch min-w-touch items-center justify-center gap-2',
+        'disabled:cursor-not-allowed disabled:opacity-60',
+        className,
+      ].join(' ')}
+    >
+      {/* El estado también en palabras, para quien el gesto del interruptor no
+          le diga nada. `aria-hidden`: lo anuncia ya `aria-checked`, y por
+          partida doble sería ruido. */}
+      <span aria-hidden="true" className="text-caption font-medium text-ink-muted">
+        {checked ? 'Encendido' : 'Apagado'}
+      </span>
+      <span
+        aria-hidden="true"
+        className={[
+          'relative h-6 w-11 rounded-full border transition-colors',
+          checked ? 'border-accent bg-accent' : 'border-border bg-surface-sunken',
+        ].join(' ')}
+      >
+        {/* `inset-y-0` con `my-auto` y no un `top` contado a mano: el absoluto
+            mide desde dentro del borde de la pista y la cuenta manual perdía
+            un píxel por lado, con la bolita pegada abajo. El desplazamiento va
+            en `translate-x`, que se anima como transformación. */}
+        <span
+          className={[
+            'absolute inset-y-0 start-px my-auto size-5 rounded-full transition-transform',
+            checked ? 'translate-x-5 bg-ink-inverse' : 'bg-border-strong',
+          ].join(' ')}
+        />
+      </span>
     </button>
   )
 }
@@ -118,6 +183,29 @@ export function Field({ label, hint, error, id, className = '', ...props }: Fiel
           <span>{error}</span>
         </p>
       )}
+    </div>
+  )
+}
+
+/**
+ * Alinea un control sin etiqueta —un botón, una casilla— con la fila de inputs
+ * de un formulario en línea.
+ *
+ * Los formularios en línea alinean por la cabeza (`items-start`): alineando por
+ * el pie, un campo con pista empuja su input hacia arriba y la fila baila. Con
+ * la cabeza alineada, lo que no lleva etiqueta encima quedaría a la altura de
+ * las etiquetas; esta pieza le pone una fantasma con la misma anatomía que
+ * `Field`, así el control cae en la fila de los inputs y sigue cayendo ahí si
+ * el tamaño de etiqueta cambia algún día. Solo desde `md`: en móvil cada campo
+ * envuelve a su propia línea y el hueco sería aire muerto.
+ */
+export function FieldAlignedSlot({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span aria-hidden="true" className="hidden text-body-sm font-medium md:block">
+        {' '}
+      </span>
+      {children}
     </div>
   )
 }
@@ -266,9 +354,13 @@ export function Spinner({ label }: { label: string }) {
  * cada línea, y quince iconos idénticos en columna son ruido, no información: la
  * etiqueta ya dice lo que el color sugiere.
  */
-type StatusTone = NoticeTone | 'neutral' | 'available' | 'lent' | 'overdue' | 'decommissioned' | 'out-of-stock'
+type StatusTone = NoticeTone | 'accent' | 'neutral' | 'available' | 'lent' | 'overdue' | 'decommissioned' | 'out-of-stock'
 
 const STATUS_TONES: Record<StatusTone, string> = {
+  // El tono de marca, para lo pendiente que no es feedback ni estado del
+  // dominio: «sin leer» no es información del sistema, es una llamada. Su par
+  // está en la lista de check-contrast.py, como todos.
+  accent: 'bg-accent-soft text-accent-ink',
   info: 'bg-info-soft text-info',
   success: 'bg-success-soft text-success',
   warning: 'bg-warning-soft text-warning',
@@ -300,14 +392,19 @@ export function StatusBadge({ tone, children }: { tone: StatusTone; children: Re
  * Vive aquí y no en una ruta concreta porque el Hito 2 trae cuatro pantallas más
  * que la necesitan, y tres copias del mismo `header` es como se acaba con tres
  * tamaños de título distintos.
+ *
+ * El `icon` es el mismo que la sección lleva en la navegación —la cabecera
+ * repite el nombre y el icono del menú, no estrena otros— y va delante del
+ * texto, como en la barra lateral. `aria-hidden`, porque el nombre accesible de
+ * la pantalla es el título.
  */
-export function PageHeading({ title, action }: { title: string; action?: ReactNode }) {
+export function PageHeading({ title, action, icon: Icon }: { title: string; action?: ReactNode; icon?: LucideIcon }) {
   return (
-    // Sin la serif a propósito: esa entra solo en `AuthCard`, que es la pantalla
-    // de una sola columna. Aquí el `h1` compite con filas de listado y la serif
-    // a ese tamaño empieza a pesar.
     <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-title text-ink">{title}</h1>
+      <div className="flex items-center gap-2.5">
+        {Icon && <Icon size={24} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-accent-ink" />}
+        <h1 className="text-title text-ink">{title}</h1>
+      </div>
       {action}
     </header>
   )

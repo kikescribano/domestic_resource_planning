@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Handshake } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router'
 
@@ -44,10 +45,16 @@ import {
  */
 
 /** El tono del distintivo de cada estado. `OVERDUE` llama a la acción sin alarmar. */
-function toneOf(status: LoanStatus): 'success' | 'warning' | 'neutral' {
-  if (status === 'OVERDUE') return 'warning'
+/**
+ * Los tonos de **dominio**, los mismos que pinta el inventario: un préstamo es
+ * el estado de una cosa del hogar, no el resultado de una petición. Antes pedía
+ * prestados los de feedback —verde de éxito para «Prestado»— y el mismo asset
+ * salía de un color en el inventario y de otro aquí.
+ */
+function toneOf(status: LoanStatus): 'lent' | 'overdue' | 'neutral' {
+  if (status === 'OVERDUE') return 'overdue'
   if (status === 'RETURNED') return 'neutral'
-  return 'success'
+  return 'lent'
 }
 
 // --- La pantalla del hogar ---------------------------------------------------
@@ -77,6 +84,7 @@ export function LoansPage() {
     <section className="space-y-6">
       <PageHeading
         title="Préstamos"
+        icon={Handshake}
         action={
           <Button onClick={() => setIsStarting((open) => !open)}>
             {isStarting ? 'Cancelar' : 'Prestar algo'}

@@ -31,10 +31,10 @@ se contiene y cómo se comprueba que se está conteniendo.
 
 ### El problema, dicho sin rodeos
 
-Serif, sombras, esquinas generosas e ilustración funcionan en una pantalla de
+La display, las sombras, las esquinas generosas y la ilustración funcionan en una pantalla de
 alta, en un estado vacío o en el onboarding, donde hay un elemento y sitio de
 sobra. En un listado esos mismos recursos se multiplican por el número de filas:
-trescientas sombras son una textura, trescientos titulares en serif son ruido, y
+trescientas sombras son una textura, trescientos titulares en la display son ruido, y
 trescientas esquinas de 12 px son una manta de burbujas. Peor todavía: cada
 adorno roba altura, y la altura de fila es la variable que decide cuánta
 información cabe en una pantalla sin scroll.
@@ -82,7 +82,7 @@ parte que se puede revisar en un diff:
 
 | Prohibido | Por qué |
 |---|---|
-| `font-display` (serif) | Multiplicada por N filas deja de ser carácter |
+| `font-display` (la redonda de la marca) | Multiplicada por N filas deja de ser carácter |
 | Cualquier `shadow-*` | La separación entre filas es una línea de `border-subtle` |
 | Radio mayor que `--radius-sm` | Las filas no son tarjetas |
 | Ilustración o imagen decorativa | La única imagen admitida es la foto real del asset, a 1:1 y pequeña |

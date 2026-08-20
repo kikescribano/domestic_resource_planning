@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Blocks, ShoppingCart, Store, Warehouse, Wrench, type LucideIcon } from 'lucide-react'
 import { type ReactNode } from 'react'
 import { Link } from 'react-router'
 
 import { api, humanMessage, type HouseholdModule } from '../api/client'
 import { useAuthenticatedSession, useSession } from '../auth/SessionProvider'
-import { Button, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primitives'
+import { Button, Notice, PageHeading, Spinner, StatusBadge, Switch } from '../ui/primitives'
 
 /**
  * Los módulos del hogar.
@@ -44,11 +45,11 @@ import { Button, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primiti
  * Un módulo futuro sin pantalla no lo necesita: `ModuleScreen` sabe decir la
  * verdad sin nombrar un hito.
  */
-export const MODULE_SCREENS: Record<string, { path: string; label: string }> = {
-  SUPPLIERS: { path: '/proveedores', label: 'Proveedores' },
-  WAREHOUSE: { path: '/almacen', label: 'Almacén' },
-  PURCHASING: { path: '/compras', label: 'Compras' },
-  MAINTENANCE: { path: '/mantenimiento', label: 'Mantenimiento' },
+export const MODULE_SCREENS: Record<string, { path: string; label: string; icon: LucideIcon }> = {
+  SUPPLIERS: { path: '/proveedores', label: 'Proveedores', icon: Store },
+  WAREHOUSE: { path: '/almacen', label: 'Almacén', icon: Warehouse },
+  PURCHASING: { path: '/compras', label: 'Compras', icon: ShoppingCart },
+  MAINTENANCE: { path: '/mantenimiento', label: 'Mantenimiento', icon: Wrench },
 }
 
 /** El catálogo del hogar, compartido por todo lo que necesita saber qué está activo. */
@@ -83,7 +84,7 @@ export function ModulesPage() {
 
   return (
     <>
-      <PageHeading title="Módulos" />
+      <PageHeading title="Módulos del hogar" icon={Blocks} />
 
       <p className="max-w-prose text-body text-ink-muted">
         DRP viene con lo básico de casa: las cosas, dónde están y a quién se las
@@ -147,14 +148,16 @@ function ModuleRow({ module, canDecide }: { module: HouseholdModule; canDecide: 
       </div>
 
       {canDecide && (
-        <Button
-          variant={active ? 'secondary' : 'primary'}
-          onClick={() => decide.mutate()}
+        // Un interruptor y no un botón con verbo: encender y apagar es un
+        // estado, y el chip «Activo/Apagado» de al lado sigue nombrándolo. El
+        // nombre accesible es el módulo; el estado lo dice `aria-checked`.
+        <Switch
+          checked={active}
+          onToggle={() => decide.mutate()}
           busy={decide.isPending}
-          busyLabel={active ? 'Apagando…' : 'Encendiendo…'}
-        >
-          {active ? `Apagar ${module.name}` : `Encender ${module.name}`}
-        </Button>
+          aria-label={module.name}
+          title={active ? 'Apagar' : 'Encender'}
+        />
       )}
     </li>
   )

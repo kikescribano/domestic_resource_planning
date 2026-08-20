@@ -60,6 +60,7 @@ PAIRS: list[tuple[str, str, float, str]] = [
     ("color-warning", "color-warning-soft", TEXT_MINIMUM, "distintivo de aviso"),
     ("color-danger", "color-danger-soft", TEXT_MINIMUM, "distintivo de error"),
     ("color-info", "color-info-soft", TEXT_MINIMUM, "distintivo informativo"),
+    ("color-accent-ink", "color-accent-soft", TEXT_MINIMUM, "distintivo de acento"),
     ("color-state-available", "color-state-available-soft", TEXT_MINIMUM, "distintivo DISPONIBLE"),
     ("color-state-lent", "color-state-lent-soft", TEXT_MINIMUM, "distintivo PRESTADO"),
     ("color-state-overdue", "color-state-overdue-soft", TEXT_MINIMUM, "distintivo VENCIDO"),

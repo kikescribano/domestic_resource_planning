@@ -1,4 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  Bell,
+  Blocks,
+  BookOpen,
+  Boxes,
+  CircleUserRound,
+  Ellipsis,
+  Handshake,
+  HardDrive,
+  House,
+  MapPin,
+  Users,
+} from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router'
 
@@ -33,10 +46,10 @@ import { Button, DangerZone, Field, Notice, PageHeading, Spinner, StatusBadge } 
  * hay algo que arreglar.
  */
 const PRIMARY_NAVIGATION = [
-  { to: '/', label: 'Hogar', end: true },
-  { to: '/inventario', label: 'Inventario', end: false },
-  { to: '/ubicaciones', label: 'Sitios', end: false },
-  { to: '/prestamos', label: 'Préstamos', end: false },
+  { to: '/', label: 'Hogar', end: true, icon: House },
+  { to: '/inventario', label: 'Inventario', end: false, icon: Boxes },
+  { to: '/ubicaciones', label: 'Ubicaciones', end: false, icon: MapPin },
+  { to: '/prestamos', label: 'Préstamos', end: false, icon: Handshake },
 ]
 
 /**
@@ -49,12 +62,46 @@ const PRIMARY_NAVIGATION = [
  * «Más», no un hueco en el pulgar.
  */
 const SECONDARY_NAVIGATION = [
-  { to: '/avisos', label: 'Avisos', end: false },
-  { to: '/catalogo', label: 'Catálogo', end: false },
-  { to: '/usuarios', label: 'Personas', end: false },
-  { to: '/almacenamiento', label: 'Archivo', end: false },
-  { to: '/cuenta', label: 'Cuenta', end: false },
+  { to: '/avisos', label: 'Avisos', end: false, icon: Bell },
+  { to: '/catalogo', label: 'Catálogo', end: false, icon: BookOpen },
+  { to: '/usuarios', label: 'Personas', end: false, icon: Users },
+  { to: '/almacenamiento', label: 'Archivo', end: false, icon: HardDrive },
+  { to: '/cuenta', label: 'Cuenta', end: false, icon: CircleUserRound },
 ]
+
+/**
+ * La marca de DRP: el sello redondo en el teal del acento con la casa dentro,
+ * el nombre en la redonda de la marca y el lema debajo. Es el eco del logotipo
+ * circular de la identidad comercial, con los pares ya medidos del sistema
+ * —`ink-inverse` sobre `accent`—. Vive en dos sitios y por eso es una pieza:
+ * la barra lateral desde `md` y la cabecera de «Hogar» en móvil, que sin esto
+ * no veía la marca nunca. Es sello, no la acción principal de la pantalla:
+ * el relleno de acento sigue apareciendo una sola vez como *acción*.
+ */
+function BrandMark({ className = '' }: { className?: string }) {
+  return (
+    // En móvil la marca preside la pantalla de «Hogar» y va un tercio más
+    // grande; en la barra lateral vuelve a su tamaño de trabajo. El tamaño del
+    // icono va por clase y no por la prop `size`, que no sabe de breakpoints.
+    <p className={['items-center gap-3', className].join(' ')}>
+      <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-accent text-ink-inverse md:size-11">
+        <House strokeWidth={1.75} aria-hidden="true" className="size-7 md:size-5.5" />
+      </span>
+      <span className="flex flex-col">
+        <span className="font-display text-display font-extrabold leading-tight text-ink md:text-title">DRP</span>
+        <span className="text-body-sm text-ink-muted md:text-caption">El ERP doméstico</span>
+      </span>
+    </p>
+  )
+}
+
+/**
+ * El icono de una parada de la navegación. Mismo juego (Lucide), mismo trazo
+ * (1,75) y mismo tamaño en línea (20 px) que el resto del sistema, y
+ * `aria-hidden` porque el significado lo lleva siempre la etiqueta de al lado:
+ * el icono orienta, no nombra.
+ */
+const NAV_ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true, className: 'shrink-0' } as const
 
 /**
  * El hogar de la sesión, resuelto **una vez** y compartido.
@@ -100,7 +147,7 @@ export function useHouseholdToday(): string | null {
 /**
  * El aviso de que el hogar va a desaparecer, **en todas las pantallas**.
  *
- * Vive en el shell y no en «Tu hogar» porque durante la gracia todo sigue
+ * Vive en el shell y no en «Hogar» porque durante la gracia todo sigue
  * funcionando igual: alguien puede pasarse treinta días dando de alta cosas en
  * el inventario sin volver a la pantalla del hogar y sin enterarse de nada. Ese
  * es exactamente el caso que la gracia existe para atrapar.
@@ -115,7 +162,7 @@ function ClosureBanner({ household }: { household: Household }) {
     <div className="mb-6">
       <Notice tone="warning" title={`Este hogar se borrará el ${formatDate(household.closure.effectiveAt)}`}>
         Se pidió darlo de baja. Hasta esa fecha todo sigue funcionando igual, y quien administre el
-        hogar puede cancelarlo desde <Link to="/" className="underline">Tu hogar</Link>. Después no se
+        hogar puede cancelarlo desde <Link to="/" className="underline">Hogar</Link>. Después no se
         podrá recuperar nada.
       </Notice>
     </div>
@@ -187,7 +234,7 @@ function HouseholdShell() {
           'md:static md:flex md:w-64 md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-t-0 md:p-gutter-lg',
         ].join(' ')}
       >
-        <p className="hidden font-display text-title text-ink md:block">DRP</p>
+        <BrandMark className="hidden md:flex" />
 
         <nav aria-label="Principal" className="flex md:flex-col md:gap-6">
           {/* Los rótulos de grupo se leen siempre aunque solo se vean desde
@@ -203,14 +250,16 @@ function HouseholdShell() {
             {PRIMARY_NAVIGATION.map((item) => (
               <li key={item.to} className="flex flex-1 md:flex-none">
                 <NavLink to={item.to} end={item.end} className={navLinkClass}>
-                  {item.label}
+                  <item.icon {...NAV_ICON} />
+                  <span>{item.label}</span>
                 </NavLink>
               </li>
             ))}
             {SECONDARY_NAVIGATION.map((item) => (
               <li key={item.to} className="hidden md:flex">
                 <NavLink to={item.to} end={item.end} className={navLinkClass}>
-                  {item.label}
+                  <item.icon {...NAV_ICON} />
+                  <span>{item.label}</span>
                 </NavLink>
               </li>
             ))}
@@ -218,7 +267,8 @@ function HouseholdShell() {
                 hay nada detrás de ella que no esté ya en la columna. */}
             <li className="flex flex-1 md:hidden">
               <NavLink to="/mas" className={navLinkClass}>
-                Más
+                <Ellipsis {...NAV_ICON} />
+                <span>Más</span>
               </NavLink>
             </li>
           </ul>
@@ -231,13 +281,15 @@ function HouseholdShell() {
               {modules.map((module) => (
                 <li key={module.key} className="flex">
                   <NavLink to={module.path} className={navLinkClass}>
-                    {module.label}
+                    <module.icon {...NAV_ICON} />
+                    <span>{module.label}</span>
                   </NavLink>
                 </li>
               ))}
               <li className="flex">
                 <NavLink to="/modulos" className={navLinkClass}>
-                  Módulos del hogar
+                  <Blocks {...NAV_ICON} />
+                  <span>Módulos del hogar</span>
                 </NavLink>
               </li>
             </ul>
@@ -275,8 +327,12 @@ function HouseholdShell() {
  */
 function navLinkClass({ isActive }: { isActive: boolean }) {
   return [
-    'flex min-h-touch min-w-touch w-full flex-1 items-center justify-center px-1 py-3 text-body-sm',
-    'md:flex-none md:justify-start md:rounded-md md:px-3 md:text-body',
+    // En móvil el icono va encima de la etiqueta —columna— y el texto baja a
+    // `caption`: es lo que deja convivir las dos piezas dentro de los 44 px de
+    // alto sin renunciar a la etiqueta, que nunca se quita (el icono orienta,
+    // no nombra). Desde `md` vuelve a fila, icono delante.
+    'flex min-h-touch min-w-touch w-full flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-caption',
+    'md:flex-none md:flex-row md:justify-start md:gap-2.5 md:rounded-md md:px-3 md:py-2.5 md:text-body',
     // El estado activo no se dice solo con color: además del acento lleva peso
     // tipográfico y `aria-current`, que NavLink pone por su cuenta.
     isActive
@@ -298,7 +354,7 @@ export function MorePage() {
 
   return (
     <>
-      <PageHeading title="Más" />
+      <PageHeading title="Más" icon={Ellipsis} />
 
       <nav aria-label="Resto del hogar">
         <ul className="flex flex-col gap-2">
@@ -306,8 +362,9 @@ export function MorePage() {
             <li key={item.to}>
               <Link
                 to={item.to}
-                className="flex min-h-touch items-center rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
+                className="flex min-h-touch items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
               >
+                <item.icon {...NAV_ICON} />
                 {item.label}
               </Link>
             </li>
@@ -320,8 +377,9 @@ export function MorePage() {
             <li key={module.key}>
               <Link
                 to={module.path}
-                className="flex min-h-touch items-center rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
+                className="flex min-h-touch items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
               >
+                <module.icon {...NAV_ICON} />
                 {module.label}
               </Link>
             </li>
@@ -329,8 +387,9 @@ export function MorePage() {
           <li>
             <Link
               to="/modulos"
-              className="flex min-h-touch items-center rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
+              className="flex min-h-touch items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
             >
+              <Blocks {...NAV_ICON} />
               Módulos del hogar
             </Link>
           </li>
@@ -347,7 +406,12 @@ export function HomePage() {
 
   return (
     <>
-      <PageHeading title="Tu hogar" />
+      {/* La marca solo en móvil: en escritorio ya la enseña la barra lateral,
+          y aquí es el único sitio donde el móvil la ve. Centrada: presentada a
+          la izquierda parecía un desajuste del título de la pantalla. */}
+      <BrandMark className="mb-6 flex justify-center md:hidden" />
+
+      <PageHeading title="Hogar" icon={House} />
       <Notice tone="info" title="Por dónde empezar">
         Crea primero las <Link to="/ubicaciones" className="underline">ubicaciones</Link> —la vivienda y
         lo que hay dentro— y el <Link to="/catalogo" className="underline">catálogo</Link> de lo que
@@ -493,7 +557,7 @@ export function UsersPage() {
 
   return (
     <>
-      <PageHeading title="Personas" />
+      <PageHeading title="Personas" icon={Users} />
 
       {users.isPending && <Spinner label="Cargando las personas del hogar…" />}
       {users.isError && <Notice tone="danger">No se ha podido cargar la lista.</Notice>}
@@ -509,7 +573,7 @@ export function UsersPage() {
                 <p className="text-body text-ink">{user.name}</p>
                 <p className="text-caption text-ink-muted">{user.email}</p>
               </div>
-              <StatusBadge tone={user.role === 'HOUSEHOLD_ADMIN' ? 'info' : 'neutral'}>
+              <StatusBadge tone={user.role === 'HOUSEHOLD_ADMIN' ? 'accent' : 'neutral'}>
                 {ROLE_LABEL[user.role]}
               </StatusBadge>
             </li>
@@ -622,7 +686,7 @@ export function AccountPage() {
 
   return (
     <>
-      <PageHeading title="Tu cuenta" />
+      <PageHeading title="Cuenta" icon={CircleUserRound} />
 
       <OwnAvatar accessToken={session.accessToken} />
 

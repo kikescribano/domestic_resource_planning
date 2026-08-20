@@ -23,7 +23,7 @@ no aparezca el problema.
 
 | Atributo | Se manifiesta en | Evitar |
 |---|---|---|
-| **Doméstica** | Base de papel de verde empolvado y tinta de pino, la misma familia que la identidad comercial de DRP; acento teal; serif en el `h1` y en los estados vacíos; ilustración de línea donde no hay datos todavía; vocabulario de casa —«Prestado a», «Se acabó», «¿Dónde está?»— en lugar de vocabulario de ERP. | La estética de panel de control: fondo gris azulado, rejilla de tarjetas de métricas, gráficas que nadie ha pedido y un logotipo arriba a la izquierda como toda identidad. |
+| **Doméstica** | Base de papel de verde empolvado y tinta de pino, la misma familia que la identidad comercial de DRP; acento teal; la redonda de la marca en el `h1` y en los estados vacíos; ilustración de línea donde no hay datos todavía; vocabulario de casa —«Prestado a», «Se acabó», «¿Dónde está?»— en lugar de vocabulario de ERP. | La estética de panel de control: fondo gris azulado, rejilla de tarjetas de métricas, gráficas que nadie ha pedido y un logotipo arriba a la izquierda como toda identidad. |
 | **Serena bajo volumen** | Una lista de 300 filas usa una familia, un tamaño y un peso; el color aparece solo en el estado; no hay sombra ni tarjeta por fila; el acento sólido sale una vez por pantalla. | Acumular señales sobre la misma fila —cebra, borde, sombra, fondo de color y negrita a la vez— y llamar a eso jerarquía. |
 | **Directa** | Cada vacío nombra la siguiente acción y la ofrece; cada error dice qué ha fallado y qué se puede hacer; cada confirmación destructiva nombra el objeto y la consecuencia: «Dar de baja *Taladro Bosch*. Seguirá en el historial y dejará de poder prestarse». | «Ha ocurrido un error», «¿Estás seguro?», y el aviso de éxito que se va antes de haberse leído. |
 | **Táctil y de una mano** | 44 px de objetivo mínimo; acción principal al alcance del pulgar en móvil; campos de 16 px para que iOS no haga zoom al enfocar; formulario de una columna hasta 640 px; toda la fila es pulsable, no solo su icono. | Esconder una acción frecuente detrás de un menú de tres puntos, o dejar como única zona pulsable un icono de 24 px en el extremo de la fila. |
@@ -77,8 +77,8 @@ en [`frontend/src/index.css`](../../../frontend/src/index.css).
 
 | Dimensión | Decisión vigente | Evidencia o referencia |
 |---|---|---|
-| **Color** | Base de papel de verde empolvado (`oklch(98.4% 0.006 180)`) sobre tinta de pino, tomada del esquema de la identidad comercial de DRP; **un único acento**, el teal de esa identidad, para la acción principal y los enlaces; cuatro colores de feedback del sistema y **cinco de estado del dominio** —disponible, prestado, vencido, dado de baja y sin existencias—, con nombre propio aunque hoy compartan valor con su equivalente de feedback. El azul de «sin existencias» es el único frío de los cinco estados, y lo es a propósito. Y **seis colores de categoría**, que son los únicos que elige el usuario, dentro de un juego cerrado y medido (ADR-015). | [`foundations/color.md`](../design-system/foundations/color.md); auditoría de 48 pares en [`accessibility/`](../accessibility/README.md), con 4,70:1 como peor caso de texto y 3,46:1 como peor caso no textual |
-| **Tipografía** | Dos familias con reparto explícito: **serif** (`Iowan Old Style` → `Palatino` → `Georgia`) para el `h1`, los titulares de sección y los estados vacíos, **nunca por debajo de 20 px ni dentro de una fila**; **sans de sistema** para todo lo demás; **monoespaciada** para número de serie, código de barras e identificadores. Escala de siete pasos nombrada por papel, dos de ellos con `clamp()`. Pilas de sistema: cero bytes descargados y ningún salto de fuente al cargar. | [`foundations/typography.md`](../design-system/foundations/typography.md) |
+| **Color** | Base de papel de verde empolvado (`oklch(98.4% 0.006 180)`) sobre tinta de pino, tomada del esquema de la identidad comercial de DRP; **un único acento**, el teal de esa identidad, para la acción principal y los enlaces; cuatro colores de feedback del sistema y **cinco de estado del dominio** —disponible, prestado, vencido, dado de baja y sin existencias—, con nombre propio aunque hoy compartan valor con su equivalente de feedback. El azul de «sin existencias» es el único frío de los cinco estados, y lo es a propósito. Y **seis colores de categoría**, que son los únicos que elige el usuario, dentro de un juego cerrado y medido (ADR-015). | [`foundations/color.md`](../design-system/foundations/color.md); auditoría de 49 pares en [`accessibility/`](../accessibility/README.md), con 4,67:1 como peor caso de texto y 3,46:1 como peor caso no textual |
+| **Tipografía** | Dos familias con reparto explícito: **la redonda de la marca** (`Baloo 2`, autoalojada vía `@fontsource`) para el `h1`, los titulares de sección y los estados vacíos, **nunca por debajo de 20 px ni dentro de una fila**; **sans de sistema** para todo lo demás; **monoespaciada** para número de serie, código de barras e identificadores. Escala de siete pasos nombrada por papel, dos de ellos con `clamp()`. Solo la display se autoaloja —viaja con el build, sin dominio externo—; la sans y la mono siguen siendo de sistema. | [`foundations/typography.md`](../design-system/foundations/typography.md) |
 | **Densidad de información** | **Dos densidades, decididas por el dispositivo de entrada y no por el gusto.** Con el dedo no cabe ser denso —44 px de objetivo mínimo—, así que en móvil el listado es de tarjetas y respira; con puntero y teclado el aire se convierte en scroll, así que desde `md` el listado es una tabla de fila compacta (36 px), cifras en `tabular-nums` y cabecera fija. No es una preferencia configurable en la Fase 1. | [`foundations/density.md`](../design-system/foundations/density.md) |
 | **Espaciado y ritmo** | Rejilla de **4 px**, con cuatro medidas con nombre —`gutter` (16 px), `gutter-lg` (24 px), `row` (12 px) y `row-compact` (6 px)— y tres anchuras de composición: `form` (544 px), `reading` (68ch) y `shell` (1536 px). El espacio vertical entre bloques crece con la pantalla; el interlineado y la longitud de línea, no. | [`foundations/space.md`](../design-system/foundations/space.md) |
 | **Formas, bordes y elevación** | Radios de 4 a 24 px: **8 px en controles, 12 px en tarjetas, 16 px en diálogos**, redondeo completo solo en avatares y distintivos de estado. Cuatro niveles de elevación, con sombra **del tono de pino de la paleta y nunca negra**; en modo oscuro la sombra apenas se ve, así que allí quien separa planos es el escalón de claridad de la superficie más el borde. **En un listado denso no hay sombra por fila**: separan las líneas de `border-subtle`. | [`foundations/shape-and-elevation.md`](../design-system/foundations/shape-and-elevation.md) |
@@ -104,7 +104,7 @@ personalidad se gasta en tres sitios y en ninguno más.
 3. **El estado.** El único color dentro de la fila, y con su etiqueta y su icono
    al lado.
 
-Y lo que queda expresamente prohibido dentro de una fila: serif, sombra, radio
+Y lo que queda expresamente prohibido dentro de una fila: la display, sombra, radio
 mayor que `sm`, ilustración, segundo peso tipográfico, fondo de color que no sea
 la selección o el paso del puntero, y cualquier animación que no sea la del
 propio puntero.
@@ -122,7 +122,7 @@ densa en el sitio donde la calidez se ve.
 
 **Estado inicial y onboarding.** El alta de un hogar es la única escritura sin
 autenticar de la API, y también el primer contacto con el producto: pantalla de
-una sola columna sobre `surface`, un campo por paso, serif en el titular y la
+una sola columna sobre `surface`, un campo por paso, la redonda de la marca en el titular y la
 ilustración de la casa. Al entrar por primera vez, el hogar ya trae sus
 categorías sembradas, así que el inventario nunca arranca del todo vacío: la
 primera pantalla propone dar de alta el primer asset, no explica el modelo de
@@ -250,7 +250,7 @@ Lo que la dirección visual aporta a ese compromiso, con sus números, está en
   color, etiqueta e icono propios; los campos con error llevan borde, icono y
   mensaje; la fila seleccionada lleva fondo, casilla y barra de acento.
 - **Contraste comprobado, no afirmado.** Los 48 pares que el sistema usa de
-  verdad están medidos en los dos modos: el peor caso de texto es 4,70:1 y el
+  verdad están medidos en los dos modos: el peor caso de texto es 4,67:1 y el
   peor caso no textual, 3,46:1. Ningún token se sale del gamut sRGB, para que el
   número medido sea el número que se ve. Lo comprueba
   [`scripts/check-contrast.py`](../../../scripts/check-contrast.py) en cada

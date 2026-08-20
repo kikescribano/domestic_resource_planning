@@ -105,7 +105,7 @@ para el fondo del aviso, y el texto del aviso va del color base.
 | Token | Cuándo | Claro | Oscuro |
 |---|---|---|---|
 | `--color-success` / `-soft` | La operación salió bien y no se ve en pantalla | `oklch(45% 0.1 152)` · `#1f6538` / `#e0f3e4` | `oklch(78% 0.11 152)` · `#7fcc94` / `#192f1f` |
-| `--color-warning` / `-soft` | Se puede seguir, pero conviene mirarlo | `oklch(48% 0.09 70)` · `#7e541b` / `#faedd6` | `oklch(80% 0.1 80)` · `#e0b771` / `#362913` |
+| `--color-warning` / `-soft` | Se puede seguir, pero conviene mirarlo | `oklch(48% 0.095 90)` · `#725a08` / `#f6efd5` | `oklch(82% 0.11 90)` · `#e0c16d` / `#342a0e` |
 | `--color-danger` / `-soft` | Falló, o va a destruir algo | `oklch(48% 0.16 27)` · `#a52a26` / `#fbe8e5` | `oklch(72% 0.14 27)` · `#ef7f74` / `#3e1f1b` |
 | `--color-info` / `-soft` | Contexto que el usuario no ha pedido pero necesita | `oklch(45% 0.12 250)` · `#0e5794` / `#e1effd` | `oklch(76% 0.1 250)` · `#7fb6ee` / `#192a3c` |
 
@@ -119,9 +119,9 @@ el rojo de error cambie.
 | Token | Estado | Claro | Oscuro |
 |---|---|---|---|
 | `--color-state-available` / `-soft` | `AVAILABLE` | `oklch(45% 0.1 152)` · `#1f6538` / `#e0f3e4` | `oklch(78% 0.11 152)` · `#7fcc94` / `#192f1f` |
-| `--color-state-lent` / `-soft` | `LENT` | `oklch(48% 0.09 70)` · `#7e541b` / `#faedd6` | `oklch(80% 0.1 80)` · `#e0b771` / `#362913` |
+| `--color-state-lent` / `-soft` | `LENT` | `oklch(48% 0.095 90)` · `#725a08` / `#f6efd5` | `oklch(82% 0.11 90)` · `#e0c16d` / `#342a0e` |
 | `--color-state-overdue` / `-soft` | `OVERDUE` | `oklch(48% 0.16 27)` · `#a52a26` / `#fbe8e5` | `oklch(72% 0.14 27)` · `#ef7f74` / `#3e1f1b` |
-| `--color-state-decommissioned` / `-soft` | `DECOMMISSIONED` | `oklch(52% 0.012 70)` · `#6e6862` / `#efece9` | `oklch(68% 0.012 70)` · `#9d9790` / `#2b2825` |
+| `--color-state-decommissioned` / `-soft` | `DECOMMISSIONED` | `oklch(52% 0.012 190)` · `#616b6a` / `#e9eeee` | `oklch(68% 0.012 190)` · `#909b9a` / `#252a2a` |
 | `--color-state-out-of-stock` / `-soft` | Consumible con `quantity` a cero | `oklch(45% 0.12 250)` · `#0e5794` / `#e1effd` | `oklch(76% 0.1 250)` · `#7fb6ee` / `#192a3c` |
 
 Un estado se pinta **siempre** con las tres piezas: color, icono y etiqueta. El
@@ -163,7 +163,7 @@ la interfaz sin medir.
 | Token | Valor |
 |---|---|
 | `--font-sans` | `ui-sans-serif`, `system-ui`, `Segoe UI`, `Roboto`, … |
-| `--font-display` | `Iowan Old Style`, `Palatino Linotype`, `Palatino`, `Book Antiqua`, `Georgia`, `Noto Serif`, serif |
+| `--font-display` | `Baloo 2` (autoalojada vía `@fontsource`, pesos 600/700/800), `ui-rounded`, `Segoe UI`, `system-ui`, sans-serif |
 | `--font-mono` | `ui-monospace`, `Cascadia Mono`, `SFMono-Regular`, `Menlo`, `Consolas` |
 | `--text-caption` | 0.8125rem / 1.4 |
 | `--text-body-sm` | 0.875rem / 1.45 |
@@ -173,8 +173,9 @@ la interfaz sin medir.
 | `--text-title` | `clamp(1.375rem, 1.28rem + 0.4vw, 1.625rem)` / 1.25 |
 | `--text-display` | `clamp(1.75rem, 1.5rem + 1.1vw, 2.5rem)` / 1.15 |
 
-`--font-display` está atado al `h1` en la capa base. Del `h2` hacia abajo se pide
-con la clase `font-display`, y **nunca dentro de una fila de listado**.
+`--font-display` está atado al `h1` en la capa base, con su peso 700 declarado
+ahí mismo. Del `h2` hacia abajo se pide con la clase `font-display`, y **nunca
+dentro de una fila de listado**.
 
 ## Espacio
 
@@ -268,7 +269,7 @@ está usando tokens, ya funciona en los dos modos.
 3. **El borde de un control es `border`**, no `border-subtle`.
 4. **El acento sólido, una vez por pantalla.**
 5. **Un estado nunca se pinta solo con color**: color, icono y etiqueta.
-6. **La serif no entra en una fila de listado.**
+6. **La display no entra en una fila de listado.**
 7. Si un valor se repite en dos componentes, es un token que falta.
 
 ## Decisiones abiertas
@@ -293,6 +294,7 @@ está usando tokens, ya funciona en los dos modos.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | La tanda de ajustes de interfaz deja huella en los tokens: la display pasa a **Baloo 2 autoalojada**, el gris neutro y el ámbar de aviso se suman al esquema (pino 190 y oro 90), entra el tono `accent` del `StatusBadge` con su par —**49 pares ya**— y las variantes `ghost-danger` del botón y el interruptor `Switch` beben de pares ya medidos. | Equipo DRP |
 | 2026-08-20 | **La paleta de marca gira al esquema de la identidad comercial**: los neutros pasan del pardo cálido (tonos 60–85) al pino frío (tonos 177–190) y el acento deja la terracota por el teal `#2d7a71` / `#7ec7be`, los mismos que usan las presentaciones de DRP. Feedback, estados del dominio y colores de categoría no cambian. Los 48 pares siguen medidos y dentro de AA. | Equipo DRP |
 | 2026-08-20 | Entran los **doce tokens de color de categoría** (cierre de huecos, Hito 4): seis colores con su variante suave, la primera familia que elige el usuario y la única con nombre descriptivo, con su excepción a la regla de nombres razonada. | Equipo DRP |
 | 2026-08-10 | Creación del catálogo con los tokens del Hito 1 y el contrato de modo oscuro. | Equipo DRP |

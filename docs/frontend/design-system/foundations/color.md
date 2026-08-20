@@ -39,7 +39,7 @@ lo que permite tres cosas que en hexadecimal cuestan mucho:
 1. Derivar el modo oscuro **moviendo la claridad** y ajustando el croma, sin
    volver a elegir colores.
 2. Fijar la regla de que todo texto de estado vive en la banda `L 45–52 %` en
-   claro y `L 68–80 %` en oscuro, y que por tanto los cinco estados pesan
+   claro y `L 68–82 %` en oscuro, y que por tanto los cinco estados pesan
    visualmente lo mismo. Ninguno grita más que otro **salvo el vencido**, que
    lleva el croma más alto (0,16) a propósito.
 3. Comprobar de un vistazo si un color nuevo encaja, sin abrir una herramienta.
@@ -109,9 +109,9 @@ feedback:
 | Estado | Color | Por qué |
 |---|---|---|
 | `AVAILABLE` | Verde salvia | Está en casa y se puede usar |
-| `LENT` | Ámbar miel | Está fuera, pero eso es normal: **no es una advertencia** |
+| `LENT` | Oro | Está fuera, pero eso es normal: **no es una advertencia** |
 | `OVERDUE` | Rojo teja | El único que sube el croma a 0,16, porque es el único que pide actuar |
-| `DECOMMISSIONED` | Gris cálido neutro | Ya no cuenta; se ve, pero no compite |
+| `DECOMMISSIONED` | Gris de pino | Ya no cuenta; se ve, pero no compite |
 | Sin existencias | Azul pizarra | Un consumible a cero |
 
 La separación de nombres no es burocracia: **un préstamo vencido no es un error
@@ -125,7 +125,10 @@ confunde con facilidad el verde, el ámbar y el rojo entre sí, pero no confunde
 ninguno de los tres con un azul. El estado que más probablemente hay que
 distinguir de un vistazo en una despensa —«esto se ha acabado»— es el que se
 apoya en el eje de color que sobrevive. El gris del dado de baja aporta el otro
-extremo seguro.
+extremo seguro. Y desde la pasada de chips hay un séptimo color con nombre en
+los distintivos: el **tono `accent`** del `StatusBadge`, para lo pendiente que
+no es feedback ni estado del dominio —«sin leer», «administra»—, con su par
+medido como todos.
 
 Aun así, **el color nunca es el único portador**: cada estado lleva además su
 etiqueta y su icono fijo (ver [`iconography.md`](iconography.md)).
@@ -155,7 +158,7 @@ de la paleta no tiene:
 | `teal` | 195 | A 10° del teal del acento; nunca comparte forma con un botón |
 | `moss` | 130 | A 22° del verde salvia de disponible |
 
-Los cinco tonos del dominio y el acento están tomados —27, 75, 152, 185 y 250— y
+Los cinco tonos del dominio y el acento están tomados —27, 90, 152, 185 y 250— y
 estos seis se reparten lo que queda. Los tres que más se acercan son `moss`,
 `sky` y `teal` —este último desde que el acento giró de la terracota al teal de
 la identidad comercial—, y se admiten por una razón de forma y no de tono: **el
@@ -208,6 +211,7 @@ supuesto que si el claro cumple, el oscuro también.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | La pasada de chips termina lo que el giro dejó a medias: el gris neutro rota al **pino** (190), el ámbar de aviso y prestado al **oro** (90), y entra el tono `accent` del `StatusBadge` con su par —la auditoría pasa a **49 pares**—. Los tonos tomados por dominio y acento quedan en 27, 90, 152, 185 y 250. | Equipo DRP |
 | 2026-08-20 | **La marca gira al esquema de la identidad comercial de DRP**: papel y tinta pasan del pardo cálido al pino frío (tonos 177–190) y el acento deja la terracota por el teal de las presentaciones. Los colores de feedback, los cinco estados del dominio y las seis categorías no cambian; con el acento en 185, la categoría `teal` (195) pasa a ser la más cercana y se razona por qué se admite. | Equipo DRP |
 | 2026-08-20 | Entran los **seis colores de categoría** (cierre de huecos, Hito 4, [ADR-015](../../../common/architecture/decisions/ADR-015-user-chosen-category-identity.md)): la primera familia de la paleta que elige el usuario, la única con nombre descriptivo y la que lleva la auditoría de contraste de 36 pares a 48. | Equipo DRP |
 | 2026-08-10 | Creación del documento con la paleta del Hito 1. | Equipo DRP |

@@ -1,5 +1,11 @@
 @import 'tailwindcss';
 
+/* La fuente de display, autoalojada desde node_modules (@fontsource): nada se
+   descarga de fuera en tiempo de ejecución. Solo los pesos que se usan. */
+@import '@fontsource/baloo-2/600.css';
+@import '@fontsource/baloo-2/700.css';
+@import '@fontsource/baloo-2/800.css';
+
 /* ---------------------------------------------------------------------------
    Tokens del sistema de diseño de DRP.
 
@@ -87,8 +93,8 @@
   /* Feedback del sistema: lo que la aplicación le responde a una acción. */
   --color-success: light-dark(oklch(45% 0.1 152), oklch(78% 0.11 152));
   --color-success-soft: light-dark(oklch(94.5% 0.028 152), oklch(28% 0.04 152));
-  --color-warning: light-dark(oklch(48% 0.09 70), oklch(80% 0.1 80));
-  --color-warning-soft: light-dark(oklch(95% 0.033 80), oklch(29% 0.04 80));
+  --color-warning: light-dark(oklch(48% 0.095 90), oklch(82% 0.11 90));
+  --color-warning-soft: light-dark(oklch(95% 0.035 95), oklch(29% 0.045 90));
   --color-danger: light-dark(oklch(48% 0.16 27), oklch(72% 0.14 27));
   --color-danger-soft: light-dark(oklch(94.5% 0.022 27), oklch(28% 0.05 27));
   --color-info: light-dark(oklch(45% 0.12 250), oklch(76% 0.1 250));
@@ -107,12 +113,12 @@
      que sí confunde verde, ámbar y rojo. */
   --color-state-available: light-dark(oklch(45% 0.1 152), oklch(78% 0.11 152));
   --color-state-available-soft: light-dark(oklch(94.5% 0.028 152), oklch(28% 0.04 152));
-  --color-state-lent: light-dark(oklch(48% 0.09 70), oklch(80% 0.1 80));
-  --color-state-lent-soft: light-dark(oklch(95% 0.033 80), oklch(29% 0.04 80));
+  --color-state-lent: light-dark(oklch(48% 0.095 90), oklch(82% 0.11 90));
+  --color-state-lent-soft: light-dark(oklch(95% 0.035 95), oklch(29% 0.045 90));
   --color-state-overdue: light-dark(oklch(48% 0.16 27), oklch(72% 0.14 27));
   --color-state-overdue-soft: light-dark(oklch(94.5% 0.022 27), oklch(28% 0.05 27));
-  --color-state-decommissioned: light-dark(oklch(52% 0.012 70), oklch(68% 0.012 70));
-  --color-state-decommissioned-soft: light-dark(oklch(94.5% 0.006 70), oklch(28% 0.008 70));
+  --color-state-decommissioned: light-dark(oklch(52% 0.012 190), oklch(68% 0.012 190));
+  --color-state-decommissioned-soft: light-dark(oklch(94.5% 0.006 190), oklch(28% 0.008 190));
   --color-state-out-of-stock: light-dark(oklch(45% 0.12 250), oklch(76% 0.1 250));
   --color-state-out-of-stock-soft: light-dark(oklch(94.5% 0.024 250), oklch(28% 0.04 250));
 
@@ -123,7 +129,7 @@
      `--color-category-3` seria ilegible en la migracion, en el contrato y aqui.
 
      Seis y no mas, y ninguno cae encima de los cinco estados del dominio: los
-     tonos tomados son 27 (error y vencido), 75 (aviso y prestado), 152 (exito y
+     tonos tomados son 27 (error y vencido), 90 (aviso y prestado), 152 (exito y
      disponible), 185 (acento) y 250 (informacion y sin existencias). Los que mas
      se acercan --moss al verde de disponible, sky al azul de sin existencias y
      teal al acento, que desde que el acento es teal queda a solo 10 grados-- se
@@ -150,18 +156,17 @@
   /* -------------------------------------------------------------------------
      Tipografía
 
-     Dos familias con reparto explícito: la serif pone el carácter en los
-     titulares y la sans sostiene el trabajo. Las pilas son de sistema y no
-     descargan nada; el día que se autoalojen unas fuentes propias se cambia el
-     valor y ningún componente se entera. La serif no baja de 20 px ni entra en
+     Dos familias con reparto explícito: la redonda de la marca pone el carácter
+     en los titulares y la sans sostiene el trabajo. La de display es Baloo 2,
+     la redonda gruesa del logotipo, autoalojada vía @fontsource (arriba); la
+     sans sigue siendo pila de sistema. La display no baja de 20 px ni entra en
      una fila de listado (ver «Densidad» en look-and-feel.md).
      ------------------------------------------------------------------------- */
   --font-sans:
     ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif,
     'Apple Color Emoji', 'Segoe UI Emoji';
   --font-display:
-    'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, 'Noto Serif',
-    'Times New Roman', serif;
+    'Baloo 2', ui-rounded, 'Segoe UI', system-ui, sans-serif;
   --font-mono:
     ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
 
@@ -293,11 +298,15 @@
     line-height: 1.6;
   }
 
-  /* La serif solo se ata al `h1`, que es único por página y nunca cae dentro de
-     una fila de listado. Del `h2` hacia abajo se pide a mano con `font-display`,
-     y solo cuando titula una sección. */
+  /* La display solo se ata al `h1`, que es único por página y nunca cae dentro
+     de una fila de listado. Del `h2` hacia abajo se pide a mano con
+     `font-display`, y solo cuando titula una sección: ahí resuelve al 600, el
+     más cercano de los pesos cargados. El peso va aquí porque el preflight de
+     Tailwind deja los encabezados en `font-weight: inherit`, y una redonda
+     gruesa en peso normal no es la marca. */
   h1 {
     font-family: var(--font-display);
+    font-weight: 700;
     letter-spacing: -0.01em;
   }
 
@@ -330,6 +339,15 @@
   input[type='week']:focus-within {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
+  }
+
+  /* Una casilla deshabilitada tiene que parecerlo: la nativa apenas cambia de
+     cara —en oscuro, nada—, y una casilla viva en una fila apagada invita a
+     marcar lo que no se puede. En la capa base, para que ningún componente
+     pueda olvidarlo. */
+  input[type='checkbox']:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
   }
 
   ::placeholder {

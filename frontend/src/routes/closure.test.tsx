@@ -119,7 +119,7 @@ describe('la zona de peligro de la baja del hogar', () => {
   it('quien no administra no ve la zona de peligro del hogar', async () => {
     await resumeAt('/', { 'GET /api/v1/households/current': household(null) }, 'HOUSEHOLD_MEMBER')
 
-    await screen.findByRole('heading', { level: 1, name: 'Tu hogar' })
+    await screen.findByRole('heading', { level: 1, name: 'Hogar' })
     expect(screen.queryByRole('heading', { name: 'Dar de baja el hogar' })).not.toBeInTheDocument()
   })
 })
@@ -136,7 +136,7 @@ describe('el aviso mientras dura la gracia', () => {
   it('sale también fuera de la pantalla del hogar', async () => {
     await resumeAt('/catalogo', { 'GET /api/v1/households/current': household(REQUESTED) })
 
-    // Vive en el shell y no en «Tu hogar» porque durante la gracia todo sigue
+    // Vive en el shell y no en «Hogar» porque durante la gracia todo sigue
     // funcionando igual: alguien puede pasarse treinta días en el inventario sin
     // volver a la pantalla del hogar.
     expect(await screen.findByText(/Este hogar se borrará el/)).toBeInTheDocument()

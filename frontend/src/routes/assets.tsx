@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Boxes } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
@@ -97,6 +98,7 @@ export function AssetsPage() {
     <>
       <PageHeading
         title="Inventario"
+        icon={Boxes}
         action={
           <div className="flex gap-2">
             <Link

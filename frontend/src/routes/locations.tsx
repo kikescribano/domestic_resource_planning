@@ -1,4 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  Armchair,
+  ChevronDown,
+  ChevronRight,
+  DoorOpen,
+  House,
+  Layers,
+  MapPin,
+  Pencil,
+  Rows3,
+  Shapes,
+  Trash2,
+  type LucideIcon,
+} from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 
 import {
@@ -14,6 +28,23 @@ import {
 } from '../api/client'
 import { useAuthenticatedSession } from '../auth/SessionProvider'
 import { Button, EmptyState, Field, Notice, PageHeading, SelectField, Spinner } from '../ui/primitives'
+
+/**
+ * El icono de cada tipo de ubicación, del mismo juego que toda la iconografía.
+ *
+ * Vive aquí y no junto a `LOCATION_TYPE_LABELS` a propósito: la etiqueta es un
+ * dato que cualquier capa puede escribir, y el icono es presentación —importa
+ * React— y solo lo consume esta pantalla. Va `aria-hidden` en la fila porque la
+ * etiqueta del tipo sigue al lado del nombre: el icono orienta, no nombra.
+ */
+const LOCATION_TYPE_ICONS: Record<LocationType, LucideIcon> = {
+  HOUSE: House,
+  FLOOR: Layers,
+  ROOM: DoorOpen,
+  FURNITURE: Armchair,
+  SHELF: Rows3,
+  OTHER: Shapes,
+}
 
 /**
  * El árbol de ubicaciones del hogar.
@@ -181,7 +212,7 @@ export function LocationsPage() {
 
   return (
     <>
-      <PageHeading title="Ubicaciones" />
+      <PageHeading title="Ubicaciones" icon={MapPin} />
 
       <div className="flex flex-col gap-6">
         <form onSubmit={submit} className="flex max-w-form flex-col gap-3">
@@ -256,12 +287,13 @@ export function LocationsPage() {
         ) : (
           // Un solo `ul` con `role="tree"`: la jerarquía se anuncia con
           // `aria-level`, no con la sangría, que un lector de pantalla no ve.
-          <ul role="tree" aria-label="Ubicaciones del hogar" className="flex flex-col gap-1">
-            {tree.map((node) => (
+          <ul role="tree" aria-label="Ubicaciones del hogar" className="flex flex-col gap-1.5">
+            {tree.map((node, index) => (
               <LocationBranch
                 key={node.location.id}
                 node={node}
                 level={1}
+                isLast={index === tree.length - 1}
                 onEdit={setEditingId}
                 onDelete={remove.mutate}
               />
@@ -276,55 +308,187 @@ export function LocationsPage() {
 function LocationBranch({
   node,
   level,
+  isLast,
   onEdit,
   onDelete,
 }: {
   node: TreeNode
   level: number
+  /** Si es la última hermana: su conector baja hasta su tarjeta y ahí se corta. */
+  isLast: boolean
   onEdit: (id: string) => void
   onDelete: (id: string) => void
 }) {
   const hasChildren = node.children.length > 0
+  const TypeIcon = LOCATION_TYPE_ICONS[node.location.type]
+  // Expandido por defecto: plegar es un gesto de quien mira un árbol grande,
+  // no un estado que haya que conquistar rama a rama al entrar.
+  const [isOpen, setIsOpen] = useState(true)
+  // La sangría de la tarjeta y la abscisa del conector salen de la misma
+  // cuenta: el conector vive en el canalón que la propia sangría abre, a mitad
+  // del escalón de 20 px. El tope de niveles existe por los 375 px —una
+  // sangría sin techo dejaría el nombre en una columna de dos caracteres— y a
+  // partir de él el conector se solapa con el borde de la tarjeta y deja de
+  // distinguirse; es el mismo compromiso de siempre.
+  const indent = Math.min(level - 1, 3) * 1.25
+  const connectorX = `${indent - 0.625}rem`
 
   return (
-    <li role="treeitem" aria-level={level} aria-expanded={hasChildren ? true : undefined}>
+    <li role="treeitem" aria-level={level} aria-expanded={hasChildren ? isOpen : undefined} className="relative">
+      {/* El conector con la madre, decorativo: la jerarquía la dice `aria-level`
+          y la sangría; esto solo la dibuja. Cada hermana pinta **un codo
+          redondeado** —borde izquierdo más inferior con radio— que baja de la
+          madre y entra curvado en su tarjeta; las que no son la última añaden
+          el tramo recto del raíl, que termina exactamente donde empieza el
+          codo de la siguiente: los tramos se tocan, nunca se pisan, que era lo
+          que en oscuro se veía como un solape.
+
+          Las tarjetas llevan `relative z-10` justo por esto: el conector queda
+          por encima del fondo de la página pero por debajo de todas las
+          tarjetas, así que el tramo que sube hasta la madre pasa por debajo de
+          la suya en vez de pintarse encima. Un z negativo aquí no vale: lo
+          taparía el `bg-surface` del shell, que pinta por encima de cualquier
+          z < 0. */}
+      {level > 1 && (
+        <>
+          <span
+            aria-hidden="true"
+            className="absolute rounded-bl-sm border-b border-l border-border"
+            style={{ insetInlineStart: connectorX, top: '-0.75rem', width: '0.625rem', height: '2.125rem' }}
+          />
+          {!isLast && (
+            <span
+              aria-hidden="true"
+              className="absolute w-px bg-border"
+              style={{ insetInlineStart: connectorX, top: '1.375rem', bottom: '0.375rem' }}
+            />
+          )}
+        </>
+      )}
       <div
-        className="flex min-h-touch flex-wrap items-center justify-between gap-2 rounded-md border border-border-subtle bg-surface-raised px-3 py-2"
+        // Sin `flex-wrap` a propósito: un nombre largo envuelve dentro de su
+        // columna y los botones no caen a una segunda fila, que rompía la
+        // altura homogénea que la línea de capacidad reservada consigue.
+        //
+        // La tarjeta entera pliega y despliega —«toda la fila es pulsable»—,
+        // pero el gesto de teclado vive en el botón del chevron: un `div` con
+        // `onClick` no existe para el tabulador. Las acciones de dentro cortan
+        // la propagación para no plegar el nodo al editar o borrar.
+        onClick={hasChildren ? () => setIsOpen((open) => !open) : undefined}
+        // Altura fija y no mínima: es lo que iguala todas las tarjetas sin
+        // reservar una línea fantasma. Con capacidad caben las dos líneas; sin
+        // ella, el centrado vertical deja el nombre a la altura del icono.
+        className={[
+          'relative z-10 flex h-15 items-center justify-between gap-2 rounded-md border border-border-subtle bg-surface-raised px-3 py-2',
+          hasChildren ? 'cursor-pointer' : '',
+        ].join(' ')}
         // La sangría se aplica con estilo y no con márgenes anidados para que en
         // 375 px se pueda limitar: con seis niveles, una sangría fija dejaría el
         // nombre en una columna de dos caracteres.
-        style={{ marginInlineStart: `${Math.min(level - 1, 4) * 0.75}rem` }}
+        style={{ marginInlineStart: `${indent}rem` }}
       >
-        <span className="flex flex-wrap items-baseline gap-2">
-          <span className="text-body text-ink">{node.location.name}</span>
-          <span className="text-caption text-ink-muted">{LOCATION_TYPE_LABELS[node.location.type]}</span>
-          {/* Se pinta cualquier capacidad y no solo la de unidades: que el
-              sistema no pueda contar kilos no la convierte en un dato que quien
-              mira la estantería no quiera ver. */}
-          {node.location.capacity && (
-            <span className="text-caption text-ink-subtle">
-              hasta {node.location.capacity.max} {node.location.capacity.unit}
-            </span>
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          {/* El chevron dice si la rama está abierta. En las hojas su sitio se
+              reserva vacío: sin él se desalinearía el icono de tipo entre
+              hermanas, y un chevron apagado prometería un pliegue que no
+              existe. */}
+          {hasChildren ? (
+            <button
+              type="button"
+              aria-expanded={isOpen}
+              aria-label={`${isOpen ? 'Contraer' : 'Expandir'} ${node.location.name}`}
+              onClick={(event) => {
+                event.stopPropagation()
+                setIsOpen((open) => !open)
+              }}
+              className="flex size-6 shrink-0 items-center justify-center rounded-xs text-ink-muted hover:text-ink"
+            >
+              {isOpen ? (
+                <ChevronDown size={20} strokeWidth={1.75} aria-hidden="true" />
+              ) : (
+                <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
+              )}
+            </button>
+          ) : (
+            <span aria-hidden="true" className="size-6 shrink-0" />
           )}
+          <TypeIcon
+            size={20}
+            strokeWidth={1.75}
+            aria-hidden="true"
+            className="shrink-0 text-ink-muted"
+          />
+          <span className="flex min-w-0 flex-col">
+            {/* Sin `flex-wrap` y con el nombre en `truncate`: un nombre largo se
+                recorta con puntos suspensivos en vez de envolver, que estiraba
+                la tarjeta y rompía la altura homogénea. El recorte es solo
+                visual: el nombre entero queda en el `title` y en los nombres
+                accesibles de los botones. */}
+            <span className="flex min-w-0 items-baseline gap-2">
+              <span className="min-w-0 truncate text-body text-ink" title={node.location.name}>
+                {node.location.name}
+              </span>
+              {/* En móvil el tipo lo dice su icono y el texto se retira de la
+                  vista, no del árbol de accesibilidad: `sr-only` y no `hidden`,
+                  porque el icono va `aria-hidden` y sin esto el tipo dejaría de
+                  existir para quien no lo ve. */}
+              <span className="sr-only shrink-0 text-caption text-ink-muted md:not-sr-only">
+                {LOCATION_TYPE_LABELS[node.location.type]}
+              </span>
+            </span>
+            {/* Se pinta cualquier capacidad y no solo la de unidades: que el
+                sistema no pueda contar kilos no la convierte en un dato que quien
+                mira la estantería no quiera ver. Sin capacidad no hay línea:
+                la altura la fija la tarjeta, no una reserva fantasma. */}
+            {node.location.capacity && (
+              <span className="text-caption text-ink-subtle">
+                hasta {node.location.capacity.max} {node.location.capacity.unit}
+              </span>
+            )}
+          </span>
         </span>
 
         <span className="flex items-center gap-1">
-          <Button variant="ghost" onClick={() => onEdit(node.location.id)}>
-            Editar
+          {/* Icono en vez de texto, pero nunca mudo: el nombre accesible lleva
+              el del sitio, que además deja consultarlos sin ambigüedad en un
+              árbol donde cada rama contiene los botones de sus hijas. El lápiz
+              va en el teal del acento y la papelera en el rojo de peligro del
+              esquema; `title` da la pista a quien pasa el puntero. */}
+          <Button
+            variant="ghost"
+            onClick={(event) => {
+              event.stopPropagation()
+              onEdit(node.location.id)
+            }}
+            aria-label={`Editar ${node.location.name}`}
+            title="Editar"
+            className="w-11 px-0"
+          >
+            <Pencil size={20} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
           </Button>
-          <Button variant="ghost" onClick={() => onDelete(node.location.id)}>
-            Borrar
+          <Button
+            variant="ghost-danger"
+            onClick={(event) => {
+              event.stopPropagation()
+              onDelete(node.location.id)
+            }}
+            aria-label={`Borrar ${node.location.name}`}
+            title="Borrar"
+            className="w-11 px-0"
+          >
+            <Trash2 size={20} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
           </Button>
         </span>
       </div>
 
-      {hasChildren && (
-        <ul role="group" className="mt-1 flex flex-col gap-1">
-          {node.children.map((child) => (
+      {hasChildren && isOpen && (
+        <ul role="group" className="mt-1.5 flex flex-col gap-1.5">
+          {node.children.map((child, index) => (
             <LocationBranch
               key={child.location.id}
               node={child}
               level={level + 1}
+              isLast={index === node.children.length - 1}
               onEdit={onEdit}
               onDelete={onDelete}
             />

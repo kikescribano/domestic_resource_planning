@@ -162,7 +162,7 @@ async function signInAndVisit(link: string, responses: Record<string, StubbedRes
   await userEvent.type(screen.getByLabelText('Correo'), 'kike@example.test')
   await userEvent.type(screen.getByLabelText('Contraseña'), 'el gato duerme en el sofa')
   await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
-  await screen.findByRole('heading', { level: 1, name: 'Tu hogar' })
+  await screen.findByRole('heading', { level: 1, name: 'Hogar' })
 
   await userEvent.click(screen.getByRole('link', { name: link }))
   return stub
@@ -420,7 +420,7 @@ describe('etiquetas e identidad visual', () => {
 
 describe('árbol de ubicaciones', () => {
   it('anida las ubicaciones y anuncia el nivel a un lector de pantalla', async () => {
-    await signInAndVisit('Sitios', {
+    await signInAndVisit('Ubicaciones', {
       'GET /api/v1/locations?size=200': LOCATIONS,
     })
 
@@ -434,7 +434,7 @@ describe('árbol de ubicaciones', () => {
   })
 
   it('borrar una ubicación que tiene cosas dentro se explica sin jerga', async () => {
-    await signInAndVisit('Sitios', {
+    await signInAndVisit('Ubicaciones', {
       'GET /api/v1/locations?size=200': LOCATIONS,
       'DELETE /api/v1/locations/loc-2': {
         status: 409,
@@ -444,13 +444,13 @@ describe('árbol de ubicaciones', () => {
 
     const tree = await screen.findByRole('tree', { name: 'Ubicaciones del hogar' })
     const [, despensa] = within(tree).getAllByRole('treeitem')
-    await userEvent.click(within(despensa!).getByRole('button', { name: 'Borrar' }))
+    await userEvent.click(within(despensa!).getByRole('button', { name: 'Borrar Despensa' }))
 
     expect(await screen.findByText('No se puede borrar: todavía hay cosas guardadas ahí.')).toBeInTheDocument()
   })
 
   it('la capacidad se declara al crear, con su medida', async () => {
-    const { calls } = await signInAndVisit('Sitios', {
+    const { calls } = await signInAndVisit('Ubicaciones', {
       'GET /api/v1/locations?size=200': LOCATIONS,
       'POST /api/v1/locations': {
         status: 201,
@@ -481,7 +481,7 @@ describe('árbol de ubicaciones', () => {
   })
 
   it('editar manda los cuatro campos, porque en un PATCH ausente conserva y nulo borra', async () => {
-    const { calls } = await signInAndVisit('Sitios', {
+    const { calls } = await signInAndVisit('Ubicaciones', {
       'GET /api/v1/locations?size=200': LOCATIONS,
       'PATCH /api/v1/locations/loc-2': {
         status: 200,
@@ -491,7 +491,7 @@ describe('árbol de ubicaciones', () => {
 
     const tree = await screen.findByRole('tree', { name: 'Ubicaciones del hogar' })
     const [, despensa] = within(tree).getAllByRole('treeitem')
-    await userEvent.click(within(despensa!).getByRole('button', { name: 'Editar' }))
+    await userEvent.click(within(despensa!).getByRole('button', { name: 'Editar Despensa' }))
 
     const form = await screen.findByRole('heading', { name: 'Editar «Despensa»' })
     // El foco se va al formulario: quien lo abrió con el teclado estaba en un
@@ -513,16 +513,16 @@ describe('árbol de ubicaciones', () => {
   })
 
   it('no se ofrece como destino ni ella misma ni lo que cuelga de ella', async () => {
-    await signInAndVisit('Sitios', {
+    await signInAndVisit('Ubicaciones', {
       'GET /api/v1/locations?size=200': LOCATIONS,
     })
 
     const tree = await screen.findByRole('tree', { name: 'Ubicaciones del hogar' })
     const [casa] = within(tree).getAllByRole('treeitem')
-    // El primero: un `treeitem` con hijas los contiene dentro, así que ahí abajo
-    // hay más botones «Editar» que no son el suyo. En orden de DOM, la fila del
-    // nodo va antes que su lista de hijas.
-    await userEvent.click(within(casa!).getAllByRole('button', { name: 'Editar' })[0]!)
+    // El nombre accesible lleva el del sitio, así que en un `treeitem` con hijas
+    // —que contiene los botones de todas ellas— el suyo se consulta sin
+    // ambigüedad.
+    await userEvent.click(within(casa!).getByRole('button', { name: 'Editar Casa del Pinar' }))
 
     // Meter la casa dentro de su propia despensa es el ciclo que el servidor
     // rechaza con LOCATION_CYCLE. Aquí ni se ofrece: la negativa del servidor es

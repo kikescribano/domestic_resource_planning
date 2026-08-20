@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Store } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import {
@@ -13,6 +14,7 @@ import {
   Button,
   EmptyState,
   Field,
+  FieldAlignedSlot,
   Notice,
   PageHeading,
   SelectField,
@@ -64,6 +66,7 @@ export function SuppliersPage() {
     <>
       <PageHeading
         title="Proveedores"
+        icon={Store}
         action={
           <Button variant="primary" onClick={() => setAdding((open) => !open)} aria-expanded={adding}>
             Añadir contacto
@@ -87,7 +90,7 @@ export function SuppliersPage() {
         />
       )}
 
-      <div className="mt-6 flex flex-wrap items-end gap-3">
+      <div className="mt-6 flex flex-wrap items-start gap-3">
         {/* «Filtrar por categoría» y no «Categoría de servicio»: el formulario
             de alta tiene un campo con ese nombre, y dos controles con el mismo
             nombre accesible en la misma pantalla son indistinguibles para quien
@@ -116,14 +119,16 @@ export function SuppliersPage() {
           hint="Busca por nombre."
         />
 
-        <label className="flex min-h-touch items-center gap-2 text-body-sm text-ink">
-          <input
-            type="checkbox"
-            checked={includeRetired}
-            onChange={(event) => setIncludeRetired(event.target.checked)}
-          />
-          Ver también los retirados
-        </label>
+        <FieldAlignedSlot>
+          <label className="flex min-h-touch items-center gap-2 text-body-sm text-ink">
+            <input
+              type="checkbox"
+              checked={includeRetired}
+              onChange={(event) => setIncludeRetired(event.target.checked)}
+            />
+            Ver también los retirados
+          </label>
+        </FieldAlignedSlot>
       </div>
 
       <div className="mt-6">
