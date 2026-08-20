@@ -897,10 +897,17 @@ function MemberRow({ user, canDecide }: { user: User; canDecide: boolean }) {
   const active = user.deactivatedAt === null
 
   const decide = useMutation({
-    mutationFn: () =>
-      active
-        ? api.deactivateUser(user.id, session.accessToken)
-        : api.reactivateUser(user.id, session.accessToken),
+    // `async` con `await` en cada rama, y no un ternario que devuelva la
+    // promesa: la baja responde 204 sin cuerpo y la vuelta devuelve el User,
+    // así que el ternario tipa como una unión que a la mutación no le vale.
+    // El User tampoco se usa: la lista se refresca invalidando.
+    mutationFn: async () => {
+      if (active) {
+        await api.deactivateUser(user.id, session.accessToken)
+      } else {
+        await api.reactivateUser(user.id, session.accessToken)
+      }
+    },
     onSuccess: () => {
       setConfirming(false)
       // El prefijo alcanza también al avatar propio y al desplegable de
