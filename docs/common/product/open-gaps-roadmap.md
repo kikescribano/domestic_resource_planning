@@ -433,10 +433,11 @@ crecen sin techo se resuelve, según
       `FileStorage`, con el criterio de `PurgeUnusedFiles`: los bytes primero y las
       filas después.
 - [x] **Qué se lleva la cascada, comprobado tabla por tabla** y no confiando en las
-      claves ajenas: las **veintitrés que llevan `household_id`**, las de los cuatro
-      módulos incluidas, y aparte las **cinco que no lo llevan** (5.6), que son
-      exactamente donde está el nudo. Una tabla que se quede fuera no da ningún
-      error — deja filas de un hogar que pidió marcharse.
+      claves ajenas: las **veintidós que cuelgan de `households` con `ON DELETE
+      CASCADE`**, las de los cuatro módulos incluidas, y aparte las **cinco que no
+      llevan `household_id`** (5.6), que son exactamente donde está el nudo. Una
+      tabla que se quede fuera no da ningún error — deja filas de un hogar que
+      pidió marcharse.
 - [x] **Cuatro operaciones en el contrato**, con su `operationId`: solicitar la
       baja, cancelarla, verla en el estado del hogar y cerrar la cuenta.
 - [x] **Frontend**: la zona de peligro en la pantalla del hogar, con confirmación
