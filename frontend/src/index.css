@@ -117,8 +117,8 @@
   --color-state-lent-soft: light-dark(oklch(95% 0.033 80), oklch(29% 0.04 80));
   --color-state-overdue: light-dark(oklch(48% 0.16 27), oklch(72% 0.14 27));
   --color-state-overdue-soft: light-dark(oklch(94.5% 0.022 27), oklch(28% 0.05 27));
-  --color-state-decommissioned: light-dark(oklch(52% 0.012 70), oklch(68% 0.012 70));
-  --color-state-decommissioned-soft: light-dark(oklch(94.5% 0.006 70), oklch(28% 0.008 70));
+  --color-state-decommissioned: light-dark(oklch(52% 0.012 190), oklch(68% 0.012 190));
+  --color-state-decommissioned-soft: light-dark(oklch(94.5% 0.006 190), oklch(28% 0.008 190));
   --color-state-out-of-stock: light-dark(oklch(45% 0.12 250), oklch(76% 0.1 250));
   --color-state-out-of-stock-soft: light-dark(oklch(94.5% 0.024 250), oklch(28% 0.04 250));
 

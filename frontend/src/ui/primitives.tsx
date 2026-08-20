@@ -270,9 +270,13 @@ export function Spinner({ label }: { label: string }) {
  * cada línea, y quince iconos idénticos en columna son ruido, no información: la
  * etiqueta ya dice lo que el color sugiere.
  */
-type StatusTone = NoticeTone | 'neutral' | 'available' | 'lent' | 'overdue' | 'decommissioned' | 'out-of-stock'
+type StatusTone = NoticeTone | 'accent' | 'neutral' | 'available' | 'lent' | 'overdue' | 'decommissioned' | 'out-of-stock'
 
 const STATUS_TONES: Record<StatusTone, string> = {
+  // El tono de marca, para lo pendiente que no es feedback ni estado del
+  // dominio: «sin leer» no es información del sistema, es una llamada. Su par
+  // está en la lista de check-contrast.py, como todos.
+  accent: 'bg-accent-soft text-accent-ink',
   info: 'bg-info-soft text-info',
   success: 'bg-success-soft text-success',
   warning: 'bg-warning-soft text-warning',

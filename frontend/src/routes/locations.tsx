@@ -462,9 +462,9 @@ function LocationBranch({
             }}
             aria-label={`Editar ${node.location.name}`}
             title="Editar"
-            className="min-w-touch px-0"
+            className="w-11 px-0"
           >
-            <Pencil size={20} strokeWidth={1.75} aria-hidden="true" />
+            <Pencil size={20} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
           </Button>
           <Button
             variant="ghost-danger"
@@ -474,9 +474,9 @@ function LocationBranch({
             }}
             aria-label={`Borrar ${node.location.name}`}
             title="Borrar"
-            className="min-w-touch px-0"
+            className="w-11 px-0"
           >
-            <Trash2 size={20} strokeWidth={1.75} aria-hidden="true" />
+            <Trash2 size={20} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
           </Button>
         </span>
       </div>

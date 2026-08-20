@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell } from 'lucide-react'
+import { Bell, Mail, MailOpen } from 'lucide-react'
 import { useState } from 'react'
 
 import { api, formatDate, humanMessage, type Notice } from '../api/client'
@@ -127,7 +127,7 @@ function NoticeRow({ notice, onRead }: { notice: Notice; onRead: () => void }) {
           {/* El estado con etiqueta y no solo con color, que es la regla 4 de la
               dirección visual: sin leer y leído no se pueden distinguir solo por
               el peso del texto. */}
-          <StatusBadge tone={read ? 'neutral' : 'info'}>{read ? 'Leído' : 'Sin leer'}</StatusBadge>
+          <StatusBadge tone={read ? 'neutral' : 'accent'}>{read ? 'Leído' : 'Sin leer'}</StatusBadge>
         </div>
         <p className="mt-1 text-body-sm text-ink-muted">{notice.body}</p>
         <p className="mt-1 text-caption text-ink-subtle">{formatDate(notice.createdAt)}</p>
@@ -135,14 +135,43 @@ function NoticeRow({ notice, onRead }: { notice: Notice; onRead: () => void }) {
         {mark.isError && <p className="mt-2 text-caption text-danger">{humanMessage(mark.error)}</p>}
       </div>
 
-      {!read && (
-        <Button variant="ghost" onClick={() => mark.mutate()} busy={mark.isPending} busyLabel="Marcando…">
-          {/* El título dentro del nombre accesible: con quince avisos, quince
-              botones que digan «Marcar como leído» son quince destinos idénticos
-              para quien navega por lista de botones. */}
-          Marcar como leído: {notice.title}
-        </Button>
-      )}
+      {/* El par de sobres cuenta el estado en la misma esquina de todas las
+          tarjetas: cerrado y pulsable en las pendientes —abrir el sobre es
+          marcarlo leído—, abierto y decorativo en las leídas, donde el
+          significado ya lo lleva la etiqueta «Leído». En móvil la esquina es
+          la inferior derecha —una fila propia, flex y no absoluto, para que el
+          sitio se reserve solo— y desde `md`, la superior derecha. */}
+      <span className="flex w-full justify-end md:w-auto">
+        {read ? (
+          // La misma anchura explícita que el botón de abajo: `w-11` y no
+          // `min-w-touch`, porque el `px-0` del botón compite con el `px-4` de
+          // la base y quién gana lo decide el orden del CSS generado — con la
+          // anchura fijada, los dos sobres caen en el mismo eje siempre.
+          <span aria-hidden="true" className="inline-flex min-h-touch w-11 items-center justify-center text-ink-subtle">
+            <MailOpen size={20} strokeWidth={1.75} />
+          </span>
+        ) : (
+          <Button
+            variant="ghost"
+            onClick={() => mark.mutate()}
+            busy={mark.isPending}
+            // El título dentro del nombre accesible: con quince avisos, quince
+            // botones que digan «Marcar como leído» son quince destinos
+            // idénticos para quien navega por lista de botones. Sin `busyLabel`
+            // a propósito: cambiaría el icono por texto y la anchura daría un
+            // salto; el estado en curso lo dice `aria-busy`.
+            aria-label={`Marcar como leído: ${notice.title}`}
+            title="Marcar como leído"
+            // El `px-0` no gana nunca al `px-4` de la base —Tailwind ordena las
+            // utilidades en la hoja, no en el atributo—, así que la caja de
+            // contenido queda en 12 px: el `shrink-0` del icono es lo que lo
+            // mantiene en sus 20 px, centrado sobre el relleno.
+            className="w-11 px-0"
+          >
+            <Mail size={20} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
+          </Button>
+        )}
+      </span>
     </li>
   )
 }
