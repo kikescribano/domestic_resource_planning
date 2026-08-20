@@ -4,6 +4,7 @@ import {
   Blocks,
   BookOpen,
   Boxes,
+  CircleHelp,
   CircleUserRound,
   Ellipsis,
   Handshake,
@@ -77,9 +78,10 @@ const THUMB_STOPS = new Set(['/', '/avisos', '/inventario', '/prestamos'])
  * - **Datos maestros** es lo que las demás pantallas consultan: quién, qué y
  *   dónde. El nombre es el término de un ERP a conciencia — este es doméstico,
  *   pero es un ERP.
- * - **Configuración** solo existe para quien administra: un miembro no puede
- *   tocar nada de lo que hay dentro, y un grupo entero de puertas cerradas es
- *   peor que ningún grupo.
+ * - **Configuración** cierra la lista. Sus dos paradas de administración solo
+ *   las ve quien administra —un miembro no puede tocar nada de lo que hay
+ *   dentro, y una puerta cerrada es peor que ninguna—, pero el grupo existe
+ *   para todos porque lo remata «Ayuda», que es de cualquiera.
  *
  * Las paradas de módulo son huecos con posición fija: si el módulo está activo
  * la parada aparece ahí, y si no, no está — la tercera capa del gate de la
@@ -124,18 +126,23 @@ function useNavigationGroups() {
         { to: '/almacenamiento', label: 'Archivo', end: false, icon: HardDrive },
       ],
     },
-  ]
-
-  if (isAdmin) {
-    groups.push({
+    {
       id: 'nav-config',
       label: 'Configuración',
       items: [
-        { to: '/configuracion', label: 'General', end: false, icon: Settings },
-        { to: '/modulos', label: 'Módulos del hogar', end: false, icon: Blocks },
+        ...(isAdmin
+          ? [
+              { to: '/configuracion', label: 'General', end: false, icon: Settings },
+              { to: '/modulos', label: 'Módulos del hogar', end: false, icon: Blocks },
+            ]
+          : []),
+        // La última parada de la navegación entera, y para todos los papeles:
+        // la guía de la herramienta es de quien la usa, no de quien la
+        // administra.
+        { to: '/ayuda', label: 'Ayuda', end: false, icon: CircleHelp },
       ],
-    })
-  }
+    },
+  ]
 
   return groups
 }

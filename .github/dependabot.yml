@@ -1,0 +1,70 @@
+# Vigilancia continua de dependencias.
+#
+# Es la otra mitad del hallazgo 5 de la auditoría OWASP, y la que de verdad
+# importa a largo plazo: subir Spring Boot una vez cierra las CVE **de hoy**;
+# esto es lo que hace que las de mañana las vea alguien. Sin ello, una CVE nueva
+# no la detecta nadie hasta la siguiente auditoría manual — que es exactamente lo
+# que pasó con `webp-imageio`, congelada desde 2020 en el repositorio.
+#
+# Los tres ecosistemas, porque los tres han dado un hallazgo:
+#
+# - `gradle`, donde estaban las CVE de Spring y la librería de imagen sin
+#   mantener.
+# - `npm`, hoy limpio (`npm audit` da cero), y precisamente por eso conviene que
+#   siga vigilado sin que nadie se acuerde.
+# - `github-actions`, que la auditoría marcó por ir fijado a etiqueta mayor
+#   mutable: un tag se puede reapuntar, así que el compromiso de una acción
+#   compromete la integración. Dependabot es lo que permite fijar por SHA sin
+#   que quedarse atrás salga gratis.
+#
+# **Las alertas de seguridad del repositorio son aparte y no se configuran
+# aquí**: Dependabot alerts, security updates y el escaneo de secretos con
+# protección de push se activan en los ajustes del repositorio, y siguen
+# pendientes (ver `docs/common/security/owasp-audit.md`).
+
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    # Agrupado a propósito: el BOM de Spring Boot mueve decenas de artefactos a
+    # la vez, y un pull request por cada uno convierte la vigilancia en ruido que
+    # se acaba ignorando — que es la forma habitual de que esto deje de servir.
+    groups:
+      spring:
+        patterns:
+          - org.springframework*
+          - org.springdoc*
+      test:
+        patterns:
+          - org.testcontainers*
+          - io.kotest*
+          - com.tngtech.archunit*
+    commit-message:
+      prefix: build
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # El utillaje de desarrollo no llega al artefacto que se sirve, así que sus
+      # subidas no son urgentes y sí numerosas: agruparlas las separa de lo que
+      # sí viaja al navegador.
+      tooling:
+        dependency-type: development
+    commit-message:
+      prefix: build
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: ci

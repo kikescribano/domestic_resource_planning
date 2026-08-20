@@ -25,6 +25,17 @@ on:
     branches: [main]
   pull_request:
 
+# El token de la integracion, con lo minimo: **leer el codigo y nada mas**.
+#
+# Sin este bloque hereda lo que tenga configurado el repositorio, que puede ser
+# escritura, y ninguno de los cinco trabajos la necesita --clonan, construyen y
+# publican informes, y la publicacion de artefactos no va por este token--. Es
+# la contencion que hace que una accion comprometida no pueda escribir en el
+# repositorio: hoy van fijadas por etiqueta mayor, que es mutable, asi que la
+# superficie existe (ver la auditoria OWASP).
+permissions:
+  contents: read
+
 # Un push nuevo sobre la misma rama cancela la ejecucion anterior.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
