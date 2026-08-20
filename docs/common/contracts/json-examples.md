@@ -19,7 +19,8 @@ El contrato completo, con todos los recursos, parámetros y esquemas de error, s
   "categoryId": "c1a70de5-...-00000000000b",
   "ownerId": "3d0a1e2c-...-000000000001",
   "location": { "type": "ASSET", "id": "9f21b4a0-...-000000000002" },
-  "condition": "GOOD"
+  "condition": "GOOD",
+  "tagIds": ["b2e40a17-...-000000000021"]
 }
 ```
 
@@ -31,16 +32,23 @@ El contrato completo, con todos los recursos, parámetros y esquemas de error, s
   "type": "DURABLE",
   "categoryId": "c1a70de5-...-00000000000b",
   "category": "Mobiliario",
+  "categoryIcon": "SOFA",
+  "categoryColor": "PLUM",
   "ownerId": "3d0a1e2c-...-000000000001",
   "location": { "type": "ASSET", "id": "9f21b4a0-...-000000000002" },
   "status": "AVAILABLE",
   "condition": "GOOD",
+  "tags": [
+    { "id": "b2e40a17-...-000000000021", "name": "Heredado", "createdAt": "2026-02-11T18:20:00Z" }
+  ],
   "createdAt": "2026-08-06T10:15:00Z"
 }
 ```
 > El `status` y el `condition` no se parecen aunque los dos suenen a «estado»: el primero dice **qué le está pasando** a la cosa —está prestada, está de baja— y lo gobiernan otras operaciones; el segundo dice **cómo está**, lo escribe una persona y es opcional. Nulo en `condition` significa que nadie lo ha anotado, que es el caso normal.
 >
-> `categoryId` es lo que se escribe; `category` es su nombre resuelto para lectura. Mismo patrón que `name` y `unit` con el artículo: se guarda una vez y se resuelve al leer.
+> `categoryId` es lo que se escribe; `category`, `categoryIcon` y `categoryColor` son la categoría resuelta para lectura. Mismo patrón que `name` y `unit` con el artículo: se guarda una vez y se resuelve al leer — y con la cara importa más, porque cuando el asset hereda la categoría de su artículo no la guarda en su fila y sin resolverla el listado tendría que pedir el catálogo entero para pintar un cuadradito.
+>
+> Las **etiquetas** llegan con identificador y nombre, y no solo con el nombre, porque el filtro del listado va por identificador: con el texto solo, la pantalla tendría que buscar en el catálogo la etiqueta que acaba de pintar.
 
 **`POST /api/v1/assets`** — la misma alta, cuando la ubicación se queda corta (`201 Created`)
 ```json
@@ -185,6 +193,31 @@ El contrato completo, con todos los recursos, parámetros y esquemas de error, s
 
 **`GET /api/v1/assets?condition=UNUSABLE`** — qué hay para tirar
 > Es la pregunta que justifica que sea un enumerado y no texto libre: sobre `notes` no se puede filtrar. Los assets sin anotar **no salen en ningún filtro por estado**, y eso es correcto: no tener anotación no es un estado.
+
+**`POST /api/v1/tags`** — crear una etiqueta, o revivir la que existiera retirada
+```json
+{ "name": "Camping" }
+```
+> Responde **`201`** si la creó y **`200`** si ya existía —viva, o retirada y revivida—, igual que la entrada de un consumible y por el mismo motivo: quien escribe un nombre en el campo de etiquetas no tiene por qué saber cuál de las dos cosas va a pasar. La comparación es normalizada, así que «camping» y «Camping» son la misma.
+>
+> Que revivir sea aquí y no una operación aparte sale del índice único de `tags`, que **no es parcial por retirada** al contrario que el de `categories` (ver 5.6): con el índice completo, crear «Camping» teniendo una «camping» retirada sería un `409` sobre una fila que el usuario no ve.
+
+**`PATCH /api/v1/assets/{id}`** — etiquetar, y desetiquetar
+```json
+{ "tagIds": ["b2e40a17-...-000000000021", "b2e40a17-...-000000000022"] }
+```
+> **La lista entera y no un delta**: sustituye lo que hubiera, igual que la cantidad de una existencia. No mencionar `tagIds` no toca nada, y `[]` las quita todas — que es como se desetiqueta. Una etiqueta de otro hogar, o una retirada, se rechazan con `404`.
+
+**`GET /api/v1/assets?tagId=b2e40a17-...-000000000021`** — qué hay etiquetado como camping
+> Es la mitad por la que existe el atributo: clasificar sin poder preguntar después no clasifica nada. **Una sola etiqueta y no varias**, porque con dos habría que decidir si se cruzan en `AND` o en `OR` —«lo de camping que además es del abuelo» frente a «lo de camping y lo del abuelo»— y ninguna pantalla ha pedido todavía ninguna de las dos.
+
+**`PATCH /api/v1/categories/{id}`** — ponerle cara a una categoría, y quitársela
+```json
+{ "name": "Herramientas", "icon": "TOOL", "color": "SKY" }
+```
+> Los dos son opcionales y se eligen dentro de un **juego cerrado** —dieciséis iconos y seis colores— porque un color libre no está en ningún token del sistema de diseño y por tanto no lo mide `scripts/check-contrast.py` (ver [ADR-015](../architecture/decisions/ADR-015-user-chosen-category-identity.md)). Un valor fuera de la lista se rechaza con `400` y `VALIDATION_ERROR`.
+>
+> **El cuerpo es la categoría entera y no un parche campo a campo**, como ya pasaba con `notes`: mandar `{ "name": "Herramientas" }` a secas **quita** el icono y el color, que es como se retira uno elegido por error.
 
 **`PATCH /api/v1/assets/{id}`** — apuntar el número de serie que no se tenía al dar de alta
 ```json

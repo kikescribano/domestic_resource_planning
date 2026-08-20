@@ -115,6 +115,36 @@
   --color-state-out-of-stock: light-dark(oklch(45% 0.12 250), oklch(76% 0.1 250));
   --color-state-out-of-stock-soft: light-dark(oklch(94.5% 0.024 250), oklch(28% 0.04 250));
 
+  /* Identidad visual de una categoria: los seis colores entre los que el hogar
+     elige (ADR-015). Es la unica familia de esta paleta cuyo nombre es
+     DESCRIPTIVO y no semantico, y la excepcion esta razonada: el significado no
+     lo pone el sistema sino la persona que clasifica, asi que un
+     `--color-category-3` seria ilegible en la migracion, en el contrato y aqui.
+
+     Seis y no mas, y ninguno cae encima de los cinco estados del dominio ni del
+     acento: los tonos tomados son 27 (error y vencido), 42 (acento), 75 (aviso y
+     prestado), 152 (exito y disponible) y 250 (informacion y sin existencias).
+     Los dos que mas se acercan --moss al verde de disponible y sky al azul de
+     sin existencias-- se admiten porque **el color de una categoria nunca va
+     solo**: lleva su nombre al lado y un icono dentro, y su forma es un
+     cuadradito y no la pastilla de un estado.
+
+     Cada uno tiene su par medido en scripts/check-contrast.py, en los dos modos
+     y contra las dos superficies sobre las que se pinta: su propio fondo suave
+     y `surface-sunken`, que es el marcador de una foto que falta. */
+  --color-category-rose: light-dark(oklch(47% 0.14 350), oklch(78% 0.12 350));
+  --color-category-rose-soft: light-dark(oklch(94.5% 0.025 350), oklch(28% 0.045 350));
+  --color-category-plum: light-dark(oklch(46% 0.14 310), oklch(78% 0.11 310));
+  --color-category-plum-soft: light-dark(oklch(94.5% 0.025 310), oklch(28% 0.045 310));
+  --color-category-indigo: light-dark(oklch(46% 0.14 275), oklch(78% 0.11 275));
+  --color-category-indigo-soft: light-dark(oklch(94.5% 0.022 275), oklch(28% 0.045 275));
+  --color-category-sky: light-dark(oklch(46% 0.09 230), oklch(78% 0.1 230));
+  --color-category-sky-soft: light-dark(oklch(94.5% 0.026 230), oklch(28% 0.04 230));
+  --color-category-teal: light-dark(oklch(45% 0.07 195), oklch(78% 0.1 195));
+  --color-category-teal-soft: light-dark(oklch(94.5% 0.026 195), oklch(28% 0.04 195));
+  --color-category-moss: light-dark(oklch(45% 0.1 130), oklch(78% 0.11 130));
+  --color-category-moss-soft: light-dark(oklch(94.5% 0.03 130), oklch(28% 0.04 130));
+
   /* -------------------------------------------------------------------------
      Tipografía
 

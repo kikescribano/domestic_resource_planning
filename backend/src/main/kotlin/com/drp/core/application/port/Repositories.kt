@@ -4,6 +4,9 @@ import com.drp.platform.page.Page
 import com.drp.platform.page.Pagination
 import com.drp.core.domain.catalog.Article
 import com.drp.core.domain.catalog.Category
+import com.drp.core.domain.catalog.CategoryColor
+import com.drp.core.domain.catalog.CategoryIcon
+import com.drp.core.domain.catalog.Tag
 import com.drp.core.domain.household.Household
 import com.drp.core.domain.household.HouseholdMember
 import com.drp.core.domain.file.Document
@@ -193,6 +196,14 @@ interface RefreshTokenRepository {
     fun revokeAllForIdentityExcept(identityId: UUID, keepTokenId: UUID?, at: Instant)
 }
 
+/**
+ * Una categoria de las que siembra el alta de un hogar, ya con su cara puesta.
+ *
+ * Existe para que `seed` no reciba tres listas paralelas: el nombre, el icono y
+ * el color de una misma categoria se deciden juntos y viajan juntos.
+ */
+data class SeededCategory(val name: String, val icon: CategoryIcon, val color: CategoryColor)
+
 interface CategoryRepository {
     /**
      * Las categorias que siembra el alta de un hogar (ver README 4.1.1).
@@ -200,7 +211,7 @@ interface CategoryRepository {
      * No recibe autoria porque no la tiene: sembrar lo hace el sistema, no una
      * persona, y eso es exactamente lo que significa un `created_by` a nulo.
      */
-    fun seed(names: List<String>, at: Instant)
+    fun seed(categories: List<SeededCategory>, at: Instant)
 
     fun countCurrent(): Long
 
@@ -220,6 +231,61 @@ interface CategoryRepository {
     fun findLiveByName(name: String): Category?
 
     fun list(includeRetired: Boolean, pagination: Pagination): Page<Category>
+}
+
+/**
+ * El catalogo de etiquetas del hogar y su relacion con los assets.
+ *
+ * Es **un solo puerto para las dos tablas** y no dos, porque una etiqueta sin la
+ * relacion no responde a ninguna pregunta que alguien haga: las cuatro
+ * operaciones del catalogo y el «que lleva puesto este asset» se piden siempre
+ * en el mismo gesto.
+ */
+interface TagRepository {
+    fun save(tag: Tag): Tag
+
+    fun findById(tagId: UUID): Tag?
+
+    /**
+     * La etiqueta que se llame asi, **viva o retirada**, comparando sin
+     * distinguir mayusculas ni acentos.
+     *
+     * Al contrario que en `categories`, aqui se miran tambien las retiradas, y
+     * es lo que sostiene la decision de la V17: el indice unico **no es parcial**
+     * --dos etiquetas del mismo nombre podrian acabar sobre el mismo asset y
+     * pintarlo dos veces-- asi que crear una que ya existe retirada la **revive**
+     * en lugar de fallar. Sin esta consulta esa reviviscencia no se puede
+     * escribir.
+     *
+     * Normaliza con `immutable_unaccent`, la misma funcion que el indice, y no
+     * con un `lowercase()` de Kotlin: dos formas distintas de normalizar
+     * significan que el caso de uso deja pasar nombres que la base de datos
+     * rechaza despues con un 500.
+     */
+    fun findByName(name: String): Tag?
+
+    fun list(includeRetired: Boolean, query: String?, pagination: Pagination): Page<Tag>
+
+    /**
+     * Las etiquetas de varios assets **de una vez**.
+     *
+     * En plural y no una consulta por asset: el listado del inventario trae
+     * hasta doscientas filas, y resolverlas de una en una serian doscientas
+     * consultas por la misma razon por la que las miniaturas se resuelven en
+     * bloque.
+     */
+    fun tagsOf(assetIds: List<UUID>): Map<UUID, List<Tag>>
+
+    /**
+     * Deja el asset con **exactamente** estas etiquetas: pone las que faltan y
+     * quita las que sobran.
+     *
+     * Es absoluto y no un delta, igual que el `tagIds` del contrato y que la
+     * cantidad de un `PATCH`. Dos formas distintas de decir lo mismo a cada lado
+     * de la frontera obligarian a traducir en el adaptador, que es donde se
+     * olvida.
+     */
+    fun replaceTagsOf(assetId: UUID, tagIds: List<UUID>, by: UUID?, at: Instant)
 }
 
 interface ArticleRepository {
@@ -365,6 +431,18 @@ data class AssetFilter(
      * no se puede filtrar.
      */
     val condition: AssetCondition? = null,
+    /**
+     * «Que hay etiquetado como camping». Es la mitad por la que existe el
+     * atributo: clasificar sin poder preguntar despues no clasifica nada.
+     *
+     * **Una etiqueta y no varias**, y se dice por que: con dos habria que
+     * decidir si se cruzan en `AND` o en `OR`, que son dos preguntas distintas
+     * --«lo de camping que ademas es del abuelo» frente a «lo de camping y lo
+     * del abuelo»-- y ninguna pantalla ha pedido todavia ninguna de las dos. El
+     * dia que se pida, el parametro se ensancha y el filtro de hoy sigue
+     * significando lo mismo.
+     */
+    val tagId: UUID? = null,
     /** Los huerfanos de una baja de usuario, que es la pregunta que deja abierta `DeactivateUser`. */
     val withoutOwner: Boolean = false,
 )

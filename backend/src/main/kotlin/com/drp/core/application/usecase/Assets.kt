@@ -7,6 +7,7 @@ import com.drp.core.application.event.LocationKind
 import com.drp.core.application.event.QuantityChangeReason
 import com.drp.core.application.port.ArticleRepository
 import com.drp.core.application.port.AssetFilter
+import com.drp.core.application.port.TagRepository
 import com.drp.core.application.port.AssetRepository
 import com.drp.core.application.port.CategoryRepository
 import com.drp.core.application.port.HierarchyLock
@@ -19,7 +20,10 @@ import com.drp.platform.error.BusinessRuleViolation
 import com.drp.platform.error.ErrorCode
 import com.drp.platform.error.ResourceNotFound
 import com.drp.platform.error.ValidationFailure
+import com.drp.core.domain.catalog.CategoryColor
+import com.drp.core.domain.catalog.CategoryIcon
 import com.drp.core.domain.catalog.MeasurementUnit
+import com.drp.core.domain.catalog.Tag
 import com.drp.core.domain.inventory.Asset
 import com.drp.core.domain.inventory.AssetCondition
 import com.drp.core.domain.inventory.AssetLocation
@@ -64,7 +68,17 @@ data class AssetView(
     val name: String,
     val categoryId: UUID?,
     val categoryName: String?,
+    /**
+     * La cara de su categoria, resuelta al leer igual que el nombre. Va aqui y
+     * no en la pantalla porque el asset **no guarda su categoria por duplicado**
+     * cuando la hereda de un articulo: sin resolverla, el listado tendria que
+     * pedir el catalogo entero para pintar un cuadradito.
+     */
+    val categoryIcon: CategoryIcon?,
+    val categoryColor: CategoryColor?,
     val unit: MeasurementUnit?,
+    /** Las etiquetas puestas, en el orden en que se resuelven. Vacio es lo normal. */
+    val tags: List<Tag> = emptyList(),
     val warnings: List<OperationWarning> = emptyList(),
 )
 
@@ -81,6 +95,14 @@ data class CreateAssetCommand(
     val photoUrl: String?,
     val photoFileId: UUID?,
     val notes: String?,
+    /**
+     * Las etiquetas con las que nace. Vacio es lo normal, y **no se ofrece en la
+     * entrada de un consumible**: dar entrada suma sobre una existencia que
+     * puede llevar ya las suyas, asi que habria que decidir si el cuerpo las
+     * reemplaza o las funde, y ninguna de las dos respuestas es evidente. Se
+     * etiqueta despues, con el `PATCH`.
+     */
+    val tagIds: List<UUID> = emptyList(),
 )
 
 data class IntakeCommand(
@@ -104,6 +126,12 @@ data class AssetPatch(
     val photoUrl: Patch<String?> = Patch.Absent,
     val photoFileId: Patch<UUID?> = Patch.Absent,
     val notes: Patch<String?> = Patch.Absent,
+    /**
+     * La lista **entera**, no un delta: sustituye lo que hubiera, igual que la
+     * cantidad de una existencia. Ausente no toca nada y una lista vacia las
+     * quita todas, que es como se desetiqueta.
+     */
+    val tagIds: Patch<List<UUID>> = Patch.Absent,
 )
 
 /**
@@ -117,24 +145,51 @@ data class AssetPatch(
 class AssetViewFactory(
     private val articles: ArticleRepository,
     private val categories: CategoryRepository,
+    private val tags: TagRepository,
 ) {
 
-    fun of(asset: Asset, warnings: List<OperationWarning> = emptyList()): AssetView {
+    fun of(asset: Asset, warnings: List<OperationWarning> = emptyList()): AssetView =
+        build(asset, tags.tagsOf(listOf(asset.id))[asset.id].orEmpty(), warnings)
+
+    /**
+     * La pagina entera, con **las etiquetas resueltas de una sola consulta**.
+     *
+     * Es la misma economia que las miniaturas firmadas del controlador: el
+     * listado del inventario trae hasta doscientas filas y una consulta por fila
+     * serian doscientas. La categoria sigue resolviendose de una en una, que es
+     * como estaba, y no se cambia aqui: seria otro arreglo y no el de este hito.
+     */
+    fun ofAll(page: Page<Asset>): Page<AssetView> {
+        val byAsset = tags.tagsOf(page.items.map { it.id })
+        return Page(
+            page.items.map { build(it, byAsset[it.id].orEmpty()) },
+            page.page,
+            page.size,
+            page.total,
+        )
+    }
+
+    private fun build(
+        asset: Asset,
+        tags: List<Tag>,
+        warnings: List<OperationWarning> = emptyList(),
+    ): AssetView {
         val article = asset.articleId?.let { articles.findById(it) }
         val categoryId = article?.categoryId ?: asset.categoryId
+        val category = categoryId?.let { categories.findById(it) }
 
         return AssetView(
             asset = asset,
             name = article?.name ?: asset.name.orEmpty(),
             categoryId = categoryId,
-            categoryName = categoryId?.let { categories.findById(it)?.name },
+            categoryName = category?.name,
+            categoryIcon = category?.icon,
+            categoryColor = category?.color,
             unit = article?.unit,
+            tags = tags,
             warnings = warnings,
         )
     }
-
-    fun ofAll(page: Page<Asset>): Page<AssetView> =
-        Page(page.items.map { of(it) }, page.page, page.size, page.total)
 }
 
 @Service
@@ -163,6 +218,8 @@ class GetAsset(
 class CreateAsset(
     private val assets: AssetRepository,
     private val references: AssetReferenceResolver,
+    private val tagReferences: TagReferenceResolver,
+    private val tags: TagRepository,
     private val capacity: CapacityAdvisor,
     private val views: AssetViewFactory,
     private val events: CoreEvents,
@@ -187,6 +244,9 @@ class CreateAsset(
         }
 
         references.resolveAll(command.articleId, command.categoryId, command.ownerId, command.photoFileId)
+        // Antes de escribir nada: una etiqueta de otro hogar tiene que dar 404 y
+        // no un error de restriccion a mitad de la transaccion.
+        val tagIds = tagReferences.resolveAll(command.tagIds)
         command.location?.let { references.requireUsableAsContainer(it) }
 
         val now = clock.instant()
@@ -216,6 +276,12 @@ class CreateAsset(
             ),
         )
 
+        if (tagIds.isNotEmpty()) tags.replaceTagsOf(created.id, tagIds, session.memberId, now)
+
+        // El evento no lleva las etiquetas, y no es un olvido: ningun modulo
+        // previsto reacciona a la clasificacion interna del hogar, que es el
+        // mismo criterio por el que crear una categoria tampoco publica nada
+        // (README 5.2.3). El dia que uno las necesite, las lee.
         events.assetCreated(
             created.id,
             created.type.name,
@@ -337,6 +403,8 @@ class RegisterConsumableIntake(
 class UpdateAsset(
     private val assets: AssetRepository,
     private val references: AssetReferenceResolver,
+    private val tagReferences: TagReferenceResolver,
+    private val tags: TagRepository,
     private val hierarchyLock: HierarchyLock,
     private val capacity: CapacityAdvisor,
     private val views: AssetViewFactory,
@@ -382,6 +450,9 @@ class UpdateAsset(
         val newOwnerId = patch.ownerId.orKeep(current.ownerId)
         if (patch.ownerId is Patch.Set && newOwnerId != null) references.requireMember(newOwnerId)
         if (patch.photoFileId is Patch.Set) references.requirePhoto(patch.photoFileId.value, current.photoFileId)
+        // Se resuelven **antes** de guardar, como las demas referencias del
+        // cuerpo: una etiqueta ajena no puede dejar el asset ya reescrito.
+        val newTagIds = (patch.tagIds as? Patch.Set)?.let { tagReferences.resolveAll(it.value) }
 
         // El nombre y la categoria propios solo valen en un asset SIN articulo:
         // si lo tiene, se cambian en el articulo. Guardarlos aqui los duplicaria
@@ -411,6 +482,10 @@ class UpdateAsset(
                 updatedBy = session.memberId,
             ),
         )
+
+        // Absoluto y no un delta: la lista que llega es la que queda. Una lista
+        // vacia las quita todas, que es como se desetiqueta desde la ficha.
+        newTagIds?.let { tags.replaceTagsOf(assetId, it, session.memberId, updated.updatedAt) }
 
         if (moves) publishMove(current, updated)
         if (newQuantity != null && current.quantity != null && newQuantity.compareTo(current.quantity) != 0) {

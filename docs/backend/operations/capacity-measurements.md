@@ -89,6 +89,16 @@ optimizar. **Las cuatro primeras ya no son todas del core:**
 | `documents` | 168 kiB | Core |
 | `warehouse_locations` | 144 kiB | Warehouse |
 
+> **Las dos tablas del Hito 4 del cierre de huecos caen en esta magnitud, no en
+> la de actividad, y conviene dejarlo escrito antes de volver a medir.** `tags` es
+> un catálogo del tamaño del vocabulario de la casa —del orden de decenas de
+> filas, como `categories`— y `asset_tags` crece con **lo que el hogar tiene y
+> etiqueta**, no con lo que hace: 500 assets a cinco etiquetas cada uno son 2 500
+> filas de tres `uuid`, muy por debajo de `documents`. Ninguna de las dos entra en
+> la lista de la purga, y las dos se van con la baja del hogar como el resto de
+> tablas con `household_id`. **El número no se vuelve a medir aquí**: la remedición
+> completa, con las dos dentro, es del hito de cierre del bloque.
+
 ## Bytes por año: lo que el hogar hace
 
 Un hogar ya sembrado, con los cuatro módulos encendidos, al que **no se le añade

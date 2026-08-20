@@ -182,8 +182,8 @@ class RowLevelSecurityTest {
      * ademas cualquier tabla nueva que alguien olvidara.
      */
     @Test
-    @DisplayName("el esquema tiene las veintinueve tablas del modelo, ni una mas")
-    fun `el esquema tiene veintinueve tablas`() {
+    @DisplayName("el esquema tiene las treinta y una tablas del modelo, ni una mas")
+    fun `el esquema tiene treinta y una tablas`() {
         // Quince del core, dos de plataforma --`household_modules`, de la
         // activacion de modulos del Hito 0 (ADR-010), y `household_notices`, de
         // la plataforma de avisos del Hito 1 (ADR-011)-- y **once de los cuatro
@@ -204,7 +204,15 @@ class RowLevelSecurityTest {
         // Lleva `household_id`, RLS y `FORCE` como cualquier otra --y aqui la
         // politica hace mas trabajo que en casi ninguna, porque quien la lee no
         // nace de una peticion--, asi que tampoco toca la lista de las cinco.
-        owner.queryAllTables().size.shouldBe(29)
+        //
+        // Y las dos ultimas son **del core**, con las etiquetas libres del Hito 4
+        // del cierre de huecos: `tags`, que es el catalogo, y `asset_tags`, que
+        // es la union. Las dos llevan `household_id`, RLS y `FORCE`, asi que
+        // suben este recuento y no el de las cinco. La de union lo lleva **aunque
+        // sus dos puntas ya sean del hogar**, y no es redundante: sin esa columna
+        // no hay politica que escribir, y es lo que permite declarar las dos
+        // claves ajenas compuestas que impiden etiquetar el asset de otro hogar.
+        owner.queryAllTables().size.shouldBe(31)
     }
 
     @Test

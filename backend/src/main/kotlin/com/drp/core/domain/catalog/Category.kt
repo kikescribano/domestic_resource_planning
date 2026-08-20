@@ -22,6 +22,21 @@ data class Category(
     val id: UUID,
     val name: String,
     val notes: String?,
+    /**
+     * La cara de la categoria: uno de los dieciseis iconos y uno de los seis
+     * colores, o nada.
+     *
+     * **Son enumerados y no texto libre**, y esa es la decision entera de la
+     * ADR-015: un color elegido con un selector libre no esta en ningun token
+     * del sistema de diseno, asi que no lo mide `scripts/check-contrast.py` y
+     * seria lo unico de la interfaz cuyo contraste se afirma en vez de
+     * comprobarse. Con el juego cerrado, los pares nuevos entran en esa lista.
+     *
+     * Nulo significa **que nadie lo eligio**, que es el caso normal: una
+     * categoria recien sembrada no tiene por que tener cara.
+     */
+    val icon: CategoryIcon?,
+    val color: CategoryColor?,
     val createdAt: Instant,
     val updatedAt: Instant,
     val retiredAt: Instant?,
@@ -35,3 +50,24 @@ data class Category(
      */
     val isLive: Boolean get() = retiredAt == null
 }
+
+/**
+ * El juego cerrado de iconos entre los que un hogar elige.
+ *
+ * Dieciseis, y no las mil y pico que trae Lucide: un buscador sobre el juego
+ * entero obligaria a mantener una traduccion de mil nombres al castellano y
+ * dejaria elegir una papelera para «Alimentacion». Que dieciseis, y con que
+ * nombre se ven en pantalla, esta en
+ * `docs/frontend/design-system/foundations/iconography.md`.
+ *
+ * `BOX` es ademas el que se pinta cuando no hay ninguno elegido.
+ */
+enum class CategoryIcon { BOX, SOFA, UTENSILS, SPRAY, TOOL, FRAME, PLUG, POT, PILL, MONITOR, SHIRT, BIKE, PENCIL, CAR, LEAF, PAW }
+
+/**
+ * Los seis colores entre los que un hogar elige, todos medidos.
+ *
+ * Ninguno cae encima de los cinco tonos del dominio ni del acento, y **el color
+ * nunca es el unico portador**: el nombre de la categoria va siempre al lado.
+ */
+enum class CategoryColor { ROSE, PLUM, INDIGO, SKY, TEAL, MOSS }

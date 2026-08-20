@@ -1002,7 +1002,108 @@ test.describe('recorrido vertical', () => {
     expect(bytes.includes(Buffer.from('GPS'))).toBe(false)
   })
 
-  test('la pasada sistemática: las nueve pantallas de la lista, con teclado, reflujo y axe', async ({
+  /**
+   * Las etiquetas libres y la cara de una categoría
+   * ([ADR-015](../../docs/common/architecture/decisions/ADR-015-user-chosen-category-identity.md)).
+   *
+   * **Es el único recorrido del bloque en el que la accesibilidad puede romperse
+   * por un dato del usuario y no por una decisión del sistema**, y por eso mide
+   * algo que ningún otro mide: el contraste del color **aplicado**, leído del
+   * navegador y en los dos modos. `check-contrast.py` mide los doce pares en
+   * abstracto; aquí se comprueba que el par que acaba en pantalla cuando alguien
+   * elige «cielo» es ese par y no otro —que es exactamente lo que falla cuando
+   * una clase se compone con una plantilla y Tailwind no la genera.
+   */
+  test('las etiquetas y la cara de una categoría, con el color medido ya aplicado', async ({ page }) => {
+    const email = `etiquetas-${Date.now()}@example.test`
+    const password = 'el gato duerme en el sofa'
+
+    await page.goto('/crear-hogar')
+    await page.getByLabel('Nombre del hogar').fill('Casa con etiquetas')
+    await page.getByLabel('Tu nombre').fill('Kike')
+    await page.getByLabel('Correo').fill(email)
+    await page.getByLabel('Contraseña', { exact: true }).fill(password)
+    await page.getByRole('button', { name: /crear/i }).click()
+    await page.goto(await linkFromEmail(email))
+    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+
+    // --- 1. La cara de una categoría, elegida a mano ------------------------
+    await navigateTo(page, 'Catálogo', '/catalogo')
+    await page.getByRole('tab', { name: 'Categorías' }).click()
+
+    // Una de las cinco sembradas: nace con su cara puesta, y aquí se cambia.
+    await page.getByRole('button', { name: 'Editar Herramientas' }).click()
+    await page.getByRole('button', { name: 'Herramienta, Herramientas' }).click()
+    await page.getByRole('button', { name: 'Cielo, Herramientas' }).click()
+    await page.getByRole('button', { name: 'Guardar' }).click()
+    await expect(page.getByRole('button', { name: 'Editar Herramientas' })).toBeVisible()
+
+    await checkAccessibility(page, 'el catálogo con la cara puesta')
+    await checkReflow(page, 'el catálogo con la cara puesta')
+
+    // --- 2. Un asset con una etiqueta creada desde su propio campo ----------
+    await navigateTo(page, 'Inventario', '/inventario')
+    await page.getByRole('link', { name: 'Dar de alta' }).click()
+    await page.getByLabel('Nombre').fill('Taladro')
+    await page.getByLabel('Categoría').selectOption({ label: 'Herramientas' })
+
+    // No existe todavía: el campo la crea, que es lo único que su pista promete.
+    await page.getByRole('combobox', { name: 'Etiquetas (opcional)' }).fill('Camping')
+    await page.getByRole('option', { name: 'Crear «Camping»' }).click()
+    await expect(page.getByRole('button', { name: 'Quitar la etiqueta Camping' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Dar de alta' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Taladro' })).toBeVisible()
+
+    // --- 3. El color, medido ya aplicado y en los dos modos -----------------
+    //
+    // El marcador de la foto que falta es el único que lleva nombre accesible
+    // propio, porque es el único donde no hay texto al lado que diga de qué es
+    // el hueco. Y es el sitio donde el color del usuario ocupa más pantalla.
+    const marker = page.getByRole('img', { name: 'Sin foto. Categoría: Herramientas' })
+    await expect(marker).toBeVisible()
+
+    expect(
+      await appliedContrast(page, marker),
+      'el color de categoría elegido no llega a 4,5:1 en modo claro, ya aplicado',
+    ).toBeGreaterThanOrEqual(4.5)
+
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await settleTransitions(page)
+    expect(
+      await appliedContrast(page, marker),
+      'el color de categoría elegido no llega a 4,5:1 en modo oscuro, ya aplicado',
+    ).toBeGreaterThanOrEqual(4.5)
+    await page.evaluate(() => document.documentElement.removeAttribute('data-theme'))
+    await settleTransitions(page)
+
+    await checkAccessibility(page, 'la ficha con etiqueta y color')
+
+    // --- 4. La etiqueta, en la fila y en el filtro --------------------------
+    await navigateTo(page, 'Inventario', '/inventario')
+    const row = page.getByRole('link', { name: /Taladro/ })
+    await expect(row.getByText('Camping')).toBeVisible()
+
+    await page.getByLabel('Etiqueta').selectOption({ label: 'Camping' })
+    await expect(page.getByRole('link', { name: /Taladro/ })).toBeVisible()
+
+    // Y un asset sin ella desaparece del filtro, que es lo que demuestra que el
+    // filtro filtra en vez de no hacer nada.
+    await page.getByLabel('Etiqueta').selectOption('')
+    await page.getByRole('link', { name: 'Dar de alta' }).click()
+    await page.getByLabel('Nombre').fill('Sofá')
+    await page.getByLabel('Categoría').selectOption({ label: 'Mobiliario' })
+    await page.getByRole('button', { name: 'Dar de alta' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Sofá' })).toBeVisible()
+
+    await navigateTo(page, 'Inventario', '/inventario')
+    await expect(page.getByRole('link', { name: /Sofá/ })).toBeVisible()
+    await page.getByLabel('Etiqueta').selectOption({ label: 'Camping' })
+    await expect(page.getByRole('link', { name: /Taladro/ })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Sofá/ })).toHaveCount(0)
+  })
+
+  test('la pasada sistemática: las diez pantallas de la lista, con teclado, reflujo y axe', async ({
     page,
     request,
   }) => {
@@ -1062,10 +1163,36 @@ test.describe('recorrido vertical', () => {
     const categories = await request.get('/api/v1/categories', {
       headers: { Authorization: `Bearer ${token}` },
     })
-    const seededCategory = ((await categories.json()) as { items: Array<{ id: string }> }).items[0]!.id
+    // Por nombre y no por posición: el hito le cambia el icono y el color a esta
+    // misma, y el recorrido tiene que decir a cuál se los cambia.
+    const seededCategory = ((await categories.json()) as {
+      items: Array<{ id: string; name: string }>
+    }).items.find((item) => item.name === 'Herramientas')!.id
+    // **Con una etiqueta y con color puesto**, que es lo que el Hito 4 añade a
+    // esta pantalla y a la del catálogo. Sin ellos, axe auditaría la fila de
+    // ayer: ni una pastilla de etiqueta ni un marcador de color.
+    const tag = await request.post('/api/v1/tags', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { name: 'Camping' },
+    })
+    expect(tag.status(), 'no se pudo sembrar la etiqueta de la auditoría').toBe(201)
+    const tagId = ((await tag.json()) as { id: string }).id
+
+    const painted = await request.patch(`/api/v1/categories/${seededCategory}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { name: 'Herramientas', icon: 'TOOL', color: 'SKY' },
+    })
+    expect(painted.status(), 'no se pudo pintar la categoría de la auditoría').toBe(200)
+
     const asset = await request.post('/api/v1/assets', {
       headers: { Authorization: `Bearer ${token}` },
-      data: { name: 'Taladro', type: 'DURABLE', categoryId: seededCategory, condition: 'WORN' },
+      data: {
+        name: 'Taladro',
+        type: 'DURABLE',
+        categoryId: seededCategory,
+        condition: 'WORN',
+        tagIds: [tagId],
+      },
     })
     expect(asset.status(), 'no se pudo sembrar el asset de la auditoría').toBe(201)
 
@@ -1103,8 +1230,8 @@ test.describe('recorrido vertical', () => {
  * hito en vez de hacerlo de paso, pero conviene saber que la lista describe hoy
  * «lo que se audita» y no «lo que trajo la Fase 2».
  *
- * **Lo que sigue sin auditar son tres pantallas del core**: Sitios, Catálogo y
- * Personas. Inventario dejó de estarlo con el cierre de huecos, y Préstamos y
+ * **Lo que sigue sin auditar son dos pantallas del core**: Sitios y Personas.
+ * Inventario y Catálogo dejaron de estarlo con el cierre de huecos, y Préstamos y
  * Avisos sí tienen su llamada suelta en los recorridos de arriba.
  */
 const PHASE_TWO_SCREENS = [
@@ -1124,6 +1251,12 @@ const PHASE_TWO_SCREENS = [
   // la rejilla de ficheros, y no la miraba axe ni aquí ni en ninguna llamada
   // suelta. La celda de un PDF llevaba una semana sin nombre accesible por eso.
   { link: 'Archivo', path: '/almacenamiento', heading: 'Almacenamiento' },
+  // «Catálogo» entra el 2026-08-20, con la identidad visual de las categorías:
+  // es donde vive el selector de icono y color, o sea las veintidós parejas de
+  // botones que este hito añade y **el único sitio del producto donde un color
+  // lo elige el usuario**. Se siembra una categoría con color antes, porque en
+  // gris axe no habría mirado ninguno de los seis.
+  { link: 'Catálogo', path: '/catalogo', heading: 'Catálogo' },
   { link: 'Avisos', path: '/avisos', heading: 'Avisos' },
   { link: 'Proveedores', path: '/proveedores', heading: 'Proveedores' },
   { link: 'Almacén', path: '/almacen', heading: 'Almacén' },
@@ -1312,6 +1445,56 @@ async function linkFromEmail(recipient: string): Promise<string> {
   }
 
   throw new Error(`No llegó ningún correo a ${recipient} en 30 s`)
+}
+
+/**
+ * El contraste **ya aplicado** entre la tinta y el fondo de un elemento, leído
+ * del navegador.
+ *
+ * Existe por los seis colores de categoría, que son lo único de la interfaz que
+ * elige el usuario. `check-contrast.py` mide sus doce pares en abstracto, leyendo
+ * los `oklch()` de los tokens; lo que no puede saber es si el par que acaba en
+ * pantalla es ese. Un `bg-category-${color}-soft` compuesto con una plantilla no
+ * lo genera Tailwind y **no falla nadie**: el fondo sale transparente y el
+ * contraste medido aquí se desploma. Es el defecto que el Hito 3 destapó en la
+ * pantalla de Préstamos, medido esta vez antes de que ocurra.
+ *
+ * axe no lo cubre porque el icono es un gráfico y no texto: su regla de
+ * contraste solo mira nodos con texto.
+ *
+ * **El color se resuelve pintándolo, no leyéndolo.** La versión obvia --sacar los
+ * tres números del valor calculado-- da 1,00:1 sobre esta paleta y tardó una
+ * ejecución en entenderse: Chrome **conserva `oklch()` en `getComputedStyle`**
+ * para los espacios de color modernos, así que `oklch(0.46 0.09 230)` se parseaba
+ * como el sRGB `(0,46, 0,09, 230)` y los dos colores salían casi negros. Un
+ * píxel de lienzo devuelve los bytes de verdad, sea cual sea la notación.
+ */
+async function appliedContrast(page: Page, locator: Locator): Promise<number> {
+  return locator.evaluate((node) => {
+    const toRgb = (value: string) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 1
+      canvas.height = 1
+      const context = canvas.getContext('2d')!
+      context.fillStyle = value
+      context.fillRect(0, 0, 1, 1)
+      const [r, g, b] = context.getImageData(0, 0, 1, 1).data
+      return [r!, g!, b!]
+    }
+
+    const luminance = ([r, g, b]: number[]) => {
+      const channel = (raw: number) => {
+        const c = raw / 255
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+      }
+      return 0.2126 * channel(r!) + 0.7152 * channel(g!) + 0.0722 * channel(b!)
+    }
+
+    const style = getComputedStyle(node)
+    const ink = luminance(toRgb(style.color))
+    const paper = luminance(toRgb(style.backgroundColor))
+    return (Math.max(ink, paper) + 0.05) / (Math.min(ink, paper) + 0.05)
+  })
 }
 
 /**

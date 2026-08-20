@@ -5,6 +5,8 @@ import com.drp.core.application.port.ArticleRepository
 import com.drp.core.application.port.AssetFilter
 import com.drp.core.application.port.AssetRepository
 import com.drp.core.application.port.CategoryRepository
+import com.drp.core.application.port.SeededCategory
+import com.drp.core.application.port.TagRepository
 import com.drp.core.application.port.DocumentFilter
 import com.drp.core.application.port.DocumentRepository
 import com.drp.core.application.port.EmailVerificationTokenRepository
@@ -29,6 +31,7 @@ import com.drp.platform.tenant.HouseholdDirectory
 import com.drp.platform.tenant.TenantContext
 import com.drp.core.domain.catalog.Article
 import com.drp.core.domain.catalog.Category
+import com.drp.core.domain.catalog.Tag
 import com.drp.core.domain.file.Document
 import com.drp.core.domain.file.DocumentContent
 import com.drp.core.domain.file.DocumentTarget
@@ -424,7 +427,7 @@ class CategoryRepositoryAdapter(
     private val tenantContext: TenantContext,
 ) : CategoryRepository {
 
-    override fun seed(names: List<String>, at: Instant) {
+    override fun seed(categoriesToSeed: List<SeededCategory>, at: Instant) {
         // El household_id sale del contexto de inquilino, jamas de un parametro.
         // Es la misma regla que cumple el resto del core, aplicada al unico sitio
         // donde el dominio no trae ya el hogar dentro del objeto: si viniera como
@@ -435,12 +438,14 @@ class CategoryRepositoryAdapter(
         }
 
         categories.saveAll(
-            names.map { name ->
+            categoriesToSeed.map { seeded ->
                 CategoryEntity(
                     id = UUID.randomUUID(),
                     householdId = householdId,
-                    name = name,
+                    name = seeded.name,
                     notes = null,
+                    icon = seeded.icon,
+                    color = seeded.color,
                     createdAt = at,
                     updatedAt = at,
                     retiredAt = null,
@@ -469,6 +474,8 @@ class CategoryRepositoryAdapter(
                 householdId = householdId,
                 name = category.name,
                 notes = category.notes,
+                icon = category.icon,
+                color = category.color,
                 createdAt = category.createdAt,
                 updatedAt = category.updatedAt,
                 retiredAt = category.retiredAt,
@@ -499,6 +506,110 @@ internal fun CategoryEntity.toDomain() = Category(
     id = id,
     name = name,
     notes = notes,
+    icon = icon,
+    color = color,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    retiredAt = retiredAt,
+    createdBy = createdBy,
+    updatedBy = updatedBy,
+)
+
+/**
+ * El catalogo de etiquetas y su union con los assets, en un solo adaptador
+ * porque son un solo puerto.
+ */
+@Repository
+class TagRepositoryAdapter(
+    private val tags: TagJpaRepository,
+    private val assetTags: AssetTagJpaRepository,
+    private val tenantContext: TenantContext,
+) : TagRepository {
+
+    override fun save(tag: Tag): Tag {
+        val householdId = requireNotNull(tenantContext.currentHousehold()) {
+            "Guardar una etiqueta exige contexto de inquilino"
+        }
+
+        return tags.save(
+            TagEntity(
+                id = tag.id,
+                householdId = householdId,
+                name = tag.name,
+                createdAt = tag.createdAt,
+                updatedAt = tag.updatedAt,
+                retiredAt = tag.retiredAt,
+                createdBy = tag.createdBy,
+                updatedBy = tag.updatedBy,
+            ),
+        ).toDomain()
+    }
+
+    override fun findById(tagId: UUID): Tag? = tags.findById(tagId).orElse(null)?.toDomain()
+
+    override fun findByName(name: String): Tag? = tags.findByNormalizedName(name)?.toDomain()
+
+    override fun list(includeRetired: Boolean, query: String?, pagination: Pagination): Page<Tag> {
+        val found = tags.search(includeRetired, query, PageRequest.of(pagination.page, pagination.size))
+        return Page(found.content.map { it.toDomain() }, pagination.page, pagination.size, found.totalElements)
+    }
+
+    /**
+     * Dos consultas y no una por asset: la de union y la de las etiquetas que
+     * nombra. Con una sola por fila, un listado de doscientos assets serian
+     * doscientas.
+     */
+    override fun tagsOf(assetIds: List<UUID>): Map<UUID, List<Tag>> {
+        if (assetIds.isEmpty()) return emptyMap()
+
+        val links = assetTags.findAllByAssetIdIn(assetIds)
+        if (links.isEmpty()) return emptyMap()
+
+        val byId = tags.findAllById(links.map { it.tagId }.distinct()).associate { it.id to it.toDomain() }
+        return links
+            .groupBy { it.assetId }
+            .mapValues { (_, rows) -> rows.mapNotNull { byId[it.tagId] }.sortedBy { it.name } }
+    }
+
+    /**
+     * Absoluto: pone las que faltan y quita las que sobran.
+     *
+     * Se calcula la diferencia en lugar de borrar todo y volver a insertar, y no
+     * es optimizacion prematura: reinsertar cambiaria el `created_at` y el
+     * `created_by` de una etiqueta que ya estaba, o sea que corregir las notas de
+     * un asset reescribiria la autoria de quien lo etiqueto el ano pasado.
+     */
+    override fun replaceTagsOf(assetId: UUID, tagIds: List<UUID>, by: UUID?, at: Instant) {
+        val householdId = requireNotNull(tenantContext.currentHousehold()) {
+            "Etiquetar un asset exige contexto de inquilino"
+        }
+
+        val current = assetTags.findAllByAssetId(assetId).map { it.tagId }.toSet()
+        val wanted = tagIds.toSet()
+
+        val removed = current - wanted
+        if (removed.isNotEmpty()) assetTags.deleteByAssetIdAndTagIdIn(assetId, removed)
+
+        val added = wanted - current
+        if (added.isNotEmpty()) {
+            assetTags.saveAll(
+                added.map { tagId ->
+                    AssetTagEntity(
+                        assetId = assetId,
+                        tagId = tagId,
+                        householdId = householdId,
+                        createdAt = at,
+                        createdBy = by,
+                    )
+                },
+            )
+        }
+    }
+}
+
+internal fun TagEntity.toDomain() = Tag(
+    id = id,
+    name = name,
     createdAt = createdAt,
     updatedAt = updatedAt,
     retiredAt = retiredAt,
@@ -579,6 +690,7 @@ class AssetRepositoryAdapter(
             articleId = filter.articleId,
             categoryId = filter.categoryId,
             condition = filter.condition?.name,
+            tagId = filter.tagId,
             pageable = PageRequest.of(pagination.page, pagination.size),
         )
         return Page(found.content.map { it.toDomain() }, pagination.page, pagination.size, found.totalElements)

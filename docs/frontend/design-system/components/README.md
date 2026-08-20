@@ -95,9 +95,14 @@ con sus siete puntos. No se reordena ni se recorta.
 | `DangerZone` | [`danger-zone.md`](danger-zone.md) | **Implementado** — ficha escrita antes que el componente, cierre de huecos Hito 0 | [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) |
 | `LoanExternalPage` | [`loan-external-page.md`](loan-external-page.md) | **Implementado** como `ExternalLoanPage` | [`routes/loans.tsx`](../../../../frontend/src/routes/loans.tsx) |
 | `SuppliersPage` | [`suppliers-page.md`](suppliers-page.md) | **Implementada** — ficha escrita antes que la pantalla, Fase 2 Hito 2 | [`routes/suppliers.tsx`](../../../../frontend/src/routes/suppliers.tsx) |
+| `TagField` y `TagChip` | [`tag-field.md`](tag-field.md) | **Implementados** — ficha escrita antes que el componente, cierre de huecos Hito 4 | [`ui/catalog.tsx`](../../../../frontend/src/ui/catalog.tsx) |
+| `CategoryMarker` e `IconColorPicker` | [`category-identity.md`](category-identity.md) | **Implementados** — ficha escrita antes que los componentes, cierre de huecos Hito 4 | [`ui/catalog.tsx`](../../../../frontend/src/ui/catalog.tsx) |
 
-**Catorce componentes reutilizables —diez en `primitives.tsx` y cuatro en
-`files.tsx`— más dos pantallas, y doce de las dieciséis filas tienen ficha**:
+**Dieciocho componentes reutilizables —diez en `primitives.tsx`, cuatro en
+`files.tsx` y cuatro en `catalog.tsx`— más dos pantallas, en dieciocho filas
+—`CategoryMarker` y su selector comparten una, y `TagField` otra con su pastilla,
+porque en los dos casos son mitades de una sola anatomía— y catorce de ellas
+tienen ficha**:
 `SelectField`, `PageHeading` y `EmptyState` entraron con el Hito 2 sin la suya, y
 `QuotaMeter` con el Hito 3, documentado como variante dentro de la ficha de
 `UploadField` y acabando en pieza aparte.
@@ -128,6 +133,15 @@ galería: mientras quepan en un fichero que se lee de una sentada, partirlos
 añadiría estructura sin resolver nada. Con tres piezas más —y la de la galería
 trae rejilla, celda y sus marcadores— ese «de una sentada» se acaba, y la
 decisión de dónde partir está más abajo.
+
+**Y el tercer fichero llegó con el cierre de huecos**: `catalog.tsx`, con
+`TagField`, `CategoryMarker` e `IconColorPicker`. Se parte **por dominio** y no
+por el eje del Hito 3 —primitiva pura frente a pieza con peticiones—, que habría
+mandado el marcador y el selector a `primitives.tsx` y solo el campo de etiquetas
+fuera. El motivo es el juego de iconos: son **dieciséis dibujos**, una tabla de
+datos cerrada más que un componente, y dentro de `primitives.tsx` acaban con el
+«de una sentada» de arriba. El razonamiento entero está en
+[`category-identity.md`](category-identity.md).
 
 ## Lo que falta por construir
 
@@ -186,16 +200,26 @@ porque es donde se incumplen:
 
 ## Decisiones abiertas
 
-- **`lucide-react` sigue sin estar en
-  [`frontend/package.json`](../../../../frontend/package.json).**
-  [`iconography.md`](../foundations/iconography.md) adopta Lucide como juego de
-  iconos, pero los cuatro iconos que hay hoy están dibujados a mano dentro de
-  `primitives.tsx`, siguiendo su geometría —cuadrícula de 24, trazo 1,75— sin ser
-  Lucide. El Hito 2 se cerró sin dar de alta la dependencia y sin los cinco
-  iconos de estado del dominio, así que `StatusBadge` sigue diciendo el estado con
-  color y etiqueta, sin icono. El Hito 3 añade a la lista el icono de documento,
-  el de persona y el de subir: cada hito que pasa hace más caro dibujarlos a mano
-  y más raro no haber decidido.
+- ~~**`lucide-react` sigue sin estar en
+  [`frontend/package.json`](../../../../frontend/package.json).**~~ **Resuelto en
+  el cierre de huecos, Hito 4 (2026-08-20): la dependencia entra**, y con el
+  número delante. Con los dieciséis iconos de categoría importados uno a uno, la
+  primera carga pasa de 413,73 kB a 419,61 —**5,88 kB, 2,63 kB comprimidos**, un
+  1,4 %—, y dibujarlos a mano cuesta aproximadamente lo mismo en bytes. Así que
+  el peso, que era el motivo por el que la dependencia seguía fuera, no decidía
+  nada: lo que decidía era que un juego **adoptado y no instalado** obliga a
+  imitar a mano lo que ya se había elegido. Los cuatro iconos dibujados a mano se
+  migraron en el mismo hito, en un commit propio, para no quedarse con dos
+  vocabularios.
+- **Los cinco iconos de estado del dominio siguen sin estar**, y ahora la razón
+  es otra y hay que decidirla. [`iconography.md`](../foundations/iconography.md)
+  declara **normativa** la tabla de un icono por estado, «lo que sostiene el
+  criterio 1.4.1»; [`status-badge.md`](status-badge.md) declara lo contrario y con
+  su motivo —quince iconos idénticos en columna son ruido, no información— y el
+  Hito 3 lo volvió a confirmar. Ya no es un problema de dependencia: **son dos
+  documentos del sistema de diseño que se contradicen**, y quien lo resuelva tiene
+  que tocar uno de los dos. Queda anotado y no se resuelve aquí, que es de otro
+  alcance.
 - ~~**Dónde vive el segundo componente.**~~ **Resuelto en el Hito 3**, y con el
   criterio que se había propuesto: los primitivos siguen en `primitives.tsx` (376
   líneas, nueve componentes) y las piezas con estado propio y peticiones en curso
@@ -221,6 +245,8 @@ porque es donde se incumplen:
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **«Catálogo» entra en la pasada sistemática de axe**, con una categoría de color puesto sembrada antes: es donde vive el selector, o sea las veintidós parejas de botones del hito, y en gris no habría mirado ninguno de los seis colores. Quedan **dos pantallas del core sin auditar**: Sitios y Personas. | Equipo DRP |
+| 2026-08-20 | Entran **tres componentes y dos fichas**, las dos escritas antes que el código: [`tag-field.md`](tag-field.md) y [`category-identity.md`](category-identity.md) (cierre de huecos, Hito 4). Nace el **tercer fichero de componentes**, `catalog.tsx`, partido por dominio y no por el eje del Hito 3, y con su motivo. Se cierra la decisión abierta de **`lucide-react`** con la medida delante, y se abre en su sitio la que quedaba escondida detrás: `iconography.md` y `status-badge.md` se contradicen sobre el icono de estado. | Equipo DRP |
 | 2026-08-20 | **Los dos defectos que el repaso destapó, arreglados.** La celda de la galería lleva su nombre accesible en el botón y la miniatura pasa a decorativa —tal y como `file-gallery.md` lo tenía especificado desde el primer día—, y **«Archivo» entra en la pasada sistemática de axe** con un fichero sembrado, porque auditarla vacía no habría mirado ninguna celda. Quedan **cuatro pantallas del core sin auditar**: Inventario, Sitios, Catálogo y Personas. | Equipo DRP |
 | 2026-08-20 | **Repaso de las doce fichas contra el código, una a una.** `avatar.md` y `file-gallery.md` decían «Previsto. No existe» de componentes construidos en el Hito 3 —siete días antes—, y `card.md`, `field.md` y `status-badge.md` arrastraban en «Lo que falta» cosas que la Fase 2 había resuelto: `PageHeading` salió de `household.tsx`, llegó `SelectField` y los tonos de dominio del distintivo existen. `button.md`, `notice.md` y `spinner.md` **no cambian ni una afirmación** —lo suyo era el marco, que hablaba en futuro de un hito cerrado hace dos fases—, y `danger-zone.md`, `loan-external-page.md` y `suppliers-page.md` estaban al día. Lo que **no** se hizo: borrar la especificación de lo que no existe. Donde el componente se queda corto, la entrada se queda y gana precisión — así es como `Textarea`, el campo numérico y el `<select>` sin migrar de `household.tsx` siguen escritos. El repaso destapó además dos cosas que no son de documentación y quedan anotadas en la ficha de la galería: **la celda de un PDF no tiene nombre accesible** y **la pantalla «Archivo» no entra en ninguna pasada de axe**, que es por lo que no se había visto. Se anota el desajuste del campo `Estado`, que seis fichas usan como estado documental y seis como estado de implementación, y las seis primeras pasan de `Borrador` a `Vigente`: describen componentes construidos y auditados. | Equipo DRP |
 | 2026-08-12 | Creación del directorio con las seis fichas de los componentes que existen, y el registro de los que el Hito 2 va a pedir. | Equipo DRP |

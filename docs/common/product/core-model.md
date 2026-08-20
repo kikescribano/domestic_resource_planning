@@ -75,6 +75,7 @@ graph TD
 | Fecha de adquisición (`acquiredOn`) | Solo `DURABLE`, opcional | Cuándo entró en el hogar. Es procedencia, no valor: el importe pertenece al módulo de gastos. Se corrige después del alta, igual que el número de serie |
 | Estado de conservación (`condition`) | Solo `DURABLE`, opcional | En qué estado está la cosa: `NEW`, `GOOD`, `WORN`, `DAMAGED`, `UNUSABLE`. **Nulo significa que nadie lo ha anotado**, que es el caso normal, y no que esté bien. Se corrige cuando cambia, que es lo que lo distingue de los dos anteriores: el número de serie de un taladro es el mismo el día que se compra y el día que se tira |
 | Foto (`photoUrl` / `photoFileId`) | Ambos, opcional | Una imagen, en forma de **enlace externo o de fichero guardado en el servidor** —nunca las dos a la vez— igual que en la documentación (ver «Ficheros almacenados»). Reconocer una cosa de un vistazo es la mitad de un inventario doméstico |
+| Etiquetas (`tagIds`) | Ambos, opcional | Clasificación libre y **múltiple**, contra el catálogo de etiquetas del hogar (ver más abajo). Es lo que la categoría no puede dar, porque la categoría es una |
 | Notas (`notes`) | Ambos, opcional | Texto libre |
 | Fecha de alta (`createdAt`) | Ambos | — |
 | Última modificación (`updatedAt`) | Ambos | — |
@@ -138,11 +139,88 @@ La clasificación funcional no es una lista fija del sistema sino una **entidad 
 | Identificador (`id`) | — |
 | Nombre (`name`) | Único entre las categorías vigentes del hogar, comparado normalizado |
 | Notas (`notes`) | Texto libre, opcional |
+| Icono (`icon`) | Opcional. Uno de los dieciséis de un **juego cerrado** (ver más abajo) |
+| Color (`color`) | Opcional. Uno de los seis de un juego cerrado |
 | Fecha de alta (`createdAt`) | — |
 | Última modificación (`updatedAt`) | — |
 | Fecha de retirada (`retiredAt`) | Informada si la categoría está retirada |
 | Creado por (`createdBy`) | Ver «Autoría de los cambios» |
 | Modificado por (`updatedBy`) | Ídem |
+
+**El icono y el color se eligen dentro de un juego cerrado, y esa es la
+decisión.** Un hogar lee sus categorías en listas largas y en un móvil, y
+distinguirlas de un vistazo es justo lo que un rótulo de 13 px no consigue. Pero
+un color elegido con un selector libre **no está en ningún token del sistema de
+diseño**, así que no lo mide `scripts/check-contrast.py` y sería lo único de la
+interfaz cuyo contraste se afirma en vez de comprobarse. Con el juego cerrado,
+los doce pares que producen los seis colores entran en esa lista y la
+construcción falla si alguno baja de WCAG AA. El porqué entero, con las
+alternativas descartadas, está en la
+[ADR-015](../architecture/decisions/ADR-015-user-chosen-category-identity.md); el
+juego de iconos, en
+[`iconography.md`](../../frontend/design-system/foundations/iconography.md).
+
+Tres consecuencias que conviene tener presentes:
+
+- **Nulo significa que nadie lo eligió**, no que sea gris. Es el caso normal de
+  una categoría recién creada. La excepción son las cinco que siembra el alta de
+  un hogar, que nacen con icono y color puestos —el valor por omisión de un dato
+  que pone el sistema lo pone el sistema, igual que pone los nombres.
+- **El color nunca es el único portador**: el nombre de la categoría va siempre
+  al lado. De ahí que repetir color entre categorías no sea un defecto —seis
+  colores para las doce de un hogar significa que el color **agrupa**, no que
+  identifica.
+- **Ampliar el juego cuesta una migración**, porque la lista vive también en un
+  `CHECK` de la tabla (ver 5.6). Esa fricción es deliberada: es lo que impide que
+  exista un color que nadie ha medido.
+
+**Etiquetas: clasificar por más de una cosa a la vez.**
+
+La categoría responde a «qué clase de cosa es esto» y es **una**. La etiqueta
+responde a otra pregunta que la categoría no puede: «para qué la tengo». El
+taladro es de Herramientas, y a la vez es *camping* y *heredado del abuelo*; con
+una sola categoría hay que elegir una de las tres y perder las otras dos.
+
+Una etiqueta es una **entidad propia**, `Tag`, con una fila por etiqueta y por
+hogar, exactamente igual que una categoría. Un asset lleva las que haga falta, y
+lo normal es que no lleve ninguna.
+
+| Atributo | Descripción |
+|---|---|
+| Identificador (`id`) | — |
+| Nombre (`name`) | Único en el hogar, comparado normalizado y **contando también las retiradas** |
+| Fecha de alta (`createdAt`) | — |
+| Última modificación (`updatedAt`) | — |
+| Fecha de retirada (`retiredAt`) | Informada si la etiqueta está retirada |
+| Creado por (`createdBy`) | Ver «Autoría de los cambios» |
+| Modificado por (`updatedBy`) | Ídem |
+
+**Es un catálogo y no una columna de texto en el asset**, y las tres razones son
+lo que decide la forma:
+
+| Qué se quiere hacer | Con catálogo | Con texto libre |
+|---|---|---|
+| Renombrar | Una fila | Recorrer todos los assets del hogar y reescribir cada uno |
+| Deduplicar sin distinguir mayúsculas ni acentos | El mismo índice normalizado que ya protege categorías y artículos | No hay ninguna fila común donde poner la restricción |
+| Autocompletar | Una consulta sobre una tabla pequeña | Un `DISTINCT` sobre un campo repetido tantas veces como cosas tenga la casa |
+
+Y dos reglas propias, que se apartan de las de una categoría con su motivo:
+
+- **El nombre es único contando también las retiradas**, al contrario que en una
+  categoría. Allí un nombre retirado se puede reutilizar sin consecuencias porque
+  un asset tiene **una** categoría; aquí dos etiquetas del mismo nombre podrían
+  acabar sobre el mismo asset y pintarlo dos veces.
+- **Crear una etiqueta que existe retirada la revive**, en vez de fallar. Es lo
+  que sustituye al índice parcial: así ningún nombre se quema, y retirar tiene
+  deshacer sin necesitar una operación propia. Es la misma forma que
+  `RegisterConsumableIntake` usa con un artículo —resolverlo, creándolo si hace
+  falta— y responde `200` en vez de `201`.
+
+Se retira y no se borra, por un motivo más fuerte que el de una categoría:
+borrarla se llevaría por delante la clasificación de todos los assets que la
+tuvieran, y eso no se puede deshacer. Una etiqueta retirada deja de ofrecerse al
+etiquetar y de sugerirse al escribir; los assets que ya la llevaban la conservan
+y la siguen enseñando.
 
 A diferencia de `type`, `status` o `unit`, los nombres de categoría **no son valores de un enumerado**: son datos que el hogar edita y que se le muestran tal cual, así que van en su idioma y no siguen la regla de nomenclatura de 4.1.7.
 
@@ -225,7 +303,9 @@ El hogar es la excepción: no lleva autoría propia porque, en el instante en qu
 - Dar de baja una existencia que aún tenía cantidad la deja a 0 — se da por perdida — en lugar de dejar un resto colgando en una fila muerta que ninguna suma de existencias volvería a mirar.
 - Un `CONSUMABLE` debe tener `articleId` y `quantity` (≥ 0); un `DURABLE` no puede tener `quantity` — la suya implícita es siempre 1.
 - El nombre y la categoría efectivos de un asset son los de su artículo cuando lo tiene; un asset sin artículo debe informarlos él. No se guardan por duplicado.
-- Una categoría no se borra: se retira cuando el hogar deja de usarla, y los assets que ya la tenían la conservan.
+- Una categoría no se borra: se retira cuando el hogar deja de usarla, y los assets que ya la tenían la conservan. Lo mismo vale para una etiqueta.
+- Una etiqueta **retirada no se puede poner** en un asset, igual que no se puede clasificar con una categoría retirada.
+- Las etiquetas de un asset se escriben **enteras**: la lista que llega sustituye a la que hubiera, y una lista vacía las quita todas.
 - Un documento cuelga de un asset **o** de un artículo, nunca de los dos ni de ninguno.
 - Un documento apunta a un enlace **o** a un fichero, nunca a los dos ni a ninguno. Una foto también es enlace **o** fichero, pero ahí sí caben los dos vacíos: no tener foto es lo normal.
 - Un fichero pertenece a un hogar y **no puede referenciarse desde otro**, ni siquiera adjuntándolo a mano por identificador.

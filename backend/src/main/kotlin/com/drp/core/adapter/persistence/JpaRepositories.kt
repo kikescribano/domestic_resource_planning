@@ -291,6 +291,66 @@ interface CategoryJpaRepository : JpaRepository<CategoryEntity, UUID> {
     fun findAllByRetiredAtIsNull(pageable: Pageable): org.springframework.data.domain.Page<CategoryEntity>
 }
 
+interface TagJpaRepository : JpaRepository<TagEntity, UUID> {
+
+    /**
+     * **Sin `retired_at IS NULL`**, que es la diferencia con la de categorias y
+     * no un descuido. El indice unico de `tags` no es parcial por retirada --dos
+     * etiquetas del mismo nombre podrian acabar sobre el mismo asset y pintarlo
+     * dos veces-- asi que la unicidad se comprueba contra **todas**, y crear una
+     * que ya existe retirada la revive en lugar de chocar.
+     *
+     * Normaliza con `immutable_unaccent`, la misma funcion del indice, por el
+     * mismo motivo que la de categorias: normalizar distinto convierte un 409
+     * limpio en un 500 por violacion de restriccion.
+     */
+    @Query(
+        value = """
+            SELECT * FROM tags
+            WHERE lower(immutable_unaccent(name)) = lower(immutable_unaccent(:name))
+            LIMIT 1
+        """,
+        nativeQuery = true,
+    )
+    fun findByNormalizedName(@Param("name") name: String): TagEntity?
+
+    /**
+     * El catalogo, con su busqueda para el autocompletado. El `q` compara
+     * tambien normalizado: buscar «decoracion» tiene que encontrar «Decoración»,
+     * que es justo lo que una persona escribe deprisa en un movil.
+     */
+    @Query(
+        value = """
+            SELECT * FROM tags
+            WHERE (:includeRetired OR retired_at IS NULL)
+              AND (CAST(:query AS text) IS NULL
+                   OR lower(immutable_unaccent(name)) LIKE '%' || lower(immutable_unaccent(CAST(:query AS text))) || '%')
+            ORDER BY name
+        """,
+        countQuery = """
+            SELECT count(*) FROM tags
+            WHERE (:includeRetired OR retired_at IS NULL)
+              AND (CAST(:query AS text) IS NULL
+                   OR lower(immutable_unaccent(name)) LIKE '%' || lower(immutable_unaccent(CAST(:query AS text))) || '%')
+        """,
+        nativeQuery = true,
+    )
+    fun search(
+        @Param("includeRetired") includeRetired: Boolean,
+        @Param("query") query: String?,
+        pageable: Pageable,
+    ): org.springframework.data.domain.Page<TagEntity>
+}
+
+interface AssetTagJpaRepository : JpaRepository<AssetTagEntity, AssetTagKey> {
+
+    fun findAllByAssetIdIn(assetIds: Collection<UUID>): List<AssetTagEntity>
+
+    fun findAllByAssetId(assetId: UUID): List<AssetTagEntity>
+
+    fun deleteByAssetIdAndTagIdIn(assetId: UUID, tagIds: Collection<UUID>)
+}
+
 interface AssetJpaRepository : JpaRepository<AssetEntity, UUID> {
 
     /**
@@ -414,8 +474,13 @@ interface AssetJpaRepository : JpaRepository<AssetEntity, UUID> {
     fun countOpenLoans(@Param("assetId") assetId: UUID): Long
 
     /**
-     * El listado con sus nueve filtros. Excluye los `DECOMMISSIONED` **salvo que
-     * se pida ese estado**, que es la unica forma de ver el historial.
+     * El listado con sus **diez** filtros. Excluye los `DECOMMISSIONED` **salvo
+     * que se pida ese estado**, que es la unica forma de ver el historial.
+     *
+     * El de etiqueta va por `EXISTS` y no por `JOIN`: con un `JOIN` un asset con
+     * dos etiquetas saldria dos veces en cuanto el filtro dejara de estar puesto
+     * --y la cuenta total mentiria--, mientras que `EXISTS` responde a la
+     * pregunta que se hace, que es «la lleva o no la lleva».
      */
     @Query(
         value = """
@@ -430,6 +495,9 @@ interface AssetJpaRepository : JpaRepository<AssetEntity, UUID> {
               AND (CAST(:articleId AS uuid) IS NULL OR article_id = CAST(:articleId AS uuid))
               AND (CAST(:categoryId AS uuid) IS NULL OR category_id = CAST(:categoryId AS uuid))
               AND (CAST(:condition AS text) IS NULL OR condition = CAST(:condition AS text))
+              AND (CAST(:tagId AS uuid) IS NULL
+                   OR EXISTS (SELECT 1 FROM asset_tags at
+                              WHERE at.asset_id = assets.id AND at.tag_id = CAST(:tagId AS uuid)))
             ORDER BY created_at DESC
         """,
         countQuery = """
@@ -444,6 +512,9 @@ interface AssetJpaRepository : JpaRepository<AssetEntity, UUID> {
               AND (CAST(:articleId AS uuid) IS NULL OR article_id = CAST(:articleId AS uuid))
               AND (CAST(:categoryId AS uuid) IS NULL OR category_id = CAST(:categoryId AS uuid))
               AND (CAST(:condition AS text) IS NULL OR condition = CAST(:condition AS text))
+              AND (CAST(:tagId AS uuid) IS NULL
+                   OR EXISTS (SELECT 1 FROM asset_tags at
+                              WHERE at.asset_id = assets.id AND at.tag_id = CAST(:tagId AS uuid)))
         """,
         nativeQuery = true,
     )
@@ -458,6 +529,7 @@ interface AssetJpaRepository : JpaRepository<AssetEntity, UUID> {
         @Param("articleId") articleId: UUID?,
         @Param("categoryId") categoryId: UUID?,
         @Param("condition") condition: String?,
+        @Param("tagId") tagId: UUID?,
         pageable: Pageable,
     ): org.springframework.data.domain.Page<AssetEntity>
 }

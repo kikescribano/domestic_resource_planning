@@ -217,6 +217,21 @@ class JsonPatch(private val body: JsonNode) {
     inline fun <reified E : Enum<E>> enum(field: String): Patch<E?> =
         if (!has(field)) Patch.Absent else Patch.Set(rawNode(field)?.asText()?.let { enumValueOf<E>(it) })
 
+    /**
+     * Una lista de identificadores que se puede cambiar **y vaciar**, como las
+     * etiquetas de un asset.
+     *
+     * Vacia no es lo mismo que ausente y esa es la razon entera de que esto
+     * viva en el arbol JSON: `[]` **quita todas**, que es como se desetiqueta, y
+     * no mencionar el campo no toca nada. Un `List<UUID>?` en un `data class`
+     * llegaria nulo en los dos casos.
+     */
+    fun uuidList(field: String): Patch<List<UUID>> {
+        if (!has(field)) return Patch.Absent
+        val value = node(field) ?: return Patch.Set(emptyList())
+        return Patch.Set(value.map { UUID.fromString(it.asText()) })
+    }
+
     fun rawText(field: String): String =
         body.get(field)?.takeUnless { it.isNull }?.asText()
             ?: throw IllegalArgumentException("El campo $field no admite nulo")

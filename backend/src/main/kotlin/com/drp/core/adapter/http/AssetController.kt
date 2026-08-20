@@ -61,6 +61,7 @@ class AssetController(
         @RequestParam(required = false) articleId: UUID?,
         @RequestParam(required = false) categoryId: UUID?,
         @RequestParam(required = false) condition: AssetCondition?,
+        @RequestParam(required = false) tagId: UUID?,
         @RequestParam(defaultValue = "false") withoutOwner: Boolean,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "50") size: Int,
@@ -74,6 +75,7 @@ class AssetController(
             articleId,
             categoryId,
             condition,
+            tagId,
             withoutOwner,
         ),
         Pagination(page, size),
@@ -116,6 +118,7 @@ class AssetController(
             photoUrl = input.photoUrl,
             photoFileId = input.photoFileId,
             notes = input.notes,
+            tagIds = input.tagIds,
         ),
     ).withThumbnail()
 
@@ -188,6 +191,8 @@ class AssetController(
                 photoUrl = patch.text("photoUrl"),
                 photoFileId = patch.uuid("photoFileId"),
                 notes = patch.text("notes"),
+                // Absoluto: `[]` las quita todas y no mencionarlo no toca nada.
+                tagIds = patch.uuidList("tagIds"),
             ),
         ).withThumbnail()
     }

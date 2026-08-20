@@ -27,6 +27,9 @@ import com.drp.core.domain.identity.PasswordValidation
 import com.drp.core.domain.token.SingleUseToken
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
+import com.drp.core.application.port.SeededCategory
+import com.drp.core.domain.catalog.CategoryColor
+import com.drp.core.domain.catalog.CategoryIcon
 import java.time.Clock
 import java.time.DateTimeException
 import java.time.ZoneId
@@ -38,8 +41,21 @@ import java.util.UUID
  * Son **datos** que se le muestran al usuario y que edita a su gusto, no valores
  * de un enumerado, asi que van en castellano y no siguen la regla de nombrar en
  * ingles.
+ *
+ * **Y desde el cierre de huecos vienen con cara puesta**, icono y color de los
+ * juegos cerrados de la ADR-015. Es lo unico que hace que un hogar recien creado
+ * no vea cinco cuadraditos grises: la eleccion sigue siendo suya --puede
+ * cambiarlos o quitarlos-- pero el valor por omision de un dato que el sistema
+ * siembra lo pone el sistema, igual que pone los nombres. Los cinco colores son
+ * distintos entre si, que es lo que ensena para que sirve el atributo.
  */
-val DEFAULT_CATEGORIES = listOf("Mobiliario", "Alimentación", "Limpieza", "Herramientas", "Decoración")
+val DEFAULT_CATEGORIES = listOf(
+    SeededCategory("Mobiliario", CategoryIcon.SOFA, CategoryColor.PLUM),
+    SeededCategory("Alimentación", CategoryIcon.UTENSILS, CategoryColor.MOSS),
+    SeededCategory("Limpieza", CategoryIcon.SPRAY, CategoryColor.TEAL),
+    SeededCategory("Herramientas", CategoryIcon.TOOL, CategoryColor.SKY),
+    SeededCategory("Decoración", CategoryIcon.FRAME, CategoryColor.ROSE),
+)
 
 data class CreateHouseholdCommand(
     val name: String,

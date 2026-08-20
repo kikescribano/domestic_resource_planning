@@ -33,3 +33,4 @@ Usa [`ADR-template.md`](ADR-template.md) para crear una entrada.
 | [ADR-012](ADR-012-data-erasure-household-closure-and-account-closure.md) | Supresión de datos: baja de hogar y cierre de cuenta | accepted | — |
 | [ADR-013](ADR-013-transactional-outbox.md) | Transactional Outbox | accepted | — |
 | [ADR-014](ADR-014-heic-conversion.md) | Conversión de HEIC | accepted | — |
+| [ADR-015](ADR-015-user-chosen-category-identity.md) | Color e icono elegidos por el usuario, dentro de un juego certificado | accepted | — |

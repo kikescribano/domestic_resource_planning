@@ -16,8 +16,10 @@ import {
   type AssetStatus,
   type AssetType,
   type DocumentType,
+  type Tag,
 } from '../api/client'
 import { useAuthenticatedSession } from '../auth/SessionProvider'
+import { CategoryMarker, TagChip, TagField } from '../ui/catalog'
 import { FileGallery, UploadField, type GalleryItem } from '../ui/files'
 import {
   Button,
@@ -72,14 +74,23 @@ export function AssetsPage() {
   const { accessToken } = useAuthenticatedSession()
   const [type, setType] = useState<AssetType | ''>('')
   const [condition, setCondition] = useState<AssetCondition | ''>('')
+  const [tagId, setTagId] = useState('')
 
   const assets = useQuery({
-    queryKey: ['assets', type, condition],
+    queryKey: ['assets', type, condition, tagId],
     queryFn: () =>
       api.listAssets(accessToken, {
         ...(type ? { type } : {}),
         ...(condition ? { condition } : {}),
+        ...(tagId ? { tagId } : {}),
       }),
+  })
+
+  // Solo las vigentes: una etiqueta retirada sigue puesta en lo que la llevaba,
+  // pero ofrecerla como filtro sería ofrecer vocabulario que el hogar ya dejó.
+  const tags = useQuery({
+    queryKey: ['tags', ''],
+    queryFn: () => api.listTags(accessToken),
   })
 
   return (
@@ -137,6 +148,25 @@ export function AssetsPage() {
           ))}
         </SelectField>
 
+        {/* Un desplegable y no una pastilla por etiqueta: el vocabulario de un
+            hogar crece sin techo, y veinte pastillas en la cabecera dejan el
+            listado debajo del pliegue. `SelectField` porque es quien pone la
+            pista en `aria-describedby` en vez de dentro del nombre accesible. */}
+        <SelectField
+          label="Etiqueta"
+          hint="Una sola: cruzar dos son dos preguntas distintas y todavía no hay ninguna pantalla que las pida."
+          className="max-w-form"
+          value={tagId}
+          onChange={(event) => setTagId(event.target.value)}
+        >
+          <option value="">Cualquiera</option>
+          {tags.data?.items.map((tag) => (
+            <option key={tag.id} value={tag.id}>
+              {tag.name}
+            </option>
+          ))}
+        </SelectField>
+
         {assets.isPending ? (
           <Spinner label="Cargando inventario" />
         ) : assets.isError ? (
@@ -190,9 +220,16 @@ function AssetRow({ asset }: { asset: Asset }) {
         to={`/inventario/${asset.id}`}
         className="flex min-h-touch flex-wrap items-center justify-between gap-2 rounded-md border border-border-subtle bg-surface-raised px-3 py-2 hover:bg-surface-hover"
       >
-        <span className="flex flex-wrap items-baseline gap-2">
+        <span className="flex flex-wrap items-center gap-2">
+          {/* Antes del nombre y sin encoger: es lo que deja recorrer una lista
+              larga de un vistazo sin leer cada fila. Decorativo, porque el
+              nombre de la categoría está al lado. */}
+          <CategoryMarker icon={asset.categoryIcon} color={asset.categoryColor} />
           <span className="text-body text-ink">{asset.name}</span>
           {asset.category && <span className="text-caption text-ink-muted">{asset.category}</span>}
+          {asset.tags.map((tag) => (
+            <TagChip key={tag.id}>{tag.name}</TagChip>
+          ))}
           {/* En tinta y no en un segundo distintivo: la ficha de `StatusBadge`
               declara antiuso dos distintivos en la misma fila, y el presupuesto
               de calidez de `density.md` da un color por fila. El de la derecha
@@ -227,6 +264,7 @@ export function NewAssetPage() {
     acquiredOn: '',
     condition: '' as AssetCondition | '',
   })
+  const [tags, setTags] = useState<Tag[]>([])
 
   const categories = useQuery({
     queryKey: ['categories'],
@@ -251,6 +289,7 @@ export function NewAssetPage() {
           ...(draft.serialNumber.trim() ? { serialNumber: draft.serialNumber.trim() } : {}),
           ...(draft.acquiredOn ? { acquiredOn: draft.acquiredOn } : {}),
           ...(draft.condition ? { condition: draft.condition } : {}),
+          ...(tags.length > 0 ? { tagIds: tags.map((tag) => tag.id) } : {}),
         },
         accessToken,
       ),
@@ -340,6 +379,14 @@ export function NewAssetPage() {
             </option>
           ))}
         </SelectField>
+
+        <TagField
+          label="Etiquetas (opcional)"
+          value={tags}
+          onChange={setTags}
+          accessToken={accessToken}
+          hint="Escribe para buscar. Si la etiqueta no existe, se crea."
+        />
 
         {failure && <Notice tone="danger">{failure}</Notice>}
 
@@ -551,6 +598,14 @@ export function AssetDetailPage() {
     onError: (error) => setFailure(humanMessage(error)),
   })
 
+  const retag = useMutation({
+    // La lista entera y no un delta, que es lo que el contrato declara: `[]`
+    // las quita todas y no mencionarlas no toca nada.
+    mutationFn: (tags: Tag[]) => api.updateAsset(id, { tagIds: tags.map((tag) => tag.id) }, accessToken),
+    onSuccess: refresh,
+    onError: (error) => setFailure(humanMessage(error)),
+  })
+
   const merge = useMutation({
     mutationFn: (targetAssetId: string) => api.mergeStockItems(id, targetAssetId, accessToken),
     onSuccess: (target) => {
@@ -590,7 +645,20 @@ export function AssetDetailPage() {
           <Detail label="Naturaleza">
             {current.type === 'DURABLE' ? 'Duradero' : 'Consumible'}
           </Detail>
-          <Detail label="Categoría">{current.category ?? '—'}</Detail>
+          <Detail label="Categoría">
+            {current.category ? (
+              <span className="flex items-center gap-2">
+                <CategoryMarker
+                  icon={current.categoryIcon}
+                  color={current.categoryColor}
+                  size="md"
+                />
+                {current.category}
+              </span>
+            ) : (
+              '—'
+            )}
+          </Detail>
           {quantity && <Detail label="Cantidad">{quantity}</Detail>}
           {current.type === 'DURABLE' && (
             <>
@@ -603,6 +671,17 @@ export function AssetDetailPage() {
               </Detail>
             </>
           )}
+          <Detail label="Etiquetas">
+            {current.tags.length === 0 ? (
+              'Ninguna'
+            ) : (
+              <span className="flex flex-wrap gap-1">
+                {current.tags.map((tag) => (
+                  <TagChip key={tag.id}>{tag.name}</TagChip>
+                ))}
+              </span>
+            )}
+          </Detail>
           {current.articleId && (
             // Lo heredado se señala: el nombre y la categoría de este asset son
             // los de su artículo, así que se corrigen allí y no aquí.
@@ -648,6 +727,20 @@ export function AssetDetailPage() {
                 <MergeForm assetId={current.id} articleId={current.articleId} onMerge={merge.mutate} busy={merge.isPending} />
               </>
             )}
+
+            {/* Para las dos naturalezas, al contrario que la conservación:
+                clasificar la despensa por «lo del bebé» tiene tanto sentido
+                como clasificar el taller. */}
+            {/* `key` por el asset: esta ruta **no se desmonta** al pasar de una
+                ficha a otra --el `:id` cambia y el componente se queda-- así que
+                sin él el borrador seguiría siendo el del asset anterior. */}
+            <TagsForm
+              key={current.id}
+              tags={current.tags}
+              onSave={retag.mutate}
+              busy={retag.isPending}
+              accessToken={accessToken}
+            />
 
             <AssetDocuments assetId={current.id} assetName={current.name} accessToken={accessToken} />
 
@@ -920,6 +1013,43 @@ function MergeForm({
  * hay más formulario que rellenar, pero siguen siendo dos operaciones y el
  * segundo puede fallar por su cuenta —si el fichero ya colgara de otro sitio.
  */
+/**
+ * Las etiquetas de un asset, en su ficha.
+ *
+ * Guarda con un botón y no al elegir, igual que el resto de formularios de esta
+ * pantalla: cada elección dispararía una petición, y quitar tres etiquetas serían
+ * tres `PATCH` sobre el mismo asset con tres estados intermedios que nadie pidió.
+ */
+function TagsForm({
+  tags,
+  onSave,
+  busy,
+  accessToken,
+}: {
+  tags: Tag[]
+  onSave: (tags: Tag[]) => void
+  busy: boolean
+  accessToken: string
+}) {
+  const [draft, setDraft] = useState(tags)
+
+  return (
+    <section className="flex max-w-form flex-col gap-3 border-t border-border-subtle pt-4">
+      <h2 className="text-body font-medium text-ink">Etiquetas</h2>
+      <TagField
+        label="Etiquetas de este asset"
+        value={draft}
+        onChange={setDraft}
+        accessToken={accessToken}
+        hint="Escribe para buscar. Si la etiqueta no existe, se crea."
+      />
+      <Button variant="secondary" busy={busy} busyLabel="Guardando…" onClick={() => onSave(draft)}>
+        Guardar etiquetas
+      </Button>
+    </section>
+  )
+}
+
 function AssetPhoto({ asset, accessToken }: { asset: Asset; accessToken: string }) {
   const queryClient = useQueryClient()
   const [problem, setProblem] = useState<string | null>(null)
@@ -953,12 +1083,25 @@ function AssetPhoto({ asset, accessToken }: { asset: Asset; accessToken: string 
           </Button>
         </div>
       ) : (
-        <UploadField
-          label="Añadir una foto"
-          accept="image"
-          accessToken={accessToken}
-          onUploaded={(file) => attach.mutate(file.id)}
-        />
+        <div className="flex flex-wrap items-start gap-3">
+          {/* El marcador de una foto que falta **no es un rectángulo gris**: es
+              el icono de la categoría sobre su color, que es lo que
+              `iconography.md` prometía desde la Fase 1 y no se podía cumplir
+              porque el icono no existía. Aquí sí lleva nombre accesible: no hay
+              texto al lado que diga de qué es el hueco. */}
+          <CategoryMarker
+            icon={asset.categoryIcon}
+            color={asset.categoryColor}
+            size="lg"
+            label={asset.category ?? asset.name}
+          />
+          <UploadField
+            label="Añadir una foto"
+            accept="image"
+            accessToken={accessToken}
+            onUploaded={(file) => attach.mutate(file.id)}
+          />
+        </div>
       )}
 
       {problem && <Notice tone="danger">{problem}</Notice>}

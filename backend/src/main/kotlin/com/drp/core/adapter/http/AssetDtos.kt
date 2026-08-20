@@ -3,6 +3,8 @@ package com.drp.core.adapter.http
 import com.drp.core.application.usecase.AssetView
 import com.drp.core.application.usecase.OperationWarning
 import com.drp.core.application.usecase.Patch
+import com.drp.core.domain.catalog.CategoryColor
+import com.drp.core.domain.catalog.CategoryIcon
 import com.drp.core.domain.catalog.MeasurementUnit
 import com.drp.core.domain.inventory.AssetCondition
 import com.drp.core.domain.inventory.AssetLocation
@@ -44,6 +46,8 @@ data class AssetInput(
     val photoUrl: String? = null,
     val photoFileId: UUID? = null,
     val notes: String? = null,
+    /** Las etiquetas con las que nace. Vacio es lo normal. */
+    val tagIds: List<UUID> = emptyList(),
 )
 
 data class AssetIntakeInput(
@@ -95,6 +99,14 @@ data class AssetResponse(
     val photoThumbnailUrl: String?,
     val photoFileId: UUID?,
     val notes: String?,
+    /**
+     * La cara de su categoria, resuelta al leer igual que el nombre. Nula
+     * mientras el hogar no la elija, que es el caso normal.
+     */
+    val categoryIcon: CategoryIcon?,
+    val categoryColor: CategoryColor?,
+    /** Con identificador y nombre, porque el filtro del listado va por identificador. */
+    val tags: List<TagResponse>,
     val warnings: List<WarningResponse>,
     val createdAt: Instant,
     val createdBy: UUID?,
@@ -120,6 +132,9 @@ data class AssetResponse(
             photoThumbnailUrl = photoThumbnailUrl,
             photoFileId = view.asset.photoFileId,
             notes = view.asset.notes,
+            categoryIcon = view.categoryIcon,
+            categoryColor = view.categoryColor,
+            tags = view.tags.map(TagResponse::of),
             warnings = view.warnings.map(WarningResponse::of),
             createdAt = view.asset.createdAt,
             createdBy = view.asset.createdBy,

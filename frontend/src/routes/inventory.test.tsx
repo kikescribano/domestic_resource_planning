@@ -23,14 +23,37 @@ const CATEGORIES = {
   status: 200,
   body: {
     items: [
-      { id: 'cat-1', name: 'Alimentación', notes: null, createdAt: '2026-08-12T00:00:00Z', retiredAt: null },
-      { id: 'cat-2', name: 'Herramientas', notes: null, createdAt: '2026-08-12T00:00:00Z', retiredAt: null },
+      {
+        id: 'cat-1',
+        name: 'Alimentación',
+        notes: null,
+        icon: 'UTENSILS',
+        color: 'MOSS',
+        createdAt: '2026-08-12T00:00:00Z',
+        retiredAt: null,
+      },
+      // Sin cara a propósito: es el caso normal de una categoría que nadie ha
+      // tocado, y el que tiene que salir del marcador sin inventar un color.
+      {
+        id: 'cat-2',
+        name: 'Herramientas',
+        notes: null,
+        icon: null,
+        color: null,
+        createdAt: '2026-08-12T00:00:00Z',
+        retiredAt: null,
+      },
     ],
     page: 0,
     size: 200,
     total: 2,
   },
 }
+
+const CAMPING = { id: 'tag-1', name: 'Camping', createdAt: '2026-08-12T00:00:00Z', retiredAt: null }
+const HERENCIA = { id: 'tag-2', name: 'Herencia', createdAt: '2026-08-12T00:00:00Z', retiredAt: null }
+
+const TAGS = { status: 200, body: { items: [CAMPING, HERENCIA], page: 0, size: 200, total: 2 } }
 
 const LOCATIONS = {
   status: 200,
@@ -77,6 +100,9 @@ function stockItem(overrides: Record<string, unknown> = {}) {
     serialNumber: null,
     acquiredOn: null,
     condition: null,
+    categoryIcon: null,
+    categoryColor: null,
+    tags: [],
     notes: null,
     warnings: [],
     ...overrides,
@@ -100,6 +126,9 @@ function durable(overrides: Record<string, unknown> = {}) {
     serialNumber: null,
     acquiredOn: null,
     condition: null,
+    categoryIcon: null,
+    categoryColor: null,
+    tags: [],
     notes: null,
     warnings: [],
     ...overrides,
@@ -113,6 +142,11 @@ const SESSION_ROUTES: Record<string, StubbedResponse> = {
     status: 200,
     body: { items: [], page: 0, size: 50, total: 0 },
   },
+  // Desde el Hito 4 del cierre de huecos, el catálogo de etiquetas lo piden el
+  // listado --para su filtro-- y la ficha --para el campo--. Va aquí y no en
+  // cada prueba porque no es lo que ninguna de ellas mide; las que sí lo miden
+  // lo sustituyen con la misma clave.
+  'GET /api/v1/tags?size=200': TAGS,
 }
 
 /**
@@ -192,6 +226,195 @@ describe('catálogo', () => {
     await vi.waitFor(() => {
       expect(calls.some((call) => call.url.includes('q=azu'))).toBe(true)
     })
+  })
+})
+
+/**
+ * Entra y abre la ficha del duradero, que es donde vive el campo de etiquetas.
+ *
+ * No se puede ir directo a `/inventario/asset-2`: la sesión no se restaura de
+ * `localStorage` --solo el refresh token vive ahí-- así que una URL profunda
+ * pinta el login.
+ */
+async function openDurableDetail(responses: Record<string, StubbedResponse>) {
+  return signInAndVisit('Inventario', {
+    'GET /api/v1/assets?size=200': {
+      status: 200,
+      body: { items: [durable()], page: 0, size: 200, total: 1 },
+    },
+    'GET /api/v1/assets/asset-2': { status: 200, body: durable() },
+    'GET /api/v1/locations?size=200': LOCATIONS,
+    'GET /api/v1/documents?assetId=asset-2&size=200': {
+      status: 200,
+      body: { items: [], page: 0, size: 200, total: 0 },
+    },
+    ...responses,
+  }).then(async (stub) => {
+    await userEvent.click(await screen.findByRole('link', { name: /Taladro/ }))
+    await screen.findByRole('heading', { level: 1, name: 'Taladro' })
+    return stub
+  })
+}
+
+describe('etiquetas e identidad visual', () => {
+  it('el filtro por etiqueta pregunta al servidor, no filtra en memoria', async () => {
+    const { calls } = await signInAndVisit('Inventario', {
+      'GET /api/v1/assets?size=200': { status: 200, body: { items: [durable()], page: 0, size: 200, total: 1 } },
+      'GET /api/v1/assets?tagId=tag-1&size=200': {
+        status: 200,
+        body: { items: [], page: 0, size: 200, total: 0 },
+      },
+    })
+
+    await userEvent.selectOptions(await screen.findByLabelText('Etiqueta'), 'tag-1')
+
+    await vi.waitFor(() => {
+      expect(calls.some((call) => call.url.includes('tagId=tag-1'))).toBe(true)
+    })
+  })
+
+  it('la fila enseña las etiquetas puestas, con su nombre y no solo con un color', async () => {
+    await signInAndVisit('Inventario', {
+      'GET /api/v1/assets?size=200': {
+        status: 200,
+        body: {
+          items: [durable({ tags: [CAMPING], categoryIcon: 'TOOL', categoryColor: 'SKY' })],
+          page: 0,
+          size: 200,
+          total: 1,
+        },
+      },
+    })
+
+    // Dentro de la fila y no en cualquier sitio: «Camping» está también en el
+    // desplegable del filtro, y encontrarlo allí no demostraría nada.
+    const row = await screen.findByRole('link', { name: /Taladro/ })
+    expect(within(row).getByText('Camping')).toBeInTheDocument()
+  })
+
+  it('poner una etiqueta manda la lista entera, no la que se acaba de añadir', async () => {
+    const { calls } = await openDurableDetail({
+      'GET /api/v1/assets/asset-2': { status: 200, body: durable({ tags: [CAMPING] }) },
+      'GET /api/v1/tags?q=Heren&size=200': { status: 200, body: { items: [HERENCIA], page: 0, size: 200, total: 1 } },
+      'PATCH /api/v1/assets/asset-2': { status: 200, body: durable({ tags: [CAMPING, HERENCIA] }) },
+    })
+
+    await userEvent.type(screen.getByRole('combobox', { name: 'Etiquetas de este asset' }), 'Heren')
+    await userEvent.click(await screen.findByRole('option', { name: 'Herencia' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar etiquetas' }))
+
+    const patched = calls.find((call) => call.method === 'PATCH')
+    // Las dos, no solo la nueva: el contrato declara `tagIds` absoluto.
+    expect(patched?.body).toEqual({ tagIds: ['tag-1', 'tag-2'] })
+  })
+
+  it('quitar la última etiqueta manda la lista vacía, que es lo que desetiqueta', async () => {
+    const { calls } = await openDurableDetail({
+      'GET /api/v1/assets/asset-2': { status: 200, body: durable({ tags: [CAMPING] }) },
+      'PATCH /api/v1/assets/asset-2': { status: 200, body: durable({ tags: [] }) },
+    })
+
+    // El botón dice qué quita: quince botones «Quitar» en una fila son quince
+    // controles indistinguibles para quien no ve las pastillas.
+    await userEvent.click(screen.getByRole('button', { name: 'Quitar la etiqueta Camping' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar etiquetas' }))
+
+    const patched = calls.find((call) => call.method === 'PATCH')
+    expect(patched?.body).toEqual({ tagIds: [] })
+  })
+
+  it('un nombre que no existe se ofrece crear, y uno que ya existe no', async () => {
+    await openDurableDetail({
+      'GET /api/v1/tags?q=Sótano&size=200': { status: 200, body: { items: [], page: 0, size: 200, total: 0 } },
+      'GET /api/v1/tags?q=camping&size=200': { status: 200, body: { items: [CAMPING], page: 0, size: 200, total: 1 } },
+    })
+
+    // Por rol y no por rótulo: el patrón combobox de ARIA 1.2 nombra tambien
+    // el `listbox` con la etiqueta del campo, asi que `getByLabelText` casa dos.
+    const field = screen.getByRole('combobox', { name: 'Etiquetas de este asset' })
+    await userEvent.type(field, 'Sótano')
+    expect(await screen.findByRole('option', { name: 'Crear «Sótano»' })).toBeInTheDocument()
+
+    // Y con una que ya existe escrita en minúsculas y sin tilde: el catálogo
+    // compara normalizado, así que ofrecer crearla sería ofrecer un 409.
+    await userEvent.clear(field)
+    await userEvent.type(field, 'camping')
+    expect(await screen.findByRole('option', { name: 'Camping' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /Crear/ })).not.toBeInTheDocument()
+  })
+
+  it('crear una etiqueta desde el campo la da de alta y la deja puesta', async () => {
+    const { calls } = await openDurableDetail({
+      'GET /api/v1/tags?q=Sótano&size=200': { status: 200, body: { items: [], page: 0, size: 200, total: 0 } },
+      'POST /api/v1/tags': {
+        status: 201,
+        body: { id: 'tag-9', name: 'Sótano', createdAt: '2026-08-20T00:00:00Z', retiredAt: null },
+      },
+    })
+
+    await userEvent.type(screen.getByRole('combobox', { name: 'Etiquetas de este asset' }), 'Sótano')
+    await userEvent.click(await screen.findByRole('option', { name: 'Crear «Sótano»' }))
+
+    const created = calls.find((call) => call.method === 'POST' && call.url.endsWith('/tags'))
+    expect(created?.body).toEqual({ name: 'Sótano' })
+    expect(await screen.findByRole('button', { name: 'Quitar la etiqueta Sótano' })).toBeInTheDocument()
+  })
+
+  it('el icono y el color viajan al crear la categoría, y se pueden dejar sin elegir', async () => {
+    const { calls } = await signInAndVisit('Catálogo', {
+      'GET /api/v1/categories?includeRetired=false&size=200': CATEGORIES,
+      'GET /api/v1/articles?size=200': ARTICLES,
+      'POST /api/v1/categories': { status: 201, body: CATEGORIES.body.items[0] },
+    })
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Categorías' }))
+    await userEvent.type(screen.getByLabelText('Nueva categoría'), 'Escalada')
+
+    // Por su nombre en castellano: es lo único que tiene quien no ve la rejilla.
+    await userEvent.click(screen.getByRole('button', { name: 'Bicicleta, categoría nueva' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Turquesa, categoría nueva' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Crear categoría' }))
+
+    const created = calls.find((call) => call.method === 'POST' && call.url.endsWith('/categories'))
+    expect(created?.body).toEqual({ name: 'Escalada', icon: 'BIKE', color: 'TEAL' })
+  })
+
+  it('lo elegido se dice con aria-pressed y no solo con el relleno', async () => {
+    await signInAndVisit('Catálogo', {
+      'GET /api/v1/categories?includeRetired=false&size=200': CATEGORIES,
+      'GET /api/v1/articles?size=200': ARTICLES,
+    })
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Categorías' }))
+    const bike = screen.getByRole('button', { name: 'Bicicleta, categoría nueva' })
+    expect(bike).toHaveAttribute('aria-pressed', 'false')
+
+    await userEvent.click(bike)
+    expect(bike).toHaveAttribute('aria-pressed', 'true')
+
+    // Y se puede desmarcar, que es por lo que son botones y no radios: una
+    // categoría sin cara es el estado inicial de todas.
+    await userEvent.click(screen.getByRole('button', { name: 'Sin icono, categoría nueva' }))
+    expect(bike).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('editar una categoría manda su cara entera, que es como se retira un icono', async () => {
+    const { calls } = await signInAndVisit('Catálogo', {
+      'GET /api/v1/categories?includeRetired=false&size=200': CATEGORIES,
+      'GET /api/v1/articles?size=200': ARTICLES,
+      'PATCH /api/v1/categories/cat-1': { status: 200, body: CATEGORIES.body.items[0] },
+    })
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Categorías' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Editar Alimentación' }))
+    // Con el nombre de la categoría dentro: en esta pantalla puede haber dos
+    // selectores a la vez --el del alta y el de la fila-- y sin eso serían
+    // cuarenta y cuatro botones con veintidós nombres repetidos.
+    await userEvent.click(screen.getByRole('button', { name: 'Sin icono, Alimentación' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    const patched = calls.find((call) => call.method === 'PATCH')
+    expect(patched?.body).toEqual({ name: 'Alimentación', icon: null, color: 'MOSS' })
   })
 })
 

@@ -321,12 +321,64 @@ export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
   OTHER: 'Otro',
 }
 
+/**
+ * El juego cerrado de iconos entre los que un hogar elige (ADR-015). El mapa a
+ * componente y a nombre en castellano vive en `ui/catalog.tsx`, que es donde se
+ * pintan.
+ */
+export type CategoryIcon =
+  | 'BOX'
+  | 'SOFA'
+  | 'UTENSILS'
+  | 'SPRAY'
+  | 'TOOL'
+  | 'FRAME'
+  | 'PLUG'
+  | 'POT'
+  | 'PILL'
+  | 'MONITOR'
+  | 'SHIRT'
+  | 'BIKE'
+  | 'PENCIL'
+  | 'CAR'
+  | 'LEAF'
+  | 'PAW'
+
+/** Y los seis colores, todos medidos por `scripts/check-contrast.py`. */
+export type CategoryColor = 'ROSE' | 'PLUM' | 'INDIGO' | 'SKY' | 'TEAL' | 'MOSS'
+
 export interface Category {
   id: string
   name: string
   notes: string | null
+  /** Nulo significa **que nadie lo eligió**, no que sea gris. */
+  icon: CategoryIcon | null
+  color: CategoryColor | null
   createdAt: string
   retiredAt: string | null
+}
+
+/**
+ * Una etiqueta libre del hogar.
+ *
+ * Llega con identificador **y** nombre también dentro de un asset, y no solo el
+ * nombre: el filtro del listado va por identificador, así que con el texto solo
+ * habría que buscarla en el catálogo para poder filtrar por lo que se acaba de
+ * pintar.
+ */
+export interface Tag {
+  id: string
+  name: string
+  createdAt: string
+  retiredAt: string | null
+}
+
+/** Lo que se manda al crear o modificar una categoría. */
+export interface CategoryBody {
+  name: string
+  notes?: string
+  icon?: CategoryIcon | null
+  color?: CategoryColor | null
 }
 
 export interface Article {
@@ -710,6 +762,11 @@ export interface Asset {
   acquiredOn: string | null
   /** Solo en un `DURABLE`. Nulo significa **que nadie lo ha anotado**, no que esté bien. */
   condition: AssetCondition | null
+  /** La cara de su categoría, resuelta al leer igual que el nombre. */
+  categoryIcon: CategoryIcon | null
+  categoryColor: CategoryColor | null
+  /** Ordenadas por nombre. Vacío es lo normal. */
+  tags: Tag[]
   notes: string | null
   photoUrl: string | null
   photoThumbnailUrl: string | null
@@ -725,6 +782,8 @@ export interface AssetFilters {
   type?: AssetType
   status?: AssetStatus
   condition?: AssetCondition
+  /** Una sola: con dos habría que decidir si se cruzan en `AND` o en `OR`. */
+  tagId?: string
   withoutOwner?: boolean
 }
 
@@ -1699,14 +1758,37 @@ export const api = {
   listCategories: (accessToken: string, includeRetired = false) =>
     request<Page<Category>>(`/categories${queryString({ includeRetired, size: 200 })}`, { accessToken }),
 
-  createCategory: (body: { name: string; notes?: string }, accessToken: string) =>
+  createCategory: (body: CategoryBody, accessToken: string) =>
     request<Category>('/categories', { method: 'POST', body, accessToken }),
 
-  updateCategory: (id: string, body: { name: string; notes?: string }, accessToken: string) =>
+  /**
+   * El cuerpo es la categoría **entera** y no un parche campo a campo: un campo
+   * ausente se quita, que es como se retira un icono elegido por error.
+   */
+  updateCategory: (id: string, body: CategoryBody, accessToken: string) =>
     request<Category>(`/categories/${id}`, { method: 'PATCH', body, accessToken }),
 
   retireCategory: (id: string, accessToken: string) =>
     request<void>(`/categories/${id}`, { method: 'DELETE', accessToken }),
+
+  // --- Etiquetas ------------------------------------------------------------
+  /** El `q` alimenta el autocompletado del campo de etiquetas de un asset. */
+  listTags: (accessToken: string, filters: { q?: string; includeRetired?: boolean } = {}) =>
+    request<Page<Tag>>(`/tags${queryString({ ...filters, size: 200 })}`, { accessToken }),
+
+  /**
+   * Crea la etiqueta, o **revive** la que existiera retirada con ese nombre. Las
+   * dos respuestas —`201` y `200`— traen la etiqueta, así que quien la usa no
+   * tiene que saber cuál de las dos cosas ha pasado.
+   */
+  createTag: (body: { name: string }, accessToken: string) =>
+    request<Tag>('/tags', { method: 'POST', body, accessToken }),
+
+  updateTag: (id: string, body: { name: string }, accessToken: string) =>
+    request<Tag>(`/tags/${id}`, { method: 'PATCH', body, accessToken }),
+
+  retireTag: (id: string, accessToken: string) =>
+    request<void>(`/tags/${id}`, { method: 'DELETE', accessToken }),
 
   // --- Artículos ------------------------------------------------------------
   listArticles: (

@@ -127,6 +127,42 @@ extremo seguro.
 Aun así, **el color nunca es el único portador**: cada estado lleva además su
 etiqueta y su icono fijo (ver [`iconography.md`](iconography.md)).
 
+### Los seis colores de categoría, que los elige el usuario
+
+Es la única familia de la paleta que **no decide el sistema**. Un hogar le pone
+icono y color a cada una de sus categorías, y de ahí salen dos cosas que el resto
+de la paleta no tiene:
+
+- **Su nombre es descriptivo y no semántico**, que es la excepción a la primera
+  regla de [`tokens/`](../tokens/README.md). El significado lo pone quien
+  clasifica —«el verde es la despensa»— así que el token no puede llamarse por lo
+  que dice: se llama por lo que es. `--color-category-moss`, no
+  `--color-category-3`, que sería ilegible en la migración, en el contrato y aquí.
+- **Es un juego cerrado**, y por eso existe. El razonamiento entero está en la
+  [ADR-015](../../../common/architecture/decisions/ADR-015-user-chosen-category-identity.md):
+  un color libre no está en ningún token, así que no lo mide nadie, y sería lo
+  único de la interfaz cuyo contraste se afirma en vez de comprobarse.
+
+| Color | Tono | Dónde no choca |
+|---|---|---|
+| `rose` | 350 | Lejos del rojo teja de vencido (27) |
+| `plum` | 310 | — |
+| `indigo` | 275 | A 25° del azul pizarra de sin existencias |
+| `sky` | 230 | A 20° del mismo azul; el croma es la mitad |
+| `teal` | 195 | — |
+| `moss` | 130 | A 22° del verde salvia de disponible |
+
+Los cinco tonos del dominio y el acento están tomados —27, 42, 75, 152 y 250— y
+estos seis se reparten lo que queda. Los dos que más se acercan son `moss` y
+`sky`, y se admiten por una razón de forma y no de tono: **el color de una
+categoría nunca va solo**. Lleva su nombre al lado y su icono dentro, y su
+recipiente es un cuadradito redondeado y no la pastilla de un estado, así que las
+dos cosas no se confunden ni siquiera cuando comparten fila.
+
+De ahí también que **repetir color entre categorías no sea un defecto**: seis
+colores para las doce categorías de un hogar significa que el color agrupa, no
+que identifica. Lo que identifica es el nombre.
+
 ### Cómo se deriva el modo oscuro
 
 No es una inversión. La regla es:
@@ -167,4 +203,5 @@ supuesto que si el claro cumple, el oscuro también.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | Entran los **seis colores de categoría** (cierre de huecos, Hito 4, [ADR-015](../../../common/architecture/decisions/ADR-015-user-chosen-category-identity.md)): la primera familia de la paleta que elige el usuario, la única con nombre descriptivo y la que lleva la auditoría de contraste de 36 pares a 48. | Equipo DRP |
 | 2026-08-10 | Creación del documento con la paleta del Hito 1. | Equipo DRP |

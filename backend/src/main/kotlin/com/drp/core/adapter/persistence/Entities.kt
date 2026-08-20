@@ -1,5 +1,7 @@
 package com.drp.core.adapter.persistence
 
+import com.drp.core.domain.catalog.CategoryColor
+import com.drp.core.domain.catalog.CategoryIcon
 import com.drp.core.domain.catalog.MeasurementUnit
 import com.drp.core.domain.file.DocumentType
 import com.drp.core.domain.household.MemberRole
@@ -16,6 +18,7 @@ import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Id
+import jakarta.persistence.IdClass
 import jakarta.persistence.Table
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
@@ -199,12 +202,52 @@ class CategoryEntity(
     var householdId: UUID,
     var name: String,
     var notes: String?,
+    @Enumerated(EnumType.STRING) var icon: CategoryIcon?,
+    @Enumerated(EnumType.STRING) var color: CategoryColor?,
     var createdAt: Instant,
     var updatedAt: Instant,
     var retiredAt: Instant?,
     var createdBy: UUID?,
     var updatedBy: UUID?,
 )
+
+@Entity
+@Table(name = "tags")
+class TagEntity(
+    @Id var id: UUID,
+    var householdId: UUID,
+    var name: String,
+    var createdAt: Instant,
+    var updatedAt: Instant,
+    var retiredAt: Instant?,
+    var createdBy: UUID?,
+    var updatedBy: UUID?,
+)
+
+/**
+ * La union entre un asset y una etiqueta.
+ *
+ * Clave primaria compuesta, y por eso lleva `@IdClass` en vez de un `id`
+ * inventado: el par **es** la fila, y darle una clave propia dejaria escribir
+ * dos veces la misma etiqueta sobre el mismo asset.
+ */
+@Entity
+@Table(name = "asset_tags")
+@IdClass(AssetTagKey::class)
+class AssetTagEntity(
+    @Id var assetId: UUID,
+    @Id var tagId: UUID,
+    var householdId: UUID,
+    var createdAt: Instant,
+    var createdBy: UUID?,
+)
+
+/** La clave compuesta de [AssetTagEntity]. JPA exige que sea serializable y con `equals`. */
+data class AssetTagKey(val assetId: UUID = NIL, val tagId: UUID = NIL) : java.io.Serializable {
+    companion object {
+        private val NIL: UUID = UUID(0, 0)
+    }
+}
 
 @Entity
 @Table(name = "articles")

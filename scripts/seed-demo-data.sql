@@ -123,27 +123,74 @@ FROM (VALUES
 -- Las cinco que siembra el alta de un hogar (`DEFAULT_CATEGORIES`) sin autoría,
 -- porque las pone el sistema, más las que esta casa ha ido añadiendo. Sus nombres
 -- son datos que se leen en pantalla, así que van en castellano.
+--
+-- **Las doce llevan icono y color** desde el Hito 4 del cierre de huecos, y no
+-- por adorno: la pantalla del catálogo y las filas del inventario existen para
+-- enseñar la identidad visual, y sin ella el hogar de demostración las enseñaría
+-- vacías. Los iconos son los del juego cerrado (ADR-015) y **el color se repite
+-- a propósito** --seis colores para doce categorías-- porque eso es exactamente
+-- lo que el color hace: agrupar. Lo que identifica es el nombre.
+--
+-- Se agrupan por afinidad: lo que se enchufa en índigo, lo de comer y cocinar en
+-- musgo, lo de limpiar y asear en turquesa, el taller y el deporte en cielo, y
+-- lo que se ve en rosa y ciruela.
 
-INSERT INTO categories (id, household_id, name, notes, created_at, updated_at, created_by, updated_by)
+INSERT INTO categories (id, household_id, name, notes, icon, color,
+                        created_at, updated_at, created_by, updated_by)
 SELECT pg_temp.demo_id('categoria:' || v.clave), pg_temp.demo_id('hogar'), v.nombre, v.notas,
+       v.icono, v.color,
        now() - (v.antiguedad || ' months')::interval,
        now() - (v.antiguedad || ' months')::interval,
        CASE WHEN v.sembrada THEN NULL ELSE pg_temp.demo_id('miembro:marta') END,
        CASE WHEN v.sembrada THEN NULL ELSE pg_temp.demo_id('miembro:marta') END
 FROM (VALUES
-    ('mobiliario',        'Mobiliario',           NULL,                            true,  '14'),
-    ('alimentacion',      'Alimentación',         NULL,                            true,  '14'),
-    ('limpieza',          'Limpieza',             NULL,                            true,  '14'),
-    ('herramientas',      'Herramientas',         NULL,                            true,  '14'),
-    ('decoracion',        'Decoración',           NULL,                            true,  '14'),
-    ('electrodomesticos', 'Electrodomésticos',    'Lo que se enchufa y se avería', false, '13'),
-    ('menaje',            'Menaje y cocina',      NULL,                            false, '13'),
-    ('higiene',           'Higiene y salud',      'Baño y botiquín',               false, '13'),
-    ('electronica',       'Electrónica',          NULL,                            false, '12'),
-    ('textil',            'Ropa y textil',        NULL,                            false, '11'),
-    ('deporte',           'Deporte y aire libre', NULL,                            false, '10'),
-    ('papeleria',         'Papelería y escolar',  'Se dispara cada septiembre',    false, '9')
-) AS v(clave, nombre, notas, sembrada, antiguedad);
+    ('mobiliario',        'Mobiliario',           NULL,                            'SOFA',     'PLUM',   true,  '14'),
+    ('alimentacion',      'Alimentación',         NULL,                            'UTENSILS', 'MOSS',   true,  '14'),
+    ('limpieza',          'Limpieza',             NULL,                            'SPRAY',    'TEAL',   true,  '14'),
+    ('herramientas',      'Herramientas',         NULL,                            'TOOL',     'SKY',    true,  '14'),
+    ('decoracion',        'Decoración',           NULL,                            'FRAME',    'ROSE',   true,  '14'),
+    ('electrodomesticos', 'Electrodomésticos',    'Lo que se enchufa y se avería', 'PLUG',     'INDIGO', false, '13'),
+    ('menaje',            'Menaje y cocina',      NULL,                            'POT',      'MOSS',   false, '13'),
+    ('higiene',           'Higiene y salud',      'Baño y botiquín',               'PILL',     'TEAL',   false, '13'),
+    ('electronica',       'Electrónica',          NULL,                            'MONITOR',  'INDIGO', false, '12'),
+    ('textil',            'Ropa y textil',        NULL,                            'SHIRT',    'PLUM',   false, '11'),
+    ('deporte',           'Deporte y aire libre', NULL,                            'BIKE',     'SKY',    false, '10'),
+    -- La única sin color a propósito: nulo es un valor con significado --nadie lo
+    -- eligió-- y una demostración en la que todo está relleno no enseña cómo se
+    -- ve el caso normal de una categoría recién creada.
+    ('papeleria',         'Papelería y escolar',  'Se dispara cada septiembre',    'PENCIL',   NULL,     false, '9')
+) AS v(clave, nombre, notas, icono, color, sembrada, antiguedad);
+
+
+-- =====================================================================
+-- 2 bis. Etiquetas
+-- =====================================================================
+--
+-- El vocabulario propio de esta casa, que es lo que la categoría no puede dar
+-- porque la categoría es una: la tienda de campaña es de Deporte, y a la vez es
+-- *camping* y *se presta*.
+--
+-- Seis, que es lo que una casa real acumula en un año: ni dos --que no enseñan
+-- el filtro-- ni treinta, que serían un catálogo inventado. Una está **retirada**
+-- a propósito, porque retirada es un estado del modelo que ninguna pantalla
+-- enseña si nadie lo siembra: sigue puesta en lo que la llevaba y deja de
+-- ofrecerse al etiquetar.
+
+INSERT INTO tags (id, household_id, name, created_at, updated_at, retired_at, created_by, updated_by)
+SELECT pg_temp.demo_id('etiqueta:' || v.clave), pg_temp.demo_id('hogar'), v.nombre,
+       now() - (v.antiguedad || ' months')::interval,
+       now() - (v.antiguedad || ' months')::interval,
+       CASE WHEN v.retirada THEN now() - interval '2 months' ELSE NULL END,
+       pg_temp.demo_id('miembro:' || v.quien),
+       pg_temp.demo_id('miembro:' || v.quien)
+FROM (VALUES
+    ('camping',    'Camping',            'javier', false, '11'),
+    ('prestable',  'Se presta',          'marta',  false, '10'),
+    ('heredado',   'Heredado',           'marta',  false, '12'),
+    ('reparar',    'Para reparar',       'javier', false, '4'),
+    ('cole',       'Cosas del cole',     'lucia',  false, '9'),
+    ('mudanza',    'Mudanza 2025',       'marta',  true,  '13')
+) AS v(clave, nombre, quien, retirada, antiguedad);
 
 
 -- =====================================================================
@@ -358,6 +405,46 @@ FROM (VALUES
     ('arbol-navidad',  'Árbol de Navidad artificial',      NULL,               'decoracion',        'marta',  NULL,                'estanteria',      NULL,              88,  'AVAILABLE', NULL, 'WORN'),
     ('ventilador',     'Ventilador de pie',                NULL,               'electrodomesticos', 'marta',  NULL,                'trastero',        NULL,              62,  'DECOMMISSIONED', 'Se le rompió el motor el verano pasado', 'UNUSABLE')
 ) AS v(clave, nombre, articulo, categoria, propietario, contenedor, ubicacion, serie, antiguedad, estado, notas, condicion);
+
+
+-- =====================================================================
+-- 5 bis. Qué lleva etiquetado cada cosa
+-- =====================================================================
+--
+-- Trece parejas sobre once assets, que es la proporción que interesa enseñar:
+-- **la mayoría del inventario no lleva ninguna**. Un hogar de demostración con
+-- todo etiquetado enseñaría una casa que no existe y, peor, escondería el caso
+-- normal --la fila sin pastillas-- que es contra el que hay que mirar si la
+-- maquetación aguanta.
+--
+-- Dos assets llevan dos, que es lo que la categoría no podía dar: la tienda de
+-- campaña es *camping* y *se presta* a la vez.
+
+INSERT INTO asset_tags (household_id, asset_id, tag_id, created_at, created_by)
+SELECT pg_temp.demo_id('hogar'),
+       pg_temp.demo_id('asset:'    || v.asset),
+       pg_temp.demo_id('etiqueta:' || v.etiqueta),
+       now() - (v.antiguedad || ' months')::interval,
+       pg_temp.demo_id('miembro:' || v.quien)
+FROM (VALUES
+    ('tienda-campana', 'camping',   'javier', '9'),
+    ('tienda-campana', 'prestable', 'javier', '9'),
+    ('nevera-portatil','camping',   'javier', '9'),
+    ('barbacoa',       'camping',   'javier', '8'),
+    ('bomba-bici',     'camping',   'hugo',   '7'),
+    ('escalera',       'prestable', 'javier', '10'),
+    ('taladro',        'prestable', 'javier', '10'),
+    ('olla',           'heredado',  'marta',  '12'),
+    ('vajilla',        'heredado',  'marta',  '12'),
+    ('arbol-navidad',  'heredado',  'marta',  '12'),
+    -- La única que además está estropeada: la etiqueta dice qué hay que hacer
+    -- con ella, y la condición, en qué estado está. Son dos preguntas distintas.
+    ('tienda-campana', 'reparar',   'javier', '2'),
+    ('portatil-lucia', 'cole',      'lucia',  '9'),
+    -- Y una con la etiqueta **retirada**: sigue puesta y se sigue viendo, que es
+    -- lo que distingue retirar de borrar.
+    ('maleta',         'mudanza',   'marta',  '13')
+) AS v(asset, etiqueta, quien, antiguedad);
 
 
 -- =====================================================================
@@ -1137,6 +1224,8 @@ COMMIT;
 SELECT 'hogares'        AS tabla, count(*) FROM households
 UNION ALL SELECT 'personas',      count(*) FROM household_members
 UNION ALL SELECT 'categorías',    count(*) FROM categories
+UNION ALL SELECT 'etiquetas',    count(*) FROM tags
+UNION ALL SELECT 'etiquetado',   count(*) FROM asset_tags
 UNION ALL SELECT 'ubicaciones',   count(*) FROM locations
 UNION ALL SELECT 'artículos',     count(*) FROM articles
 UNION ALL SELECT 'assets',        count(*) FROM assets
