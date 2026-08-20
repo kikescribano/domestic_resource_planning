@@ -54,7 +54,7 @@ Tres tokens con obligaciones distintas, detallado en
 
 - `border-subtle` es decorativo: separa filas y delimita tarjetas.
 - `border` delimita **controles** y está obligado a 3:1 por el criterio 1.4.11 de
-  WCAG. Medido: 3,49:1 en claro y 4,30:1 en oscuro.
+  WCAG. Medido: 3,46:1 en claro y 4,33:1 en oscuro.
 - `border-strong` es énfasis: control activo, seleccionado o con error.
 
 Confundir los dos primeros es el error más fácil del sistema, porque un `input`
@@ -65,9 +65,9 @@ con borde sutil queda más bonito y deja de cumplir.
 Cuatro niveles: `shadow-xs` (control levantado), `shadow-sm` (tarjeta),
 `shadow-md` (menú, desplegable, aviso flotante), `shadow-lg` (diálogo y hoja).
 
-Las sombras son **de tono cálido y nunca negras**: se construyen con un pardo
-translúcido (`oklch(30% 0.03 60 / …)`), porque una sombra gris neutra sobre un
-papel cálido se ve azulada y ensucia toda la paleta. Cada nivel son dos capas:
+Las sombras son **del tono de la paleta y nunca negras**: se construyen con un
+pino translúcido (`oklch(30% 0.03 190 / …)`), porque una sombra gris neutra sobre
+un papel teñido se ve ajena y ensucia toda la paleta. Cada nivel son dos capas:
 una corta y densa que apoya el objeto, y una larga y difusa que lo separa del
 fondo.
 

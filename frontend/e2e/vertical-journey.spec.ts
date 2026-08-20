@@ -1630,8 +1630,8 @@ async function appliedContrast(page: Page, locator: Locator): Promise<number> {
  * - Al cambiar de tema hay 140 ms de `transition-colors` en los que el color es
  *   una **mezcla de los dos modos**, y esa mezcla no está en ningún diseño ni la
  *   mide ningún script. Auditar ahí acusó al botón principal de dar 3,55:1 en
- *   oscuro cuando sus tokens dan 6,77:1: el contraste real de un color que no
- *   existe.
+ *   oscuro cuando sus tokens daban entonces 6,77:1: el contraste real de un
+ *   color que no existe.
  *
  * Acotado a A y AA, que es el objetivo normativo que fija la ADR-006.
  */

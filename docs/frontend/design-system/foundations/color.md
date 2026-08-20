@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-10 |
+| Última revisión | 2026-08-20 |
 
 ## Propósito
 
@@ -57,8 +57,9 @@ justamente por esto.
 **Superficies.** Cuatro planos, de atrás hacia delante: `surface-sunken` (huecos,
 cabecera de tabla), `surface` (la página), `surface-raised` (tarjetas y
 diálogos) y `surface-hover` (la fila bajo el puntero). El fondo no es blanco sino
-un papel cálido, `oklch(98.4% 0.006 85)`: es el único gesto de la dirección que
-está presente en absolutamente todas las pantallas y no cuesta ni un píxel de
+un papel de verde empolvado, `oklch(98.4% 0.006 180)` —el mismo tinte frío de
+pino que usan las piezas comerciales de DRP—: es el único gesto de la dirección
+que está presente en absolutamente todas las pantallas y no cuesta ni un píxel de
 densidad. Además hay `scrim`, la capa translúcida que atenúa el fondo de un
 diálogo.
 
@@ -87,7 +88,9 @@ Usar `border-subtle` en un `input` es un incumplimiento, no una preferencia
 estética. Es el error más fácil de cometer de todo el sistema de color, porque el
 resultado es bonito.
 
-**Acento.** Uno solo: terracota. `accent` es el relleno de la acción principal,
+**Acento.** Uno solo: teal, el primario de la identidad de DRP —`#2d7a71` en
+claro y `#7ec7be` en oscuro, los mismos que llevan las presentaciones del
+proyecto—. `accent` es el relleno de la acción principal,
 `accent-hover` su estado bajo el puntero, `accent-ink` la versión oscurecida para
 usarlo como **texto** —un enlace no puede ir del color de un botón, porque el
 botón no necesita 4,5:1 contra el papel y el texto sí— y `accent-soft` el fondo
@@ -116,7 +119,7 @@ del sistema**, y el día que el rojo de error cambie de tono el inventario no de
 repintarse detrás. Hoy los valores coinciden; los nombres permiten que dejen de
 hacerlo sin tocar ningún componente.
 
-**Por qué el azul.** Es el único color frío de un sistema deliberadamente cálido,
+**Por qué el azul.** Es el único frío de los cinco estados,
 y está donde está por accesibilidad antes que por estética: una deuteranopia
 confunde con facilidad el verde, el ámbar y el rojo entre sí, pero no confunde
 ninguno de los tres con un azul. El estado que más probablemente hay que
@@ -149,15 +152,17 @@ de la paleta no tiene:
 | `plum` | 310 | — |
 | `indigo` | 275 | A 25° del azul pizarra de sin existencias |
 | `sky` | 230 | A 20° del mismo azul; el croma es la mitad |
-| `teal` | 195 | — |
+| `teal` | 195 | A 10° del teal del acento; nunca comparte forma con un botón |
 | `moss` | 130 | A 22° del verde salvia de disponible |
 
-Los cinco tonos del dominio y el acento están tomados —27, 42, 75, 152 y 250— y
-estos seis se reparten lo que queda. Los dos que más se acercan son `moss` y
-`sky`, y se admiten por una razón de forma y no de tono: **el color de una
-categoría nunca va solo**. Lleva su nombre al lado y su icono dentro, y su
-recipiente es un cuadradito redondeado y no la pastilla de un estado, así que las
-dos cosas no se confunden ni siquiera cuando comparten fila.
+Los cinco tonos del dominio y el acento están tomados —27, 75, 152, 185 y 250— y
+estos seis se reparten lo que queda. Los tres que más se acercan son `moss`,
+`sky` y `teal` —este último desde que el acento giró de la terracota al teal de
+la identidad comercial—, y se admiten por una razón de forma y no de tono: **el
+color de una categoría nunca va solo**. Lleva su nombre al lado y su icono
+dentro, y su recipiente es un cuadradito redondeado y no la pastilla de un estado
+ni el relleno de un botón, así que las dos cosas no se confunden ni siquiera
+cuando comparten fila.
 
 De ahí también que **repetir color entre categorías no sea un defecto**: seis
 colores para las doce categorías de un hogar significa que el color agrupa, no
@@ -167,9 +172,9 @@ que identifica. Lo que identifica es el nombre.
 
 No es una inversión. La regla es:
 
-- Las superficies suben de `L 15,5–27 %` manteniendo el tono cálido (H 70). El
-  fondo oscuro de DRP es pardo, no azulado ni negro puro; el negro puro sobre una
-  pantalla OLED produce halo alrededor del texto claro.
+- Las superficies suben de `L 15,5–27 %` manteniendo el tono de pino (H 190). El
+  fondo oscuro de DRP es un pino profundo, no un gris azulado ni negro puro; el
+  negro puro sobre una pantalla OLED produce halo alrededor del texto claro.
 - La tinta baja de contraste absoluto respecto de una inversión ingenua: `ink` es
   `L 95 %`, no blanco, porque blanco puro sobre fondo muy oscuro produce
   deslumbramiento y falso desenfoque.
@@ -203,5 +208,6 @@ supuesto que si el claro cumple, el oscuro también.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **La marca gira al esquema de la identidad comercial de DRP**: papel y tinta pasan del pardo cálido al pino frío (tonos 177–190) y el acento deja la terracota por el teal de las presentaciones. Los colores de feedback, los cinco estados del dominio y las seis categorías no cambian; con el acento en 185, la categoría `teal` (195) pasa a ser la más cercana y se razona por qué se admite. | Equipo DRP |
 | 2026-08-20 | Entran los **seis colores de categoría** (cierre de huecos, Hito 4, [ADR-015](../../../common/architecture/decisions/ADR-015-user-chosen-category-identity.md)): la primera familia de la paleta que elige el usuario, la única con nombre descriptivo y la que lleva la auditoría de contraste de 36 pares a 48. | Equipo DRP |
 | 2026-08-10 | Creación del documento con la paleta del Hito 1. | Equipo DRP |

@@ -74,7 +74,7 @@ más**:
 1. **El papel de fondo.** El listado se dibuja sobre la misma base cálida que el
    resto de la aplicación. Es lo que impide que la tabla parezca una hoja de
    cálculo y no cuesta ni un píxel de altura.
-2. **La acción principal.** El único relleno de terracota de la pantalla.
+2. **La acción principal.** El único relleno de teal de la pantalla.
 3. **El estado.** El único color dentro de la fila, con su etiqueta y su icono.
 
 Y esta es la lista de lo que queda **prohibido dentro de una fila**, que es la
