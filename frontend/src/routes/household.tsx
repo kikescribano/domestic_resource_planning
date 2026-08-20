@@ -8,6 +8,7 @@ import {
   api,
   formatDate,
   humanMessage,
+  todayIn,
   type Household,
   type UserRole,
 } from '../api/client'
@@ -74,6 +75,26 @@ export function useHousehold() {
     queryKey: ['household'],
     queryFn: () => api.getCurrentHousehold(session.accessToken),
   })
+}
+
+/**
+ * **Qué día es hoy en el calendario del hogar**, o `null` mientras no se sepa.
+ *
+ * Sale de aquí y no de `new Date()` porque el día de una regla de calendario es
+ * el del hogar y no el del navegador ni el de Greenwich: es el servidor quien
+ * decide si una intervención es «del futuro», y lo hace contra
+ * `households.time_zone`. Un cliente que enseñe otro día pone al usuario a
+ * registrar una fecha que le van a rechazar —o, peor, una que le van a aceptar
+ * y no es la que hizo.
+ *
+ * **Nulo es un estado normal y dura poco**: el shell pide el hogar al montar y
+ * la clave es compartida, así que para cuando una pantalla de módulo tiene datos
+ * que pintar esto ya tiene valor. Quien lo use pinta el campo vacío mientras
+ * tanto, que es preferible a rellenarlo con un día inventado.
+ */
+export function useHouseholdToday(): string | null {
+  const { data } = useHousehold()
+  return data ? todayIn(data.timeZone) : null
 }
 
 /**

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from '../App'
+import { todayIn } from '../api/client'
 import { fakeTokenPair, stubFetch, type StubbedRoute } from '../test/http'
 
 /**
@@ -34,11 +35,22 @@ const CALLERS = 'GET /api/v1/maintenance/suppliers'
 const ASSET = 'aaaaaaaa-0000-0000-0000-000000000001'
 const PLAN = 'bbbbbbbb-0000-0000-0000-000000000001'
 
-/** Una fecha relativa a hoy: una fija caduca y hace que la prueba falle sola un día cualquiera. */
+/** La del hogar que `stubFetch` da de base. Ver [inDays] y `el día que se propone`. */
+const HOUSEHOLD_ZONE = 'Europe/Madrid'
+
+/**
+ * Una fecha relativa a hoy: una fija caduca y hace que la prueba falle sola un
+ * día cualquiera.
+ *
+ * **Cuenta desde el día del hogar**, que es el que la pantalla usa desde que el
+ * «hoy» de una regla de calendario es el suyo. Con `toISOString()` esto daba el
+ * día de Greenwich y las dos mitades de la prueba dejaban de hablar del mismo
+ * día durante las últimas horas de la tarde.
+ */
 function inDays(days: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() + days)
-  return date.toISOString().slice(0, 10)
+  const day = new Date(`${todayIn(HOUSEHOLD_ZONE)}T00:00:00Z`)
+  day.setUTCDate(day.getUTCDate() + days)
+  return day.toISOString().slice(0, 10)
 }
 
 function plan(overrides: Record<string, unknown> = {}) {
@@ -178,6 +190,44 @@ describe('los planes', () => {
     expect(screen.queryByLabelText(/qui[eé]n lo hace/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/responsable/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/a qui[eé]n le toca/i)).not.toBeInTheDocument()
+  })
+
+  /**
+   * **El día que el campo propone es el del hogar, no el de Greenwich.**
+   *
+   * El reloj se para a las 23:30 UTC, que en `Europe/Madrid` es la 01:30 del día
+   * siguiente: es la franja entera en la que esta pantalla proponía **ayer** y el
+   * selector se negaba a ofrecer hoy. Se para el reloj y no se cuenta desde la
+   * hora real porque el defecto solo aparece de madrugada, que es exactamente
+   * como se coló.
+   *
+   * Se falsea `Date` y no los temporizadores: React Query y `userEvent` los
+   * necesitan de verdad, y lo único que esta prueba tiene que congelar es qué día
+   * es.
+   */
+  it('el día que se propone y el máximo del campo son los del hogar', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-07-15T23:30:00Z') })
+
+    try {
+      await openMaintenance({
+        [PLANS]: page([plan()]),
+        [`GET /api/v1/maintenance/plans/${PLAN}`]: {
+          status: 200,
+          body: { plan: plan(), machineName: 'Caldera', supplier: null, interventions: [] },
+        },
+      })
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Ya está hecho' }))
+
+      const cuando = await screen.findByLabelText('Cuándo se hizo')
+      // El 16 y no el 15: en la cocina ya es el día siguiente.
+      expect(cuando).toHaveValue('2026-07-16')
+      // Y el tope también, que es la otra mitad: con el 15 el selector no dejaba
+      // elegir el día que la persona tiene delante.
+      expect(cuando).toHaveAttribute('max', '2026-07-16')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('crear un plan manda los meses y la fecha, y nada más', async () => {
