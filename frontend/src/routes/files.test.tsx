@@ -344,9 +344,18 @@ function fakeXhr(response: { status: number; body: unknown }) {
     },
   }
 
+  // **Una función normal y no una flecha, y no es estilo.** El código bajo
+  // prueba hace `new XMLHttpRequest()`, y desde Vitest 4 el doble se invoca de
+  // verdad con `new`. Una flecha no es constructora, así que el doble no llega a
+  // construirse: el `XMLHttpRequest` falso nunca se abre y las tres pruebas de
+  // subida fallan con `expected [] to not have a length of +0` --un mensaje que
+  // no se parece en nada a la causa--. Con Vitest 3 pasaba porque el mock
+  // llamaba a la implementación como función corriente.
   vi.stubGlobal(
     'XMLHttpRequest',
-    vi.fn(() => request),
+    vi.fn(function () {
+      return request
+    }),
   )
   return request
 }
