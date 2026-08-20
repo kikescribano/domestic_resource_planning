@@ -15,6 +15,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5",
     "heic-to": "^1.5.2",
+    "lucide-react": "^1.33.0",
     "react": "^19",
     "react-dom": "^19",
     "react-router": "^7"

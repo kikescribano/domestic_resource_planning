@@ -1,3 +1,4 @@
+import { CircleAlert, CircleCheck, Info, TriangleAlert } from 'lucide-react'
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -524,57 +525,34 @@ export function Combobox({
   )
 }
 
-// Iconos de línea, cuadrícula de 24, como fija la dirección visual. Van con
-// aria-hidden porque el significado lo lleva siempre el texto de al lado.
+// Los cuatro iconos de feedback, ya de Lucide.
+//
+// Estaban dibujados a mano desde la Fase 1 «siguiendo su geometría sin ser
+// Lucide», porque `iconography.md` adoptó el juego y dejó la dependencia fuera.
+// La dependencia entró con el cierre de huecos (Hito 4), y dejarlos a mano
+// habría dejado el sistema con **dos vocabularios de iconos**: estos cuatro y
+// los dieciséis de categoría. Son los mismos trazos —cuadrícula de 24, grosor
+// 1,75— y ninguno cambia de silueta.
+//
+// Van con aria-hidden porque el significado lo lleva siempre el texto de al
+// lado, y a 20 px, que es la medida en línea de texto que fija la dirección.
 
-function iconProps() {
-  return {
-    width: 20,
-    height: 20,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.75,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    'aria-hidden': true,
-  }
-}
+const ICON_IN_TEXT = { size: 20, strokeWidth: 1.75, 'aria-hidden': true } as const
 
 function ErrorIcon() {
-  return (
-    <svg {...iconProps()}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7.5v5M12 16h.01" />
-    </svg>
-  )
+  return <CircleAlert {...ICON_IN_TEXT} />
 }
 
 function InfoIcon() {
-  return (
-    <svg {...iconProps()}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 11v5M12 8h.01" />
-    </svg>
-  )
+  return <Info {...ICON_IN_TEXT} />
 }
 
 function SuccessIcon() {
-  return (
-    <svg {...iconProps()}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="m8.5 12.5 2.5 2.5 4.5-5" />
-    </svg>
-  )
+  return <CircleCheck {...ICON_IN_TEXT} />
 }
 
 function WarningIcon() {
-  return (
-    <svg {...iconProps()}>
-      <path d="M10.3 4.3 2.8 17.2a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0Z" />
-      <path d="M12 9.5v4M12 17h.01" />
-    </svg>
-  )
+  return <TriangleAlert {...ICON_IN_TEXT} />
 }
 
 /**
