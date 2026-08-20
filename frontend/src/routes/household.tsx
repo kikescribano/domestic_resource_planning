@@ -187,7 +187,7 @@ function HouseholdShell() {
           'md:static md:flex md:w-64 md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-t-0 md:p-gutter-lg',
         ].join(' ')}
       >
-        <p className="hidden font-display text-title text-ink md:block">DRP</p>
+        <p className="hidden font-display text-title font-extrabold text-ink md:block">DRP</p>
 
         <nav aria-label="Principal" className="flex md:flex-col md:gap-6">
           {/* Los rótulos de grupo se leen siempre aunque solo se vean desde

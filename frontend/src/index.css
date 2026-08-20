@@ -1,5 +1,11 @@
 @import 'tailwindcss';
 
+/* La fuente de display, autoalojada desde node_modules (@fontsource): nada se
+   descarga de fuera en tiempo de ejecución. Solo los pesos que se usan. */
+@import '@fontsource/baloo-2/600.css';
+@import '@fontsource/baloo-2/700.css';
+@import '@fontsource/baloo-2/800.css';
+
 /* ---------------------------------------------------------------------------
    Tokens del sistema de diseño de DRP.
 
@@ -150,18 +156,17 @@
   /* -------------------------------------------------------------------------
      Tipografía
 
-     Dos familias con reparto explícito: la serif pone el carácter en los
-     titulares y la sans sostiene el trabajo. Las pilas son de sistema y no
-     descargan nada; el día que se autoalojen unas fuentes propias se cambia el
-     valor y ningún componente se entera. La serif no baja de 20 px ni entra en
+     Dos familias con reparto explícito: la redonda de la marca pone el carácter
+     en los titulares y la sans sostiene el trabajo. La de display es Baloo 2,
+     la redonda gruesa del logotipo, autoalojada vía @fontsource (arriba); la
+     sans sigue siendo pila de sistema. La display no baja de 20 px ni entra en
      una fila de listado (ver «Densidad» en look-and-feel.md).
      ------------------------------------------------------------------------- */
   --font-sans:
     ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif,
     'Apple Color Emoji', 'Segoe UI Emoji';
   --font-display:
-    'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, 'Noto Serif',
-    'Times New Roman', serif;
+    'Baloo 2', ui-rounded, 'Segoe UI', system-ui, sans-serif;
   --font-mono:
     ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
 
@@ -293,11 +298,15 @@
     line-height: 1.6;
   }
 
-  /* La serif solo se ata al `h1`, que es único por página y nunca cae dentro de
-     una fila de listado. Del `h2` hacia abajo se pide a mano con `font-display`,
-     y solo cuando titula una sección. */
+  /* La display solo se ata al `h1`, que es único por página y nunca cae dentro
+     de una fila de listado. Del `h2` hacia abajo se pide a mano con
+     `font-display`, y solo cuando titula una sección: ahí resuelve al 600, el
+     más cercano de los pesos cargados. El peso va aquí porque el preflight de
+     Tailwind deja los encabezados en `font-weight: inherit`, y una redonda
+     gruesa en peso normal no es la marca. */
   h1 {
     font-family: var(--font-display);
+    font-weight: 700;
     letter-spacing: -0.01em;
   }
 
