@@ -3,6 +3,15 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
+/**
+ * **El aviso de «chunks larger than 500 kB» al construir es esperado, y no se
+ * silencia.** Lo levanta el decodificador de HEIC (ADR-014), que son 2 995 kB en
+ * un fragmento propio; su consejo —«considera usar import() dinámico»— ya está
+ * aplicado, que es precisamente por lo que sale en un fragmento aparte y no
+ * dentro del bundle. Subir `build.chunkSizeWarningLimit` lo taparía a cambio de
+ * dejar de avisar del día en que el que crezca sea el de la aplicación, que es
+ * el aviso que sí importa.
+ */
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {

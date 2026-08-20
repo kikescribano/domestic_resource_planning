@@ -10,6 +10,8 @@
  * preparado y llega cuando haya suficiente superficie que generar.
  */
 
+import { HeicConversionError, toUploadable } from './heic'
+
 /** Códigos de error de negocio, tal y como los enumera `openapi.yaml`. */
 export type ApiErrorCode =
   | 'ALREADY_MEMBER'
@@ -160,6 +162,12 @@ const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
 export function humanMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return ERROR_MESSAGES[error.code] ?? 'No se ha podido completar la operación.'
+  }
+  // La conversión de HEIC falla **antes** de que haya petición, así que no trae
+  // `code` y tampoco es un fallo de red: el mensaje por defecto mandaría a
+  // comprobar la conexión, que es mirar donde no es.
+  if (error instanceof HeicConversionError) {
+    return 'No se ha podido convertir esta foto. Vuelve a intentarlo, o súbela en JPEG.'
   }
   return 'No se ha podido conectar. Comprueba la conexión e inténtalo otra vez.'
 }
@@ -853,8 +861,22 @@ export interface SupplierInput {
 
 export type FileContentType = 'image/jpeg' | 'image/png' | 'image/webp' | 'application/pdf'
 
-/** Los cuatro que admite la lista blanca. Sirve para el `accept` del selector. */
+/** Los cuatro que admite la lista blanca de 5.8.3. Es lo que el servidor guarda, y no cambia. */
 export const ALLOWED_FILE_TYPES: FileContentType[] = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+
+/**
+ * Lo que el selector ofrece **además** de la lista blanca, porque el cliente lo
+ * convierte a JPEG antes de enviarlo (ADR-014).
+ *
+ * No amplía nada del servidor: HEIC sigue fuera de `ALLOWED_FILE_TYPES`, del
+ * `CHECK` de `files.content_type` y del contrato. Lo único que dice es que un
+ * fichero así ya no hay que dejarlo en gris en el diálogo, porque ahora se puede
+ * subir.
+ *
+ * Van los tipos **y** las extensiones a propósito: `image/heic` no está
+ * registrado en todos los sistemas, y ahí el diálogo solo casa por extensión.
+ */
+export const CONVERTIBLE_FILE_TYPES = ['image/heic', 'image/heif', '.heic', '.heif']
 
 export interface StoredFile {
   id: string
@@ -1179,23 +1201,32 @@ function renewSession(): Promise<string | null> {
  * después de haber transmitido los 20 MB, que es el peor momento posible para
  * perderlos. Comparte el mismo intento de renovación que el resto del cliente, de
  * modo que varias subidas a la vez no rotan el refresh token unas contra otras.
+ *
+ * **Y convierte el HEIC antes de enviar nada** (ADR-014). Va aquí y no en el
+ * campo de subida porque aquí pasan las dos vías —los ficheros del hogar y el
+ * avatar, que tiene su propio `<input>`— y la tercera que se escriba. El coste
+ * de quien no sube un HEIC es leer doce bytes.
  */
 export async function uploadFile(
   file: File,
   accessToken: string,
   onProgress?: (fraction: number) => void,
-  options: { path?: string; method?: string } = {},
+  options: { path?: string; method?: string; onConverting?: () => void } = {},
 ): Promise<StoredFile> {
-  const { path = '/files', method = 'POST' } = options
+  const { path = '/files', method = 'POST', onConverting } = options
+  const sendable = await toUploadable(file, onConverting)
 
   try {
-    return await sendFile(file, accessToken, onProgress, path, method)
+    return await sendFile(sendable, accessToken, onProgress, path, method)
   } catch (error) {
     if (!(error instanceof ApiError) || error.status !== 401 || error.code !== 'UNAUTHORIZED') throw error
 
     const renewed = await renewSession()
     if (!renewed) throw error
-    return sendFile(file, renewed, onProgress, path, method)
+    // El reintento va con lo ya convertido, no con lo que eligió la persona:
+    // volver al original mandaría el HEIC y lo respondería un 415 detrás de una
+    // renovación que sí había funcionado.
+    return sendFile(sendable, renewed, onProgress, path, method)
   }
 }
 
@@ -1703,8 +1734,12 @@ export const api = {
     request<void>(`/documents/${id}`, { method: 'DELETE', accessToken }),
 
   /** «me» es la **identidad**, no la pertenencia: el avatar es de la persona. */
-  setOwnAvatar: (file: File, accessToken: string, onProgress?: (fraction: number) => void) =>
-    uploadFile(file, accessToken, onProgress, { path: '/users/me/avatar', method: 'PUT' }),
+  setOwnAvatar: (
+    file: File,
+    accessToken: string,
+    onProgress?: (fraction: number) => void,
+    onConverting?: () => void,
+  ) => uploadFile(file, accessToken, onProgress, { path: '/users/me/avatar', method: 'PUT', onConverting }),
 
   deleteOwnAvatar: (accessToken: string) =>
     request<void>('/users/me/avatar', { method: 'DELETE', accessToken }),

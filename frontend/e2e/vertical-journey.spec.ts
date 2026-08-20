@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test'
+import { fileURLToPath } from 'node:url'
 
 /**
  * El recorrido vertical de la Fase 1, en un navegador de verdad.
@@ -52,6 +53,17 @@ const WIDTHS = [
 
 /** El tope de `--container-shell`, 96rem, que es lo que impide la línea infinita. */
 const SHELL_CAP = 1536
+
+/**
+ * La foto HEIC de prueba, que es **un HEIC de verdad y no un JPEG renombrado**.
+ *
+ * Vive en `src/test/fixtures/` y no aquí porque la comparten los dos
+ * corredores: `heic.test.ts` mide con ella la detección por bytes y este
+ * recorrido, la conversión entera. Su procedencia y cómo se rehace están en el
+ * [`README`](../src/test/fixtures/README.md) de ese directorio — hace falta
+ * porque nada de este repositorio sabe escribir un HEIC.
+ */
+const HEIC_FIXTURE = fileURLToPath(new URL('../src/test/fixtures/photo-with-gps.heic', import.meta.url))
 
 test.describe('recorrido vertical', () => {
   test('de dar de alta un hogar a devolver un préstamo desde el correo', async ({ page, browser }) => {
@@ -837,6 +849,94 @@ test.describe('recorrido vertical', () => {
     const tree = page.getByRole('tree', { name: 'Ubicaciones del hogar' })
     await expect(tree.getByText('Trastero')).toBeVisible()
     await expect(tree.getByText('Buhardilla')).toBeVisible()
+  })
+
+  /**
+   * La conversión de HEIC, con un HEIC de verdad
+   * ([ADR-014](../../docs/common/architecture/decisions/ADR-014-heic-conversion.md)).
+   *
+   * **Este recorrido no se puede escribir en ningún otro sitio**, y por eso está
+   * aquí y no en Vitest. El decodificador es un módulo nativo compilado a wasm
+   * que corre en un Worker y vuelca los píxeles en un lienzo: `jsdom` no tiene
+   * ninguna de las tres cosas, así que allí solo se puede doblar. Lo que se
+   * comprueba de verdad —que 95 kB de HEIC entran por un `<input type=file>` y
+   * salen en la rejilla como una foto— solo ocurre en un navegador.
+   *
+   * Va hasta los bytes servidos a propósito. La foto de prueba lleva **352 B de
+   * EXIF con coordenadas GPS** dentro, que es el dato más sensible que atraviesa
+   * este mecanismo (5.8.3): con una foto sin metadatos, comprobar que no salen
+   * no distinguiría entre haberlos borrado y no haber tenido ninguno.
+   */
+  test('la conversión de HEIC: una foto de iPhone entra, se ve y no saca las coordenadas de casa', async ({
+    page,
+    request,
+  }) => {
+    const email = `heic-${Date.now()}@example.test`
+    const password = 'el gato duerme en el sofa'
+
+    await page.goto('/crear-hogar')
+    await page.getByLabel('Nombre del hogar').fill('Casa con iPhone')
+    await page.getByLabel('Tu nombre').fill('Kike')
+    await page.getByLabel('Correo').fill(email)
+    await page.getByLabel('Contraseña', { exact: true }).fill(password)
+    await page.getByRole('button', { name: /crear/i }).click()
+    await page.goto(await linkFromEmail(email))
+    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+
+    // --- 1. Una cosa a la que ponerle la foto -------------------------------
+    await navigateTo(page, 'Inventario', '/inventario')
+    await page.getByRole('link', { name: 'Dar de alta' }).click()
+    await page.getByLabel('Nombre').fill('Caldera')
+    await page.getByLabel('Categoría').selectOption({ label: 'Herramientas' })
+    await page.getByRole('button', { name: 'Dar de alta' }).click()
+    await page.waitForURL('**/inventario/*')
+    await expect(page.getByRole('heading', { level: 1, name: 'Caldera' })).toBeVisible()
+
+    // --- 2. El HEIC, por donde lo metería una persona -----------------------
+    // Antes de este hito, esto terminaba en un `415` que enumeraba cuatro tipos
+    // que quien hizo la foto no eligió.
+    await page.getByLabel('Añadir una foto').setInputFiles(HEIC_FIXTURE)
+
+    // La miniatura en la ficha del asset. El plazo es largo a propósito:
+    // descargar el decodificador, instanciar el wasm y decodificar 1280 × 960
+    // van por delante del primer byte enviado.
+    await expect(page.getByRole('img', { name: 'Foto de Caldera' })).toBeVisible({ timeout: 45_000 })
+
+    // --- 3. Y en la galería del hogar ---------------------------------------
+    await navigateTo(page, 'Archivo', '/almacenamiento')
+    // Con el nombre en `.jpg`: es lo que se ha guardado. Dejarlo en `.heic`
+    // describiría unos bytes que ya no existen en ninguna parte.
+    await expect(page.getByText('photo-with-gps.jpg')).toBeVisible()
+    await expect(page.getByRole('img', { name: /photo-with-gps/ })).toBeVisible()
+
+    // --- 4. Lo que se guardó, y lo que no ------------------------------------
+    const token = await accessToken(request, email, password)
+    const listing = await request.get('/api/v1/files?size=200', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(listing.ok(), 'no se pudo leer el listado de ficheros').toBe(true)
+    const files = (await listing.json()) as { items: { id: string; contentType: string }[] }
+    expect(files.items).toHaveLength(1)
+
+    // **HEIC no llega nunca a `files.content_type`**, y de ahí que este hito no
+    // traiga migración: el `CHECK` de la tabla sigue admitiendo los cuatro tipos
+    // de siempre porque lo que se guarda es lo detectado tras recodificar.
+    expect(files.items[0]!.contentType).toBe('image/jpeg')
+
+    const content = await request.get(`/api/v1/files/${files.items[0]!.id}/content`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(content.ok(), 'no se pudo descargar el fichero guardado').toBe(true)
+
+    const bytes = await content.body()
+    // Un JPEG de verdad, y **sin un solo bloque de metadatos**: ni el `Exif` que
+    // traía el original, ni el `APP1` que lo transporta. Salen dos veces por el
+    // camino --el lienzo del navegador al convertir y el del servidor al
+    // recodificar-- y basta con que falle una para que las coordenadas de la
+    // casa acaben en el disco.
+    expect(bytes.subarray(0, 3)).toEqual(Buffer.from([0xff, 0xd8, 0xff]))
+    expect(bytes.includes(Buffer.from('Exif'))).toBe(false)
+    expect(bytes.includes(Buffer.from('GPS'))).toBe(false)
   })
 
   test('la pasada sistemática: las ocho pantallas de la lista, con teclado, reflujo y axe', async ({

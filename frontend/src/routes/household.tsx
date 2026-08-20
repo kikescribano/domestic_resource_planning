@@ -2,7 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router'
 
-import { ApiError, api, formatDate, humanMessage, type Household, type UserRole } from '../api/client'
+import {
+  ApiError,
+  CONVERTIBLE_FILE_TYPES,
+  api,
+  formatDate,
+  humanMessage,
+  type Household,
+  type UserRole,
+} from '../api/client'
 import { useAuthenticatedSession, useSession } from '../auth/SessionProvider'
 import { useActiveModuleScreens } from './modules'
 import { Avatar } from '../ui/files'
@@ -718,10 +726,21 @@ function CloseAccountSection() {
  * No consume la cuota de ningún hogar —una identidad no pertenece a uno— y por
  * eso su tope es otro: 1 MB, y solo imagen.
  */
+
+/**
+ * El avatar admite HEIC por el mismo motivo que el campo de subida: no porque la
+ * lista blanca haya crecido, sino porque el cliente lo convierte antes de enviar
+ * (ADR-014). Y aquí el megabyte de tope importa más que allí — un HEIC de 12 MP
+ * convertido a JPEG con calidad 0,90 ronda los 240 kB, así que entra con holgura
+ * donde el original de varios megabytes no habría entrado.
+ */
+const AVATAR_ACCEPT = ['image/jpeg', 'image/png', 'image/webp', ...CONVERTIBLE_FILE_TYPES].join(',')
 function OwnAvatar({ accessToken }: { accessToken: string }) {
   const queryClient = useQueryClient()
   const [problem, setProblem] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  /** El hueco de antes del primer byte, cuando lo elegido era un HEIC y hay que decodificarlo aquí. */
+  const [converting, setConverting] = useState(false)
 
   const me = useQuery({
     queryKey: ['users'],
@@ -743,13 +762,18 @@ function OwnAvatar({ accessToken }: { accessToken: string }) {
 
   async function choose(file: File) {
     setUploading(true)
+    setConverting(false)
     try {
-      await api.setOwnAvatar(file, accessToken)
+      // El avatar no pasa por `UploadField` --tiene su propio `<input>`, porque
+      // sustituye en vez de acumular-- pero sí por `uploadFile`, así que la
+      // conversión de HEIC le llega sola (ADR-014). Lo único suyo es decirlo.
+      await api.setOwnAvatar(file, accessToken, undefined, () => setConverting(true))
       refresh()
     } catch (error) {
       setProblem(humanMessage(error))
     } finally {
       setUploading(false)
+      setConverting(false)
     }
   }
 
@@ -762,10 +786,16 @@ function OwnAvatar({ accessToken }: { accessToken: string }) {
 
         <div className="flex flex-col gap-1.5">
           <label className="inline-flex min-h-touch w-fit cursor-pointer items-center justify-center rounded-md border border-border bg-surface-raised px-4 py-2 text-body font-medium text-ink transition-colors hover:bg-surface-hover focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
-            {uploading ? 'Subiendo…' : mine?.avatarUrl ? 'Cambiar la foto' : 'Elegir una foto'}
+            {converting
+              ? 'Convirtiendo…'
+              : uploading
+                ? 'Subiendo…'
+                : mine?.avatarUrl
+                  ? 'Cambiar la foto'
+                  : 'Elegir una foto'}
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept={AVATAR_ACCEPT}
               disabled={uploading}
               className="sr-only"
               onChange={(event) => {
@@ -775,7 +805,9 @@ function OwnAvatar({ accessToken }: { accessToken: string }) {
               }}
             />
           </label>
-          <p className="text-caption text-ink-muted">JPEG, PNG o WebP. Hasta 1 MB. Sustituye a la anterior.</p>
+          <p className="text-caption text-ink-muted">
+            JPEG, PNG, WebP o HEIC. Hasta 1 MB. Sustituye a la anterior.
+          </p>
         </div>
 
         {mine?.avatarUrl && (

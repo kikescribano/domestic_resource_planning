@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from '../App'
-import { uploadFile } from '../api/client'
+import { ALLOWED_FILE_TYPES, uploadFile } from '../api/client'
 import { fakeTokenPair, stubFetch, type StubbedRoute } from '../test/http'
 
 /**
@@ -152,6 +152,24 @@ describe('el almacenamiento del hogar', () => {
     })
   })
 
+  it('ofrece HEIC en el selector, aunque la lista blanca del servidor siga teniendo cuatro tipos', async () => {
+    await signInAndVisit('Archivo', {
+      '/api/v1/storage': USAGE,
+      '/api/v1/files?size=200': FILES,
+    })
+
+    // Dejarlo fuera del `accept` sería el mismo muro que el `415` con otra
+    // cara: el fichero aparecería en gris y no habría nada que hacer. Ahora se
+    // convierte antes de subirlo (ADR-014), así que se puede elegir.
+    const chooser = await screen.findByLabelText('Subir un fichero')
+    expect(chooser).toHaveAttribute('accept', expect.stringContaining('image/heic'))
+    // Y también por extensión: `image/heic` no está registrado en todos los
+    // sistemas, y ahí el diálogo solo casa por el final del nombre.
+    expect(chooser).toHaveAttribute('accept', expect.stringContaining('.heic'))
+    // Lo que **no** ha cambiado: el servidor sigue guardando cuatro tipos.
+    expect(ALLOWED_FILE_TYPES).toEqual(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+  })
+
   it('un fichero en uso no se borra, y lo dice con lo que hay que hacer', async () => {
     await signInAndVisit('Archivo', {
       '/api/v1/storage': USAGE,
@@ -186,6 +204,7 @@ describe('la subida de un fichero', () => {
     const progress: number[] = []
     const uploading = uploadFile(new File(['x'], 'foto.jpg'), 'token', (fraction) => progress.push(fraction))
 
+    await untilOpened(request)
     request.upload.onprogress?.({ lengthComputable: true, loaded: 5, total: 10 } as ProgressEvent)
     request.upload.onprogress?.({ lengthComputable: true, loaded: 10, total: 10 } as ProgressEvent)
     request.onload?.(new Event('load') as ProgressEvent)
@@ -205,11 +224,26 @@ describe('la subida de un fichero', () => {
     })
 
     const uploading = uploadFile(new File(['x'], 'foto.jpg'), 'token')
+    await untilOpened(request)
     request.onload?.(new Event('load') as ProgressEvent)
 
     await expect(uploading).rejects.toMatchObject({ code: 'STORAGE_QUOTA_EXCEEDED', status: 409 })
   })
 })
+
+/**
+ * Espera a que la peticion este abierta antes de dispararle los eventos.
+ *
+ * **La subida ya no empieza en el mismo turno**, y esta espera es lo que lo fija:
+ * antes de enviar nada hay que mirar los doce primeros bytes de lo elegido para
+ * saber si era un HEIC que hay que convertir (ADR-014), y leer un `Blob` es
+ * asincrono. Sin esperar, la prueba dispara `onprogress` sobre un objeto al que
+ * `uploadFile` todavia no se ha enganchado y se queda colgada hasta el timeout,
+ * que es un sintoma que no se parece en nada a la causa.
+ */
+async function untilOpened(request: { opened: string[] }) {
+  await vi.waitFor(() => expect(request.opened).not.toHaveLength(0))
+}
 
 /** Un `XMLHttpRequest` de mentira, con los ganchos a la vista para dispararlos desde la prueba. */
 function fakeXhr(response: { status: number; body: unknown }) {
