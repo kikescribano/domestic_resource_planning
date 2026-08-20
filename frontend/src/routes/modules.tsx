@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ShoppingCart, Store, Warehouse, Wrench, type LucideIcon } from 'lucide-react'
 import { type ReactNode } from 'react'
 import { Link } from 'react-router'
 
@@ -44,11 +45,11 @@ import { Button, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primiti
  * Un módulo futuro sin pantalla no lo necesita: `ModuleScreen` sabe decir la
  * verdad sin nombrar un hito.
  */
-export const MODULE_SCREENS: Record<string, { path: string; label: string }> = {
-  SUPPLIERS: { path: '/proveedores', label: 'Proveedores' },
-  WAREHOUSE: { path: '/almacen', label: 'Almacén' },
-  PURCHASING: { path: '/compras', label: 'Compras' },
-  MAINTENANCE: { path: '/mantenimiento', label: 'Mantenimiento' },
+export const MODULE_SCREENS: Record<string, { path: string; label: string; icon: LucideIcon }> = {
+  SUPPLIERS: { path: '/proveedores', label: 'Proveedores', icon: Store },
+  WAREHOUSE: { path: '/almacen', label: 'Almacén', icon: Warehouse },
+  PURCHASING: { path: '/compras', label: 'Compras', icon: ShoppingCart },
+  MAINTENANCE: { path: '/mantenimiento', label: 'Mantenimiento', icon: Wrench },
 }
 
 /** El catálogo del hogar, compartido por todo lo que necesita saber qué está activo. */

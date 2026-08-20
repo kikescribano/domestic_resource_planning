@@ -1,4 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  Bell,
+  Blocks,
+  BookOpen,
+  Boxes,
+  CircleUserRound,
+  Ellipsis,
+  Handshake,
+  HardDrive,
+  House,
+  MapPin,
+  Users,
+} from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router'
 
@@ -33,10 +46,10 @@ import { Button, DangerZone, Field, Notice, PageHeading, Spinner, StatusBadge } 
  * hay algo que arreglar.
  */
 const PRIMARY_NAVIGATION = [
-  { to: '/', label: 'Hogar', end: true },
-  { to: '/inventario', label: 'Inventario', end: false },
-  { to: '/ubicaciones', label: 'Sitios', end: false },
-  { to: '/prestamos', label: 'Préstamos', end: false },
+  { to: '/', label: 'Hogar', end: true, icon: House },
+  { to: '/inventario', label: 'Inventario', end: false, icon: Boxes },
+  { to: '/ubicaciones', label: 'Sitios', end: false, icon: MapPin },
+  { to: '/prestamos', label: 'Préstamos', end: false, icon: Handshake },
 ]
 
 /**
@@ -49,12 +62,20 @@ const PRIMARY_NAVIGATION = [
  * «Más», no un hueco en el pulgar.
  */
 const SECONDARY_NAVIGATION = [
-  { to: '/avisos', label: 'Avisos', end: false },
-  { to: '/catalogo', label: 'Catálogo', end: false },
-  { to: '/usuarios', label: 'Personas', end: false },
-  { to: '/almacenamiento', label: 'Archivo', end: false },
-  { to: '/cuenta', label: 'Cuenta', end: false },
+  { to: '/avisos', label: 'Avisos', end: false, icon: Bell },
+  { to: '/catalogo', label: 'Catálogo', end: false, icon: BookOpen },
+  { to: '/usuarios', label: 'Personas', end: false, icon: Users },
+  { to: '/almacenamiento', label: 'Archivo', end: false, icon: HardDrive },
+  { to: '/cuenta', label: 'Cuenta', end: false, icon: CircleUserRound },
 ]
+
+/**
+ * El icono de una parada de la navegación. Mismo juego (Lucide), mismo trazo
+ * (1,75) y mismo tamaño en línea (20 px) que el resto del sistema, y
+ * `aria-hidden` porque el significado lo lleva siempre la etiqueta de al lado:
+ * el icono orienta, no nombra.
+ */
+const NAV_ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true, className: 'shrink-0' } as const
 
 /**
  * El hogar de la sesión, resuelto **una vez** y compartido.
@@ -203,14 +224,16 @@ function HouseholdShell() {
             {PRIMARY_NAVIGATION.map((item) => (
               <li key={item.to} className="flex flex-1 md:flex-none">
                 <NavLink to={item.to} end={item.end} className={navLinkClass}>
-                  {item.label}
+                  <item.icon {...NAV_ICON} />
+                  <span>{item.label}</span>
                 </NavLink>
               </li>
             ))}
             {SECONDARY_NAVIGATION.map((item) => (
               <li key={item.to} className="hidden md:flex">
                 <NavLink to={item.to} end={item.end} className={navLinkClass}>
-                  {item.label}
+                  <item.icon {...NAV_ICON} />
+                  <span>{item.label}</span>
                 </NavLink>
               </li>
             ))}
@@ -218,7 +241,8 @@ function HouseholdShell() {
                 hay nada detrás de ella que no esté ya en la columna. */}
             <li className="flex flex-1 md:hidden">
               <NavLink to="/mas" className={navLinkClass}>
-                Más
+                <Ellipsis {...NAV_ICON} />
+                <span>Más</span>
               </NavLink>
             </li>
           </ul>
@@ -231,13 +255,15 @@ function HouseholdShell() {
               {modules.map((module) => (
                 <li key={module.key} className="flex">
                   <NavLink to={module.path} className={navLinkClass}>
-                    {module.label}
+                    <module.icon {...NAV_ICON} />
+                    <span>{module.label}</span>
                   </NavLink>
                 </li>
               ))}
               <li className="flex">
                 <NavLink to="/modulos" className={navLinkClass}>
-                  Módulos del hogar
+                  <Blocks {...NAV_ICON} />
+                  <span>Módulos del hogar</span>
                 </NavLink>
               </li>
             </ul>
@@ -275,8 +301,12 @@ function HouseholdShell() {
  */
 function navLinkClass({ isActive }: { isActive: boolean }) {
   return [
-    'flex min-h-touch min-w-touch w-full flex-1 items-center justify-center px-1 py-3 text-body-sm',
-    'md:flex-none md:justify-start md:rounded-md md:px-3 md:text-body',
+    // En móvil el icono va encima de la etiqueta —columna— y el texto baja a
+    // `caption`: es lo que deja convivir las dos piezas dentro de los 44 px de
+    // alto sin renunciar a la etiqueta, que nunca se quita (el icono orienta,
+    // no nombra). Desde `md` vuelve a fila, icono delante.
+    'flex min-h-touch min-w-touch w-full flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-caption',
+    'md:flex-none md:flex-row md:justify-start md:gap-2.5 md:rounded-md md:px-3 md:py-2.5 md:text-body',
     // El estado activo no se dice solo con color: además del acento lleva peso
     // tipográfico y `aria-current`, que NavLink pone por su cuenta.
     isActive
@@ -306,8 +336,9 @@ export function MorePage() {
             <li key={item.to}>
               <Link
                 to={item.to}
-                className="flex min-h-touch items-center rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
+                className="flex min-h-touch items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
               >
+                <item.icon {...NAV_ICON} />
                 {item.label}
               </Link>
             </li>
@@ -320,8 +351,9 @@ export function MorePage() {
             <li key={module.key}>
               <Link
                 to={module.path}
-                className="flex min-h-touch items-center rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
+                className="flex min-h-touch items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
               >
+                <module.icon {...NAV_ICON} />
                 {module.label}
               </Link>
             </li>
@@ -329,8 +361,9 @@ export function MorePage() {
           <li>
             <Link
               to="/modulos"
-              className="flex min-h-touch items-center rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
+              className="flex min-h-touch items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
             >
+              <Blocks {...NAV_ICON} />
               Módulos del hogar
             </Link>
           </li>
