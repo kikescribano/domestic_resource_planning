@@ -230,8 +230,9 @@ el criterio de reflujo de WCAG y el que suele romperse sin que nadie lo note.
 > De ahí la forma que tiene desde el reagrupado del 2026-08-20: **cuatro paradas
 > y «Más»** en móvil —las cuatro primeras de «Tu hogar», en su mismo orden: la
 > barra es un recorte de la columna y no otra lista—, y desde `md` una columna
-> lateral con tres grupos —**Tu hogar**, **Datos maestros** y, solo para quien
-> administra, **Configuración**— dentro del **mismo `<nav>`**, recolocado con
+> lateral con tres grupos —**Tu hogar**, **Datos maestros** y **Configuración**,
+> cuyas paradas de administración solo ve quien administra y que cierra «Ayuda»,
+> la guía de la herramienta, para todos— dentro del **mismo `<nav>`**, recolocado con
 > CSS. La regla que esto no puede romper sigue siendo la de siempre: **un solo
 > landmark de navegación**, así que los rótulos de grupo son párrafos
 > referenciados con `aria-labelledby` y no encabezados —un `h2` ahí saldría
@@ -301,6 +302,7 @@ todavía no existe.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | **«Ayuda» cierra el grupo «Configuración» para todos los papeles**: la guía de la herramienta —un bloque por pantalla con su caso de uso y un buscador que filtra bloques— entra como última parada de la navegación en las dos plataformas, y el grupo deja de ser exclusivo de administración aunque sus dos paradas de configuración lo sigan siendo. |
 | 2026-08-20 | **La navegación se reparte en tres grupos** —Tu hogar, Datos maestros y, solo para quien administra, Configuración— con un orden único para las dos plataformas: la barra inferior pasa a ser las cuatro primeras paradas de «Tu hogar» («Avisos» entra en el pulgar y «Ubicaciones» sale hacia «Datos maestros»), los módulos dejan de tener grupo propio y viven donde su contenido pertenece, y nace «General», la pantalla de configuración que hereda la baja del hogar. |
 | 2026-08-20 | **La paleta de marca gira al esquema de la identidad comercial de DRP**: papel y tinta pasan del pardo cálido al pino frío y el acento deja la terracota por el teal de las presentaciones del proyecto. Cambia solo la dimensión de color —feedback, estados y categorías se quedan—; los 48 pares se remiden y siguen en AA (peor texto 4,70:1, peor no textual 3,46:1, foco 9,35:1 y 11,87:1). |
 | 2026-08-06 | Se crea la plantilla inicial; no hay dirección visual aprobada. |
