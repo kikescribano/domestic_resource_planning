@@ -1230,8 +1230,8 @@ test.describe('recorrido vertical', () => {
  * hito en vez de hacerlo de paso, pero conviene saber que la lista describe hoy
  * «lo que se audita» y no «lo que trajo la Fase 2».
  *
- * **Lo que sigue sin auditar son tres pantallas del core**: Sitios, Catálogo y
- * Personas. Inventario dejó de estarlo con el cierre de huecos, y Préstamos y
+ * **Lo que sigue sin auditar son dos pantallas del core**: Sitios y Personas.
+ * Inventario y Catálogo dejaron de estarlo con el cierre de huecos, y Préstamos y
  * Avisos sí tienen su llamada suelta en los recorridos de arriba.
  */
 const PHASE_TWO_SCREENS = [

@@ -51,7 +51,8 @@ encendidos** desde hace diez.
 | | |
 |---|---|
 | Ubicaciones | 18, en dos raíces: la vivienda y el trastero del edificio |
-| Categorías | 12: las cinco que siembra el alta más las que la casa ha añadido |
+| Categorías | 12: las cinco que siembra el alta más las que la casa ha añadido, **todas con icono y once con color** |
+| Etiquetas | 6, una de ellas retirada, puestas en 11 assets con 13 parejas |
 | Artículos | 48, entre despensa, limpieza, botiquín y los modelos de duradero |
 | Assets | 46 duraderos —uno dado de baja— y 40 existencias de consumible |
 | Documentos | 18: manuales, facturas, garantías y un contrato |
@@ -72,6 +73,16 @@ son los que enseñan para qué sirve cada módulo.
   resuelta por el sitio —diez días en la despensa, treinta en el botiquín—.
 - Un plan de mantenimiento **pasado de fecha**, otro que toca dentro de dos
   semanas y ocho más repartidos por el año.
+- **Seis colores para doce categorías**, repetidos a propósito: el color agrupa
+  y lo que identifica es el nombre. Una se queda **sin color** y una etiqueta,
+  **retirada**, que son dos estados del modelo que ninguna pantalla enseña si
+  nadie los siembra —y el segundo se sigue viendo puesto en la maleta, que es lo
+  que distingue retirar de borrar.
+- **La mayoría del inventario no lleva ninguna etiqueta**, y esa proporción es
+  deliberada: un hogar de demostración con todo etiquetado escondería el caso
+  normal, que es la fila sin pastillas y contra la que hay que mirar si la
+  maquetación aguanta. Dos assets llevan varias, que es lo que la categoría no
+  podía dar.
 - Un préstamo **vencido** que sigue ocupando su asset, porque vencer no es
   devolver.
 - **Estados de conservación puestos en 36 de los 46 duraderos y a nulo en los

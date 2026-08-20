@@ -101,3 +101,25 @@ contraste, foco visible y navegación completa por teclado a 375 px y en ultrawi
 
 Revisar si aparece un requisito de página pública indexable, que reabriría la
 decisión sobre renderizado en servidor pero no necesariamente las demás.
+
+## Posterior a esta decisión
+
+**2026-08-20 — [ADR-015](ADR-015-user-chosen-category-identity.md): color e icono
+elegidos por el usuario.** Esta ADR no se toca: el objetivo normativo —WCAG 2.2
+AA—, el sistema de tokens semánticos y la auditoría que los mide siguen
+exactamente como se decidieron aquí. Lo que la ADR-015 añade es **cómo entra en
+ese sistema un color que no decide el sistema**, que es una situación que aquí no
+existía: el hogar elige la cara de sus categorías dentro de un juego cerrado de
+seis colores y dieciséis iconos, y los doce pares que produce entran en la lista
+de `scripts/check-contrast.py`, que pasa de 36 a 48.
+
+Dos consecuencias de esta ADR que la 015 conserva y una que matiza:
+
+- **Se conserva** que nada se dice solo con color: el nombre de la categoría va
+  siempre al lado del marcador, y por eso repetir color entre categorías no es un
+  defecto.
+- **Se conserva** que el contraste está comprobado y no afirmado: es justamente el
+  argumento por el que el juego es cerrado y no un selector libre.
+- **Se matiza** la regla de nombres de tokens —semánticos, no descriptivos—. Los
+  doce `--color-category-*` son la única excepción del sistema, porque su
+  significado lo pone quien clasifica y no el sistema.

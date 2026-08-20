@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | En curso — Hitos 0, 1, 2 y 3 cerrados |
+| Estado | En curso — Hitos 0, 1, 2, 3 y 4 cerrados |
 | Responsable | Equipo DRP |
 | Ámbito | Los cuatro huecos que las Fases 1 y 2 dejaron abiertos a propósito, más el quinto que apareció ejecutándolos |
 | Última revisión | 2026-08-20 |
@@ -606,35 +606,74 @@ de cambio: un enumerado corto que nace en el dominio y llega hasta un desplegabl
 > aparte, porque apareció al añadirle la condición y copiarle las clases habría
 > propagado el defecto.
 
-### Hito 4 — Etiquetas e identidad visual de las categorías · **Pendiente**
+### Hito 4 — Etiquetas e identidad visual de las categorías · **Hecho** (2026-08-20)
 
-- [ ] **ADR-015 — Color e icono elegidos por el usuario dentro de una paleta
-      certificada**: por qué el juego es cerrado, cómo entra en
-      `scripts/check-contrast.py` y qué pasa el día que alguien quiera abrirlo.
-      Extiende la
+Los **dos atributos que quedaban** de los cuatro que 4.1.7 dejó propuestos el
+2026-08-09. Con ellos, esa propuesta queda cerrada entera.
+
+- [x] **ADR-015 — Color e icono elegidos por el usuario, dentro de un juego
+      certificado**: por qué el juego es cerrado, cómo entra en
+      `scripts/check-contrast.py` y qué haría falta el día que alguien quiera
+      abrirlo. Extiende la
       [ADR-006](../architecture/decisions/ADR-006-frontend-stack-and-design-system.md),
-      que no se reescribe.
-- [ ] **Migración `V17`**: la etiqueta y su relación con el asset, **dos tablas más
-      con `household_id`, RLS y `FORCE`**, más el icono y el color en `categories`.
-      Con ellas y con la del Hito 1, el modelo pasa de 28 a 31.
-- [ ] **La forma de la etiqueta**, que es la pregunta de este hito: catálogo por
-      hogar frente a una columna de texto. Decidida con lo que cuesta cada una al
-      renombrar, al deduplicar sin distinguir mayúsculas y al autocompletar.
-- [ ] **Las operaciones que haga falta** en el contrato: listar, crear, retirar y
-      el filtro de `ListAssets`. Con `operationId`, que es lo que la
-      [ADR-007](../architecture/decisions/ADR-007-openapi-contract-as-source-of-truth.md)
-      necesita.
-- [ ] **La ficha del componente antes del componente**, en el registro del sistema
-      de diseño: el campo de etiquetas y el selector de icono y color. Es la regla
-      que la Fase 2 aplicó a los módulos y que en la Fase 1 pagó dos veces.
-- [ ] **`scripts/check-contrast.py` con los pares nuevos.** Un color de categoría
-      que no esté en esa lista es un color que nadie mide.
-- [ ] **Frontend**: las etiquetas en el asset y en su filtro, y la categoría con su
-      icono y su color en el catálogo, en los listados y en la navegación móvil,
-      que es donde un icono se gana el sitio.
-- [ ] **Recorrido vertical y auditoría axe en los dos modos**, con el color puesto:
-      es el único hito de este bloque en el que la accesibilidad puede romperse por
-      un dato del usuario y no por una decisión del sistema.
+      que **no se reescribe** y gana su sección hacia adelante.
+- [x] **Migración `V17`**: `tags` y `asset_tags`, las dos con `household_id`, RLS
+      y `FORCE`, más el icono y el color en `categories`. El modelo pasa de **29 a
+      31** —el plan decía «de 28 a 31» porque se escribió antes del outbox.
+- [x] **La forma de la etiqueta, decidida: catálogo por hogar.** Con las tres
+      cosas medidas y cada una con su prueba: renombrar es una fila frente a
+      recorrer todos los assets; deduplicar sin mayúsculas ni acentos lo hace el
+      índice normalizado que ya existe, y sobre texto no hay ninguna fila común
+      donde ponerlo; y autocompletar es un `SELECT` sobre una tabla pequeña frente
+      a un `DISTINCT` sobre un campo repetido.
+- [x] **Cuatro operaciones en el contrato**, con su `operationId`: listar, crear,
+      renombrar y retirar. Etiquetar **no** es una quinta: viaja en `tagIds` dentro
+      de `POST /assets` y `PATCH /assets/{id}`. El contrato pasa de **102 a 106**.
+- [x] **Las dos fichas antes de los componentes**, y volvieron a pagar tres veces:
+      la navegación no tiene categorías, la entrada de un consumible no puede
+      llevar el campo, y los cinco iconos de estado no eran un problema de
+      dependencia sino **dos documentos del sistema de diseño que se contradicen**.
+- [x] **`scripts/check-contrast.py` con los doce pares nuevos**, que pasa de 36 a
+      **48**. Tres de los doce valores nacieron fuera del gamut sRGB y lo destapó
+      la propia comprobación de gamut del script.
+- [x] **Frontend**: el marcador en cada fila del inventario y en la ficha, las
+      etiquetas en la fila, en la ficha y en el filtro, y el selector en el
+      catálogo —que de paso le da interfaz a `updateCategory`, que existía desde
+      el Hito 2 sin nadie que lo llamara—. **En la navegación no entra, y se dice
+      por qué**; a cambio se cumple la promesa de `iconography.md` sobre el hueco
+      de una foto que falta.
+- [x] **Recorrido vertical y auditoría axe en los dos modos, con el color
+      puesto**: «Catálogo» entra en la lista y el recorrido **mide el contraste ya
+      aplicado** leyéndolo del navegador, que es lo único que demuestra que el par
+      medido es el par que llega a la pantalla.
+- [x] **Barrido de aislamiento**: las dos operaciones con identificador en la
+      ruta, las dos referencias nuevas en el cuerpo —la primera que viaja **dentro
+      de un array**—, el filtro del listado y la unicidad. Comprobado quitando el
+      resolutor: falla.
+- [x] **El hogar de demostración**: las doce categorías con icono y once con
+      color, seis etiquetas sobre trece parejas, una categoría sin color y una
+      etiqueta retirada.
+
+> **Lo que la implementación destapó y el plan no preveía.** Cuatro cosas. La
+> primera es que **el índice único de una etiqueta no puede ser parcial por
+> retirada** como el de una categoría: allí es inofensivo porque un asset tiene
+> una sola categoría, y aquí dos etiquetas del mismo nombre acabarían pintando la
+> misma fila dos veces. Lo que lo sustituye —crear una que existe retirada **la
+> revive**— apareció al buscar una salida que no fuera un `409` sobre una fila que
+> el usuario no ve, y de paso le da deshacer a la retirada sin una quinta
+> operación.
+>
+> La segunda es de medición y costó una ejecución del recorrido: **Chrome conserva
+> `oklch()` en `getComputedStyle`**, así que el ayudante que leía los tres números
+> del color devolvía 1,00:1 para todo. Se resuelve pintando un píxel de lienzo.
+>
+> La tercera y la cuarta son defectos de accesibilidad que **solo aparecieron al
+> escribir las pruebas**: JSX se come el espacio inicial de la línea, así que el
+> `<span class="sr-only">` detrás de un rótulo producía «EditarAlimentación»; y el
+> selector de icono y color puede estar **dos veces en la misma pantalla** —el del
+> alta y el de la fila que se edita—, con lo que eran cuarenta y cuatro botones
+> con veintidós nombres repetidos. Es el mismo fallo que la ficha de
+> `SuppliersPage` encontró en su día al escribirse por delante.
 
 ### Hito 5 — El «hoy» de las reglas de calendario · **Pendiente**
 
@@ -744,7 +783,7 @@ no aquí.
 | ~~**¿El outbox es el único camino de entrega, o convive con la entrega in-process?**~~ **Resuelta (2026-08-20): convive**, en la [ADR-013](../architecture/decisions/ADR-013-transactional-outbox.md) y en [`decisions.md`](decisions.md). Un solo camino volvería **asíncrona respecto a la petición** una entrega que hoy no lo es, en los cuatro módulos a la vez y sin ninguna pantalla que lo pida; el relay queda como camino de recuperación, con un periodo de gracia para no pisar al reparto en el acto | 1 | De ello depende si `AFTER_COMMIT` sigue significando algo en `ModuleEventHandler` |
 | ~~**¿La fila entregada se borra o se conserva?**~~ **Resuelta (2026-08-20): se borra.** El outbox es una cola y no un archivo, así que **no hay sexta tabla**: su estado normal es vacía y su tamaño es el indicador. Conservarla habría dado un registro de lo publicado a cambio de una segunda copia de cada `payload` y de una retención inventada para una necesidad que nadie ha expresado | 1 | La medición de capacidad distingue lo que crece con lo que el hogar tiene de lo que crece con lo que hace, y esto es lo segundo |
 | ~~**HEIC: ¿cliente o servidor?**~~ **Resuelta (2026-08-20): el cliente**, en la [ADR-014](../architecture/decisions/ADR-014-heic-conversion.md) y en [`decisions.md`](decisions.md). Con las dos medidas delante, y las dos cambiaron el resultado que se esperaba: el megabyte no cae sobre el bundle sino sobre un fragmento que solo descarga quien elige un HEIC —**2,49 kB** sobre la primera carga—, y el camino del servidor no era una dependencia más sino **JDK 22 y `libheif` del sistema**, con el proyecto en 17. La tercera salida —no convertir— se evaluó y se descartó por escrito | 2 | Es la decisión del hito, y su ADR no se puede escribir sin ella |
-| **La etiqueta: ¿catálogo por hogar o columna de texto?** El catálogo cuesta una tabla y una relación; el texto no se puede renombrar, ni deduplicar sin distinguir mayúsculas, ni autocompletar sin recorrer todos los assets | 4 | Es lo que decide la migración, y con datos dentro cambiarla cuesta otra |
+| ~~**La etiqueta: ¿catálogo por hogar o columna de texto?**~~ **Resuelta (2026-08-20): catálogo por hogar**, en la [ADR-015](../architecture/decisions/ADR-015-user-chosen-category-identity.md) y en [`decisions.md`](decisions.md). Las tres cosas que la decidían se midieron una a una y las tres tienen su prueba: renombrar es una fila frente a recorrer todos los assets de la casa; deduplicar sin mayúsculas ni acentos lo hace el índice normalizado que ya protege categorías y artículos, y sobre texto no hay ninguna fila común donde ponerlo; y autocompletar es un `SELECT` sobre una tabla pequeña frente a un `DISTINCT` sobre un campo repetido tantas veces como cosas tenga la casa | 4 | Es lo que decide la migración, y con datos dentro cambiarla cuesta otra |
 | **El «hoy» de una regla de calendario: ¿el del hogar o el de UTC?** El del hogar da el día que la persona tiene delante y cuesta un puerto de plataforma más; el de UTC es lo que hay hoy, no cuesta nada y hace que un hogar al este de Greenwich no pueda registrar de madrugada lo que acaba de hacer | 5 | De ella depende si el puerto hace falta, y es lo único que ese hito decide |
 
 ## Lo que sigue fuera, y por qué
@@ -772,6 +811,7 @@ no aquí.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | **Hito 4 cerrado**: las **etiquetas libres** y el **icono y color de una categoría**, que son los dos atributos que quedaban de los cuatro que 4.1.7 llevaba desde el 2026-08-09 dejando fuera — con lo que esa propuesta queda cerrada entera. Trae la **ADR-015**, que extiende la ADR-006 sin reescribirla y le añade su sección hacia adelante, la migración `V17` que lleva el modelo de **29 a 31 tablas** y **cuatro operaciones** que llevan el contrato de 102 a **106**. **La pregunta del hito se resuelve con las tres cosas medidas**: la etiqueta es un **catálogo por hogar** porque el texto libre no se puede renombrar de una vez, ni deduplicar sin distinguir mayúsculas ni acentos —no hay ninguna fila común donde poner la restricción—, ni autocompletar sin recorrer los assets enteros. Etiquetar **no gana operación**: viaja en `tagIds`, que es absoluto como la cantidad de una existencia, porque una operación más sería una segunda escritura sobre el inventario para hacer lo que el `PATCH` ya hace. El icono y el color van dentro de un **juego cerrado** —dieciséis y seis— y esa es la ADR entera: un color libre no está en ningún token, así que **no lo mide nadie** y sería lo único de la interfaz cuyo contraste se afirma en vez de comprobarse; `check-contrast.py` pasa de **36 pares a 48** y tres de los doce valores nuevos nacieron fuera del gamut sRGB. Se cierra además la decisión abierta de **`lucide-react`**, con el número delante —5,88 kB sobre la primera carga, 2,63 comprimidos— y se migran los cuatro iconos que llevaban dos fases dibujados a mano; detrás aparece una contradicción que la dependencia tapaba y que **no se resuelve aquí**: `iconography.md` y `status-badge.md` dicen lo contrario sobre el icono de estado. **«Catálogo» entra en la auditoría sistemática** con una categoría de color puesto, y el recorrido **mide el contraste ya aplicado** en los dos modos, que es lo único que demuestra que el par medido es el que llega. Lo que la implementación destapó: el índice de `tags` **no puede ser parcial por retirada** y lo que lo sustituye es que crear una retirada **la revive**; **Chrome conserva `oklch()` en `getComputedStyle`**, lo que hizo que la primera versión del medidor diera 1,00:1 para todo; y dos defectos de accesibilidad que solo aparecieron al escribir las pruebas —JSX se come el espacio inicial de la línea, y el selector puede estar dos veces en la misma pantalla—. La categoría **no entra en la navegación móvil**, que el plan pedía, porque en la navegación no hay ninguna categoría; a cambio se cumple la promesa que `iconography.md` llevaba desde la Fase 1 sobre el hueco de una foto que falta |
 | 2026-08-20 | **Hito 3 cerrado**: el **estado de conservación** de un asset y la **condición en la entrega y la devolución** de un préstamo, que son dos de los cuatro atributos que 4.1.7 llevaba desde el 2026-08-09 dejando fuera. **Sin ADR y sin operación nueva**: tres columnas anulables en la `V16`, seis esquemas ensanchados y el contrato quieto en **102 operaciones**, que era la condición del plan. Lo que sí trae son ocho decisiones de producto. **Una sola escala de cinco valores** para los tres campos, porque el motivo entero de la condición en préstamo es poder decir «salió bien y volvió rayado» y dos escalas distintas no se comparan; **solo sobre un `DURABLE`**, ampliando la restricción que ya cubría el número de serie en vez de añadir una segunda; y **la devolución no toca el asset**, que es la decisión que más se discutió: propagarla le daría a un token acotado —el de quien no tiene cuenta— una escritura sobre el inventario, y CMMS ya había declarado que registrar una intervención «no toca el asset». La vista externa **se ensancha por primera vez** desde que se escribió, de siete campos a nueve, y con su motivo: las dos condiciones describen la cosa que quien pregunta tiene en las manos, no el hogar que se la prestó. La devolución gana un **cuerpo opcional** en lugar de una operación nueva, porque una operación más sería una segunda escritura que el token acotado tendría que alcanzar; hay una prueba que le manda cinco campos de más y comprueba desde dentro de casa que ninguno se escribió. **La condición no se pinta con color** —dos distintivos en una fila es antiuso declarado, y la paleta de dominio tiene cinco tonos elegidos para sobrevivir a una deuteranopia— así que `check-contrast.py` sigue midiendo 36 pares. «Inventario» entra en la auditoría sistemática, con un asset sembrado, y el hogar de demostración trae las tres columnas puestas con diez duraderos sin anotar a propósito. Y se destapa algo ajeno: **la pantalla de Préstamos era el único fichero del frontend pintado con tokens que no existen**, `text-muted` y `border-line`, que no generan ni una regla de CSS |
 | 2026-08-20 | **Hito 2 cerrado**: la **conversión de HEIC**, con la **ADR-014** y las dos medidas delante en lugar de una opinión. **Gana el cliente**, que es lo que 5.8.3 ya decía —así que esa sección se confirma y no se enmienda—, y las dos cifras llegaron cambiando lo que el plan esperaba: **el megabyte no cae sobre el bundle** —en un `import()` dinámico son 2,49 kB sobre la primera carga y 2 995 kB para quien elige un HEIC—, y **el camino del servidor no era una dependencia más sino un cambio de plataforma**, porque el único plugin de ImageIO para HEIF exige JDK 22 con el proyecto en 17, además de `libheif` en la imagen y en el runner, y de ×3,4 a ×5,6 sobre la operación que ya era la cara. **La tercera salida se evalúa y se descarta por escrito**: pedir que se cambie el ajuste de la cámara cuesta cero y pierde porque no arregla la foto ya hecha, no toca el HEIC que llega de fuera del teléfono y se paga en la cuota del usuario. La trampa que el plan anunciaba se resolvió del otro lado —**HEIC no llega nunca a `files.content_type`**, así que no hay migración ni cambio de contrato— y aparece **una tercera magnitud de capacidad**: lo que cuesta llegar al navegador. Se decide además `heic-to` frente al que pesa la mitad, por decodificar fuera del hilo principal y no necesitar `unsafe-eval`. Y se destapa algo ajeno: **`UploadField` documenta desde la Fase 1 un botón de Cancelar que nunca se construyó**, que se deja de afirmar aunque no se arregle aquí |
 | 2026-08-20 | **Se añade el Hito 5, que no venía del plan**: ejecutando el Hito 1 se destapó que las tres reglas de calendario del proyecto —la que rechaza una intervención «del futuro» y las dos comprobaciones de fecha de CMMS y Warehouse— resuelven su «hoy» contra la **fecha UTC** y no contra la del hogar, con la misma línea copiada en los tres sitios. La consecuencia es que un hogar peninsular **no puede registrar de madrugada lo que acaba de hacer**: entre la medianoche local y la de Greenwich, la fecha de hoy es futuro para la aplicación. El frontend arrastra el mismo criterio y lo empeora, porque el campo de fecha sale relleno con ayer y el selector no ofrece hoy. Se anota como hito propio y no dentro del cierre del bloque porque **cambia una regla de dominio** y el cierre no añade producto; el de cierre pasa a ser el **6**. La pregunta que decide —día del hogar o día de UTC— queda asignada al Hito 5, y **no se da por resuelta aquí**. La parte de las pruebas ya la arregló el Hito 1, alineando su «hoy» con el de la aplicación; lo que queda es si ese «hoy» es el correcto |

@@ -71,14 +71,25 @@ sombra, sin radio mayor que `sm`, sin segundo peso, sin ilustración— y el
 presupuesto de calidez: **el único color de la fila es el estado**, con su
 [`StatusBadge`](../components/status-badge.md).
 
+**Con una excepción desde el cierre de huecos, y está acotada**: el marcador de
+la categoría, que abre la fila de un asset con el icono y el color que el hogar
+eligió ([ADR-015](../../../common/architecture/decisions/ADR-015-user-chosen-category-identity.md)).
+No rompe el presupuesto porque no compite con el estado —el marcador va al
+principio y el distintivo al final, uno es un cuadradito y el otro una pastilla—
+y porque **no dice nada por sí solo**: el nombre de la categoría sigue estando al
+lado en tinta. Una etiqueta puesta, en cambio, sí va sin color: una pastilla de
+`surface-sunken` con su texto, y nunca un `StatusBadge`, que tiene cinco tonos de
+dominio detrás y diría algo que no significa nada.
+
 ### Qué lleva una fila
 
 | Colección | Lo que identifica | Lo que se ve al lado |
 |---|---|---|
-| Assets | Nombre | Estado, ubicación, y cantidad con unidad si es `CONSUMABLE` |
+| Assets | El marcador de su categoría **y** el nombre | Categoría, conservación, etiquetas, estado, y cantidad con unidad si es `CONSUMABLE` |
 | Artículos | Nombre | Categoría, unidad, y si está retirado |
 | Ubicaciones | Nombre | Tipo, y qué contiene |
-| Categorías | Nombre | Si está retirada |
+| Categorías | El marcador **y** el nombre | Editar y retirar |
+| Etiquetas | Nombre | Si está retirada |
 
 Dos reglas que vienen de arriba: **la fila entera es pulsable**, no un icono de
 24 px en su extremo; y **el nombre largo se trunca en dos líneas dejando el
@@ -106,9 +117,14 @@ con teclado y de compartir por URL—, y si el número de página viaja en la UR
 ### Filtros
 
 Cada colección trae los suyos en el contrato, y no son pocos: `GET /assets`
-admite ocho —ubicación, asset padre, propietario, estado, tipo, artículo,
-categoría y «sin propietario»—, y `GET /articles` cuatro, entre ellos el `q` de
-búsqueda por nombre normalizado que alimenta el autocompletado.
+admite **diez** —ubicación, asset padre, propietario, estado, tipo, artículo,
+categoría, conservación, etiqueta y «sin propietario»—, y `GET /articles` cuatro,
+entre ellos el `q` de búsqueda por nombre normalizado que alimenta el
+autocompletado. `GET /tags` trae el suyo por el mismo motivo.
+
+**El de etiqueta va en un desplegable y no en pastillas**, al contrario que el de
+naturaleza: el vocabulario de un hogar crece sin techo, y veinte pastillas en la
+cabecera dejan el listado debajo del pliegue.
 
 Tres reglas:
 

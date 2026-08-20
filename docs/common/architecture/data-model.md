@@ -55,6 +55,9 @@ erDiagram
     ARTICLES ||--o{ ASSETS : "define"
     CATEGORIES ||--o{ ASSETS : "clasifica"
     CATEGORIES ||--o{ ARTICLES : "clasifica"
+    HOUSEHOLDS ||--o{ TAGS : "tiene"
+    TAGS ||--o{ ASSET_TAGS : "etiqueta con"
+    ASSETS ||--o{ ASSET_TAGS : "lleva"
     HOUSEHOLDS ||--o{ FILES : "almacena"
     ASSETS ||--o{ DOCUMENTS : "adjunta"
     ARTICLES ||--o{ DOCUMENTS : "adjunta"
@@ -139,11 +142,30 @@ erDiagram
         uuid household_id FK
         text name
         text notes
+        text icon
+        text color
         timestamptz created_at
         timestamptz updated_at
         timestamptz retired_at
         uuid created_by FK
         uuid updated_by FK
+    }
+    TAGS {
+        uuid id PK
+        uuid household_id FK
+        text name
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz retired_at
+        uuid created_by FK
+        uuid updated_by FK
+    }
+    ASSET_TAGS {
+        uuid asset_id PK
+        uuid tag_id PK
+        uuid household_id FK
+        timestamptz created_at
+        uuid created_by FK
     }
     DOCUMENTS {
         uuid id PK
@@ -281,6 +303,9 @@ erDiagram
 | `password_reset_tokens` | `token_hash` único; un solo token vivo por identidad, con índice único parcial `(identity_id) WHERE used_at IS NULL` — pedir uno nuevo marca el anterior como usado antes de insertar. Caduca a la hora. Tabla propia y no un `purpose` compartido con la verificación: con una sola tabla, un filtro mal escrito convierte un token de verificación en uno de cambio de contraseña, que es una clase de vulnerabilidad conocida |
 | `email_verification_tokens` | `token_hash` único; un solo uso, marcado con `used_at`; expira. Mismo patrón que `loan_access_tokens`, y por el mismo motivo: el token viaja por correo y hay que poder comprobar reutilización |
 | `categories` | `name` único entre las categorías vigentes del hogar, con índice único parcial sobre `(household_id, lower(unaccent(name))) WHERE retired_at IS NULL` — mismo tratamiento que `articles`, y por el mismo motivo: la retirada es lógica porque `assets` y `articles` la referencian |
+| `categories` | Las dos columnas de la cara llegan con la [ADR-015](decisions/ADR-015-user-chosen-category-identity.md) y las dos son anulables: nulo significa que nadie lo eligió, que es el caso normal. `icon` con `CHECK IN (...)` sobre los dieciséis del juego cerrado y `color` sobre los seis. La lista vive **también aquí** y no solo en el enumerado, por lo mismo que la lista blanca de `files.content_type`: ampliarla exige una migración, y esa fricción es lo que impide que exista un color que `scripts/check-contrast.py` no haya medido |
+| `tags` | `name` único en el hogar, con índice sobre `(household_id, lower(unaccent(name)))` — y **no parcial por retirada**, que es la diferencia con `categories` y no un descuido: allí el parcial es inofensivo porque un asset tiene *una* categoría, y aquí dos etiquetas del mismo nombre podrían acabar sobre el mismo asset y pintarlo dos veces. Lo que sustituye al parcial es que crear una que existe retirada **la revive** (ver 4.1.1 y 5.7). La retirada es lógica porque `asset_tags` la referencia |
+| `asset_tags` | Clave primaria `(asset_id, tag_id)`: el par **es** la fila, y darle una clave propia dejaría escribir dos veces la misma etiqueta sobre el mismo asset. Lleva `household_id` **aunque sus dos puntas ya sean del hogar**, y por dos motivos: sin esa columna no hay política de RLS que escribir, y es lo que permite declarar las dos claves ajenas **compuestas** contra el `UNIQUE (household_id, id)` de cada punta, que es lo que de verdad impide etiquetar el asset de otro hogar. Índice `(tag_id)` para el filtro del listado. El borrado aquí **sí es real**: una fila no es historial de nada, es «esta cosa lleva hoy esta etiqueta». No lleva `updated_at` ni `updated_by`, porque una fila de unión no se modifica: se pone o se quita |
 | `documents` | Cuelga de exactamente uno de los dos, con `CHECK ((asset_id IS NULL) <> (article_id IS NULL))`; `type` con `CHECK IN ('INVOICE','WARRANTY','MANUAL','OTHER')`; el contenido, también en exactamente uno, con `CHECK ((url IS NULL) <> (file_id IS NULL))` — misma forma que el destino, y por el mismo motivo; `CHECK (valid_until IS NULL OR date IS NULL OR valid_until >= date)`, porque una garantía no puede caducar antes de emitirse. Borrar un documento sigue siendo un `DELETE` real: no lo referencia nada y no forma parte del historial de ninguna otra entidad. Si tenía fichero, la misma transacción marca su `deleted_at` en `files`; los bytes los desenlaza el proceso diario |
 | `files` | `UNIQUE (household_id, id)`, que es lo que permite declarar las claves ajenas compuestas que impiden adjuntar el fichero de otro hogar — la misma técnica que ya protege la autoría, más abajo; `storage_key` único; `CHECK (size_bytes > 0 AND size_bytes <= 26214400)`, los 25 MB de tope por fichero; `content_type` con `CHECK IN ('image/jpeg','image/png','image/webp','application/pdf')`, que es la lista blanca de 5.8.3 expresada también aquí — ampliarla exige una migración, y esa fricción es deliberada. Índice `(household_id) WHERE deleted_at IS NULL` para que la suma de la cuota no recorra los borrados. `uploaded_at` a nulo marca la reserva de una subida en curso, que ya ocupa cuota y todavía no se puede adjuntar (ver 5.8.3). **La cuota de 1 GB no es un `CHECK`:** es una suma sobre las filas vivas del hogar, y se valida en el caso de uso con la fila del hogar bloqueada durante la reserva. El borrado es lógico aunque no lo referencie nadie, porque los bytes se desenlazan aparte: borrar la fila en el acto dejaría el fichero en disco sin nadie que supiera que sobra |
 | `articles` | `name` único entre los artículos **vigentes** del hogar, sin distinguir mayúsculas ni acentos: índice único parcial sobre `(household_id, lower(unaccent(name))) WHERE retired_at IS NULL` — requiere la extensión `unaccent`, que se instala en su propia migración; `barcode` con el mismo tratamiento, `(household_id, barcode) WHERE barcode IS NOT NULL AND retired_at IS NULL`; `unit` con `CHECK IN ('UNIT','GRAM','KILOGRAM','MILLILITER','LITER','METER','PACK')`; `CHECK (pack_size IS NULL OR pack_size > 0)`. La retirada es **lógica** (`retired_at`), no un `DELETE`: las existencias dadas de baja conservan su `article_id`, así que borrar la fila rompería la clave ajena y con ella el historial |
@@ -304,7 +329,7 @@ Así, aunque alguien acertara el identificador de un fichero ajeno y el caso de 
 
 > **Y no es el único sitio: son todos.** La versión anterior de este párrafo decía que el fichero era «el único sitio donde un identificador de otro hogar podría llegar del cliente», y no era cierto — `categoryId`, `articleId`, `locationId` y `assetId` llegan del cliente exactamente igual. Lo que lo convierte en un problema y no en una redundancia es un detalle de PostgreSQL que se descubre al probarlo: **la comprobación de una clave ajena no pasa por las políticas de RLS**. Una fila de otro hogar es invisible a un `SELECT` y aun así se puede referenciar. Por eso **todas** las referencias que pueden llegar del cliente son compuestas contra `(household_id, id)` —autoría, propietario, participantes de un préstamo, ficheros, categoría, artículo, ubicación y asset contenedor—, y cada tabla referenciada lleva su `UNIQUE (household_id, id)` para poder serlo.
 
-Todas las tablas del core incluyen `household_id` para el filtrado multi-tenant, con cinco excepciones: `loan_access_tokens` cuelga de `loans`, y `refresh_tokens`, `email_verification_tokens`, `password_reset_tokens` e `identities` cuelgan de la identidad, que por definición no pertenece a ningún hogar.
+Todas las tablas del core incluyen `household_id` para el filtrado multi-tenant —`asset_tags` incluida, que es una tabla de unión y lo lleva igual (ver su fila más arriba)—, con cinco excepciones: `loan_access_tokens` cuelga de `loans`, y `refresh_tokens`, `email_verification_tokens`, `password_reset_tokens` e `identities` cuelgan de la identidad, que por definición no pertenece a ningún hogar.
 
 > **Ojo con `identities`.** Las otras tres excepciones son tablas de tokens, sin más contenido que un hash. `identities` no: guarda nombre, correo y teléfono de personas reales, y al no llevar `household_id` **no puede tener política de RLS**. Es la única tabla con datos personales que depende de una sola capa de aislamiento, la de la aplicación. Su repositorio debe resolver siempre por identidad autenticada —nunca listar, nunca buscar por correo salvo en el login— porque ahí no hay red debajo. Lo mismo vale ahora para el avatar que cuelga de ella: es la única imagen del sistema sin política de RLS detrás, y su ruta se deriva del `identityId`, resuelto del token y jamás recibido como parámetro.
 
