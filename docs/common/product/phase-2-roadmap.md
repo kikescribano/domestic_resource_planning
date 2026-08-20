@@ -5,7 +5,7 @@
 | Estado | Cerrado |
 | Responsable | Equipo DRP |
 | Ámbito | Ejecución de la Fase 2, **completada el 2026-08-19** |
-| Última revisión | 2026-08-19 |
+| Última revisión | 2026-08-20 |
 
 > El estado de **las fases** vive en la sección 8 del
 > [`README principal`](../../../README.md), y solo allí. Este documento baja al
@@ -890,11 +890,21 @@ conocido.
 > los cuatro atributos propuestos. El outbox va primero que la Fase 3 por lo que
 > aquí ya se dice: con cuatro módulos escuchando el síntoma dejó de ser teórico, y
 > con trece cada handler nuevo es otro consumidor de un evento que se puede perder.
+>
+> **Y desde el 2026-08-20 los tres están hechos**, con el
+> [cierre de huecos](open-gaps-roadmap.md) completo: un hogar que pide marcharse
+> desaparece entero a los treinta días, la foto de un iPhone se sube y se ve, y
+> **un evento publicado ya no se pierde en un reinicio** —el síntoma conocido que
+> esta sección dejó anotado tiene ahora una prueba que corta el proceso antes de
+> entregar y comprueba que el handler recibe al arrancar—. El candidato que aquí
+> se apuntó «para la Fase 3» no esperó a ella, por el mismo motivo que esta
+> sección ya daba.
 
 ## Historial
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | Se anota, sin tocar lo que la fase decidió, que **los tres huecos que dejó fuera están hechos**: el [cierre de huecos](open-gaps-roadmap.md) se completó con sus siete hitos, el Transactional Outbox incluido. |
 | 2026-08-19 | Se anota, sin tocar lo que la fase decidió, que **los tres huecos que dejó fuera ya tienen plan y no esperan a la Fase 3**: la baja de un hogar, la conversión de HEIC y el Transactional Outbox se ejecutan en el [cierre de huecos](open-gaps-roadmap.md), junto con los cuatro atributos propuestos. |
 | 2026-08-19 | **Hito 6 completado, y con él la Fase 2.** El hito no añade producto: consolida — y consolidar destapó **cuatro defectos que ninguna prueba de recorrido podía ver**, porque los tres barridos preguntan por lo que *no* se hizo. El **barrido de aislamiento** pasa de las treinta y ocho operaciones de la Fase 1 al **contrato entero**, con 313 comprobaciones y sin una desviación, y con **el criterio de inclusión escrito**: entra la operación que puede nombrar o devolver algo del hogar de al lado; queda fuera la que no acepta ningún identificador ni devuelve ninguna fila, porque esa prueba no podría fallar. De las cuarenta y cuatro nuevas —**el número que este documento tenía mal, que decía cuarenta y una**— cuarenta y una entran por las cuatro formas de ataque y tres por el cierre. Destapó dos `500` de Warehouse donde el contrato declara `404` y que **recibir una compra ignoraba en silencio** una línea ajena. La **auditoría de accesibilidad** recorre las seis pantallas enteras con los cuatro módulos encendidos —doce paradas, el caso peor— y encontró que **`input[type=date]` no dibujaba anillo de foco**, porque Chromium delega el foco a su shadow DOM y el campo no casa ni con `:focus-visible` ni con `:focus`. La **capacidad, vuelta a medir**, obliga a partir la medición en dos: por hogar pasa de 61 kB a **116 kB**, y aparece lo que crece con lo que el hogar *hace* —**2457 B/día**—; **VPS-3 sigue en pie y sigue decidiéndolo el disco**. Se cierra la **purga de las cinco tablas** con un número delante en vez de por aplazamiento, se resuelven o reafirman las **cinco decisiones abiertas** —la antelación del aviso eran dos preguntas y es una: será de plataforma— y **la prueba del reloj se retira**, porque la propiedad se cuenta y no se cronometra. El deck de marketing, regenerado desde su script. **Los cuatro módulos se quedan en «En desarrollo», y se dice por qué**: no hay ningún despliegue, y decir lo contrario sería decirlo también del core. Doce decisiones que la definición no preveía |
 | 2026-08-19 | **Hito 5 completado, y con él los cuatro módulos de prioridad alta**: Mantenimiento (CMMS) llega con tres tablas que suben el recuento de veinticinco a veintiocho, once operaciones que llevan el contrato a noventa y ocho, y el sexto recorrido vertical de la batería. Es el único módulo cuya frontera principal se ha escrito **sin el otro lado delante** —**de CMMS es el cuándo y del planificador de tareas el quién lo hace**—, con sus tres consecuencias cumplidas en código: ninguna tabla lleva responsable, no hay ocurrencias materializadas y no consume `UserDeactivated`. Es también **la prueba de verdad del puerto de dato maestro**, que **no se ensancha** —filtrar por categoría escondería justo al contacto que hace falta— y que de paso ejercita por fin la garantía que Proveedores declaró por adelantado: un contacto retirado sigue siendo legible por su identificador. Y el primero cuyo **aviso por fecha se rearma**, colgado de la próxima fecha prevista y no del plan. Se corrige el catálogo de eventos de 5.2.3 —`AssetCreated` abre la **ficha** de la máquina y no un plan por defecto, que no se sostiene— y se retira la última promesa autoprogramada del Hito 0, el campo `milestone`. El recorrido vertical vuelve a encontrar lo que solo se ve en un navegador: **recargar devolvía al login con la sesión viva en el servidor**. Doce decisiones que la definición no preveía |
