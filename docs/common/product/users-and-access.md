@@ -158,6 +158,22 @@ Son dos operaciones distintas, y la separación entre identidad y pertenencia es
 >
 > Y **el único administrador activo no puede cerrar su cuenta**, con el mismo `USER_LAST_ADMIN` que ya impide quitarle el rol o darlo de baja, porque es la misma regla: un hogar sin administrador no puede invitar, cambiar roles, encender módulos ni pedir su propia baja. La salida está en sus manos — nombrar administradora a otra persona, o dar de baja el hogar.
 
+**La vuelta: dejar el hogar tiene deshacer, y son dos puertas (2026-08-20).**
+
+La baja de una **pertenencia** es reversible, y la de una **identidad** no — que es la misma frontera de siempre, mirada desde el otro lado:
+
+- **`ReactivateUser`** (`POST /users/{id}/activation`, solo `HOUSEHOLD_ADMIN`) limpia `deactivatedAt` en la pertenencia y la persona vuelve **con el rol que tenía**: la fila es la misma. Es idempotente como la activación de un módulo, y es el interruptor de la pantalla «Personas» — que para poder ofrecerlo lista con `includeDeactivated=true` cuando quien mira administra.
+- **Aceptar una invitación nueva** también trae de vuelta a un ex-miembro: como nadie pertenece dos veces al mismo hogar (`UNIQUE (household_id, identity_id)`), la aceptación **revive** la pertenencia dada de baja con el rol de la invitación, conservando identificador e historial — sus préstamos y su autoría siguen apuntando a la misma persona.
+
+Lo que ninguna de las dos deshace, y es deliberado: **los refresh tokens revocados no vuelven** —la persona entra de nuevo con sus credenciales— y **sus assets siguen sin propietario**, porque a estas alturas pueden tener dueño nuevo y reasignarlos en bloque sería adivinar; se localizan donde siempre (`ListAssets` con el filtro de huérfanos).
+
+Y lo que ninguna de las dos puede hacer, con su `409` cada caso:
+
+- **Si la identidad ya vive en otro hogar** (`IDENTITY_ALREADY_MEMBER`, el mismo código que al aceptar una invitación): mientras el MVP admita una sola pertenencia activa, el índice único parcial lo impediría igualmente — la comprobación en el caso de uso existe para responder con el código del contrato en vez de con un `500`.
+- **Si la cuenta está cerrada** (`IDENTITY_CLOSED`): reactivar esa pertenencia —o crearla al aceptar una invitación— fabricaría un miembro activo que no puede autenticarse nunca, justo la incoherencia que `CloseAccount` evita al dar de baja identidad y pertenencia a la vez. Una invitación **no reabre una cuenta**: si algún día se quiere reabrir una identidad, será una decisión nueva y no un efecto colateral de un token.
+
+> **La baja publica `UserDeactivated` desde las dos puertas que la ejecutan** —`DeactivateUser` y `CloseAccount`, que también apaga la pertenencia—, que era una promesa del contrato desde la Fase 1 sin código detrás. La vuelta **no publica evento**: el criterio del catálogo de 5.2.3 es que un evento entra cuando un módulo lo necesita, no la simetría, y el destinatario natural —el planificador de tareas— no existe todavía (ver 4.1.7).
+
 **Y una tercera baja, que es la del hogar entero.**
 
 `RequestHouseholdClosure` la solicita —solo `HOUSEHOLD_ADMIN`— y a partir de ahí corren **treinta días de gracia** en los que el hogar funciona exactamente igual; lo único que lo distingue es un aviso con la fecha en la que desaparecerá. `CancelHouseholdClosure` la retira mientras tanto, sin nada que restaurar. Vencido el plazo, el recorrido diario borra el hogar entero: sus filas, las de todos los módulos y **sus ficheros en disco**.

@@ -71,11 +71,12 @@ La condición que **sí** hay que tomarse en serio antes de exponerlo es doble:
    documentación hacen y que quedaron a medio cumplir*: el rate limit «cuando
    llegue nginx», la validación de secretos aplicada a un secreto sí y a otro
    no, y el reparto imagen/documento de la ADR-005. **Tres de los cinco ya están
-   corregidos** (los dos fail-open de secretos y el rate limit tras el proxy), y
-   del cuarto —las dependencias de Spring— está cerrada la parte que importaba
-   hoy: **todas las CVE concretas**, más la vigilancia continua que evita repetir
-   esta auditoría a mano. Queda el salto a la línea 4.x de Spring Boot, que es un
-   bloque propio, y la sustitución de `webp-imageio`.
+   corregidos** (los dos fail-open de secretos y el rate limit tras el proxy),
+   más el de `webp-imageio`; y del quinto —las dependencias de Spring— está
+   cerrada la parte que importaba hoy: **todas las CVE concretas**, más la
+   vigilancia continua que evita repetir esta auditoría a mano. **Queda una sola
+   cosa**: el salto a la línea 4.x de Spring Boot, que es un bloque propio porque
+   arrastra Jackson 3, Kotlin 2.2+, Spring Security 7 e Hibernate 7.
 2. **El despliegue todavía no existe**, y sin TLS, firewall, secretos
    inyectados, backups automatizados y un compose de producción endurecido, la
    solidez del código no basta. Eso es un bloque de trabajo propio (§ Requisitos
@@ -92,7 +93,7 @@ cerró**; un guion en la segunda significa que sigue abierto.
 | 1 | ALTA | El rate limit por IP colapsa en un cubo global detrás de nginx (DoS de toda la autenticación) | Auth | 2026-08-20 | 2026-08-20 |
 | 2 | ALTA | Fail-open del secreto JWT: sin perfil activo, producción arranca con la clave de ejemplo del repositorio | Infra | 2026-08-20 | 2026-08-20 |
 | 3 | ALTA | `DRP_FILES_LINK_SECRET` no se valida al arrancar: puede quedar el secreto de firma de desarrollo en producción | Ficheros | 2026-08-20 | 2026-08-20 |
-| 4 | ALTA | `webp-imageio 0.1.6` embebe libwebp anterior al fix de CVE-2023-4863 y decodifica WebP subido por usuarios | Deps | 2026-08-20 | — |
+| 4 | ALTA | `webp-imageio 0.1.6` embebe libwebp anterior al fix de CVE-2023-4863 y decodifica WebP subido por usuarios | Deps | 2026-08-20 | 2026-08-20 |
 | 5 | ALTA | Spring Boot 3.4.x fuera de soporte OSS y sin detección continua de dependencias | Deps | 2026-08-20 | parcial 2026-08-20 |
 | 6 | MEDIA | `CloseAccount` (`DELETE /users/me`) no re-autentica: un access token robado expulsa a la víctima de forma permanente | AuthZ | 2026-08-20 | — |
 | 7 | MEDIA | Rotación de refresh sin detección de reutilización (robo indetectable) | Auth | 2026-08-20 | — |
@@ -117,11 +118,12 @@ cerró**; un guion en la segunda significa que sigue abierto.
 > vivo un hallazgo, que es lo único que convierte esta tabla en un registro y no
 > en una foto.
 >
-> **Los tres cerrados eran los tres «a medio cumplir»**, y se cerraron juntos por
-> eso: los tres consistían en que una mitad del control estaba escrita y la otra
-> no. Los dos ALTA que siguen abiertos —`webp-imageio` y la línea de Spring
-> Boot— son subidas de dependencia con riesgo de regresión propio, así que van en
-> su propio bloque y no mezclados con estos.
+> **Los tres primeros en cerrarse eran los tres «a medio cumplir»**, y se
+> cerraron juntos por eso: los tres consistían en que una mitad del control
+> estaba escrita y la otra no. De los dos de dependencias, `webp-imageio` se
+> cerró después —resultó ser un cambio sin impacto en el código—, y **el único
+> ALTA que sigue abierto es el salto a la línea 4.x de Spring Boot**, que es un
+> bloque propio por lo que arrastra.
 
 ---
 
@@ -240,6 +242,26 @@ alta de hogares en autoservicio hace que «autenticado» sea una barrera baja.
   va dentro del jar; como mitigación temporal, valorar retirar `image/webp` de la
   lista blanca de subida (la escritura de miniaturas en WebP no depende de la
   entrada del usuario, pero la decodificación de la subida sí).
+- **Corregido.** Sustituida por `com.github.usefulness:webp-imageio:0.10.2`, la
+  continuación mantenida del mismo código —conserva el paquete
+  `com.luciad.imageio.webp` del original, de ahí que el cambio **no toque una
+  sola línea de la aplicación**: el procesador pide el códec por SPI genérico—.
+  La versión del nativo no se dio por supuesta ni se leyó del README, que no la
+  dice: se comprobó que **el submódulo apunta al commit exacto del tag v1.5.0 de
+  libwebp**, muy por delante de la 1.3.2 que trajo el arreglo. No hizo falta la
+  mitigación temporal de retirar `image/webp` de la lista blanca.
+- **Por qué no la 0.11.0, que es la última.** Está compilada con Kotlin 2.4 y el
+  compilador del proyecto va por 2.1.20, así que rechaza su metadata. Subir
+  Kotlin para esto sería meter una migración dentro de un arreglo de seguridad, y
+  además Kotlin 2.2+ es requisito del salto a Spring Boot 4: su sitio es aquel
+  bloque. La 0.10.2 evita de paso una regresión de la 0.11.0, cuyos binarios de
+  Linux x86/x86_64 dejan de valer para glibc antiguas —lo que importaría al
+  empaquetar sobre una imagen musl (Alpine)—.
+- **Trampa medida, y aplicable a cualquier cambio de dependencia:** la primera
+  versión de este arreglo **pasó en local y falló en la CI**. Kotlin no vuelve a
+  escanear la metadata del classpath si no ha cambiado ningún fuente, de modo que
+  la construcción incremental da verde sobre una biblioteca que una construcción
+  desde cero rechaza. Se comprueba con `./gradlew compileKotlin --rerun-tasks`.
 
 ### 5. Spring Boot 3.4.x fuera de soporte OSS, sin detección continua de dependencias
 
@@ -692,4 +714,5 @@ Lo que la auditoría comprobó como correcto, para que no se toque sin querer:
 | 2026-08-20 | Creación: auditoría OWASP previa al despliegue en VPS, sobre las 106 operaciones y 31 tablas del cierre de huecos. Cinco superficies auditadas; sin vulnerabilidades críticas; cinco ALTA y catorce MEDIA en el código actual, más los requisitos del despliegue. | kikescribano |
 | 2026-08-20 | **Corregidos los tres ALTA acotados**, que eran los tres «a medio cumplir»: el rate limit recupera la IP del cliente tras un proxy declarado de confianza (`drp.rate-limit.trusted-proxies`, leyendo la **última** entrada de `X-Forwarded-For`), la ausencia de perfil pasa a contar como producción —con `bootRun` declarando `dev` y la tarea de pruebas `test`— y el secreto de firma de ficheros se valida al arrancar igual que el del JWT. La tabla del resumen gana **fecha de detección y de corrección** por hallazgo, para que se pueda decir cuánto tiempo estuvo vivo cada uno y no solo si está cerrado. Quedan abiertos los dos ALTA de dependencias, que van en su propio bloque. | kikescribano |
 | 2026-08-20 | **Hallazgo 5, cerrado en parte, y con una corrección del propio informe delante**: la recomendación original —«migrar a Spring Boot 3.5.x, es un salto menor»— **era falsa**, y se descubrió al ir a ejecutarla. La 3.5 también está fuera de soporte OSS desde el 2026-06-30 y la línea con soporte es la 4.x; el destino es un salto **mayor** que arrastra Jackson 3 con cambio de `groupId`, Kotlin 2.2+, Spring Security 7 y Hibernate 7. Se deja escrito cómo se detectó, porque el modo de fallo se repetirá: las páginas de fechas de fin de vida daban versiones inexistentes y el índice de búsqueda de Maven Central respondía con una versión atrasada; lo zanjó el `maven-metadata.xml` del repositorio. Entra el **peldaño 3.5.16** que la guía de Spring exige antes del salto y que **ya cierra todas las CVE concretas** del hallazgo —Spring Security 6.5.11, Framework 6.2.19, Tomcat 10.1.55 y nimbus-jose-jwt 9.37.4—, con springdoc 2.9.0 y BouncyCastle 1.85.2 detrás. Y entra la **vigilancia continua**, que era la otra mitad: `dependabot.yml` con los tres ecosistemas y actualizaciones agrupadas, más `permissions: contents: read` en la CI. | kikescribano |
+| 2026-08-20 | **Hallazgo 4 cerrado: fuera la libwebp sin parchear.** `org.sejda.imageio:webp-imageio:0.1.6` —publicada en 2020 y nunca más— se sustituye por `com.github.usefulness:webp-imageio:0.10.2`, la continuación mantenida del mismo código, cuyo submódulo apunta al tag **v1.5.0 de libwebp** —muy por delante de la 1.3.2 que trajo el arreglo, y comprobado contra el repositorio en lugar de suponerlo—. Importaba porque ese decodificador se alimenta con los bytes que sube cualquier miembro de cualquier hogar: `image/webp` está en la lista blanca y toda imagen se decodifica para recodificarla. El cambio **no toca una sola línea de la aplicación**, porque la sustituta conserva el paquete `com.luciad.imageio.webp` y el procesador pide el códec por SPI genérico. No se fue a la 0.11.0 —la última— porque está compilada con Kotlin 2.4 y el proyecto va por 2.1.20: subir Kotlin es parte del salto a Spring Boot 4, no de un arreglo de seguridad, y la 0.10.2 evita de paso su regresión con glibc antiguas. *(Esta fila decía 0.11.0 con libwebp 1.6.0: se escribió antes de que la CI obligara al peldaño 0.10.2 y no se corrigió con el cuerpo del hallazgo.)* **Con esto el único ALTA abierto es el salto a Spring Boot 4.x** | kikescribano |
 | 2026-08-20 | **Hallazgo 5: cerrada también la mitad que vivía en los ajustes del repositorio**, auditada contra la API de GitHub con la CLI `gh` en lugar de fiarla a la interfaz. Lo encontrado: alertas de Dependabot ya activas y grafo de dependencias funcionando, pero las security updates y todo el escaneo de secretos apagados. Se activan por API las security updates, el secret scanning y la push protection —re-verificado con las mismas consultas—, se comprueba que el token de Actions ya tenía `read` por defecto, y entra CodeQL con el *default setup*. Cero alertas de dependencias y de código a día de hoy. Los *non-provider patterns* y las *validity checks* quedan fuera a propósito: son de pago y el criterio es cuenta gratuita con repositorio público. Del hallazgo 5 solo queda abierto el salto a Spring Boot 4.x. | kikescribano |

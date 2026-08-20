@@ -1,6 +1,7 @@
 package com.drp.core.adapter.http
 
 import com.drp.platform.schedule.DailySweep
+import com.drp.test.DrpMailpit
 import com.drp.test.SpringIntegrationTest
 import com.drp.test.TestHousehold
 import com.drp.test.deleteJson
@@ -31,7 +32,11 @@ import java.util.UUID
  * operaciones de la Fase 1, las **cuarenta y cuatro** que trajo la Fase 2 --tres
  * de activacion, tres de avisos, siete de Proveedores, diez de Warehouse, diez de
  * Compras y once de Mantenimiento--, las **cuatro** de la baja de hogar y el
- * cierre de cuenta (ADR-012) y las **cuatro** del catalogo de etiquetas.
+ * cierre de cuenta (ADR-012), las **cuatro** del catalogo de etiquetas y las
+ * **dos** de la gestion de miembros: la reactivacion que trajo el interruptor de
+ * «Personas», y `DELETE /users/{id}`, que es de la Fase 1 y se quedo fuera del
+ * barrido --su 404 vivia en `HouseholdIsolationTest`, anterior a esta clase--
+ * hasta que sembrar a los miembros de A que las dos necesitan lo hizo barato.
  *
  * No sustituye a las pruebas de recorrido de cada recurso ni a las de gate de
  * cada modulo: comprueba una sola cosa --la de la ADR-002-- sobre todas ellas y
@@ -151,6 +156,16 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     private lateinit var tagA: String
     private lateinit var tagA2: String
 
+    /**
+     * Los miembros de A para las dos operaciones de la gestion de miembros: uno
+     * **activo** --el unico al que una baja cruzada podria apagar-- y uno **dado
+     * de baja**, que es lo unico que una reactivacion cruzada podria encender.
+     * Con los papeles al reves, ninguna de las dos podria cambiar nada y la
+     * comprobacion pasaria sin haber medido.
+     */
+    private lateinit var memberA: String
+    private lateinit var exMemberA: String
+
     /** Lo que el hogar A tiene **en los cuatro modulos**, con los cuatro encendidos. */
     private lateinit var supA: String
     private lateinit var linkA: String
@@ -257,6 +272,15 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         tagB = b.createTag("EtiquetaDeB")
         tagB2 = b.createTag("SegundaEtiquetaDeB")
 
+        // Los miembros de la gestion de miembros. La baja del segundo la hace A
+        // sobre si mismo, que es el unico camino legitimo para dejar una
+        // pertenencia apagada delante del barrido.
+        memberA = a.inviteMember()
+        exMemberA = a.inviteMember()
+        check(http.deleteJson("$USERS/$exMemberA", a.accessToken).statusCode == HttpStatus.NO_CONTENT) {
+            "No se pudo dar de baja al miembro que el barrido necesita apagado"
+        }
+
         // -----------------------------------------------------------------
         // Los cuatro modulos de la Fase 2, encendidos en los dos hogares
         // -----------------------------------------------------------------
@@ -327,6 +351,13 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             // operaciones de la baja: si la de B marcara el hogar equivocado, lo
             // que cambiaria es este cuerpo y ninguna respuesta.
             "/api/v1/households/current",
+            // Las personas de A, CON las dadas de baja dentro: es lo unico que
+            // cambiaria si una baja o una reactivacion cruzaran de hogar --el
+            // listado por defecto excluye a los apagados, asi que sin el flag una
+            // baja cruzada solo haria desaparecer una fila sin dejar rastro que
+            // comparar. Sin avatares no lleva URL firmada, asi que el cuerpo es
+            // estable y puede entrar en el retrato.
+            "/api/v1/users?includeDeactivated=true",
             "/api/v1/suppliers",
             "/api/v1/suppliers/$supA",
             "/api/v1/warehouse/stock",
@@ -348,7 +379,7 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("las cuarenta y cuatro operaciones con identificador en la ruta se niegan ante uno de otro hogar")
+    @DisplayName("las cuarenta y seis operaciones con identificador en la ruta se niegan ante uno de otro hogar")
     fun `barrido por identificador del recurso`() {
         val section = "ruta"
 
@@ -1551,10 +1582,11 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
     // ------------------------------------------------------------------
 
     /**
-     * Las **cuarenta y cuatro** operaciones con identificador en la ruta --veinte
-     * de la Fase 1, veintidos de la Fase 2 y las dos de etiquetas del cierre de
-     * huecos--, cada una como una llamada que solo espera el identificador. Es lo que permite ejecutarlas dos veces --con el de
-     * A y con uno inventado-- sin repetir el cuerpo.
+     * Las **cuarenta y seis** operaciones con identificador en la ruta --veintiuna
+     * de la Fase 1, veintidos de la Fase 2, las dos de etiquetas del cierre de
+     * huecos y la reactivacion de un miembro--, cada una como una llamada que
+     * solo espera el identificador. Es lo que permite ejecutarlas dos veces --con
+     * el de A y con uno inventado-- sin repetir el cuerpo.
      */
     private fun operationsWithPathId(): List<Pair<String, (String) -> ResponseEntity<String>>> = listOf(
         "PATCH /categories/{id}" to { id ->
@@ -1600,6 +1632,12 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         // que daria por devuelto el prestamo de otro hogar.
         "GET /loans/{id}" to { id -> http.getJson("$LOANS/$id", b.accessToken) },
         "POST /loans/{id}/return" to { id -> http.postJson("$LOANS/$id/return", "", b.accessToken) },
+
+        // Las dos de la gestion de miembros. Un fallo aqui no filtraria un
+        // dato: echaria de su casa a la persona de otro hogar --revocandole las
+        // sesiones--, o le meteria de vuelta a quien aquel hogar ya despidio.
+        "DELETE /users/{id}" to { id -> http.deleteJson("$USERS/$id", b.accessToken) },
+        "POST /users/{id}/activation" to { id -> http.postJson("$USERS/$id/activation", "", b.accessToken) },
 
         // --- Y las veintidos de la Fase 2 con identificador en la ruta.
         //
@@ -1721,6 +1759,10 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
         operation.contains("/files") -> fileA
         operation.contains("/documents") -> docA
         operation.contains("/loans") -> loanA
+        // La reactivacion ataca al miembro APAGADO y la baja al encendido: al
+        // reves, ninguna de las dos podria cambiar nada aunque cruzara.
+        operation.contains("/activation") -> exMemberA
+        operation.contains("/users") -> memberA
         else -> durA
     }
 
@@ -1901,6 +1943,30 @@ class TenantIsolationSweepTest : SpringIntegrationTest() {
             "No se pudo preparar el escenario con POST $path: ${response.statusCode} ${response.body}"
         }
         return response.body!!.extract("id")
+    }
+
+    /**
+     * Invita a alguien, acepta por el y devuelve su `memberId`, que sale del
+     * token de la sesion recien emitida: la API no lo devuelve suelto.
+     */
+    private fun TestHousehold.inviteMember(): String {
+        val email = "miembro-${short()}@example.test"
+        check(
+            http.postJson(
+                "/api/v1/invitations",
+                """{"email":"$email","role":"HOUSEHOLD_MEMBER"}""",
+                accessToken,
+            ).statusCode == HttpStatus.CREATED,
+        ) { "No se pudo invitar al miembro que el barrido necesita" }
+
+        val token = DrpMailpit.instance.awaitMessageTo(email).token()
+        val session = http.postJson(
+            "/api/v1/invitations/accept",
+            """{"token":"$token","name":"Miembro","password":"una frase larga mas"}""",
+        ).body!!.extract("accessToken")
+
+        val payload = String(java.util.Base64.getUrlDecoder().decode(session.split(".")[1]))
+        return payload.extract("memberId")
     }
 
     /** Un prestamo abierto del hogar, de si mismo a si mismo. */

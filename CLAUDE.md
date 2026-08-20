@@ -25,8 +25,8 @@ uno. Lo que hay es un monorepo con `backend/` (Kotlin, Gradle con Kotlin DSL) y
   certificado (ADR-015)— y el «hoy» de las reglas de calendario resuelto con la
   zona del hogar vía el puerto `HouseholdCalendar` (ADR-011 ampliada).
 
-En cifras: **106 operaciones** en el contrato, **31 tablas** con RLS y `FORCE`, y
-**diez recorridos verticales** en un navegador de verdad.
+En cifras: **107 operaciones** en el contrato, **31 tablas** con RLS y `FORCE`, y
+**once recorridos verticales** en un navegador de verdad.
 
 Así que la advertencia es la contraria a la que había aquí: **no supongas que algo
 no existe**. Antes de escribir un caso de uso, una tabla o una pantalla, busca si

@@ -74,16 +74,50 @@ dependencies {
     // Se enchufa como plugin de ImageIO, de modo que el codigo de recodificacion
     // es el mismo para los tres formatos de imagen y no hay un camino aparte.
     // Trae los binarios nativos dentro del jar y los extrae al arrancar.
-    implementation("org.sejda.imageio:webp-imageio:0.1.6")
+    //
+    // **Era `org.sejda.imageio:webp-imageio:0.1.6`, y se cambio por seguridad.**
+    // Aquella se publico en 2020 y no ha vuelto a publicarse, asi que los
+    // binarios que lleva dentro son de una libwebp anterior a la 1.3.2 --de
+    // septiembre de 2023-- y por tanto vulnerables a **CVE-2023-4863**, el
+    // desbordamiento de heap de WebP que se exploto de verdad. No era teorico:
+    // este decodificador se alimenta con **los bytes que sube cualquier miembro
+    // de cualquier hogar**, porque `image/webp` esta en la lista blanca y toda
+    // imagen se decodifica para recodificarla.
+    //
+    // Esta es la continuacion mantenida del mismo codigo --conserva el paquete
+    // `com.luciad.imageio.webp` del original, de ahi que el cambio no toque una
+    // sola linea de la aplicacion.
+    //
+    // **Se queda en la 0.10.2 y no sube a la 0.11.0, que es la ultima.** La
+    // 0.11.0 esta compilada con Kotlin 2.4 y el compilador de este proyecto va
+    // por 2.1.20, asi que rechaza su metadata: «The binary version of its
+    // metadata is 2.4.0, expected version is 2.1.0». Subir Kotlin para esto
+    // seria meter una migracion dentro de un arreglo de seguridad, y ademas
+    // Kotlin 2.2+ es requisito del salto a Spring Boot 4: su sitio es aquel
+    // bloque, no este. Cuando Kotlin suba alli, la 0.11.0 queda disponible.
+    //
+    // Lo que importa se cumple igual: **la 0.10.2 fija libwebp en el commit
+    // exacto del tag v1.5.0**, muy por delante de la 1.3.2 que trae el arreglo
+    // de CVE-2023-4863. Y de paso evita una regresion de la 0.11.0, cuyos
+    // binarios de Linux x86/x86_64 se construyen con toolchains mas nuevos y
+    // dejan de valer para glibc antiguas: la 0.10.2 sigue sirviendo para una
+    // imagen musl --Alpine-- si algun dia la aplicacion se empaqueta asi.
+    //
+    // **Cuidado al cambiar esta linea:** un cambio de dependencia puede pasar en
+    // local y fallar en la CI. Kotlin no vuelve a escanear la metadata del
+    // classpath si no ha cambiado ningun fuente, asi que la construccion
+    // incremental da verde sobre una biblioteca que la CI --que parte de cero--
+    // rechaza. Comprobalo con `./gradlew compileKotlin --rerun-tasks`.
+    implementation("com.github.usefulness:webp-imageio:0.10.2")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
-    testImplementation("io.kotest:kotest-assertions-core:5.9.1")
+    testImplementation("io.kotest:kotest-assertions-core:6.2.4")
     // Las fronteras de modulo de la ADR-010, comprobadas por la construccion y no
     // por un acuerdo: ningun modulo puede referenciar a otro, el core no puede
     // referenciar a ninguno y plataforma no se apoya en el core. Una regla que
     // solo se escribe en una ADR se incumple al tercer hito sin que nadie lo note.
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.5.0")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
