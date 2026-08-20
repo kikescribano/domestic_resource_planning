@@ -5,10 +5,10 @@ import com.drp.module.warehouse.domain.ExpiryStage
 import com.drp.platform.notice.NoticeDraft
 import com.drp.platform.schedule.CheckOwner
 import com.drp.platform.schedule.ScheduledCheck
+import com.drp.platform.tenant.HouseholdCalendar
 import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.LocalDate
-import java.time.ZoneId
 
 /**
  * Las dos comprobaciones periodicas de Warehouse: **las primeras de un modulo de
@@ -53,6 +53,7 @@ import java.time.ZoneId
 @Component
 class WarehouseExpiryCheck(
     private val warehouse: WarehouseRepository,
+    private val calendar: HouseholdCalendar,
     private val clock: Clock,
 ) : ScheduledCheck {
 
@@ -60,7 +61,10 @@ class WarehouseExpiryCheck(
     override val owner: CheckOwner = CheckOwner.Module(WarehouseModule.KEY)
 
     override fun check(): List<NoticeDraft> {
-        val today = LocalDate.ofInstant(clock.instant(), clock.zone ?: ZoneId.systemDefault())
+        // **El dia es el del hogar y no el del servidor.** Que un yogur haya
+        // caducado es una frase sobre el calendario de la cocina, no sobre el de
+        // Greenwich.
+        val today = calendar.today()
 
         // El horizonte se acota por la antelacion mas larga posible, y la fase
         // exacta la decide el dominio lote a lote: la consulta no puede aplicar
