@@ -97,13 +97,14 @@ con sus siete puntos. No se reordena ni se recorta.
 | `DangerZone` | [`danger-zone.md`](danger-zone.md) | **Implementado** — ficha escrita antes que el componente, cierre de huecos Hito 0 | [`primitives.tsx`](../../../../frontend/src/ui/primitives.tsx) |
 | `LoanExternalPage` | [`loan-external-page.md`](loan-external-page.md) | **Implementado** como `ExternalLoanPage` | [`routes/loans.tsx`](../../../../frontend/src/routes/loans.tsx) |
 | `SuppliersPage` | [`suppliers-page.md`](suppliers-page.md) | **Implementada** — ficha escrita antes que la pantalla, Fase 2 Hito 2 | [`routes/suppliers.tsx`](../../../../frontend/src/routes/suppliers.tsx) |
+| `HelpPage` | [`help-page.md`](help-page.md) | **Implementada** — la guía de la herramienta; su ficha lleva además la regla de alineación con las pantallas y su registro de deuda | [`routes/help.tsx`](../../../../frontend/src/routes/help.tsx) |
 | `TagField` y `TagChip` | [`tag-field.md`](tag-field.md) | **Implementados** — ficha escrita antes que el componente, cierre de huecos Hito 4 | [`ui/catalog.tsx`](../../../../frontend/src/ui/catalog.tsx) |
 | `CategoryMarker` e `IconColorPicker` | [`category-identity.md`](category-identity.md) | **Implementados** — ficha escrita antes que los componentes, cierre de huecos Hito 4 | [`ui/catalog.tsx`](../../../../frontend/src/ui/catalog.tsx) |
 
 **Dieciocho componentes reutilizables —diez en `primitives.tsx`, cuatro en
-`files.tsx` y cuatro en `catalog.tsx`— más dos pantallas, en dieciocho filas
+`files.tsx` y cuatro en `catalog.tsx`— más tres pantallas, en diecinueve filas
 —`CategoryMarker` y su selector comparten una, y `TagField` otra con su pastilla,
-porque en los dos casos son mitades de una sola anatomía— y catorce de ellas
+porque en los dos casos son mitades de una sola anatomía— y quince de ellas
 tienen ficha**:
 `SelectField`, `PageHeading` y `EmptyState` entraron con el Hito 2 sin la suya, y
 `QuotaMeter` con el Hito 3, documentado como variante dentro de la ficha de
@@ -247,6 +248,7 @@ porque es donde se incumplen:
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | Entra **`HelpPage`** (`/ayuda`), la tercera pantalla con ficha propia — y la primera cuya ficha existe sobre todo por su apartado de mantenimiento: la guía describe a las demás pantallas, así que [`help-page.md`](help-page.md) fija la regla de alineación —quien cambia una pantalla alinea su bloque en el mismo cambio o apunta la deuda— y lleva el registro para saldarla en lote. | Equipo DRP |
 | 2026-08-20 | **«Catálogo» entra en la pasada sistemática de axe**, con una categoría de color puesto sembrada antes: es donde vive el selector, o sea las veintidós parejas de botones del hito, y en gris no habría mirado ninguno de los seis colores. Quedan **dos pantallas del core sin auditar**: Sitios y Personas. | Equipo DRP |
 | 2026-08-20 | Entran **tres componentes y dos fichas**, las dos escritas antes que el código: [`tag-field.md`](tag-field.md) y [`category-identity.md`](category-identity.md) (cierre de huecos, Hito 4). Nace el **tercer fichero de componentes**, `catalog.tsx`, partido por dominio y no por el eje del Hito 3, y con su motivo. Se cierra la decisión abierta de **`lucide-react`** con la medida delante, y se abre en su sitio la que quedaba escondida detrás: `iconography.md` y `status-badge.md` se contradicen sobre el icono de estado. | Equipo DRP |
 | 2026-08-20 | **Los dos defectos que el repaso destapó, arreglados.** La celda de la galería lleva su nombre accesible en el botón y la miniatura pasa a decorativa —tal y como `file-gallery.md` lo tenía especificado desde el primer día—, y **«Archivo» entra en la pasada sistemática de axe** con un fichero sembrado, porque auditarla vacía no habría mirado ninguna celda. Quedan **cuatro pantallas del core sin auditar**: Inventario, Sitios, Catálogo y Personas. | Equipo DRP |

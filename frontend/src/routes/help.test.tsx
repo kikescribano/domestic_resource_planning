@@ -36,10 +36,10 @@ describe('la guía de la herramienta', () => {
   it('tiene un bloque por pantalla, cada uno con su enlace', async () => {
     await openHelp()
 
-    // Una muestra de cada tramo de la navegación: pulgar, resto del core y
-    // módulos. Si la lista de pantallas crece, el bloque nuevo se añade a
-    // `HELP_TOPICS` y esta prueba no se toca.
-    for (const title of ['Inventario', 'Catálogo', 'Mantenimiento']) {
+    // Una muestra de cada grupo de la navegación —Tu hogar, Datos maestros,
+    // Configuración— y un módulo. Si la lista de pantallas crece, el bloque
+    // nuevo se añade a `HELP_TOPICS` y esta prueba no se toca.
+    for (const title of ['Inventario', 'Catálogo', 'General', 'Mantenimiento']) {
       expect(screen.getByRole('article', { name: title })).toBeInTheDocument()
       expect(screen.getByRole('link', { name: `Ir a ${title}` })).toBeInTheDocument()
     }
