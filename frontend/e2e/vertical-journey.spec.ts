@@ -1430,6 +1430,9 @@ const AUDITED_SCREENS = [
   { link: 'Almacén', path: '/almacen', heading: 'Almacén' },
   { link: 'Compras', path: '/compras', heading: 'Compras' },
   { link: 'Mantenimiento', path: '/mantenimiento', heading: 'Mantenimiento' },
+  // «Ayuda» entra el 2026-08-20, al nacer cerrando el grupo «Configuración»:
+  // su contenido es estático, así que no hay nada que sembrar.
+  { link: 'Ayuda', path: '/ayuda', heading: 'Ayuda' },
 ]
 
 /**

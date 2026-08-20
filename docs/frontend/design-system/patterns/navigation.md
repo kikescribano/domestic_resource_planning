@@ -76,7 +76,7 @@ Anatomía, tal y como está escrita:
 | Contenedor | Columna | Fila (`md:flex-row`) |
 | `<header>` | Fijo abajo, con `border-t` | Estático, 256 px de ancho, con `border-r` |
 | Marca «DRP» | Oculta en la barra —la enseñan las cabeceras de «Hogar» y «Más»— | Visible: el sello de la marca con nombre y lema, y debajo «Cuenta» y «Salir» |
-| `<nav aria-label="Principal">` | Fila con las cuatro primeras paradas de «Tu hogar» y «Más» | Columna con tres grupos: Tu hogar, Datos maestros y —solo administración— Configuración |
+| `<nav aria-label="Principal">` | Fila con las cuatro primeras paradas de «Tu hogar» y «Más» | Columna con tres grupos: Tu hogar, Datos maestros y Configuración —cuyas paradas de administración solo ve quien administra— |
 | Rótulo de grupo | Oculto | Visible, en `text-caption`, y siempre referenciado con `aria-labelledby` |
 | Enlace | `min-h-touch`, `flex-1`, centrado | Alineado a la izquierda, con radio y fondo al pasar |
 | `<main id="contenido">` | `max-w-shell`, con `pb-24` para no quedar bajo la barra | `md:pb-6` |
@@ -111,10 +111,13 @@ producto, no una casualidad del código:
   activo— y Archivo. Es lo que las demás pantallas consultan: quién, qué y
   dónde. El nombre es el término de un ERP a conciencia — este es doméstico,
   pero es un ERP.
-- **Configuración**: General (`/configuracion`, con su engranaje) y Módulos del
-  hogar, y **solo lo ve quien administra**: un miembro no puede tocar nada de
-  lo que hay dentro, y un grupo entero de puertas cerradas es peor que ningún
-  grupo. La ruta tecleada a mano lo devuelve al inicio.
+- **Configuración**: General (`/configuracion`, con su engranaje), Módulos del
+  hogar y, cerrando el grupo y la navegación entera, **Ayuda** (`/ayuda`, con su
+  interrogante). Las dos primeras **solo las ve quien administra** —un miembro
+  no puede tocar nada de lo que hay dentro, y una puerta cerrada es peor que
+  ninguna; la ruta tecleada a mano lo devuelve al inicio—, pero el grupo existe
+  para todos los papeles porque «Ayuda», la guía de la herramienta, es de
+  cualquiera que la use.
 
 **Ya no hay grupo «Módulos»**: cada módulo vive donde su contenido pertenece, y
 la puerta para encenderlos es «Módulos del hogar», dentro de Configuración.
@@ -135,7 +138,8 @@ Así que:
   número.
 - **«Más» enseña el resto con los mismos grupos y el mismo orden**: lo de «Tu
   hogar» que no cupo en la barra —los módulos de actividad—, «Datos maestros»
-  entero y, para quien administra, «Configuración». Abre con la marca igual que
+  entero y «Configuración», que para quien no administra se queda en su única
+  parada abierta, «Ayuda». Abre con la marca igual que
   «Hogar» y cierra con el apartado de la cuenta —el enlace al detalle y la
   salida directa—, que es donde el móvil tiene lo que en escritorio vive bajo
   el sello.
@@ -292,6 +296,7 @@ tiene ranura para ninguna de las dos.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **«Ayuda» (`/ayuda`) remata «Configuración» y con ella la navegación entera**, en el mismo sitio para las dos plataformas —columna en escritorio, «Más» en móvil; nunca el pulgar—. El grupo deja de ser exclusivo de administración: sus dos paradas de configuración siguen siendo solo de quien administra, pero la guía de la herramienta es de todos los papeles, así que el grupo existe para todos. | Equipo DRP |
 | 2026-08-20 | **La columna se puede encoger a iconos en escritorio** (256 → 80 px), con el conmutador cerrándola por abajo: etiquetas a `sr-only` sin perder el nombre accesible, `title` como recordatorio, filetes donde había rótulos —también entre «Salir» y «Hogar»—, la marca en el sello, solo «Salir» del bloque de la cuenta, y la elección persistida en `drp.nav`. Ensanchada, la marca pasa a centrarse en la anchura de la columna. | Equipo DRP |
 | 2026-08-20 | **Reagrupado en tres** —Tu hogar, Datos maestros y Configuración— con un orden único para columna, barra y «Más»: «Avisos» entra en el pulgar y «Ubicaciones» sale hacia «Datos maestros», los módulos pierden su grupo y viven donde su contenido pertenece, y «Configuración» —solo para quien administra— estrena «General» (`/configuracion`), que hereda la baja del hogar de la pantalla «Hogar». | Equipo DRP |
 | 2026-08-20 | **«Cuenta» deja de ser una parada y se va con la marca**, con la salida directa al lado: en escritorio bajo el sello —en el banner, fuera del landmark de navegación—; en móvil, en el apartado que cierra «Más», que además abre con la marca igual que «Hogar». La lista queda para lo que es del hogar, y «Salir» sigue sin pisar la lista de paradas. | Equipo DRP |

@@ -54,6 +54,14 @@ class RateLimitTest {
             registry.add("drp.rate-limit.window") { "5m" }
             registry.add("drp.rate-limit.per-ip") { PER_IP }
             registry.add("drp.rate-limit.per-email") { PER_EMAIL }
+
+            // El cliente de pruebas llama por el bucle local, asi que declararlo
+            // de confianza es lo que permite comprobar aqui el caso «detras de
+            // nginx». Van las dos formas porque **localhost no siempre resuelve
+            // a la misma familia**: en una maquina con IPv6 preferido el
+            // `remoteAddr` que ve Tomcat es `::1`, y con solo la forma v4
+            // declarada la prueba fallaria ahi y no en la CI.
+            registry.add("drp.rate-limit.trusted-proxies") { "127.0.0.1,::1" }
         }
     }
 
@@ -144,13 +152,71 @@ class RateLimitTest {
         }
     }
 
-    private fun postJson(path: String, email: String) = http.exchange<String>(
+    @Test
+    @DisplayName("detras del proxy, gastar el cubo de un cliente no deja sin servicio a los demas")
+    fun `tras el proxy cada cliente tiene su cubo`() {
+        // El defecto que esto fija: con nginx delante, `remoteAddr` es siempre la
+        // IP del proxy, de modo que el cubo por IP pasaba a ser **uno solo para
+        // toda la instalacion**. Seis peticiones sin credencial dejaban sin
+        // login, sin refresco y sin restablecer contrasena a todos los hogares a
+        // la vez, y repitiendolo cada ventana indefinidamente.
+        val ruta = "/api/v1/auth/resend-verification"
+        val abusador = "198.51.100.20"
+        val vecino = "203.0.113.55"
+
+        val gastadas = (1..PER_IP + 1).map {
+            postJson(ruta, "abuso-${UUID.randomUUID()}@example.test", forwardedFor = abusador)
+        }
+
+        // El abusador acaba cortado, que es lo que tiene que pasarle.
+        gastadas.take(PER_IP).forEach { it.statusCode.shouldBe(HttpStatus.ACCEPTED) }
+        gastadas.last().statusCode.shouldBe(HttpStatus.TOO_MANY_REQUESTS)
+
+        // Y quien no ha hecho nada sigue entrando.
+        postJson(ruta, "vecino-${UUID.randomUUID()}@example.test", forwardedFor = vecino)
+            .statusCode.shouldBe(HttpStatus.ACCEPTED)
+    }
+
+    @Test
+    @DisplayName("una X-Forwarded-For falsificada no estrena cubo: manda la que anade el proxy")
+    fun `no se puede elegir cubo falsificando la cabecera`() {
+        // La otra mitad, y la que convierte el arreglo en algo que no empeora lo
+        // que arregla: si bastara escribir la cabecera para estrenar contador, el
+        // limite no existiria en absoluto. nginx deja delante lo que trajera la
+        // peticion y anade **al final** la IP que el mismo observo, asi que es la
+        // ultima entrada la que cuenta.
+        // Por el login y con un correo distinto cada vez, para que lo que corte
+        // sea el cubo por IP y no el de correo --que en el login no se aplica.
+        val ruta = "/api/v1/auth/login"
+        val real = "198.51.100.77"
+
+        val respuestas = (1..PER_IP + 1).map {
+            postJson(
+                ruta,
+                "intento-${UUID.randomUUID()}@example.test",
+                // Cada intento inventa una IP distinta por delante; la de verdad
+                // --la que anade el proxy-- es siempre la misma.
+                forwardedFor = "10.10.10.$it, $real",
+            )
+        }
+
+        // Fallan por credenciales, no por frecuencia, hasta agotar el cubo...
+        respuestas.take(PER_IP).forEach { it.statusCode.shouldBe(HttpStatus.UNAUTHORIZED) }
+        // ...y entonces corta, que es la prueba de que las siete peticiones
+        // cayeron en el mismo contador pese a las siete cabeceras distintas.
+        respuestas.last().statusCode.shouldBe(HttpStatus.TOO_MANY_REQUESTS)
+    }
+
+    private fun postJson(path: String, email: String, forwardedFor: String? = null) = http.exchange<String>(
         path,
         HttpMethod.POST,
         HttpEntity(
             // La contrasena solo la mira el login; los demas la ignoran.
             """{"email":"$email","password":"una frase cualquiera larga"}""",
-            HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON },
+            HttpHeaders().apply {
+                contentType = MediaType.APPLICATION_JSON
+                forwardedFor?.let { set("X-Forwarded-For", it) }
+            },
         ),
     )
 }

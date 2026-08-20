@@ -1,5 +1,7 @@
 package com.drp.config
 
+import com.drp.core.adapter.http.FileLinkProperties
+import com.drp.core.adapter.http.SignedFileUrls
 import com.drp.core.adapter.security.JwtAuthenticationFilter
 import com.drp.core.adapter.security.SecurityProperties
 import com.drp.platform.module.http.ModuleGateFilter
@@ -86,16 +88,34 @@ class SecurityConfig {
         @Value("\${drp.security.jwt.secret}") jwtSecret: String,
         @Value("\${drp.security.jwt.access-token-ttl}") accessTokenTtl: Duration,
         @Value("\${drp.security.jwt.refresh-token-ttl}") refreshTokenTtl: Duration,
-    ): SecurityProperties {
-        // Sin ningun perfil activo se considera desarrollo, que es como arranca
-        // `./gradlew bootRun` en una maquina local. Un despliegue de verdad
-        // declara su perfil, y ahi la clave de ejemplo deja de valer.
-        val development = environment.activeProfiles.isEmpty() ||
-            environment.activeProfiles.any { it in DEVELOPMENT_PROFILES }
+    ): SecurityProperties =
+        SecurityProperties(jwtSecret, accessTokenTtl, refreshTokenTtl)
+            .also { it.validate(developmentEnvironment = environment.isDevelopment()) }
 
-        return SecurityProperties(jwtSecret, accessTokenTtl, refreshTokenTtl)
-            .also { it.validate(developmentEnvironment = development) }
-    }
+    /**
+     * El secreto que firma las URL de los ficheros, validado **igual que el del
+     * JWT** y por el mismo motivo.
+     *
+     * Hasta ahora no lo validaba nadie: se inyectaba directo en [SignedFileUrls]
+     * con el valor de ejemplo del `application.yml` de respaldo. Un despliegue
+     * que olvidara `DRP_FILES_LINK_SECRET` firmaba con un secreto **publicado en
+     * el repositorio** --y en el `compose.yaml`, en claro-- de modo que
+     * cualquiera podia forjar la firma de cualquier ruta con la caducidad que
+     * quisiera. La de quince minutos dejaba de significar nada, y las claves de
+     * avatar se derivan solo del identityId: basta conocer ese UUID para
+     * construir la URL entera.
+     *
+     * Que el del JWT tuviera esta comprobacion y este no era la desigualdad que
+     * lo hacia peligroso: el fallo silencioso estaba descrito y remediado en una
+     * punta y no en la otra.
+     */
+    @Bean
+    fun fileLinkProperties(
+        environment: Environment,
+        @Value("\${drp.files.link-secret}") linkSecret: String,
+    ): FileLinkProperties =
+        FileLinkProperties(linkSecret)
+            .also { it.validate(developmentEnvironment = environment.isDevelopment()) }
 
     @Bean
     fun securityFilterChain(
@@ -180,17 +200,41 @@ class SecurityConfig {
         writer.write("""{"code":"$code","message":"$message"}""")
     }
 
-    private companion object {
+    private fun Environment.isDevelopment(): Boolean = isDevelopmentEnvironment(activeProfiles)
+
+    companion object {
         val DEVELOPMENT_PROFILES = setOf("dev", "test", "local")
 
-        const val ARGON2 = "argon2"
+        /**
+         * Si el arranque tolera los secretos de ejemplo del repositorio.
+         *
+         * **Solo un perfil declarado a proposito cuenta como desarrollo, y la
+         * ausencia de perfil es produccion.** Antes era al reves --sin perfil
+         * activo se asumia desarrollo, porque asi arrancaba `bootRun`-- y eso
+         * convertia la comprobacion en decorativa justo donde tenia que morder:
+         * un despliegue que olvidara `SPRING_PROFILES_ACTIVE` arrancaba **sin un
+         * solo aviso** firmando con la clave publicada en el repositorio, que
+         * mide 43 bytes y pasaba de sobra el minimo de longitud. Y con el
+         * householdId del token alimentando `app.household_id`, forjar uno
+         * atraviesa las dos capas de aislamiento a la vez.
+         *
+         * El precio de invertirlo es que **desarrollo y pruebas tienen que
+         * declararse**, y por eso lo hacen desde la cadena de construccion y no
+         * clase a clase: `bootRun` arranca con `dev` y la tarea de pruebas fija
+         * `test` (ver `build.gradle.kts`). Es un sitio cada uno, y olvidarlo
+         * falla ruidosamente al arrancar en vez de en silencio.
+         */
+        fun isDevelopmentEnvironment(activeProfiles: Array<String>): Boolean =
+            activeProfiles.any { it in DEVELOPMENT_PROFILES }
+
+        private const val ARGON2 = "argon2"
 
         // Los tres de OWASP. Memoria en KiB, que es como los cuenta Argon2.
-        const val MEMORY_KIB = 19 * 1024
-        const val ITERATIONS = 2
-        const val PARALLELISM = 1
+        private const val MEMORY_KIB = 19 * 1024
+        private const val ITERATIONS = 2
+        private const val PARALLELISM = 1
 
-        const val SALT_BYTES = 16
-        const val HASH_BYTES = 32
+        private const val SALT_BYTES = 16
+        private const val HASH_BYTES = 32
     }
 }
