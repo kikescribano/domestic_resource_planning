@@ -1,9 +1,9 @@
 plugins {
-    kotlin("jvm") version "2.1.20"
-    kotlin("plugin.spring") version "2.1.20"
+    kotlin("jvm") version "2.4.10"
+    kotlin("plugin.spring") version "2.4.10"
     // Genera el constructor sin argumentos que JPA exige de toda entidad y que
     // Kotlin no produce por su cuenta.
-    kotlin("plugin.jpa") version "2.1.20"
+    kotlin("plugin.jpa") version "2.4.10"
     // **Peldano hacia la linea 4.x, no destino.** La 3.5 esta fuera de soporte
     // OSS desde el 2026-06-30 y la 3.5.16 es su ultimo parche publicado; se para
     // aqui porque es lo que la guia de migracion de Spring exige antes de saltar
