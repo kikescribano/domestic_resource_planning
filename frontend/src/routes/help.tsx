@@ -25,25 +25,35 @@ import { EmptyState, Field, PageHeading } from '../ui/primitives'
 /**
  * La guía de la herramienta, pantalla a pantalla.
  *
- * Cada pantalla es un bloque con tres cosas: qué hace, un caso de uso que
- * enseña qué problema resuelve, y el enlace para ir. El contenido es estático
- * a propósito —no pide nada a la API—, así que la pantalla sirve igual con el
- * hogar recién creado que con años de histórico.
+ * Cada pantalla es un bloque con dos partes bajo subtítulo: la **explicación
+ * general** —qué es y cómo se usa— y los **casos de uso**, uno por
+ * funcionalidad y cada uno con su ejemplo práctico en situación doméstica. El
+ * contenido es estático a propósito —no pide nada a la API—, así que la
+ * pantalla sirve igual con el hogar recién creado que con años de histórico.
  *
  * El buscador filtra bloques enteros: escribir «caducidad» deja a la vista
- * solo las pantallas cuyo texto la menciona. La comparación es la misma que la
- * del catálogo —sin mayúsculas ni acentos—, para que «prestamo» encuentre
- * «Préstamos».
+ * solo las pantallas cuyo texto la menciona, casos de uso incluidos. La
+ * comparación es la misma que la del catálogo —sin mayúsculas ni acentos—,
+ * para que «prestamo» encuentre «Préstamos».
  */
+
+interface HelpUseCase {
+  /** El nombre de la funcionalidad, tal y como se contaría a alguien. */
+  title: string
+  /** Qué hace y cómo se usa. */
+  description: string
+  /** Un ejemplo práctico, en situación doméstica reconocible. */
+  example: string
+}
 
 interface HelpTopic {
   title: string
   path: string
   icon: LucideIcon
-  /** Qué es y cómo se usa la pantalla. */
-  description: string
-  /** Una situación concreta que la pantalla resuelve. */
-  useCase: string
+  /** La explicación general: qué es la pantalla y qué papel juega. */
+  overview: string
+  /** Un caso por funcionalidad que la pantalla cubre. */
+  useCases: HelpUseCase[]
 }
 
 /**
@@ -67,136 +77,450 @@ const HELP_TOPICS: HelpTopic[] = [
     title: 'Hogar',
     path: '/',
     icon: House,
-    description:
-      'La portada tras entrar. Recuerda por dónde empezar —primero Ubicaciones, con la vivienda y lo que hay dentro; luego el Catálogo de lo que sueles tener en casa; y con eso, dar de alta algo en el Inventario es elegir de una lista— y enseña tu papel en el hogar y cómo se llama.',
-    useCase:
-      'Acabas de crear el hogar y no sabes por dónde empezar: la portada te encadena los tres primeros pasos para que el inventario nazca ya ordenado.',
+    overview:
+      'La portada tras entrar. Recuerda por dónde empezar, enseña tu papel en el hogar y cómo se llama, y mientras dure una baja en gracia, el aviso con su fecha se ve aquí y en todas las demás pantallas.',
+    useCases: [
+      {
+        title: 'Arrancar con buen pie',
+        description:
+          'La portada encadena los tres primeros pasos en su orden: primero Ubicaciones —la vivienda y lo que hay dentro—, luego el Catálogo de lo que sueles tener, y con eso dar de alta en el Inventario es elegir de una lista.',
+        example:
+          'Acabas de crear el hogar y no sabes por dónde empezar: sigues los tres enlaces en orden y el inventario nace ya ordenado.',
+      },
+      {
+        title: 'Saber cuál es tu papel',
+        description:
+          'Dice si administras el hogar o eres miembro, que es lo que decide qué puedes tocar: encender módulos, invitar o la baja del hogar son de administración.',
+        example:
+          'No encuentras «General» en el menú: aquí ves que eres miembro, y ya sabes que eso es de quien administra.',
+      },
+    ],
   },
   {
     title: 'Avisos',
     path: '/avisos',
     icon: Bell,
-    description:
-      'La bandeja de lo que el sistema encuentra por su cuenta en su pasada diaria: préstamos vencidos, caducidades próximas, mínimos por debajo, revisiones que tocan. Arranca en lo que falta por ver, con el histórico a un clic. Los avisos son del hogar, no de cada persona: marcar uno como leído lo marca para todos. Y el día que hay algo nuevo llega además un resumen por correo — ninguno los días en que no hay nada.',
-    useCase:
-      'Un yogur caduca pasado mañana y nadie ha abierto la nevera con esa pregunta en la cabeza: el aviso aparece solo, sin que nadie tenga que revisar fechas.',
+    overview:
+      'La bandeja de lo que el sistema encuentra por su cuenta en su pasada diaria: préstamos vencidos, caducidades próximas, mínimos por debajo, revisiones que tocan. Los avisos son del hogar, no de cada persona.',
+    useCases: [
+      {
+        title: 'Ponerse al día',
+        description:
+          'La bandeja arranca en «Sin leer»: lo que la pasada diaria ha encontrado y nadie ha atendido todavía, sin tener que filtrar nada.',
+        example:
+          'Entras con el café en la mano y ves de un vistazo qué encontró el sistema esta noche: un préstamo vencido y dos caducidades.',
+      },
+      {
+        title: 'Dar un aviso por atendido',
+        description:
+          'Marcar uno como leído lo tacha para todo el hogar, no solo para ti: atendido por uno es atendido por todos.',
+        example:
+          'Tiraste el yogur caducado y marcas su aviso: a tu pareja ya no le aparece pendiente esta tarde.',
+      },
+      {
+        title: 'Repasar el histórico',
+        description: 'El filtro «Todos» enseña también lo ya leído, con quién lo leyó.',
+        example:
+          'Dudáis de si lo de la caldera avisó el mes pasado: el histórico lo resuelve sin discusión.',
+      },
+      {
+        title: 'Enterarse sin entrar',
+        description:
+          'El día que la pasada encuentra algo nuevo llega además un resumen por correo — ninguno los días en que no hay nada.',
+        example:
+          'Sin abrir la aplicación en toda la semana, el correo del jueves te avisa de que algo caduca: los otros días, silencio.',
+      },
+    ],
   },
   {
     title: 'Inventario',
     path: '/inventario',
     icon: Boxes,
-    description:
-      'Todo lo material del hogar, con filtros por tipo, estado de conservación y etiqueta. Hay dos naturalezas: los duraderos (una ficha por unidad: el taladro, la bici) se dan de alta uno a uno, y son los únicos que se prestan o que hacen de sitio para otras cosas; los consumibles (lo que se agota y se repone: azúcar, pilas) no se dan de alta sino que se les da entrada, sumando a lo que ya haya en esa ubicación. La ficha de cada cosa guarda fotos, documentos y etiquetas —y en los duraderos, número de serie, fecha de compra y estado de conservación—, y desde ella se mueve, se corrige una cantidad o se da de baja.',
-    useCase:
-      'Vuelves de la compra con otro paquete de azúcar: en lugar de crear nada, le das entrada y la cantidad se suma a la que ya había en la despensa.',
+    overview:
+      'Todo lo material del hogar. Hay dos naturalezas que se comportan distinto: los duraderos (una ficha por unidad: el taladro, la bici) son los únicos que se prestan o que hacen de sitio para otras cosas; los consumibles (lo que se agota y se repone: azúcar, pilas) se llevan por cantidad en cada ubicación.',
+    useCases: [
+      {
+        title: 'Encontrar algo',
+        description: 'El listado filtra por tipo, estado de conservación y etiqueta.',
+        example:
+          'La víspera de la acampada filtras por la etiqueta «camping» y sale todo el equipo, esté en el trastero o en el altillo.',
+      },
+      {
+        title: 'Dar de alta un duradero',
+        description:
+          'Una ficha por unidad física, con su ubicación y su propietario; después se completa con número de serie, fecha de compra y estado de conservación.',
+        example:
+          'Estrenas taladro: lo das de alta en el garaje y apuntas el número de serie por si la garantía lo pide.',
+      },
+      {
+        title: 'Dar entrada a un consumible',
+        description:
+          'Traer más de algo no crea nada: la entrada resuelve el artículo —creándolo si hace falta— y suma sobre la cantidad que ya haya en esa ubicación.',
+        example:
+          'Vuelves de la compra con otro paquete de azúcar: le das entrada y la despensa pasa de uno a dos, sin fichas duplicadas.',
+      },
+      {
+        title: 'Documentar una cosa',
+        description: 'La ficha guarda fotos y documentos adjuntos, que descuentan del espacio del hogar.',
+        example:
+          'Al taladro le adjuntas la factura y una foto: cuando falle en garantía, todo está en su ficha y no en un cajón.',
+      },
+      {
+        title: 'Mantener el orden al día',
+        description:
+          'Desde la ficha se mueve de sitio, se corrige una cantidad tras un recuento —la corrección sustituye, no suma— y dos existencias del mismo artículo se unen en una, eligiendo qué ubicación y qué propietario sobreviven.',
+        example:
+          'Aparecen dos paquetes de arroz abiertos en dos baldas: los unes y queda una sola existencia con la cantidad real.',
+      },
+      {
+        title: 'Dar de baja',
+        description: 'Lo roto, regalado o gastado se da de baja; la ficha no se borra, deja de contar.',
+        example:
+          'La tostadora se quema: la das de baja y deja de aparecer, pero su histórico —cuándo llegó, qué costó— se conserva.',
+      },
+    ],
   },
   {
     title: 'Préstamos',
     path: '/prestamos',
     icon: Handshake,
-    description:
-      'A quién le has dejado qué y para cuándo lo tiene que devolver. Solo se prestan los duraderos: ceder un consumible es un ajuste de cantidad, no un préstamo. Cada préstamo pasa por Prestado, Vencido —lo marca la pasada diaria del sistema, sin que nadie repase fechas— y Devuelto. Quien lo recibe no necesita cuenta: le llega un enlace por correo con su copia de las condiciones.',
-    useCase:
-      'Le dejas la hidrolimpiadora a un vecino y a los tres meses nadie se acuerda: aquí consta desde el primer día quién la tiene, y el vencimiento avisa solo.',
+    overview:
+      'A quién le has dejado qué y para cuándo lo tiene que devolver. Solo se prestan los duraderos: ceder un consumible es un ajuste de cantidad, no un préstamo. Cada préstamo pasa por Prestado, Vencido y Devuelto.',
+    useCases: [
+      {
+        title: 'Registrar un préstamo',
+        description: 'Qué se presta, a quién y hasta cuándo; desde entonces consta y deja de depender de la memoria.',
+        example:
+          'Le dejas la hidrolimpiadora a un vecino: queda apuntado el día y la fecha de vuelta, y no habrá que reconstruirlo de memoria en marzo.',
+      },
+      {
+        title: 'Darle su copia a quien recibe',
+        description:
+          'Quien recibe el préstamo no necesita cuenta: le llega un enlace por correo con su copia de las condiciones, que puede consultar cuando quiera.',
+        example:
+          'El vecino no se acuerda de la fecha: abre su enlace y la ve, sin llamarte y sin instalarse nada.',
+      },
+      {
+        title: 'Detectar vencidos sin vigilar',
+        description:
+          'La pasada diaria del sistema marca Vencido lo que pasa de fecha y lo convierte en aviso: nadie repasa fechas a mano.',
+        example:
+          'A los tres meses nadie se acordaba de la hidrolimpiadora: el aviso de vencimiento salta solo.',
+      },
+      {
+        title: 'Confirmar la devolución',
+        description:
+          'Un préstamo sigue contando como prestado hasta que confirmas la devolución; al confirmarla, la cosa queda libre para prestarse otra vez.',
+        example:
+          'Vuelve la escalera: confirmas la devolución y desaparece de los pendientes — hasta el siguiente vecino.',
+      },
+    ],
   },
   {
     title: 'Mantenimiento',
     path: '/mantenimiento',
     icon: Wrench,
-    description:
-      'Qué hay que revisar, cada cuánto y qué se hizo la última vez: planes con su próxima fecha (la caldera, el coche, los filtros) e intervenciones apuntadas con su coste. Cuando una revisión vence, aparece en Avisos. Es un módulo: si no está en el menú, se enciende en «Módulos del hogar», dentro de Configuración.',
-    useCase:
-      'La revisión anual de la caldera se olvida todos los años hasta que hace frío: con un plan anual, la fecha la vigila el sistema y no tu memoria.',
+    overview:
+      'Qué hay que revisar, cada cuánto y qué se hizo la última vez. Es un módulo: si no está en el menú, se enciende en «Módulos del hogar», dentro de Configuración.',
+    useCases: [
+      {
+        title: 'Planificar una revisión periódica',
+        description: 'Un plan con su intervalo y su próxima fecha, atado a lo que se revisa.',
+        example:
+          'La revisión anual de la caldera se olvida todos los años hasta que hace frío: con el plan, la fecha la vigila el sistema y no tu memoria.',
+      },
+      {
+        title: 'Apuntar una intervención',
+        description: 'Qué se hizo, cuándo y cuánto costó; el plan recalcula su próxima fecha a partir de ahí.',
+        example:
+          'Pasa el técnico del coche: apuntas la intervención con su coste y la siguiente queda para dentro de un año.',
+      },
+      {
+        title: 'Saber qué toca, y que avise',
+        description:
+          'La pantalla ordena por próxima fecha, y lo que vence aparece en Avisos sin que nadie mire el calendario.',
+        example:
+          'A primeros de mes echas un vistazo a lo que viene; y si no lo echas, el aviso de la caldera salta igual.',
+      },
+    ],
   },
   {
     title: 'Compras',
     path: '/compras',
     icon: ShoppingCart,
-    description:
-      'Qué falta, qué está pedido y qué acaba de entrar en casa. La lista se alimenta a mano o desde los mínimos del almacén, y recibir una compra da entrada en el inventario sin apuntar nada dos veces. Es un módulo: si no está en el menú, se enciende en «Módulos del hogar», dentro de Configuración.',
-    useCase:
-      'Dos personas van al supermercado por separado y vuelven con dos botes de lo mismo: con la lista compartida, lo pedido consta como pedido y no se duplica.',
+    overview:
+      'Qué falta, qué está pedido y qué acaba de entrar en casa. No enseña existencias —eso es del Almacén—. Es un módulo: si no está en el menú, se enciende en «Módulos del hogar», dentro de Configuración.',
+    useCases: [
+      {
+        title: 'Apuntar lo que falta',
+        description: 'La lista compartida del hogar, alimentada a mano en el momento en que algo se acaba.',
+        example: 'Gastas el aceite cocinando: lo apuntas ahí mismo y quien pase por la tienda lo ve.',
+      },
+      {
+        title: 'Alimentarse de los mínimos',
+        description: 'Lo que el Almacén detecta bajo mínimo puede pasar a la lista sin teclearlo.',
+        example: 'El café baja de su mínimo: aparece en la lista de la compra sin que nadie lo apunte.',
+      },
+      {
+        title: 'No comprar dos veces',
+        description: 'Marcar algo como pedido lo saca de «falta» sin sacarlo de la vista.',
+        example:
+          'Dos personas compran por separado el mismo día: el segundo ve que los botes ya están pedidos y no vuelve con otros dos.',
+      },
+      {
+        title: 'Recibir la compra',
+        description:
+          'Recibir da entrada en el inventario: las cantidades suben en su ubicación sin apuntar nada dos veces.',
+        example:
+          'Vuelves del supermercado, confirmas la recepción y la despensa queda al día sin pasar por el inventario a mano.',
+      },
+    ],
   },
   {
     title: 'Almacén',
     path: '/almacen',
     icon: Warehouse,
-    description:
-      'El control fino de los consumibles: cuánto queda de cada cosa, qué está bajo mínimo y qué caduca pronto. Apuntar un consumo descuenta del contador real del inventario —no hay dos cantidades—. Es un módulo: si no está en el menú, se enciende en «Módulos del hogar», dentro de Configuración.',
-    useCase:
-      'Quedan dos cápsulas de café y nadie lo sabía hasta el desayuno: con un mínimo puesto, el almacén lo detecta antes y lo convierte en aviso.',
+    overview:
+      'El control fino de los consumibles: cuánto queda, qué está bajo mínimo y qué caduca pronto. La cantidad es la del inventario —no hay dos contadores—. Es un módulo: si no está en el menú, se enciende en «Módulos del hogar», dentro de Configuración.',
+    useCases: [
+      {
+        title: 'Apuntar un consumo',
+        description: 'Gastar algo se apunta aquí y descuenta del contador real del inventario.',
+        example: 'Cocinas un paquete de pasta: lo apuntas y la despensa dice la verdad esta misma noche.',
+      },
+      {
+        title: 'Poner mínimos',
+        description:
+          'Cada artículo puede llevar su mínimo; al bajar de él salta un aviso, y con Compras encendido, pasa a la lista.',
+        example:
+          'Pones el café a un mínimo de diez cápsulas: el desayuno sin café deja de pasar, porque el aviso llega antes.',
+      },
+      {
+        title: 'Vigilar caducidades',
+        description: 'Lo que caduca pronto se ve junto, y la pasada diaria lo convierte en aviso a tiempo.',
+        example:
+          'Los yogures de la segunda balda caducan esta semana: lo dice el almacén el lunes, no la nariz el domingo.',
+      },
+    ],
   },
   {
     title: 'Personas',
     path: '/usuarios',
     icon: Users,
-    description:
-      'Quién forma parte del hogar y con qué papel. Desde aquí se invita por correo a nuevos miembros, se cambian roles y cada cual pone su avatar. Los administradores gestionan; el resto usa.',
-    useCase:
-      'Tu pareja quiere apuntar la compra sin pasar por ti: la invitas por correo y entra con su propia cuenta, con lo del hogar compartido y sus credenciales suyas.',
+    overview:
+      'Quién forma parte del hogar y con qué papel: administradores que gestionan y miembros que usan. Cada persona entra con su propia cuenta; lo compartido es el hogar, no las credenciales.',
+    useCases: [
+      {
+        title: 'Invitar a alguien',
+        description:
+          'La invitación sale por correo con el papel ya elegido —administración o miembro—, y quien la acepta entra con su propia cuenta.',
+        example:
+          'Tu pareja quiere apuntar la compra sin pasar por ti: la invitas como miembro y en dos minutos entra con su correo.',
+      },
+      {
+        title: 'Ver quién es qué',
+        description: 'El listado enseña a cada miembro con su papel a la vista, sin adivinar.',
+        example: 'Hay que encender un módulo y no sabes a quién pedírselo: el distintivo de administración lo dice.',
+      },
+      {
+        title: 'Seguir una invitación pendiente',
+        description: 'Las invitaciones enviadas y aún no aceptadas se ven con su papel, para saber qué falta.',
+        example: 'Invitaste a tu hija el martes y no aparece: la invitación sigue pendiente, y lo ves sin preguntarle.',
+      },
+    ],
   },
   {
     title: 'Catálogo',
     path: '/catalogo',
     icon: BookOpen,
-    description:
-      'El dato maestro del hogar: las categorías (con su icono y su color, elegidos dentro de un juego con contraste garantizado) y los artículos, que son la ficha de qué es algo —nombre, categoría, unidad, marca, código de barras—. Un artículo no ocupa sitio ni tiene cantidad: eso es del inventario. Definirlo una vez evita repetir sus datos en cada existencia.',
-    useCase:
-      'Compras siempre el mismo detergente: su artículo guarda una sola vez el nombre y la unidad, y cada entrada nueva en el inventario lo reutiliza sin reescribir nada.',
+    overview:
+      'El dato maestro del hogar: las categorías y los artículos, que son la ficha de qué es algo. Un artículo no ocupa sitio ni tiene cantidad —eso es del inventario—: definirlo una vez evita repetir sus datos en cada existencia.',
+    useCases: [
+      {
+        title: 'Dar identidad a las categorías',
+        description:
+          'Cada categoría lleva icono y color elegidos dentro de un juego con contraste garantizado: se distingue de un vistazo en cualquier listado, también en modo oscuro.',
+        example:
+          'Pones la limpieza en verde con su icono: en un inventario de cientos de filas, lo suyo se localiza sin leer.',
+      },
+      {
+        title: 'Definir un artículo una vez',
+        description:
+          'Nombre, categoría, unidad y, si los hay, marca y código de barras. La unidad la fija el artículo: todas sus existencias se llevan en ella.',
+        example:
+          'Defines «Detergente» con su marca una vez: cada compra posterior lo reutiliza y no vuelves a teclearlo.',
+      },
+      {
+        title: 'Encontrarlo entre cientos',
+        description: 'El buscador de artículos no distingue mayúsculas ni acentos.',
+        example: 'Escribes «cafe» sin tilde y salen el molido, las cápsulas y el de tu suegra.',
+      },
+      {
+        title: 'Retirar lo que ya no se compra',
+        description: 'Un artículo retirado deja de ofrecerse, pero el histórico que lo menciona se conserva.',
+        example:
+          'Aquel suavizante descatalogado: lo retiras y no vuelve a aparecer al dar entradas, sin romper lo ya registrado.',
+      },
+    ],
   },
   {
     title: 'Ubicaciones',
     path: '/ubicaciones',
     icon: MapPin,
-    description:
-      'El árbol de sitios del hogar: viviendas, habitaciones, muebles, cajas. Cada cosa del inventario cuelga de un sitio, así que este árbol es lo que responde a «¿dónde está?». Admite varias viviendas como raíces, y un duradero (un armario, un estuche) puede actuar él mismo de ubicación.',
-    useCase:
-      'Guardas los adornos de Navidad en una caja del trastero: cuando llegue diciembre no habrá que abrir cajas al azar, el inventario dice en cuál están.',
+    overview:
+      'El árbol de sitios del hogar: viviendas, habitaciones, muebles, cajas. Cada cosa del inventario cuelga de un sitio, así que este árbol es lo que responde a «¿dónde está?».',
+    useCases: [
+      {
+        title: 'Levantar el mapa de la casa',
+        description:
+          'Se construye el árbol con el tipo y el icono de cada sitio, y admite varias viviendas como raíces.',
+        example:
+          'Vivienda, cocina, despensa, tercera balda — y el trastero del garaje como segunda raíz, porque no cuelga del piso.',
+      },
+      {
+        title: 'Reorganizar sin perder nada',
+        description:
+          'Un sitio se edita y se mueve a otro padre; lo que contiene viaja con él, y el árbol impide moverlo dentro de sí mismo.',
+        example:
+          'Reordenas el trastero y mueves la estantería entera bajo la pared del fondo: sus cajas y lo de dentro se van con ella.',
+      },
+      {
+        title: 'Un mueble que guarda',
+        description: 'Un duradero puede actuar él mismo de ubicación y tener cosas dentro.',
+        example: 'El armario ropero es un asset y a la vez el sitio donde vive la ropa de esquí.',
+      },
+      {
+        title: 'Declarar cuánto cabe',
+        description:
+          'Un sitio puede declarar su capacidad máxima; al moverle algo que lo llena, la aplicación avisa sin impedirlo.',
+        example:
+          'La caja de decoración tiene un máximo declarado: al meter una guirnalda más, el aviso te lo dice antes de que no cierre.',
+      },
+    ],
   },
   {
     title: 'Proveedores',
     path: '/proveedores',
     icon: Store,
-    description:
-      'La agenda de a quién se llama: fontanero, electricista, seguro, cerrajero. Cada contacto con su categoría y sus datos, con buscador, y los que ya no se usan se retiran sin perder el histórico. Es un módulo: si no está en el menú, se enciende en «Módulos del hogar», dentro de Configuración.',
-    useCase:
-      'Revienta una tubería un domingo: el teléfono del fontanero que ya conoce la casa está aquí, no en el móvil de quien no está.',
+    overview:
+      'La agenda de a quién se llama: fontanero, electricista, seguro, cerrajero. Es un módulo: si no está en el menú, se enciende en «Módulos del hogar», dentro de Configuración.',
+    useCases: [
+      {
+        title: 'Tener el contacto a mano',
+        description: 'Cada contacto con su categoría y sus datos, del hogar y no del móvil de una sola persona.',
+        example:
+          'Revienta una tubería un domingo: el fontanero que ya conoce la casa está aquí, aunque quien lo llamó la otra vez esté de viaje.',
+      },
+      {
+        title: 'Encontrarlo rápido',
+        description: 'El buscador filtra la agenda al teclear.',
+        example: 'Tecleas «cerra» y sale el cerrajero antes de terminar la palabra.',
+      },
+      {
+        title: 'Retirar sin borrar',
+        description: 'Un contacto que ya no se usa se retira: deja de estorbar y el histórico se conserva.',
+        example:
+          'Cambias de compañía de seguros: la antigua queda retirada por si hay que reclamar algo del año pasado.',
+      },
+    ],
   },
   {
     title: 'Archivo',
     path: '/almacenamiento',
     icon: HardDrive,
-    description:
-      'El espacio de ficheros del hogar: cuánto se ha usado del gigabyte disponible, qué lo ocupa —ordenado por tamaño— y un filtro para ver solo los ficheros que ya no cuelgan de nada, que son los primeros candidatos a borrar.',
-    useCase:
-      'El medidor se acerca al tope y no sabes qué borrar: el filtro de huérfanos y el orden por tamaño te enseñan directamente lo que más libera con menos pérdida.',
+    overview:
+      'El espacio de ficheros del hogar: el gigabyte compartido donde viven las fotos y los documentos de las fichas, y lo que se suba directamente.',
+    useCases: [
+      {
+        title: 'Saber cuánto queda',
+        description: 'El medidor de cuota dice cuánto se ha usado y cuánto queda del espacio del hogar.',
+        example: 'Antes de subir el vídeo del contador del agua, el medidor te dice si cabe.',
+      },
+      {
+        title: 'Guardar un fichero suelto',
+        description: 'Se puede subir directamente, sin pasar por la ficha de ninguna cosa.',
+        example: 'El manual de la caldera en PDF, subido una vez y localizable para todos.',
+      },
+      {
+        title: 'Liberar espacio con criterio',
+        description:
+          'La rejilla ordena por tamaño y un filtro deja solo los ficheros que no cuelgan de nada: los primeros candidatos a borrar.',
+        example:
+          'El medidor se acerca al tope: dos vídeos huérfanos al principio de la lista liberan más que cien fotos pequeñas.',
+      },
+    ],
   },
   {
     title: 'General',
     path: '/configuracion',
     icon: Settings,
-    description:
-      'La configuración que afecta al hogar entero, y solo para quien administra: quien no administra ni la ve en el menú. Hoy contiene la baja del hogar. Pedirla exige confirmación escrita y abre treinta días de gracia en los que todo sigue funcionando y un aviso con la fecha se ve en todas las pantallas; cancelarla es un botón sin fricción, porque arrepentirse no se castiga. Pasada la gracia, el borrado es definitivo.',
-    useCase:
-      'El hogar se disuelve —una mudanza, una separación—: pides la baja sabiendo que hay un mes entero para echarse atrás sin perder nada.',
+    overview:
+      'La configuración que afecta al hogar entero, y solo para quien administra: quien no administra ni la ve en el menú. Hoy contiene la baja del hogar.',
+    useCases: [
+      {
+        title: 'Pedir la baja del hogar',
+        description:
+          'Exige confirmación escrita y abre treinta días de gracia en los que todo sigue funcionando; el aviso con la fecha se ve en todas las pantallas y lo ven todos los miembros. Pasada la gracia, el borrado es definitivo.',
+        example:
+          'El hogar se disuelve por una mudanza: pides la baja sabiendo que hay un mes entero de margen y que nadie se enterará por sorpresa.',
+      },
+      {
+        title: 'Arrepentirse a tiempo',
+        description:
+          'Cancelar la baja durante la gracia es un botón normal, sin fricción: deshacer algo destructivo no se castiga.',
+        example:
+          'A los diez días la mudanza se cae: cancelas la baja y el hogar sigue como si nada, con todo dentro.',
+      },
+    ],
   },
   {
     title: 'Módulos del hogar',
     path: '/modulos',
     icon: Blocks,
-    description:
-      'El interruptor de las piezas opcionales: cada hogar enciende solo los módulos que le sirven —Proveedores, Almacén, Compras, Mantenimiento— y sus pantallas aparecen en el menú, cada una en el grupo al que su contenido pertenece. Encender y apagar es cosa de administradores, y apagar no borra nada: los datos esperan a que se vuelva a encender.',
-    useCase:
-      'El hogar empieza pequeño y las pantallas de más estorban: se arranca con el core pelado y se enciende Almacén el día que la despensa lo pide.',
+    overview:
+      'El interruptor de las piezas opcionales: Proveedores, Almacén, Compras y Mantenimiento. Cada hogar enciende solo lo que le sirve, y las pantallas encendidas aparecen en el menú, cada una en el grupo al que su contenido pertenece. Encender y apagar es cosa de administradores.',
+    useCases: [
+      {
+        title: 'Encender lo que hace falta',
+        description: 'Un interruptor por módulo; al encenderlo, su pantalla aparece en la navegación de todos.',
+        example:
+          'El hogar empezó con el core pelado y la despensa ha crecido: enciendes Almacén y aparece en «Tu hogar».',
+      },
+      {
+        title: 'Apagar sin miedo',
+        description: 'Apagar no borra nada: la pantalla desaparece del menú y los datos esperan a la vuelta.',
+        example:
+          'Probasteis Compras un mes y no cuajó: lo apagas, y si en Navidad vuelve a hacer falta, la lista sigue donde estaba.',
+      },
+    ],
   },
   {
     title: 'Cuenta',
     path: '/cuenta',
     icon: CircleUserRound,
-    description:
-      'Lo tuyo, no lo del hogar: tus datos personales, tu contraseña y, si llega el caso, el cierre de tu cuenta. No es una parada del menú: se llega desde «Cuenta», junto a la marca —en móvil, en el apartado que cierra «Más»—. Lo que hiciste en el hogar se conserva; lo que te identifica, no.',
-    useCase:
-      'Sospechas que tu contraseña anda comprometida: la cambias aquí y las sesiones abiertas en otros sitios dejan de valer.',
+    overview:
+      'Lo tuyo, no lo del hogar: tus datos, tu avatar, tu contraseña y, si llega el caso, el cierre de tu cuenta. No es una parada del menú: se llega desde «Cuenta», junto a la marca —en móvil, en el apartado que cierra «Más»—.',
+    useCases: [
+      {
+        title: 'Poner cara a tu nombre',
+        description:
+          'El avatar se sube aquí y te acompaña por toda la aplicación; admite también las fotos HEIC del iPhone, que se convierten solas.',
+        example: 'Subes la foto tal cual sale del móvil y en Personas ya se te distingue de un vistazo.',
+      },
+      {
+        title: 'Cambiar la contraseña',
+        description: 'Al cambiarla se cierran tus otras sesiones; la que estás usando se queda abierta.',
+        example:
+          'Sospechas que tu contraseña anda comprometida: la cambias y cualquier sesión abierta en otro sitio deja de valer.',
+      },
+      {
+        title: 'Cerrar tu cuenta',
+        description:
+          'El cierre borra lo que te identifica; lo que hiciste en el hogar se conserva, atribuido al hogar y no a ti.',
+        example:
+          'Dejas el piso compartido: cierras tu cuenta y el inventario común sigue entero para los que se quedan.',
+      },
+    ],
   },
 ]
 
@@ -205,7 +529,13 @@ const HELP_TOPICS: HelpTopic[] = [
 const normalized = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
 function matches(topic: HelpTopic, query: string) {
-  const haystack = normalized([topic.title, topic.description, topic.useCase].join(' '))
+  const haystack = normalized(
+    [
+      topic.title,
+      topic.overview,
+      ...topic.useCases.flatMap((useCase) => [useCase.title, useCase.description, useCase.example]),
+    ].join(' '),
+  )
   return haystack.includes(normalized(query.trim()))
 }
 
@@ -220,8 +550,8 @@ export function HelpPage() {
 
       <div className="flex flex-col gap-6">
         <p className="max-w-prose text-body text-ink-muted">
-          Qué hace cada pantalla de la herramienta y qué problema resuelve. Cada bloque lleva su enlace para ir
-          directamente.
+          Qué hace cada pantalla de la herramienta y qué problema resuelve, caso a caso y con su ejemplo. Cada
+          bloque lleva su enlace para ir directamente.
         </p>
 
         <Field
@@ -229,7 +559,7 @@ export function HelpPage() {
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          hint="Filtra los bloques. No distingue mayúsculas ni acentos."
+          hint="Filtra los bloques, casos de uso incluidos. No distingue mayúsculas ni acentos."
         />
 
         {visible.length === 0 ? (
@@ -244,6 +574,16 @@ export function HelpPage() {
       </div>
     </>
   )
+}
+
+/**
+ * El subtítulo que reparte el bloque en sus dos partes. Es un `h3` bajo el
+ * `h2` del bloque —la jerarquía del documento se conserva— y con la anatomía
+ * del rótulo de grupo de la navegación: `text-caption` apagado, porque
+ * estructura sin competir con el contenido.
+ */
+function CardSubtitle({ children }: { children: string }) {
+  return <h3 className="text-caption font-medium uppercase text-ink-subtle">{children}</h3>
 }
 
 function HelpCard({ topic }: { topic: HelpTopic }) {
@@ -272,12 +612,26 @@ function HelpCard({ topic }: { topic: HelpTopic }) {
           </Link>
         </header>
 
-        <p className="max-w-prose text-body-sm text-ink-muted">{topic.description}</p>
+        <section className="flex flex-col gap-1.5">
+          <CardSubtitle>Explicación general</CardSubtitle>
+          <p className="max-w-prose text-body-sm text-ink-muted">{topic.overview}</p>
+        </section>
 
-        <p className="max-w-prose text-body-sm text-ink-muted">
-          <span className="font-medium text-ink">Cuándo te sirve: </span>
-          {topic.useCase}
-        </p>
+        <section className="flex flex-col gap-2">
+          <CardSubtitle>Casos de uso</CardSubtitle>
+          <ul className="flex flex-col gap-2.5">
+            {topic.useCases.map((useCase) => (
+              <li key={useCase.title} className="max-w-prose text-body-sm text-ink-muted">
+                <p>
+                  <span className="font-medium text-ink">{useCase.title}.</span> {useCase.description}
+                </p>
+                <p className="mt-0.5">
+                  <span className="italic">Ejemplo:</span> {useCase.example}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
       </article>
     </li>
   )

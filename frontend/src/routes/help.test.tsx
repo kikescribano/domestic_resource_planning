@@ -47,6 +47,19 @@ describe('la guía de la herramienta', () => {
     expect(screen.getByRole('link', { name: 'Ir a Almacén' })).toHaveAttribute('href', '/almacen')
   })
 
+  it('cada bloque se reparte en explicación general y casos de uso con su ejemplo', async () => {
+    await openHelp()
+
+    // El patrón de subtítulos es el contrato del bloque: las dos partes son
+    // `h3` bajo el `h2` de la pantalla —la jerarquía no se salta niveles— y
+    // cada caso de uso lleva su ejemplo práctico rotulado.
+    const card = within(screen.getByRole('article', { name: 'Préstamos' }))
+    expect(card.getByRole('heading', { level: 3, name: 'Explicación general' })).toBeInTheDocument()
+    expect(card.getByRole('heading', { level: 3, name: 'Casos de uso' })).toBeInTheDocument()
+    expect(card.getByText('Registrar un préstamo.')).toBeInTheDocument()
+    expect(card.getAllByText('Ejemplo:').length).toBeGreaterThan(1)
+  })
+
   it('el buscador filtra bloques enteros y no distingue acentos', async () => {
     await openHelp()
 
