@@ -5,7 +5,7 @@ import { Link } from 'react-router'
 
 import { api, humanMessage, type HouseholdModule } from '../api/client'
 import { useAuthenticatedSession, useSession } from '../auth/SessionProvider'
-import { Button, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primitives'
+import { Button, Notice, PageHeading, Spinner, StatusBadge, Switch } from '../ui/primitives'
 
 /**
  * Los módulos del hogar.
@@ -148,14 +148,16 @@ function ModuleRow({ module, canDecide }: { module: HouseholdModule; canDecide: 
       </div>
 
       {canDecide && (
-        <Button
-          variant={active ? 'secondary' : 'primary'}
-          onClick={() => decide.mutate()}
+        // Un interruptor y no un botón con verbo: encender y apagar es un
+        // estado, y el chip «Activo/Apagado» de al lado sigue nombrándolo. El
+        // nombre accesible es el módulo; el estado lo dice `aria-checked`.
+        <Switch
+          checked={active}
+          onToggle={() => decide.mutate()}
           busy={decide.isPending}
-          busyLabel={active ? 'Apagando…' : 'Encendiendo…'}
-        >
-          {active ? `Apagar ${module.name}` : `Encender ${module.name}`}
-        </Button>
+          aria-label={module.name}
+          title={active ? 'Apagar' : 'Encender'}
+        />
       )}
     </li>
   )

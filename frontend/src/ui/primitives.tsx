@@ -76,6 +76,67 @@ export function Button({
   )
 }
 
+interface SwitchProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'> {
+  checked: boolean
+  onToggle: () => void
+  busy?: boolean
+}
+
+/**
+ * Un interruptor: encender y apagar algo que ya existe, sin verbo que traducir.
+ *
+ * `role="switch"` y `aria-checked` llevan la semántica —el nombre accesible es
+ * la cosa que se conmuta, no la acción—, y **el estado nunca lo dice solo la
+ * posición**: quien lo monta pone al lado su etiqueta de estado, igual que un
+ * estado del dominio lleva la suya. El objetivo táctil de 44 px lo pone el
+ * propio botón; la pista visual es más pequeña y vive dentro. Encendida viste
+ * el teal del acento y apagada, superficie hundida con el borde de control,
+ * los mismos pares medidos que el resto de controles.
+ */
+export function Switch({ checked, onToggle, busy = false, disabled, className = '', ...props }: SwitchProps) {
+  return (
+    <button
+      {...props}
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-busy={busy || undefined}
+      disabled={disabled || busy}
+      onClick={onToggle}
+      className={[
+        'inline-flex min-h-touch min-w-touch items-center justify-center gap-2',
+        'disabled:cursor-not-allowed disabled:opacity-60',
+        className,
+      ].join(' ')}
+    >
+      {/* El estado también en palabras, para quien el gesto del interruptor no
+          le diga nada. `aria-hidden`: lo anuncia ya `aria-checked`, y por
+          partida doble sería ruido. */}
+      <span aria-hidden="true" className="text-caption font-medium text-ink-muted">
+        {checked ? 'Encendido' : 'Apagado'}
+      </span>
+      <span
+        aria-hidden="true"
+        className={[
+          'relative h-6 w-11 rounded-full border transition-colors',
+          checked ? 'border-accent bg-accent' : 'border-border bg-surface-sunken',
+        ].join(' ')}
+      >
+        {/* `inset-y-0` con `my-auto` y no un `top` contado a mano: el absoluto
+            mide desde dentro del borde de la pista y la cuenta manual perdía
+            un píxel por lado, con la bolita pegada abajo. El desplazamiento va
+            en `translate-x`, que se anima como transformación. */}
+        <span
+          className={[
+            'absolute inset-y-0 start-px my-auto size-5 rounded-full transition-transform',
+            checked ? 'translate-x-5 bg-ink-inverse' : 'bg-border-strong',
+          ].join(' ')}
+        />
+      </span>
+    </button>
+  )
+}
+
 interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string
   hint?: string

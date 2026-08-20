@@ -125,14 +125,13 @@ describe('navegación con módulos', () => {
       },
     })
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Encender Proveedores y contactos de servicio' }),
-    )
+    const toggle = await screen.findByRole('switch', { name: 'Proveedores y contactos de servicio' })
+    expect(toggle).not.toBeChecked()
+    await userEvent.click(toggle)
     expect(await mainNavigation().findByRole('link', { name: 'Proveedores' })).toBeInTheDocument()
+    await vi.waitFor(() => expect(toggle).toBeChecked())
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Apagar Proveedores y contactos de servicio' }),
-    )
+    await userEvent.click(toggle)
     await vi.waitFor(() =>
       expect(mainNavigation().queryByRole('link', { name: 'Proveedores' })).not.toBeInTheDocument(),
     )
@@ -152,7 +151,7 @@ describe('pantalla de módulos', () => {
     // El catálogo entero: ver que un módulo existe no es poder encenderlo, y sin
     // verlo no habría forma de pedirlo.
     expect(await screen.findByText('Almacén')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^Encender/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
     expect(screen.getByText(/Quien administra el hogar es quien los enciende/)).toBeInTheDocument()
   })
 })

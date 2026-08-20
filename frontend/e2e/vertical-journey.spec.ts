@@ -298,7 +298,7 @@ test.describe('recorrido vertical', () => {
     await checkAccessibility(page, 'módulos del hogar')
     await checkTouchTargets(page)
 
-    await page.getByRole('button', { name: /^Encender Proveedores/ }).click()
+    await page.getByRole('switch', { name: /^Proveedores/ }).click()
 
     // Aparece en la navegación, y su ruta deja de ofrecer la activación.
     await expect(navigation.getByRole('link', { name: 'Proveedores' })).toBeVisible()
@@ -314,7 +314,7 @@ test.describe('recorrido vertical', () => {
 
     // --- 3. Apagarlo otra vez ----------------------------------------------
     await navigateTo(page, 'Módulos del hogar', '/modulos')
-    await page.getByRole('button', { name: /^Apagar Proveedores/ }).click()
+    await page.getByRole('switch', { name: /^Proveedores/ }).click()
 
     await expect(navigation.getByRole('link', { name: 'Proveedores' })).toHaveCount(0)
     await page.goto('/proveedores')
