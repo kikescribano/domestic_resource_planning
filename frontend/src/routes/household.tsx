@@ -9,7 +9,11 @@ import {
   Handshake,
   HardDrive,
   House,
+  LogOut,
   MapPin,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Settings,
   Users,
 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
@@ -28,7 +32,7 @@ import {
 import { useAuthenticatedSession, useSession } from '../auth/SessionProvider'
 import { useActiveModuleScreens } from './modules'
 import { Avatar } from '../ui/files'
-import { Button, DangerZone, Field, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primitives'
+import { BrandMark, Button, DangerZone, Field, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primitives'
 
 /**
  * Lo que vive detrás del login.
@@ -39,60 +43,90 @@ import { Button, DangerZone, Field, Notice, PageHeading, Spinner, StatusBadge } 
  */
 
 /**
- * Las cuatro paradas de todos los días, que son las que caben en el pulgar.
+ * Las cuatro paradas que caben en el pulgar: **las cuatro primeras de «Tu
+ * hogar», en su mismo orden**. Desde el reagrupado del 2026-08-20 el orden de
+ * la navegación es uno solo para las dos plataformas, así que la barra
+ * inferior es un recorte de la columna y no otra lista: «Avisos» entró en el
+ * pulgar y «Ubicaciones» salió hacia «Datos maestros».
  *
- * El corte entre estas y las de abajo no es de importancia sino de **frecuencia**:
- * lo de arriba se usa a diario y lo de abajo se toca al montar el hogar o cuando
- * hay algo que arreglar.
+ * El tope sigue siendo aritmética: cinco paradas a 320 px —estas cuatro y
+ * «Más»— y una sexta las deja por debajo de los 44 px que exige la dirección
+ * visual. Lo que gana una pantalla nueva es sitio en la columna y en «Más»,
+ * no un hueco en el pulgar.
  */
-const PRIMARY_NAVIGATION = [
-  { to: '/', label: 'Hogar', end: true, icon: House },
-  { to: '/inventario', label: 'Inventario', end: false, icon: Boxes },
-  { to: '/ubicaciones', label: 'Ubicaciones', end: false, icon: MapPin },
-  { to: '/prestamos', label: 'Préstamos', end: false, icon: Handshake },
-]
+const THUMB_STOPS = new Set(['/', '/avisos', '/inventario', '/prestamos'])
 
 /**
- * El resto del core. En escritorio va en la barra lateral; en móvil, en «Más».
+ * Los tres grupos de la navegación, en el orden en que se enseñan. **El orden
+ * de los grupos y el de sus paradas es una decisión de producto, no una
+ * casualidad del código**: lo de todos los días arriba, lo que estructura el
+ * hogar en medio y lo que lo configura al final.
  *
- * **La bandeja de avisos entra aquí y no en la barra inferior**, y no es una
- * apreciación: el tope medido son cinco paradas a 320 px —cuatro y «Más»— y una
- * sexta las deja por debajo de los 44 px que exige la dirección visual. Así que
- * lo que gana una pantalla nueva es sitio en la columna del escritorio y en
- * «Más», no un hueco en el pulgar.
+ * - **Tu hogar** es la actividad: lo que pasa y lo que hay que atender.
+ * - **Datos maestros** es lo que las demás pantallas consultan: quién, qué y
+ *   dónde. El nombre es el término de un ERP a conciencia — este es doméstico,
+ *   pero es un ERP.
+ * - **Configuración** solo existe para quien administra: un miembro no puede
+ *   tocar nada de lo que hay dentro, y un grupo entero de puertas cerradas es
+ *   peor que ningún grupo.
+ *
+ * Las paradas de módulo son huecos con posición fija: si el módulo está activo
+ * la parada aparece ahí, y si no, no está — la tercera capa del gate de la
+ * ADR-010. Ya no hay un grupo «Módulos»: cada módulo vive donde su contenido
+ * pertenece, y la puerta para encenderlos es «Módulos del hogar», dentro de
+ * Configuración.
+ *
+ * «Cuenta» sigue sin ser una parada: es de la persona y no del hogar, y
+ * acompaña a la marca junto a la salida directa. Ver [AccountControls].
  */
-const SECONDARY_NAVIGATION = [
-  { to: '/avisos', label: 'Avisos', end: false, icon: Bell },
-  { to: '/catalogo', label: 'Catálogo', end: false, icon: BookOpen },
-  { to: '/usuarios', label: 'Personas', end: false, icon: Users },
-  { to: '/almacenamiento', label: 'Archivo', end: false, icon: HardDrive },
-  { to: '/cuenta', label: 'Cuenta', end: false, icon: CircleUserRound },
-]
+function useNavigationGroups() {
+  const modules = useActiveModuleScreens()
+  const { isAdmin } = useSession()
 
-/**
- * La marca de DRP: el sello redondo en el teal del acento con la casa dentro,
- * el nombre en la redonda de la marca y el lema debajo. Es el eco del logotipo
- * circular de la identidad comercial, con los pares ya medidos del sistema
- * —`ink-inverse` sobre `accent`—. Vive en dos sitios y por eso es una pieza:
- * la barra lateral desde `md` y la cabecera de «Hogar» en móvil, que sin esto
- * no veía la marca nunca. Es sello, no la acción principal de la pantalla:
- * el relleno de acento sigue apareciendo una sola vez como *acción*.
- */
-function BrandMark({ className = '' }: { className?: string }) {
-  return (
-    // En móvil la marca preside la pantalla de «Hogar» y va un tercio más
-    // grande; en la barra lateral vuelve a su tamaño de trabajo. El tamaño del
-    // icono va por clase y no por la prop `size`, que no sabe de breakpoints.
-    <p className={['items-center gap-3', className].join(' ')}>
-      <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-accent text-ink-inverse md:size-11">
-        <House strokeWidth={1.75} aria-hidden="true" className="size-7 md:size-5.5" />
-      </span>
-      <span className="flex flex-col">
-        <span className="font-display text-display font-extrabold leading-tight text-ink md:text-title">DRP</span>
-        <span className="text-body-sm text-ink-muted md:text-caption">El ERP doméstico</span>
-      </span>
-    </p>
-  )
+  const moduleStop = (key: string) =>
+    modules
+      .filter((screen) => screen.key === key)
+      .map((screen) => ({ to: screen.path, label: screen.label, end: false, icon: screen.icon }))
+
+  const groups = [
+    {
+      id: 'nav-home',
+      label: 'Tu hogar',
+      items: [
+        { to: '/', label: 'Hogar', end: true, icon: House },
+        { to: '/avisos', label: 'Avisos', end: false, icon: Bell },
+        { to: '/inventario', label: 'Inventario', end: false, icon: Boxes },
+        { to: '/prestamos', label: 'Préstamos', end: false, icon: Handshake },
+        ...moduleStop('MAINTENANCE'),
+        ...moduleStop('PURCHASING'),
+        ...moduleStop('WAREHOUSE'),
+      ],
+    },
+    {
+      id: 'nav-master',
+      label: 'Datos maestros',
+      items: [
+        { to: '/usuarios', label: 'Personas', end: false, icon: Users },
+        { to: '/catalogo', label: 'Catálogo', end: false, icon: BookOpen },
+        { to: '/ubicaciones', label: 'Ubicaciones', end: false, icon: MapPin },
+        ...moduleStop('SUPPLIERS'),
+        { to: '/almacenamiento', label: 'Archivo', end: false, icon: HardDrive },
+      ],
+    },
+  ]
+
+  if (isAdmin) {
+    groups.push({
+      id: 'nav-config',
+      label: 'Configuración',
+      items: [
+        { to: '/configuracion', label: 'General', end: false, icon: Settings },
+        { to: '/modulos', label: 'Módulos del hogar', end: false, icon: Blocks },
+      ],
+    })
+  }
+
+  return groups
 }
 
 /**
@@ -102,6 +136,68 @@ function BrandMark({ className = '' }: { className?: string }) {
  * el icono orienta, no nombra.
  */
 const NAV_ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true, className: 'shrink-0' } as const
+
+/**
+ * Cerrar la sesión y volver a la puerta. Compartido por los tres sitios desde
+ * los que se sale: el bloque de la marca en escritorio, el apartado que cierra
+ * «Más» en móvil y la sección de la pantalla de «Cuenta», que es la que
+ * explica qué pasa al salir.
+ */
+function useSignOut() {
+  const { signOut } = useSession()
+  const navigate = useNavigate()
+  return async () => {
+    await signOut()
+    navigate('/entrar', { replace: true })
+  }
+}
+
+/**
+ * La cuenta, junto a la marca y no entre las paradas.
+ *
+ * «Cuenta» dejó de ser una parada de la navegación: es de la persona y no del
+ * hogar, así que va con la marca, con la salida directa al lado. Son un par de
+ * medias filas centradas a propósito —no la anchura entera de una parada—
+ * para que se lean como parte del bloque de identidad y no como dos entradas
+ * más de la lista.
+ */
+function AccountControls({ compact = false, className = '' }: { compact?: boolean; className?: string }) {
+  const exit = useSignOut()
+  const itemClass = compact
+    ? 'flex min-h-touch min-w-touch items-center justify-center rounded-md'
+    : 'flex min-h-touch flex-1 items-center justify-center gap-2 rounded-md px-3 text-body-sm'
+
+  return (
+    <div className={[compact ? 'flex-col gap-1' : 'items-center gap-1', className].join(' ')}>
+      {/* Encogida, del par queda solo la salida: «Cuenta» es un destino, y a
+          icono junto al sello se confundía con una parada más. El detalle de
+          la cuenta se recupera ensanchando la columna. */}
+      {!compact && (
+        <NavLink
+          to="/cuenta"
+          className={({ isActive }) =>
+            [
+              itemClass,
+              isActive ? 'bg-accent-soft font-medium text-accent-ink' : 'text-ink-muted hover:bg-surface-hover',
+            ].join(' ')
+          }
+        >
+          <CircleUserRound {...NAV_ICON} />
+          <span>Cuenta</span>
+        </NavLink>
+      )}
+      <button
+        type="button"
+        onClick={exit}
+        title={compact ? 'Salir' : undefined}
+        className={[itemClass, 'text-ink-muted hover:bg-surface-hover'].join(' ')}
+      >
+        <LogOut {...NAV_ICON} />
+        <span className={compact ? 'sr-only' : ''}>Salir</span>
+      </button>
+    </div>
+  )
+}
 
 /**
  * El hogar de la sesión, resuelto **una vez** y compartido.
@@ -162,8 +258,8 @@ function ClosureBanner({ household }: { household: Household }) {
     <div className="mb-6">
       <Notice tone="warning" title={`Este hogar se borrará el ${formatDate(household.closure.effectiveAt)}`}>
         Se pidió darlo de baja. Hasta esa fecha todo sigue funcionando igual, y quien administre el
-        hogar puede cancelarlo desde <Link to="/" className="underline">Hogar</Link>. Después no se
-        podrá recuperar nada.
+        hogar puede cancelarlo desde <Link to="/configuracion" className="underline">General</Link>.
+        Después no se podrá recuperar nada.
       </Notice>
     </div>
   )
@@ -202,19 +298,41 @@ export function RequireSession() {
  * y columna lateral desde `md`, donde ese aire empieza a costar más de lo que
  * aporta.
  *
- * **Y desde la Fase 2, dos grupos y no una lista.** Cuatro módulos llevaban la
- * navegación de ocho entradas a doce, y doce no caben en una barra inferior: a
- * 320 px, las ocho de antes ya daban 40 px de ancho por parada, por debajo de los
- * 44 px que la dirección visual exige de todo objetivo táctil. Así que el móvil
- * lleva **cuatro paradas y «Más»**, que es una pantalla con el resto; y el
- * escritorio, donde la columna no se queda corta, las enseña todas repartidas en
- * **el hogar** y **los módulos**. Un hogar sin módulos activos ve sus ocho
- * enlaces del core intactos y una novena entrada, que es la puerta para encender
- * alguno.
+ * **Tres grupos y no una lista**: [useNavigationGroups] los define —actividad,
+ * datos maestros y, solo para quien administra, configuración— y esta es la
+ * pieza que los presenta sin renunciar al `<nav>` único. El orden es el mismo
+ * en las dos plataformas: en móvil los grupos se disuelven
+ * (`display: contents`) y quedan las cuatro primeras paradas de «Tu hogar»
+ * ([THUMB_STOPS]) y «Más» — la barra es un recorte de la columna, no otra
+ * lista—; desde `md` cada grupo es su lista rotulada. Cada enlace existe
+ * **una sola vez** en el DOM, que es lo que el patrón defiende desde el Hito 0
+ * de la Fase 2: dos copias son dos recorridos para quien navega con lector de
+ * pantalla.
+ *
+ * **«Cuenta» no es una parada**: acompaña a la marca con la salida directa al
+ * lado —en escritorio bajo el sello, dentro del banner y fuera del landmark de
+ * navegación; en móvil, en el apartado que cierra «Más»—.
  */
+/**
+ * Dónde se guarda si la columna va encogida. La misma casa que `drp.theme`:
+ * es una preferencia del dispositivo, no del hogar, así que no viaja a la API.
+ */
+const NAV_STATE_KEY = 'drp.nav'
+
 function HouseholdShell() {
-  const modules = useActiveModuleScreens()
+  const groups = useNavigationGroups()
   const household = useHousehold()
+
+  // Solo escritorio: en móvil la barra inferior no tiene nada que encoger.
+  // La elección sobrevive a la recarga, porque quien la encoge lo hace para
+  // trabajar así y volver a ensancharla en cada visita sería no haber elegido.
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(NAV_STATE_KEY) === 'collapsed')
+
+  function toggleCollapsed() {
+    const next = !collapsed
+    setCollapsed(next)
+    localStorage.setItem(NAV_STATE_KEY, next ? 'collapsed' : 'expanded')
+  }
 
   return (
     <div className="flex min-h-dvh flex-col bg-surface md:flex-row">
@@ -231,70 +349,106 @@ function HouseholdShell() {
       <header
         className={[
           'fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-surface-raised',
-          'md:static md:flex md:w-64 md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-t-0 md:p-gutter-lg',
+          'md:static md:flex md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-t-0',
+          collapsed ? 'md:w-20 md:p-3' : 'md:w-64 md:p-gutter-lg',
         ].join(' ')}
       >
-        <BrandMark className="hidden md:flex" />
+        {/* La marca y la cuenta comparten bloque con un aire más corto que el
+            de la columna: son la identidad —quién es DRP y quién está dentro—
+            y no dos vecinos casuales de la lista de paradas. */}
+        <div className={['hidden md:flex md:flex-col md:gap-3', collapsed ? 'md:items-center' : ''].join(' ')}>
+          {/* Centrada en la anchura de la columna, como preside «Hogar» en
+              móvil: alineada a la izquierda parecía una parada más. */}
+          <BrandMark className="flex justify-center" compact={collapsed} />
+          <AccountControls className="flex" compact={collapsed} />
+        </div>
 
         <nav aria-label="Principal" className="flex md:flex-col md:gap-6">
           {/* Los rótulos de grupo se leen siempre aunque solo se vean desde
               `md`: `aria-labelledby` toma el texto de un elemento oculto igual
-              que de uno visible, así que en móvil las dos listas siguen estando
+              que de uno visible, así que en móvil las listas siguen estando
               nombradas para quien navega sin verlas. Son párrafos y no
               encabezados a propósito: un `h2` aquí saldría antes que el `h1` del
-              contenido y dejaría el documento con los niveles al revés. */}
-          <p id="nav-core" className="hidden text-caption text-ink-subtle md:block">
-            Tu hogar
-          </p>
-          <ul className="flex flex-1 md:flex-col md:gap-1" aria-labelledby="nav-core">
-            {PRIMARY_NAVIGATION.map((item) => (
-              <li key={item.to} className="flex flex-1 md:flex-none">
-                <NavLink to={item.to} end={item.end} className={navLinkClass}>
-                  <item.icon {...NAV_ICON} />
-                  <span>{item.label}</span>
-                </NavLink>
-              </li>
-            ))}
-            {SECONDARY_NAVIGATION.map((item) => (
-              <li key={item.to} className="hidden md:flex">
-                <NavLink to={item.to} end={item.end} className={navLinkClass}>
-                  <item.icon {...NAV_ICON} />
-                  <span>{item.label}</span>
-                </NavLink>
-              </li>
-            ))}
-            {/* La quinta parada del móvil, y solo del móvil: en escritorio no
-                hay nada detrás de ella que no esté ya en la columna. */}
+              contenido y dejaría el documento con los niveles al revés.
+
+              El `contents` de cada envoltorio y cada lista es lo que deja que
+              a lo ancho del pulgar las paradas y el «Más», que viven en listas
+              distintas, convivan en la misma fila; el DOM conserva la
+              jerarquía entera —div, ul, li—, así que las listas siguen siendo
+              listas para el lector de pantalla. */}
+          {groups.map((group) => (
+            <div
+              key={group.id}
+              className={[
+                'contents md:block',
+                // Encogida no hay rótulos, y sin ellos los grupos se pegan: el
+                // filete es la frontera que el rótulo ya no puede marcar.
+                // También sobre el primero, que separa «Salir» de «Hogar».
+                collapsed ? 'md:border-t md:border-border-subtle md:pt-2' : '',
+              ].join(' ')}
+            >
+              {/* El rótulo se lee siempre: encogida la columna sigue existiendo
+                  para `aria-labelledby`, solo que sin hueco en pantalla. */}
+              <p
+                id={group.id}
+                className={['hidden text-caption text-ink-subtle', collapsed ? '' : 'md:block'].join(' ')}
+              >
+                {group.label}
+              </p>
+              <ul className="contents md:mt-1 md:flex md:flex-col md:gap-1" aria-labelledby={group.id}>
+                {group.items.map((item) => (
+                  <li
+                    key={item.to}
+                    className={THUMB_STOPS.has(item.to) ? 'flex flex-1 md:flex-none' : 'hidden md:flex'}
+                  >
+                    <NavLink
+                      to={item.to}
+                      end={item.end}
+                      title={collapsed ? item.label : undefined}
+                      className={navLinkClass(collapsed)}
+                    >
+                      <item.icon {...NAV_ICON} />
+                      <span className={collapsed ? 'md:sr-only' : ''}>{item.label}</span>
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          {/* La quinta parada del móvil, y solo del móvil: en escritorio no
+              hay nada detrás de ella que no esté ya en la columna. */}
+          <ul className="contents">
             <li className="flex flex-1 md:hidden">
-              <NavLink to="/mas" className={navLinkClass}>
+              <NavLink to="/mas" className={navLinkClass(false)}>
                 <Ellipsis {...NAV_ICON} />
                 <span>Más</span>
               </NavLink>
             </li>
           </ul>
-
-          <div className="hidden md:block">
-            <p id="nav-modules" className="text-caption text-ink-subtle">
-              Módulos
-            </p>
-            <ul className="mt-1 flex flex-col gap-1" aria-labelledby="nav-modules">
-              {modules.map((module) => (
-                <li key={module.key} className="flex">
-                  <NavLink to={module.path} className={navLinkClass}>
-                    <module.icon {...NAV_ICON} />
-                    <span>{module.label}</span>
-                  </NavLink>
-                </li>
-              ))}
-              <li className="flex">
-                <NavLink to="/modulos" className={navLinkClass}>
-                  <Blocks {...NAV_ICON} />
-                  <span>Módulos del hogar</span>
-                </NavLink>
-              </li>
-            </ul>
-          </div>
         </nav>
+
+        {/* El conmutador cierra la columna, y es lo único de esta cabecera que
+            no navega: encoger es ganar sitio para el contenido sin perder las
+            paradas, que se quedan en icono con su nombre en sr-only y su
+            `title`. Solo escritorio: la barra inferior no tiene nada que
+            encoger. */}
+        {/* En `caption`, como los rótulos de grupo: es utillaje de la columna
+            y no una parada, y al tamaño de las paradas les disputaba el peso. */}
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          title={collapsed ? 'Ensanchar la navegación' : 'Encoger la navegación'}
+          className={[
+            'hidden whitespace-nowrap text-ink-muted md:mt-auto md:flex md:min-h-touch md:items-center md:rounded-md md:text-caption md:hover:bg-surface-hover',
+            collapsed ? 'md:justify-center md:px-0' : 'md:justify-start md:gap-2.5 md:px-3',
+          ].join(' ')}
+        >
+          {collapsed ? <PanelLeftOpen {...NAV_ICON} /> : <PanelLeftClose {...NAV_ICON} />}
+          <span className={collapsed ? 'sr-only' : ''}>
+            {collapsed ? 'Ensanchar la navegación' : 'Encoger la navegación'}
+          </span>
+        </button>
       </header>
 
       <main id="contenido" className="mx-auto w-full max-w-shell flex-1 px-gutter py-6 pb-24 md:pb-6">
@@ -325,20 +479,25 @@ function HouseholdShell() {
  * ahí cada píxel de relleno se paga cinco veces. En la barra lateral, donde
  * sobra sitio, sigue siendo `px-3`.
  */
-function navLinkClass({ isActive }: { isActive: boolean }) {
-  return [
-    // En móvil el icono va encima de la etiqueta —columna— y el texto baja a
-    // `caption`: es lo que deja convivir las dos piezas dentro de los 44 px de
-    // alto sin renunciar a la etiqueta, que nunca se quita (el icono orienta,
-    // no nombra). Desde `md` vuelve a fila, icono delante.
-    'flex min-h-touch min-w-touch w-full flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-caption',
-    'md:flex-none md:flex-row md:justify-start md:gap-2.5 md:rounded-md md:px-3 md:py-2.5 md:text-body',
-    // El estado activo no se dice solo con color: además del acento lleva peso
-    // tipográfico y `aria-current`, que NavLink pone por su cuenta.
-    isActive
-      ? 'font-medium text-accent-ink md:bg-accent-soft'
-      : 'text-ink-muted md:hover:bg-surface-hover',
-  ].join(' ')
+function navLinkClass(collapsed: boolean) {
+  return ({ isActive }: { isActive: boolean }) =>
+    [
+      // En móvil el icono va encima de la etiqueta —columna— y el texto baja a
+      // `caption`: es lo que deja convivir las dos piezas dentro de los 44 px de
+      // alto sin renunciar a la etiqueta, que nunca se quita (el icono orienta,
+      // no nombra). Desde `md` vuelve a fila, icono delante — y con la columna
+      // encogida, el icono solo y centrado: la etiqueta no se va, pasa a
+      // sr-only en el propio enlace.
+      'flex min-h-touch min-w-touch w-full flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-caption',
+      collapsed
+        ? 'md:flex-none md:flex-row md:justify-center md:gap-0 md:rounded-md md:px-0 md:py-2.5 md:text-body'
+        : 'md:flex-none md:flex-row md:justify-start md:gap-2.5 md:rounded-md md:px-3 md:py-2.5 md:text-body',
+      // El estado activo no se dice solo con color: además del acento lleva peso
+      // tipográfico y `aria-current`, que NavLink pone por su cuenta.
+      isActive
+        ? 'font-medium text-accent-ink md:bg-accent-soft'
+        : 'text-ink-muted md:hover:bg-surface-hover',
+    ].join(' ')
 }
 
 /**
@@ -349,66 +508,83 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
  * del core que se tocan al montar el hogar, más los módulos— y por eso se
  * enumera entero en lugar de esconderse tras un menú.
  */
+/** La fila-tarjeta de «Más»: una parada por fila, con su objetivo táctil entero. */
+const MORE_ROW =
+  'flex min-h-touch items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink'
+
 export function MorePage() {
-  const modules = useActiveModuleScreens()
+  const groups = useNavigationGroups()
+  const exit = useSignOut()
 
   return (
     <>
+      {/* La marca igual que en «Hogar»: solo en móvil, centrada. Las dos
+          puertas de la barra inferior la enseñan, y así el móvil la ve
+          entre por la que entre. */}
+      <BrandMark className="mb-6 flex justify-center md:hidden" />
+
       <PageHeading title="Más" icon={Ellipsis} />
 
+      {/* Los mismos grupos de la columna, menos lo que ya está en el pulgar.
+          Un grupo que se queda sin paradas no pinta ni el rótulo. */}
       <nav aria-label="Resto del hogar">
-        <ul className="flex flex-col gap-2">
-          {SECONDARY_NAVIGATION.map((item) => (
-            <li key={item.to}>
-              <Link
-                to={item.to}
-                className="flex min-h-touch items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
-              >
-                <item.icon {...NAV_ICON} />
-                {item.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        {groups.map((group) => {
+          const items = group.items.filter((item) => !THUMB_STOPS.has(item.to))
+          if (items.length === 0) return null
 
-        <h2 className="mt-8 font-display text-title-sm text-ink">Módulos</h2>
+          return (
+            <section key={group.id} className="mt-8 first:mt-0">
+              <h2 className="font-display text-title-sm text-ink">{group.label}</h2>
+              <ul className="mt-3 flex flex-col gap-2">
+                {items.map((item) => (
+                  <li key={item.to}>
+                    <Link to={item.to} className={MORE_ROW}>
+                      <item.icon {...NAV_ICON} />
+                      {item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )
+        })}
+      </nav>
+
+      {/* El apartado de la persona cierra la pantalla, fuera del landmark de
+          navegación: la salida es una acción y no un sitio al que ir. Solo en
+          móvil — en escritorio la cuenta ya vive junto a la marca y a «Más»
+          no llega nadie. */}
+      <section className="mt-8 md:hidden">
+        <h2 className="font-display text-title-sm text-ink">Tu cuenta</h2>
         <ul className="mt-3 flex flex-col gap-2">
-          {modules.map((module) => (
-            <li key={module.key}>
-              <Link
-                to={module.path}
-                className="flex min-h-touch items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
-              >
-                <module.icon {...NAV_ICON} />
-                {module.label}
-              </Link>
-            </li>
-          ))}
           <li>
-            <Link
-              to="/modulos"
-              className="flex min-h-touch items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink"
-            >
-              <Blocks {...NAV_ICON} />
-              Módulos del hogar
+            <Link to="/cuenta" className={MORE_ROW}>
+              <CircleUserRound {...NAV_ICON} />
+              Cuenta
             </Link>
           </li>
+          <li>
+            <button type="button" onClick={exit} className={[MORE_ROW, 'w-full'].join(' ')}>
+              <LogOut {...NAV_ICON} />
+              Salir
+            </button>
+          </li>
         </ul>
-      </nav>
+      </section>
     </>
   )
 }
 
 export function HomePage() {
   const session = useAuthenticatedSession()
-  const { isAdmin } = useSession()
   const household = useHousehold()
 
   return (
     <>
-      {/* La marca solo en móvil: en escritorio ya la enseña la barra lateral,
-          y aquí es el único sitio donde el móvil la ve. Centrada: presentada a
-          la izquierda parecía un desajuste del título de la pantalla. */}
+      {/* La marca solo en móvil: en escritorio ya la enseña la barra lateral.
+          La ven «Hogar» y «Más», las dos puertas de la barra inferior.
+          Centrada: presentada a la izquierda parecía un desajuste del título
+          de la pantalla. */}
       <BrandMark className="mb-6 flex justify-center md:hidden" />
 
       <PageHeading title="Hogar" icon={House} />
@@ -432,11 +608,37 @@ export function HomePage() {
           </div>
         )}
       </dl>
+    </>
+  )
+}
 
-      {/* La baja solo la ve y la toca quien administra. Un miembro se entera por
-          el aviso de arriba, que sí sale para todos: enterarse no es lo mismo
-          que poder hacerlo. */}
-      {isAdmin && household.data && <HouseholdClosureSection household={household.data} />}
+/**
+ * «General»: lo que configura el hogar entero, para quien lo administra.
+ *
+ * Nace con la baja del hogar, que hasta ahora cerraba la pantalla de «Hogar»:
+ * la configuración es del papel y no de la portada, y con el grupo
+ * «Configuración» en la navegación la zona de peligro tiene por fin una casa
+ * que un miembro ni siquiera ve. Por eso el guardián: el grupo no se pinta
+ * para un miembro, y la ruta tecleada a mano lo devuelve al inicio en lugar de
+ * enseñarle una pantalla en la que no puede tocar nada. El aviso de la baja no
+ * se pierde con el traslado — vive en el shell y lo ven todos.
+ */
+export function GeneralSettingsPage() {
+  const { isAdmin } = useSession()
+  const household = useHousehold()
+
+  if (!isAdmin) return <Navigate to="/" replace />
+
+  return (
+    <>
+      <PageHeading title="General" icon={Settings} />
+      <p className="text-body-sm text-ink-muted">
+        Lo que afecta al hogar entero. De momento, solo su baja.
+      </p>
+
+      {/* Mientras el hogar carga no se pinta nada: un hueco que aparece es
+          menos ruidoso que uno que parpadea. */}
+      {household.data && <HouseholdClosureSection household={household.data} />}
     </>
   )
 }
@@ -664,8 +866,7 @@ export function UsersPage() {
 
 export function AccountPage() {
   const session = useAuthenticatedSession()
-  const { signOut } = useSession()
-  const navigate = useNavigate()
+  const exit = useSignOut()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
 
@@ -725,22 +926,17 @@ export function AccountPage() {
         </Button>
       </form>
 
-      {/* Cerrar sesión vive aquí y no en la navegación: es una acción, no un
-          sitio al que ir, y meterla entre los enlaces la deja al lado de
-          «Personas» esperando a que alguien la pulse por error con el pulgar. */}
+      {/* La salida rápida vive con la marca —bajo el sello en escritorio,
+          cerrando «Más» en móvil—, pero esta sección se queda: es la única que
+          explica qué pasa al salir. Lo que sigue sin existir es un «Salir»
+          entre las paradas de la lista, al lado de «Personas», esperando a que
+          alguien lo pulse por error con el pulgar. */}
       <section className="mt-10 max-w-form border-t border-border-subtle pt-6">
         <h2 className="font-display text-title-sm text-ink">Cerrar sesión</h2>
         <p className="mt-1 text-body-sm text-ink-muted">
           Se cierra en este dispositivo. Las demás siguen abiertas.
         </p>
-        <Button
-          variant="secondary"
-          className="mt-4"
-          onClick={async () => {
-            await signOut()
-            navigate('/entrar', { replace: true })
-          }}
-        >
+        <Button variant="secondary" className="mt-4" onClick={exit}>
           Salir
         </Button>
       </section>
@@ -764,17 +960,13 @@ export function AccountPage() {
  */
 function CloseAccountSection() {
   const session = useAuthenticatedSession()
-  const { signOut } = useSession()
-  const navigate = useNavigate()
+  const exit = useSignOut()
 
   const close = useMutation({
     mutationFn: () => api.closeAccount(session.accessToken),
-    onSuccess: async () => {
-      // La sesión ya no vale para nada: el `signOut` es lo que limpia el estado
-      // del cliente y revoca el refresh token que quedaba.
-      await signOut()
-      navigate('/entrar', { replace: true })
-    },
+    // La sesión ya no vale para nada: salir es lo que limpia el estado del
+    // cliente y revoca el refresh token que quedaba.
+    onSuccess: exit,
   })
 
   return (

@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, Info, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { CircleAlert, CircleCheck, House, Info, TriangleAlert, type LucideIcon } from 'lucide-react'
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -311,10 +311,82 @@ export function Notice({
   )
 }
 
-/** La tarjeta de las pantallas de una sola columna: alta, login, verificación. */
-export function AuthCard({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {
+/**
+ * La marca de DRP: el sello redondo en el teal del acento con la casa dentro,
+ * el nombre en la redonda de la marca y el lema debajo. Es el eco del logotipo
+ * circular de la identidad comercial, con los pares ya medidos del sistema
+ * —`ink-inverse` sobre `accent`—. Es sello, no la acción principal de la
+ * pantalla: el relleno de acento sigue apareciendo una sola vez como *acción*.
+ *
+ * Dos tamaños, uno por contexto. `nav` es el de trabajo: preside «Hogar» en
+ * móvil un tercio más grande y vuelve a su sitio en la barra lateral —por
+ * clase y no por la prop `size` de Lucide, que no sabe de breakpoints—.
+ * `hero` es su versión al 160 %, la de las pantallas sin sesión: antes de
+ * entrar la marca es protagonista y no membrete.
+ */
+const BRAND_SIZES = {
+  nav: {
+    root: 'gap-3',
+    seal: 'size-14 md:size-11',
+    icon: 'size-7 md:size-5.5',
+    name: 'text-display leading-tight md:text-title',
+    motto: 'text-body-sm md:text-caption',
+  },
+  hero: {
+    root: 'gap-5',
+    seal: 'size-22',
+    icon: 'size-11',
+    name: 'text-brand',
+    motto: 'text-title',
+  },
+} as const
+
+export function BrandMark({
+  size = 'nav',
+  compact = false,
+  className = '',
+}: {
+  size?: keyof typeof BRAND_SIZES
+  /** Solo el sello, para la columna encogida: el nombre pasa a sr-only en vez de irse. */
+  compact?: boolean
+  className?: string
+}) {
+  const s = BRAND_SIZES[size]
+  return (
+    <p className={['items-center', s.root, className].join(' ')}>
+      <span className={['flex shrink-0 items-center justify-center rounded-full bg-accent text-ink-inverse', s.seal].join(' ')}>
+        <House strokeWidth={1.75} aria-hidden="true" className={s.icon} />
+      </span>
+      <span className={compact ? 'sr-only' : 'flex flex-col'}>
+        <span className={['font-display font-extrabold text-ink', s.name].join(' ')}>DRP</span>
+        <span className={['text-ink-muted', s.motto].join(' ')}>El ERP doméstico</span>
+      </span>
+    </p>
+  )
+}
+
+/**
+ * La tarjeta de las pantallas de una sola columna: alta, login, verificación.
+ *
+ * La marca la pinta la tarjeta y no cada pantalla, para que ninguna pantalla
+ * sin sesión pueda quedarse sin ella por descuido: antes de entrar no hay
+ * barra lateral y este es el único sitio donde DRP dice cómo se llama. El
+ * margen bajo la marca es aparte del `gap` a propósito: la marca respira más
+ * que los bloques de la tarjeta entre sí, que es lo que la hace cabecera y no
+ * un bloque más del formulario.
+ */
+export function AuthCard({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string
+  subtitle?: ReactNode
+  children: ReactNode
+}) {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-form flex-col justify-center gap-6 px-gutter py-10">
+      <BrandMark size="hero" className="mb-6 flex justify-center" />
       <header className="flex flex-col gap-2">
         {/* La serif entra aquí y solo aquí: un h1 por pantalla, nunca dentro de
             una fila de listado. */}

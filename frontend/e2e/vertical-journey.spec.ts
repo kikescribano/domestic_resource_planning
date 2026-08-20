@@ -603,7 +603,10 @@ test.describe('recorrido vertical', () => {
     await page.getByLabel('Categoría').selectOption({ label: 'Alimentación' })
     await page.getByLabel('Unidad', { exact: true }).selectOption('GRAM')
     await page.getByRole('button', { name: 'Crear artículo' }).click()
-    await expect(page.getByText('Sal')).toBeVisible()
+    // `exact` porque «Sal» es subcadena de «Saltar al contenido» y de «Salir»:
+    // sin él, el modo estricto revienta con varias coincidencias — y la forma
+    // antigua pasaba casando con el salto al contenido, sin esperar a la fila.
+    await expect(page.getByText('Sal', { exact: true })).toBeVisible()
 
     await page.goto('/inventario/entrada')
     await page.getByLabel('Artículo').selectOption({ label: 'Sal' })
@@ -873,7 +876,9 @@ test.describe('recorrido vertical', () => {
     ).toBeVisible()
 
     // --- 1. La zona de peligro, que no se dispara con un clic ---------------
-    await navigateTo(page, 'Hogar', '/', true)
+    // Vive en «General», dentro del grupo «Configuración» que solo ve quien
+    // administra — y quien acaba de crear el hogar administra.
+    await navigateTo(page, 'General', '/configuracion')
     const confirm = page.getByRole('button', { name: 'Dar de baja el hogar' })
     await expect(confirm).toBeDisabled()
 
@@ -911,7 +916,7 @@ test.describe('recorrido vertical', () => {
     await checkReflow(page, 'el hogar con la baja pedida')
 
     // --- 3. Cancelarla, y comprobar que sigue todo --------------------------
-    await navigateTo(page, 'Hogar', '/', true)
+    await navigateTo(page, 'General', '/configuracion')
     await page.getByRole('button', { name: 'Cancelar la baja' }).click()
 
     await expect(page.getByText(/Este hogar se borrará el/)).toHaveCount(0)
@@ -1252,7 +1257,7 @@ test.describe('recorrido vertical', () => {
     await checkTouchTargets(page)
 
     for (const screen of AUDITED_SCREENS) {
-      await navigateTo(page, screen.link, screen.path, screen.exact ?? false)
+      await navigateTo(page, screen.link, screen.path, screen.exact ?? false, screen.landmark)
       await expect(
         page.getByRole('heading', { level: 1, name: screen.heading }),
         `«${screen.link}» no llegó a montarse`,
@@ -1296,11 +1301,17 @@ const AUDITED_SCREENS = [
   { link: 'Ubicaciones', path: '/ubicaciones', heading: 'Ubicaciones' },
   { link: 'Personas', path: '/usuarios', heading: 'Personas' },
   // Las dos que la baja de hogar (ADR-012) llenó de contenido nuevo: «Hogar»
-  // estrena la zona de peligro y «Cuenta», el cierre de cuenta. No son rutas
-  // nuevas, pero lo que hay dentro sí lo es, y la auditoría se hereda por estar
-  // aquí en vez de escribirse aparte.
+  // estrenó la zona de peligro y «Cuenta», el cierre de cuenta. No eran rutas
+  // nuevas, pero lo que había dentro sí lo era, y la auditoría se hereda por
+  // estar aquí en vez de escribirse aparte. La zona de peligro se mudó después
+  // a «General», que entra abajo con el grupo «Configuración».
   { link: 'Hogar', path: '/', heading: 'Hogar', exact: true },
-  { link: 'Cuenta', path: '/cuenta', heading: 'Cuenta' },
+  // «General» entra el 2026-08-20, al nacer con el grupo «Configuración» de la
+  // navegación: hereda aquí la zona de peligro de la baja, que era de «Hogar».
+  { link: 'General', path: '/configuracion', heading: 'General' },
+  // «Cuenta» se llega por el banner: acompaña a la marca desde que dejó de ser
+  // una parada de la lista, con la salida directa al lado.
+  { link: 'Cuenta', path: '/cuenta', heading: 'Cuenta', landmark: 'banner' as const },
   // «Archivo» entra el 2026-08-20, y con un fichero sembrado: es la pantalla de
   // la rejilla de ficheros, y no la miraba axe ni aquí ni en ninguna llamada
   // suelta. La celda de un PDF llevaba una semana sin nombre accesible por eso.
@@ -1516,15 +1527,23 @@ async function checkTouchTargets(page: Page) {
  * enlaces dentro del contenido. Y esperando a la URL, porque en una SPA el clic
  * vuelve antes de que la ruta haya cambiado y el `await` siguiente se pondría a
  * buscar en la pantalla anterior.
+ *
+ * El landmark es el de navegación salvo para «Cuenta», que desde que acompaña
+ * a la marca vive en el banner y fuera de la lista de paradas.
  */
-async function navigateTo(page: Page, label: string, path: string, exact = false) {
+async function navigateTo(
+  page: Page,
+  label: string,
+  path: string,
+  exact = false,
+  landmark: 'navigation' | 'banner' = 'navigation',
+) {
+  const scope =
+    landmark === 'banner' ? page.getByRole('banner') : page.getByRole('navigation', { name: 'Principal' })
   // `exact` hace falta desde que la lista incluye «Hogar»: por omisión Playwright
   // busca la subcadena, así que «Hogar» resuelve también a «Módulos del hogar» y
   // el localizador falla por ambigüedad en vez de por ausencia.
-  await page
-    .getByRole('navigation', { name: 'Principal' })
-    .getByRole('link', { name: label, exact })
-    .click()
+  await scope.getByRole('link', { name: label, exact }).click()
   await page.waitForURL(`**${path}`)
 }
 

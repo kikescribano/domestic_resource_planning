@@ -93,10 +93,20 @@ describe('navegación con módulos', () => {
     await resumeAt('/', { 'GET /api/v1/modules': catalogue() })
 
     const nav = mainNavigation()
-    for (const label of ['Hogar', 'Inventario', 'Ubicaciones', 'Catálogo', 'Préstamos', 'Personas', 'Archivo', 'Cuenta']) {
+    for (const label of ['Hogar', 'Inventario', 'Ubicaciones', 'Catálogo', 'Préstamos', 'Personas', 'Archivo']) {
       expect(nav.getByRole('link', { name: label })).toBeInTheDocument()
     }
     expect(await nav.findByRole('link', { name: 'Módulos del hogar' })).toBeInTheDocument()
+
+    // «Cuenta» no es una parada: vive junto a la marca, fuera del landmark de
+    // navegación, con la salida directa al lado. No se busca por el rol
+    // `banner` a propósito: el `<header>` de `PageHeading` está dentro de
+    // `<main>` y no es un banner según ARIA, pero esta versión de
+    // testing-library no aplica ese matiz y encuentra dos.
+    expect(nav.queryByRole('link', { name: 'Cuenta' })).not.toBeInTheDocument()
+    expect(nav.queryByRole('button', { name: 'Salir' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Cuenta' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Salir' })).toBeInTheDocument()
 
     // Y ninguna parada de módulo: lo apagado no está en la navegación, que es la
     // tercera capa del gate.

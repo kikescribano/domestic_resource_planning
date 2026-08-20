@@ -14,8 +14,8 @@ import {
 } from './routes/enrollment'
 import { AssetDetailPage, AssetsPage, IntakePage, NewAssetPage } from './routes/assets'
 import { CatalogPage } from './routes/catalog'
-import { AccountPage, HomePage, MorePage, RequireSession, UsersPage } from './routes/household'
 import { HelpPage } from './routes/help'
+import { AccountPage, GeneralSettingsPage, HomePage, MorePage, RequireSession, UsersPage } from './routes/household'
 import { ExternalLoanPage, LoansPage } from './routes/loans'
 import { LocationsPage } from './routes/locations'
 import { MaintenancePage } from './routes/maintenance'
@@ -102,6 +102,7 @@ export function App() {
                   llega desde móvil; en escritorio la barra lateral las enseña
                   todas. */}
               <Route path="/mas" element={<MorePage />} />
+              <Route path="/configuracion" element={<GeneralSettingsPage />} />
               <Route path="/ayuda" element={<HelpPage />} />
               <Route path="/modulos" element={<ModulesPage />} />
               {/* La bandeja de avisos. El enlace del resumen diario que manda

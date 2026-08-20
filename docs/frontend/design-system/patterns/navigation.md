@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-18 |
+| Última revisión | 2026-08-20 |
 
 ## Propósito
 
@@ -40,7 +40,8 @@ Hito 0 de la Fase 2 lo obligó a admitir doce.
 | Parte | Estado |
 |---|---|
 | Shell responsive con navegación única | **Implementado** |
-| Reparto en dos grupos y tope de cinco paradas en móvil | **Implementado** (Fase 2, Hito 0) |
+| Reparto en tres grupos con orden único y tope de cinco paradas en móvil | **Implementado** (Fase 2, Hito 0; reagrupado el 2026-08-20) |
+| Columna encogible a iconos en escritorio | **Implementado** (2026-08-20) |
 | Salto al contenido | **Implementado** |
 | Cabecera de pantalla con ranura de acción | **Implementada, y la ranura sin usar** |
 | Sitio de la acción principal en móvil | **Sin resolver**: la banda inferior ya está ocupada |
@@ -74,8 +75,8 @@ Anatomía, tal y como está escrita:
 |---|---|---|
 | Contenedor | Columna | Fila (`md:flex-row`) |
 | `<header>` | Fijo abajo, con `border-t` | Estático, 256 px de ancho, con `border-r` |
-| Marca «DRP» | Oculta en la barra —la enseña la cabecera de «Hogar»— | Visible: el sello de la marca con nombre y lema |
-| `<nav aria-label="Principal">` | Fila con cuatro paradas del core y «Más» | Columna con dos grupos: el hogar y los módulos |
+| Marca «DRP» | Oculta en la barra —la enseñan las cabeceras de «Hogar» y «Más»— | Visible: el sello de la marca con nombre y lema, y debajo «Cuenta» y «Salir» |
+| `<nav aria-label="Principal">` | Fila con las cuatro primeras paradas de «Tu hogar» y «Más» | Columna con tres grupos: Tu hogar, Datos maestros y —solo administración— Configuración |
 | Rótulo de grupo | Oculto | Visible, en `text-caption`, y siempre referenciado con `aria-labelledby` |
 | Enlace | `min-h-touch`, `flex-1`, centrado | Alineado a la izquierda, con radio y fondo al pasar |
 | `<main id="contenido">` | `max-w-shell`, con `pb-24` para no quedar bajo la barra | `md:pb-6` |
@@ -87,14 +88,36 @@ Tres detalles que se pierden al leer las clases por encima:
   literal de la regla en el sitio donde más fácil sería saltársela.
 - **El `pb-24` de `main` no es margen decorativo**: reserva la altura de la barra
   fija para que el final del contenido no quede debajo de ella.
-- **Cerrar sesión no está en la navegación.** Es una acción, no un sitio, y
+- **Cerrar sesión no está entre las paradas.** Es una acción, no un sitio, y
   ponerla entre los enlaces la deja al lado de «Personas» esperando a que alguien
-  la pulse con el pulgar por error. Vive en `AccountPage`, como botón.
+  la pulse con el pulgar por error. Desde el 2026-08-20 la salida rápida
+  acompaña a la marca —«Cuenta» y «Salir» bajo el sello en escritorio, en el
+  banner y fuera del landmark de navegación; en móvil, en el apartado que
+  cierra «Más»— y `AccountPage` conserva la sección que explica qué pasa al
+  salir. Lo que sigue sin existir es un «Salir» dentro de la lista.
 
-### Dos grupos, y el tope de cinco paradas
+### Tres grupos, y el tope de cinco paradas
 
-Lo trajo el **Hito 0 de la Fase 2**, y no por estética: cuatro módulos llevaban la
-navegación de ocho entradas a doce.
+El reparto en grupos lo trajo el **Hito 0 de la Fase 2** —dos, el hogar y los
+módulos, porque cuatro módulos llevaban la navegación de ocho entradas a doce—
+y el **2026-08-20** pasó a tres, con **un orden único para las dos
+plataformas**. El orden de los grupos y el de sus paradas es una decisión de
+producto, no una casualidad del código:
+
+- **Tu hogar**: Hogar, Avisos, Inventario, Préstamos y, si están activos, los
+  módulos Mantenimiento, Compras y Almacén. Es la actividad: lo que pasa y lo
+  que hay que atender.
+- **Datos maestros**: Personas, Catálogo, Ubicaciones, Proveedores —si está
+  activo— y Archivo. Es lo que las demás pantallas consultan: quién, qué y
+  dónde. El nombre es el término de un ERP a conciencia — este es doméstico,
+  pero es un ERP.
+- **Configuración**: General (`/configuracion`, con su engranaje) y Módulos del
+  hogar, y **solo lo ve quien administra**: un miembro no puede tocar nada de
+  lo que hay dentro, y un grupo entero de puertas cerradas es peor que ningún
+  grupo. La ruta tecleada a mano lo devuelve al inicio.
+
+**Ya no hay grupo «Módulos»**: cada módulo vive donde su contenido pertenece, y
+la puerta para encenderlos es «Módulos del hogar», dentro de Configuración.
 
 **La barra inferior tiene un tope, y es aritmética.** A 320 px cada parada mide
 320 dividido entre el número de paradas, así que **cinco es el máximo** que
@@ -104,17 +127,20 @@ lo ancho, que es justo lo que no se ve mirando la pantalla.
 
 Así que:
 
-- **En móvil**, cuatro paradas del core —Hogar, Inventario, Sitios, Préstamos— y
-  **«Más»**, que es una pantalla con el resto del core y con los módulos activos.
-  El corte entre unas y otras es de **frecuencia**, no de importancia: arriba lo
-  de todos los días, en «Más» lo que se toca al montar el hogar.
-- **Desde `md`**, la columna las enseña todas repartidas en dos grupos: **Tu
-  hogar** y **Módulos**. Un hogar sin ningún módulo activo conserva sus enlaces
-  del core y ve además «Módulos del hogar», que es la puerta para encender alguno.
-- **Y ahí es donde entra toda pantalla nueva del core.** «Avisos», que llegó con
-  el Hito 1, no ocupa un hueco en el pulgar sino sitio en la columna y en «Más»,
-  aunque sea de uso diario. El tope de cinco es una medida y no una preferencia,
-  así que lo que se negocia es el grupo, nunca el número.
+- **En móvil**, la barra es **el recorte de las cuatro primeras paradas de «Tu
+  hogar»** —Hogar, Avisos, Inventario, Préstamos— más «Más»: el mismo orden que
+  la columna, no otra lista. Con el reagrupado, «Avisos» entró en el pulgar y
+  «Ubicaciones» salió hacia «Datos maestros». El tope de cinco es una medida y
+  no una preferencia, así que lo que se negocia es **qué cinco**, nunca el
+  número.
+- **«Más» enseña el resto con los mismos grupos y el mismo orden**: lo de «Tu
+  hogar» que no cupo en la barra —los módulos de actividad—, «Datos maestros»
+  entero y, para quien administra, «Configuración». Abre con la marca igual que
+  «Hogar» y cierra con el apartado de la cuenta —el enlace al detalle y la
+  salida directa—, que es donde el móvil tiene lo que en escritorio vive bajo
+  el sello.
+- **Desde `md`**, la columna enseña los tres grupos rotulados, cada uno con sus
+  paradas en el orden fijado.
 - **Un módulo apagado no está**, ni en un sitio ni en el otro. Es la tercera capa
   del gate de la [`ADR-010`](../../../common/architecture/decisions/ADR-010-module-boundaries-and-activation.md);
   las otras dos son el `403 MODULE_INACTIVE` de la API y el silencio del handler.
@@ -123,11 +149,37 @@ Y la regla de siempre no se rompe: **sigue habiendo un solo `<nav>`**. Los rótu
 de grupo son **párrafos** referenciados con `aria-labelledby` y no encabezados —un
 `h2` ahí saldría antes que el `h1` del contenido y dejaría el documento con los
 niveles al revés— y lo que no toca en móvil se oculta con CSS en lugar de pintarse
-dos veces.
+dos veces. Desde el reagrupado, en móvil los grupos se disuelven con
+`display: contents` para que las paradas de la barra y «Más», que viven en
+listas distintas, compartan fila; el DOM conserva la jerarquía entera —div, ul,
+li—, así que las listas siguen siendo listas para el lector de pantalla.
 
 Lo comprueba el recorrido vertical midiendo **la caja de cada parada visible a
 320 px**. Es la única forma de que el defecto no vuelva con el módulo siguiente:
 un enlace de 40 px no se distingue de uno de 44 px a simple vista.
+
+### La columna encogida a iconos
+
+Solo en escritorio —la barra inferior no tiene nada que encoger— la columna se
+pliega de 256 px a 80 px con el conmutador que la cierra por abajo, para que
+quien trabaja con el contenido gane ese sitio. Las reglas del pliegue:
+
+- **La etiqueta no se va: pasa a `sr-only` dentro del propio enlace.** El
+  nombre accesible no cambia, así que el enlace se sigue encontrando por él, y
+  el `title` hace de recordatorio para el puntero. Es la versión encogida de
+  la regla de siempre: el icono orienta, no nombra.
+- **Los rótulos de grupo dejan la pantalla pero no el documento**: siguen
+  existiendo para `aria-labelledby`, y su frontera visual la marca un filete
+  entre grupos — también entre la identidad y «Hogar», que sin él se pegaban.
+- **La marca queda en el sello** —el nombre pasa a sr-only— y del bloque de la
+  cuenta queda **solo «Salir»**: «Cuenta» es un destino, y a icono junto al
+  sello se confundía con una parada más. El detalle de la cuenta se recupera
+  ensanchando la columna.
+- **La elección persiste en `localStorage` (`drp.nav`)**, la misma casa que
+  `drp.theme`: es una preferencia del dispositivo, no del hogar, así que no
+  viaja a la API.
+- **El conmutador va en `caption`**, como los rótulos: es utillaje de la
+  columna y no una parada, y al tamaño de las paradas les disputaba el peso.
 
 ### El salto al contenido
 
@@ -240,5 +292,8 @@ tiene ranura para ninguna de las dos.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **La columna se puede encoger a iconos en escritorio** (256 → 80 px), con el conmutador cerrándola por abajo: etiquetas a `sr-only` sin perder el nombre accesible, `title` como recordatorio, filetes donde había rótulos —también entre «Salir» y «Hogar»—, la marca en el sello, solo «Salir» del bloque de la cuenta, y la elección persistida en `drp.nav`. Ensanchada, la marca pasa a centrarse en la anchura de la columna. | Equipo DRP |
+| 2026-08-20 | **Reagrupado en tres** —Tu hogar, Datos maestros y Configuración— con un orden único para columna, barra y «Más»: «Avisos» entra en el pulgar y «Ubicaciones» sale hacia «Datos maestros», los módulos pierden su grupo y viven donde su contenido pertenece, y «Configuración» —solo para quien administra— estrena «General» (`/configuracion`), que hereda la baja del hogar de la pantalla «Hogar». | Equipo DRP |
+| 2026-08-20 | **«Cuenta» deja de ser una parada y se va con la marca**, con la salida directa al lado: en escritorio bajo el sello —en el banner, fuera del landmark de navegación—; en móvil, en el apartado que cierra «Más», que además abre con la marca igual que «Hogar». La lista queda para lo que es del hogar, y «Salir» sigue sin pisar la lista de paradas. | Equipo DRP |
 | 2026-08-18 | Fase 2, Hito 0: la navegación se parte en dos grupos —el hogar y los módulos— dentro del mismo `<nav>`, y la barra inferior de móvil baja a cuatro paradas más «Más». Queda resuelta la decisión abierta de cuántos destinos caben abajo: cinco a 320 px, medido y comprobado en el recorrido vertical. | Equipo DRP |
 | 2026-08-12 | Creación del documento con el shell del Hito 1 y las tres decisiones que el Hito 2 tiene que tomar. | Equipo DRP |
