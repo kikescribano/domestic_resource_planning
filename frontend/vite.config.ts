@@ -16,6 +16,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
+    // Escucha también en la red local para poder probar desde otro
+    // dispositivo (un móvil contra la IP del equipo). El backend admite esos
+    // orígenes en desarrollo: ver CorsConfig en el backend.
+    host: true,
     // En desarrollo la API se alcanza por el mismo origen, para que el
     // frontend no tenga que saber nada de CORS ni de dominios.
     proxy: {

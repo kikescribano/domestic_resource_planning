@@ -17,11 +17,13 @@ class CorsConfig {
     @Bean
     fun corsConfigurationSource(): CorsConfigurationSource {
         val configuration = CorsConfiguration()
-        configuration.allowedOrigins = listOf(
-            "http://localhost:5173",  // Frontend Vite
-            "http://localhost:8080",  // Mismo servidor (Swagger UI)
-            "http://127.0.0.1:5173",
-            "http://127.0.0.1:8080",
+        // Con allowCredentials, los comodines exigen patrones y no origenes
+        // literales. El patron de 192.168.* deja probar desde otro dispositivo
+        // de la red local (movil contra el Vite con --host).
+        configuration.allowedOriginPatterns = listOf(
+            "http://localhost:*",   // Frontend Vite y Swagger UI
+            "http://127.0.0.1:*",
+            "http://192.168.*:*",   // Otros dispositivos de la red local
         )
         configuration.allowedMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
         configuration.allowedHeaders = listOf("*")
