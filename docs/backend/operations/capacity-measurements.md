@@ -4,7 +4,7 @@
 |---|---|
 | Estado | Vigente |
 | Responsable | Equipo DRP |
-| Ámbito | Dimensionado del servidor, medido al cerrar la Fase 1 y vuelto a medir al cerrar la Fase 2 — y, desde el Hito 2 del cierre de huecos, **lo que cuesta llegar al navegador** |
+| Ámbito | Dimensionado del servidor, medido al cerrar la Fase 1 y vuelto a medir al cerrar la Fase 2 y el cierre de huecos — y, desde el Hito 2 de este último, **lo que cuesta llegar al navegador** |
 | Última revisión | 2026-08-20 |
 
 La [ADR-001](../../common/architecture/decisions/ADR-001-solution-architecture-baseline.md)
@@ -17,6 +17,14 @@ medición y la decisión que sale de ella.
 > dentro. **La decisión no cambia —sigue siendo VPS-3 y sigue siendo por disco—**
 > pero los números sí, y uno de ellos es de una clase que aquí no existía. Lo que
 > cambió está al final, en «Qué cambió con la Fase 2».
+>
+> **Y vuelto a medir el 2026-08-20, al cerrar el bloque de cierre de huecos**, con
+> lo que el bloque añadió dentro: las dos tablas del Hito 4 —`tags` y
+> `asset_tags`, sembradas con el vocabulario y el etiquetado de una casa que
+> clasifica—, el estado de conservación en la mayoría de los duraderos y las
+> categorías con icono y color. La pendiente por hogar sube de 116 394 a
+> **141 994 B** y la de actividad, de 2457 a **2525 B por día**; la decisión
+> sigue sin cambiar, y por el mismo margen de tres órdenes de magnitud.
 
 ## Cómo se mide
 
@@ -56,48 +64,61 @@ falta distinguirlas porque todo tenía techo.
 
 Se siembran hogares con un perfil realista —8 ubicaciones, 40 artículos, 50
 duraderos, 40 existencias, 15 documentos y 5 préstamos, **y los cuatro módulos
-encendidos**— y se mide `pg_database_size` en **tres puntos**, no en uno.
+encendidos**; desde el cierre de huecos, además, **6 etiquetas con la mitad de
+los duraderos etiquetados, estado de conservación en cuatro de cada cinco y las
+categorías con icono y color**— y se mide `pg_database_size` en **tres puntos**,
+no en uno.
 
 | Hogares sembrados | Ocupado sobre el esquema vacío | «Por hogar», dividiendo |
 |---|---|---|
-| 1 | 1,3 MiB | 1 400 832 B |
-| 5 | 1,8 MiB | 385 024 B |
-| 25 | 4,0 MiB | 167 772 B |
-| **Pendiente entre el primero y el último** | | **116 394 B** |
+| 1 | 1,5 MiB | 1 589 248 B |
+| 5 | 2,1 MiB | 440 729 B |
+| 25 | 4,8 MiB | 199 884 B |
+| **Pendiente entre el primero y el último** | | **141 994 B** |
 
 **Los tres puntos son la parte importante de la medición, y con uno solo el
-número habría sido doce veces mayor.** Con un hogar, el coste fijo del esquema
+número habría sido once veces mayor.** Con un hogar, el coste fijo del esquema
 —índices vacíos, catálogo, las cinco categorías sembradas, la primera página de
-cada tabla— se reparte entre ese hogar y sale «1,3 MB por hogar». Con veinticinco
-baja a 168 kB, y la pendiente real es de **~116 kB**. Un solo punto no habría sido
+cada tabla— se reparte entre ese hogar y sale «1,5 MB por hogar». Con veinticinco
+baja a 200 kB, y la pendiente real es de **~142 kB**. Un solo punto no habría sido
 una medición imprecisa: habría sido una medición equivocada, y con suficiente
 aspecto de dato como para que nadie la revisara.
 
-El esquema vacío ocupa **9,3 MiB**, que es el suelo de cualquier despliegue.
+El esquema vacío ocupa **9,5 MiB**, que es el suelo de cualquier despliegue.
 
 Las tablas que más pesan con 25 hogares, que es donde iría a mirar quien quiera
 optimizar. **Las cuatro primeras ya no son todas del core:**
 
 | Tabla | Con 25 hogares | De quién |
 |---|---|---|
-| `assets` | 872 kiB | Core |
-| `warehouse_movements` | 640 kiB | Warehouse |
-| `articles` | 528 kiB | Core |
-| `maintenance_items` | 464 kiB | CMMS |
-| `warehouse_articles` | 360 kiB | Warehouse |
-| `locations` | 168 kiB | Core |
+| `assets` | 864 kiB | Core |
+| `warehouse_movements` | 648 kiB | Warehouse |
+| `articles` | 536 kiB | Core |
+| `maintenance_items` | 456 kiB | CMMS |
+| `event_outbox` | 392 kiB | Plataforma — ver la nota |
+| `warehouse_articles` | 376 kiB | Warehouse |
+| `asset_tags` | 288 kiB | Core |
 | `documents` | 168 kiB | Core |
+| `locations` | 168 kiB | Core |
 | `warehouse_locations` | 144 kiB | Warehouse |
+| `tags` | 112 kiB | Core |
 
-> **Las dos tablas del Hito 4 del cierre de huecos caen en esta magnitud, no en
-> la de actividad, y conviene dejarlo escrito antes de volver a medir.** `tags` es
-> un catálogo del tamaño del vocabulario de la casa —del orden de decenas de
-> filas, como `categories`— y `asset_tags` crece con **lo que el hogar tiene y
-> etiqueta**, no con lo que hace: 500 assets a cinco etiquetas cada uno son 2 500
-> filas de tres `uuid`, muy por debajo de `documents`. Ninguna de las dos entra en
-> la lista de la purga, y las dos se van con la baja del hogar como el resto de
-> tablas con `household_id`. **El número no se vuelve a medir aquí**: la remedición
-> completa, con las dos dentro, es del hito de cierre del bloque.
+> **Las dos tablas del Hito 4 caen en esta magnitud, no en la de actividad, y la
+> remedición del cierre del bloque las midió como preveía.** `tags` es un catálogo
+> del tamaño del vocabulario de la casa —seis etiquetas por hogar en la siembra— y
+> `asset_tags` crece con **lo que el hogar tiene y etiqueta**, no con lo que hace:
+> las dos juntas suman 400 kiB con 25 hogares, del orden de `documents` y muy por
+> debajo de `assets`. Ninguna de las dos entra en la lista de la purga, y las dos
+> se van con la baja del hogar como el resto de tablas con `household_id`.
+>
+> **Y `event_outbox` en la quinta posición no es una cola que retiene: es la
+> huella del pico.** Al terminar la siembra la cola está vacía —cada fila se borra
+> al repartirse—, pero PostgreSQL no devuelve al sistema las páginas que una tabla
+> llegó a ocupar, así que su tamaño físico estable es el del máximo de entregas
+> simultáneamente pendientes que haya vivido, no el de lo que guarda. Sembrar 25
+> hogares publica miles de eventos en ráfaga y deja esa marca; en uso normal el
+> goteo diario reutiliza las mismas páginas. Es la precisión que le faltaba a «la
+> cola vacía no ocupa»: no acumula con el tiempo, y su suelo físico es su pico.
 
 ## Bytes por año: lo que el hogar hace
 
@@ -109,10 +130,10 @@ escribe ninguna de estas filas.
 
 | Días vividos | Ocupado sobre el hogar recién sembrado |
 |---|---|
-| 60 | 288 kiB |
-| 180 | 576 kiB |
-| **Pendiente por día** | **2457 B** |
-| **Por hogar y año** | **~875 kiB** |
+| 60 | 144 kiB |
+| 180 | 440 kiB |
+| **Pendiente por día** | **2525 B** |
+| **Por hogar y año** | **~900 kiB** |
 
 Lo que crece son dos tablas, y las dos por el mismo motivo —una fila por cosa
 hecha—: `warehouse_movements` y `shopping_list_items`. Las otras tres candidatas
@@ -246,10 +267,10 @@ Y el motivo no es el que se esperaba al abrir la pregunta.
 login y la navegación de decenas de hogares; el pico de subir fotos es
 esporádico. Por CPU bastaría el VPS-2.
 
-**No es la base de datos**, y sigue sin serlo después de la Fase 2 aunque el
-número se haya doblado. A 116 kB por hogar, mil hogares son 116 MB; sumándoles un
-año de actividad de todos ellos, 875 MB más. Cabe en cualquiera de los dos planes
-sin acercarse al límite. Lo que cambia no es la conclusión sino **su fecha de
+**No es la base de datos**, y sigue sin serlo después de la Fase 2 y del cierre
+de huecos aunque el número haya subido dos veces. A 142 kB por hogar, mil hogares
+son 142 MB; sumándoles un año de actividad de todos ellos, 900 MB más. Cabe en
+cualquiera de los dos planes sin acercarse al límite. Lo que cambia no es la conclusión sino **su fecha de
 caducidad**: el primer número no crece con el tiempo y el segundo sí, así que esta
 frase deja de ser cierta sola. Ver la condición de revisión de abajo.
 
@@ -288,7 +309,7 @@ medición es la que permite por fin decir **si hace falta y cuándo**:
 | `maintenance_interventions` | Cada reparación o revisión | Unas pocas al año |
 | `household_notices` | Cada aviso levantado | Solo cuando hay algo |
 
-**A 875 kiB por hogar y año, un hogar tarda diez años en llegar a 9 MB.** Eso no
+**A 900 kiB por hogar y año, un hogar tarda diez años en llegar a 9 MB.** Eso no
 es un problema de disco en ningún plazo razonable, y por eso **la purga no se
 escribe ahora**: escribir hoy un borrado irreversible sobre el historial de una
 casa, para ahorrar megabytes, sería resolver el problema equivocado —y el
@@ -340,6 +361,7 @@ faltaba desde el Hito 1 de la Fase 2 y lo que convierte «pendiente» en una tar
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | **Vuelta a medir al cerrar el bloque de cierre de huecos, con lo que el bloque añadió dentro** — las dos tablas del Hito 4 y los atributos de los Hitos 3 y 4 en la siembra: seis etiquetas con la mitad de los duraderos etiquetados, estado de conservación en cuatro de cada cinco y las categorías con icono y color. La pendiente por hogar pasa de **116 394 a 141 994 B** y la de actividad, de **2457 a 2525 B por día** (~900 kiB por hogar y año); el esquema vacío, de 9,3 a 9,5 MiB. `tags` y `asset_tags` quedan medidas donde la nota del Hito 4 preveía —en la magnitud de lo que el hogar *tiene*, 400 kiB entre las dos con 25 hogares— y aparece una precisión que nadie había escrito: **`event_outbox` en la quinta posición de la tabla no es una cola que retiene, es la huella física del pico**, porque PostgreSQL no devuelve las páginas que una tabla llegó a ocupar y sembrar 25 hogares publica miles de eventos en ráfaga. **La decisión no cambia: sigue siendo VPS-3 y sigue siendo por disco**, con el mismo margen de tres órdenes de magnitud. El criterio de retención tampoco: cerrado para cuatro de las cinco tablas por la baja del hogar, abierto solo para `household_notices`, y `event_outbox` sigue sin ser una sexta |
 | 2026-08-20 | **Aparece una tercera magnitud: lo que cuesta llegar al navegador.** La trae el Hito 2 del cierre de huecos, que fue el primero que tuvo que elegir entre pagar en el servidor y pagar en el cliente, y las dos mitades quedan medidas aquí porque es donde viven los números. El bundle se **vuelve a medir** y no son los 402 kB que citaba el plan sino **407,28 kB**; el decodificador de HEIC pesa **2 995,46 kB** (734,16 comprimido) y cuesta **2,49 kB sobre la primera carga**, porque va en un fragmento que solo pide quien elige un HEIC. Enfrente, el coste en servidor medido con `libheif` sobre 2 vCPU: recodificar una foto de 12 MP pasa de ×3,4 a ×5,6, o sea **2,6 a 4,3 s** aplicado a la cifra del runner. La decisión que sale de las dos está en la [ADR-014](../../common/architecture/decisions/ADR-014-heic-conversion.md). **La tabla de CPU del runner no se toca**: el camino elegido no añade ni una operación al servidor. |
 | 2026-08-20 | **No hay una sexta tabla sin techo**, aunque el Transactional Outbox parecía traerla. `event_outbox` crece con lo que el hogar hace y **la fila se borra al repartirse**, así que no acumula: su estado normal es vacía y su tamaño mide lo pendiente, no lo ocurrido. Se anota aquí para que nadie tenga que volver a derivarlo, junto con lo que sí sirve para operarla. No se vuelve a medir nada: la cola vacía no ocupa. |
 | 2026-08-19 | **Vuelta a medir al cerrar la Fase 2, con los cuatro módulos dentro.** La pendiente por hogar pasa de **61 kB a 116 kB** —casi el doble, y dos tercios de la subida son las entradas de apertura de Warehouse y las fichas de máquina de CMMS— y el esquema vacío, de 8,4 a 9,3 MiB. Aparece **una magnitud nueva que aquí no existía**: lo que crece con lo que el hogar *hace*, medido en **2457 B por día, ~875 kiB por hogar y año**, sin techo. La medición se parte en dos por eso, y el tramo de la segunda es de cuatro meses porque uno de dos daba pendientes con un tercio de diferencia entre ejecuciones. **La decisión no cambia: sigue siendo VPS-3 y sigue siendo por disco**, con tres órdenes de magnitud entre la cuota de ficheros y las filas. Se fija por fin el **criterio de retención** de las cinco tablas de la purga, con su disparador. |
