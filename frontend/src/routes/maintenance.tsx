@@ -21,6 +21,7 @@ import {
   Combobox,
   EmptyState,
   Field,
+  FieldAlignedSlot,
   Notice,
   PageHeading,
   SelectField,
@@ -328,7 +329,11 @@ function NewPlanForm({ onDone, onFailure }: { onDone: () => void; onFailure: (me
   }
 
   return (
-    <form onSubmit={submit} className="mt-6 flex flex-wrap items-end gap-3">
+    // `items-start` y no `items-end`: alineando por el pie, los campos con
+    // pista empujan su input hacia arriba y la fila baila. Con etiquetas de una
+    // línea, alinear por la cabeza deja todos los inputs en la misma fila y las
+    // pistas cuelgan por debajo sin mover a nadie.
+    <form onSubmit={submit} className="mt-6 flex flex-wrap items-start gap-3">
       <div className="min-w-[14rem] flex-1">
         <Combobox
           label="Qué máquina"
@@ -387,9 +392,11 @@ function NewPlanForm({ onDone, onFailure }: { onDone: () => void; onFailure: (me
         />
       )}
 
-      <Button type="submit" variant="primary" busy={create.isPending} busyLabel="Creando…">
-        Crear plan
-      </Button>
+      <FieldAlignedSlot>
+        <Button type="submit" variant="primary" busy={create.isPending} busyLabel="Creando…">
+          Crear plan
+        </Button>
+      </FieldAlignedSlot>
     </form>
   )
 }
@@ -639,7 +646,8 @@ function InterventionForm({
   }
 
   return (
-    <form onSubmit={submit} className="mt-4 flex flex-wrap items-end gap-3 border-t border-border-subtle pt-4">
+    // El mismo `items-start` que el formulario de planes, por el mismo motivo.
+    <form onSubmit={submit} className="mt-4 flex flex-wrap items-start gap-3 border-t border-border-subtle pt-4">
       <Field
         label="Cuándo se hizo"
         type="date"
@@ -667,9 +675,11 @@ function InterventionForm({
         />
       )}
 
-      <Button type="submit" variant="primary" busy={register.isPending} busyLabel="Apuntando…">
-        Apuntarlo
-      </Button>
+      <FieldAlignedSlot>
+        <Button type="submit" variant="primary" busy={register.isPending} busyLabel="Apuntando…">
+          Apuntarlo
+        </Button>
+      </FieldAlignedSlot>
     </form>
   )
 }

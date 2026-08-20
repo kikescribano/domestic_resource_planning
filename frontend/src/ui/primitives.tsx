@@ -126,6 +126,29 @@ export function Field({ label, hint, error, id, className = '', ...props }: Fiel
   )
 }
 
+/**
+ * Alinea un control sin etiqueta —un botón, una casilla— con la fila de inputs
+ * de un formulario en línea.
+ *
+ * Los formularios en línea alinean por la cabeza (`items-start`): alineando por
+ * el pie, un campo con pista empuja su input hacia arriba y la fila baila. Con
+ * la cabeza alineada, lo que no lleva etiqueta encima quedaría a la altura de
+ * las etiquetas; esta pieza le pone una fantasma con la misma anatomía que
+ * `Field`, así el control cae en la fila de los inputs y sigue cayendo ahí si
+ * el tamaño de etiqueta cambia algún día. Solo desde `md`: en móvil cada campo
+ * envuelve a su propia línea y el hueco sería aire muerto.
+ */
+export function FieldAlignedSlot({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span aria-hidden="true" className="hidden text-body-sm font-medium md:block">
+        {' '}
+      </span>
+      {children}
+    </div>
+  )
+}
+
 interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label: string
   hint?: string

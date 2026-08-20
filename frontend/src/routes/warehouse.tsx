@@ -15,6 +15,7 @@ import {
   Combobox,
   EmptyState,
   Field,
+  FieldAlignedSlot,
   Notice,
   PageHeading,
   Spinner,
@@ -70,30 +71,34 @@ export function WarehousePage() {
         de lo que se pone malo.
       </p>
 
-      <div className="mt-6 flex flex-wrap items-end gap-3">
+      <div className="mt-6 flex flex-wrap items-start gap-3">
         {/* Un `Combobox` y no un `SelectField`: una despensa tiene cientos de
             artículos, y `GET /warehouse/stock` lleva un parámetro `q` que existe
             justamente para esto. El primitivo llegó con este hito, después de
             quedar aplazado desde el Hito 2 de la Fase 1. */}
         <StockSearch value={query} onChange={setQuery} />
 
-        <label className="flex min-h-touch items-center gap-2 text-body-sm text-ink">
-          <input
-            type="checkbox"
-            checked={belowMinimum}
-            onChange={(event) => setBelowMinimum(event.target.checked)}
-          />
-          Solo lo que queda poco
-        </label>
+        <FieldAlignedSlot>
+          <label className="flex min-h-touch items-center gap-2 text-body-sm text-ink">
+            <input
+              type="checkbox"
+              checked={belowMinimum}
+              onChange={(event) => setBelowMinimum(event.target.checked)}
+            />
+            Solo lo que queda poco
+          </label>
+        </FieldAlignedSlot>
 
-        <label className="flex min-h-touch items-center gap-2 text-body-sm text-ink">
-          <input
-            type="checkbox"
-            checked={expiringSoon}
-            onChange={(event) => setExpiringSoon(event.target.checked)}
-          />
-          Solo lo que caduca este mes
-        </label>
+        <FieldAlignedSlot>
+          <label className="flex min-h-touch items-center gap-2 text-body-sm text-ink">
+            <input
+              type="checkbox"
+              checked={expiringSoon}
+              onChange={(event) => setExpiringSoon(event.target.checked)}
+            />
+            Solo lo que caduca este mes
+          </label>
+        </FieldAlignedSlot>
       </div>
 
       <div className="mt-6">
@@ -302,7 +307,7 @@ function ConsumptionForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex max-w-form flex-wrap items-end gap-2">
+    <form onSubmit={submit} className="flex max-w-form flex-wrap items-start gap-2">
       <Field
         label={`Gastado de ${item.article} (${item.unit.toLowerCase()})`}
         type="number"
@@ -312,9 +317,11 @@ function ConsumptionForm({
         onChange={(event) => setAmount(event.target.value)}
         hint="Lo que has gastado, no lo que queda."
       />
-      <Button type="submit" variant="primary" busy={consume.isPending} busyLabel="Apuntando…">
-        Apuntar consumo
-      </Button>
+      <FieldAlignedSlot>
+        <Button type="submit" variant="primary" busy={consume.isPending} busyLabel="Apuntando…">
+          Apuntar consumo
+        </Button>
+      </FieldAlignedSlot>
     </form>
   )
 }
@@ -351,7 +358,7 @@ function MinimumForm({
   }
 
   return (
-    <form onSubmit={submit} className="mt-3 flex max-w-form flex-wrap items-end gap-2">
+    <form onSubmit={submit} className="mt-3 flex max-w-form flex-wrap items-start gap-2">
       <Field
         label={`Avisarme cuando quede menos de (${item.unit.toLowerCase()})`}
         type="number"
@@ -361,9 +368,11 @@ function MinimumForm({
         onChange={(event) => setMinimum(event.target.value)}
         hint="Déjalo vacío para no vigilar este artículo."
       />
-      <Button type="submit" busy={save.isPending} busyLabel="Guardando…">
-        Guardar mínimo
-      </Button>
+      <FieldAlignedSlot>
+        <Button type="submit" busy={save.isPending} busyLabel="Guardando…">
+          Guardar mínimo
+        </Button>
+      </FieldAlignedSlot>
     </form>
   )
 }

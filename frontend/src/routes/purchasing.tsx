@@ -16,6 +16,7 @@ import {
   Combobox,
   EmptyState,
   Field,
+  FieldAlignedSlot,
   Notice,
   PageHeading,
   SelectField,
@@ -246,7 +247,7 @@ function AddItemForm({ onDone, onFailure }: { onDone: () => void; onFailure: (me
   }
 
   return (
-    <form onSubmit={submit} className="mt-6 flex flex-wrap items-end gap-3">
+    <form onSubmit={submit} className="mt-6 flex flex-wrap items-start gap-3">
       <div className="min-w-[16rem] flex-1">
         <Combobox
           label="Qué hace falta"
@@ -277,9 +278,11 @@ function AddItemForm({ onDone, onFailure }: { onDone: () => void; onFailure: (me
         hint="Opcional"
       />
 
-      <Button type="submit" variant="primary" busy={add.isPending} busyLabel="Apuntando…">
-        Apuntar
-      </Button>
+      <FieldAlignedSlot>
+        <Button type="submit" variant="primary" busy={add.isPending} busyLabel="Apuntando…">
+          Apuntar
+        </Button>
+      </FieldAlignedSlot>
     </form>
   )
 }
@@ -386,7 +389,7 @@ function NewPurchaseForm({
   }
 
   return (
-    <form onSubmit={submit} className="mt-6 flex flex-wrap items-end gap-3 border-t border-border-subtle pt-6">
+    <form onSubmit={submit} className="mt-6 flex flex-wrap items-start gap-3 border-t border-border-subtle pt-6">
       {/* Solo si hay dónde elegir. Con el módulo de proveedores apagado la lista
           llega vacía, así que el campo no se pinta y nadie tiene que enterarse
           de por qué. */}
@@ -409,11 +412,21 @@ function NewPurchaseForm({
         </SelectField>
       )}
 
-      <Button type="submit" variant="primary" disabled={itemIds.length === 0} busy={open.isPending} busyLabel="Abriendo…">
-        {itemIds.length === 0
-          ? 'Marca lo que te llevas'
-          : `Me llevo ${itemIds.length} ${itemIds.length === 1 ? 'cosa' : 'cosas'}`}
-      </Button>
+      {shops.data && shops.data.length > 0 ? (
+        <FieldAlignedSlot>
+          <Button type="submit" variant="primary" disabled={itemIds.length === 0} busy={open.isPending} busyLabel="Abriendo…">
+            {itemIds.length === 0
+              ? 'Marca lo que te llevas'
+              : `Me llevo ${itemIds.length} ${itemIds.length === 1 ? 'cosa' : 'cosas'}`}
+          </Button>
+        </FieldAlignedSlot>
+      ) : (
+        <Button type="submit" variant="primary" disabled={itemIds.length === 0} busy={open.isPending} busyLabel="Abriendo…">
+          {itemIds.length === 0
+            ? 'Marca lo que te llevas'
+            : `Me llevo ${itemIds.length} ${itemIds.length === 1 ? 'cosa' : 'cosas'}`}
+        </Button>
+      )}
     </form>
   )
 }
@@ -627,7 +640,7 @@ function PurchasePanel({
       </ul>
 
       {isOpen && (
-        <div className="mt-4 flex flex-wrap items-end gap-3">
+        <div className="mt-4 flex flex-wrap items-start gap-3">
           <SelectField
             label="Dónde lo guardas"
             value={locationId}
@@ -642,18 +655,22 @@ function PurchasePanel({
             ))}
           </SelectField>
 
-          <Button
-            variant="primary"
-            onClick={() => receive.mutate()}
-            busy={receive.isPending}
-            busyLabel="Guardando…"
-          >
-            Ya está en casa
-          </Button>
+          <FieldAlignedSlot>
+            <Button
+              variant="primary"
+              onClick={() => receive.mutate()}
+              busy={receive.isPending}
+              busyLabel="Guardando…"
+            >
+              Ya está en casa
+            </Button>
+          </FieldAlignedSlot>
 
-          <Button variant="secondary" onClick={() => cancel.mutate()} busy={cancel.isPending} busyLabel="Anulando…">
-            Anular la compra
-          </Button>
+          <FieldAlignedSlot>
+            <Button variant="secondary" onClick={() => cancel.mutate()} busy={cancel.isPending} busyLabel="Anulando…">
+              Anular la compra
+            </Button>
+          </FieldAlignedSlot>
         </div>
       )}
     </div>
