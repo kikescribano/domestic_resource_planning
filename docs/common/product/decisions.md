@@ -153,6 +153,19 @@ Las siguientes decisiones, inicialmente abiertas, han quedado validadas:
 > **Dos cosas menores que se decidieron sobre la marcha.** El **alcance del token se comprueba en el filtro y no en el controlador**: en el controlador sería autorización —el token vale pero no puede hacer eso— y habría que acordarse de escribirla en cada endpoint nuevo; en el filtro es autenticación, así que fuera de sus dos rutas el token no identifica a nadie y un endpoint que se añada mañana nace protegido sin que nadie se acuerde. Y el **enlace del préstamo lleva el identificador además del token**, al contrario que los otros cuatro correos: el JWT ya lo lleva dentro, pero mandarlo aparte evita que el frontend tenga que descodificar una credencial para saber qué pedir.
 
 > **La zona horaria del hogar no interviene en el vencimiento (2026-08-17).** El contrato dice que `timeZone` «lo usa el proceso diario de vencidos», y al implementarlo resulta que no lo necesita: `dueAt` es un `timestamptz`, así que «la fecha prevista ya pasó» es una comparación de instantes y no depende de ninguna zona. Lo que la zona gobierna es a qué hora local conviene pasar la escoba, que es una decisión de despliegue y no de dominio. Se anota porque la frase del contrato invita a implementar una conversión que no hace falta.
+>
+> **Matizado, no reabierto, el 2026-08-20.** Lo de arriba sigue siendo cierto y por
+> el motivo que dice, pero la frontera que traza no es «el vencimiento» sino
+> **`Instant` frente a `LocalDate`**: comparar instantes no necesita ninguna zona;
+> derivar del reloj un **día de calendario** siempre la necesita, y la única
+> defendible es la del hogar. Ejecutando el Hito 1 del [cierre de
+> huecos](open-gaps-roadmap.md) se vio que las tres reglas del proyecto que sí
+> trabajan con `LocalDate` —la que rechaza una intervención «del futuro» en CMMS y
+> las dos comprobaciones de fecha de CMMS y Warehouse— resuelven su «hoy» con la
+> fecha **UTC**, con lo que un hogar peninsular no puede registrar de madrugada lo
+> que acaba de hacer. **La pregunta queda abierta y con destinatario**: es el Hito 5
+> de ese bloque, donde se decide si ese «hoy» pasa a ser el del hogar y se descarta
+> la alternativa por escrito.
 
 > **Un fallo que solo se vio ejecutando (2026-08-17), y es el mismo del Hito 2 en otra tabla.** La propiedad calculada `isContactable` de `ExternalParty` se estaba serializando **dentro de la columna `jsonb`**: un valor derivado y congelado dentro del dato del que se deriva, que a la primera corrección de correo pasaría a mentir. Pasa a ser función y sin empezar por `is`, igual que `countsUnits()`. No lo habrían visto las pruebas de recorrido —escriben y leen con el mismo código, así que se equivocan igual en los dos sentidos— sino la que le pregunta a PostgreSQL qué claves hay de verdad. Que la misma clase de fallo reaparezca en el hito siguiente es el argumento de que esa prueba se escriba **por columna `jsonb`** y no una vez.
 

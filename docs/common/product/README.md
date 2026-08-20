@@ -28,7 +28,7 @@ cien referencias cruzadas del tipo «ver 4.1.1» por todo el repositorio.
 
 | Documento | Contenido |
 |---|---|
-| [`open-gaps-roadmap.md`](open-gaps-roadmap.md) | **Lo siguiente que se ejecuta.** Los seis hitos del cierre de los cuatro huecos que las Fases 1 y 2 dejaron abiertos a propósito —baja de hogar y de cuenta, conversión de HEIC, Transactional Outbox y los cuatro atributos propuestos—. No es una fase, y se dice por qué. **Es lo que hay que leer para arrancar un hito**, y lo que hay que actualizar al cerrarlo. |
+| [`open-gaps-roadmap.md`](open-gaps-roadmap.md) | **Lo siguiente que se ejecuta.** Los siete hitos del cierre de los cuatro huecos que las Fases 1 y 2 dejaron abiertos a propósito —baja de hogar y de cuenta, conversión de HEIC, Transactional Outbox y los cuatro atributos propuestos—, más el quinto que apareció ejecutándolos: el «hoy» de las reglas de calendario. No es una fase, y se dice por qué. **Es lo que hay que leer para arrancar un hito**, y lo que hay que actualizar al cerrarlo. |
 | [`phase-2-roadmap.md`](phase-2-roadmap.md) | Los siete hitos de la Fase 2 —activación de módulos, plataforma de avisos y los cuatro módulos de prioridad alta—, ya cerrados. Se conserva como historia de cómo se hicieron los cuatro primeros módulos, y su criterio de aceptación sigue vigente para todo módulo nuevo. |
 | [`roadmap.md`](roadmap.md) | Los cinco hitos de la Fase 1, ya cerrados. Se conserva como historia de cómo se hizo el core. El estado de las *fases* sigue en la sección 8 del README. |
 
