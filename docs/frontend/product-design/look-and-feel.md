@@ -77,7 +77,7 @@ en [`frontend/src/index.css`](../../../frontend/src/index.css).
 
 | Dimensión | Decisión vigente | Evidencia o referencia |
 |---|---|---|
-| **Color** | Base de papel cálido (`oklch(98.4% 0.006 85)`) sobre tinta parda; **un único acento**, terracota, para la acción principal y los enlaces; cuatro colores de feedback del sistema y **cinco de estado del dominio** —disponible, prestado, vencido, dado de baja y sin existencias—, con nombre propio aunque hoy compartan valor con su equivalente de feedback. El azul de «sin existencias» es el único color frío del sistema, y lo es a propósito. | [`foundations/color.md`](../design-system/foundations/color.md); auditoría de 36 pares en [`accessibility/`](../accessibility/README.md), con 4,70:1 como peor caso de texto y 3,49:1 como peor caso no textual |
+| **Color** | Base de papel cálido (`oklch(98.4% 0.006 85)`) sobre tinta parda; **un único acento**, terracota, para la acción principal y los enlaces; cuatro colores de feedback del sistema y **cinco de estado del dominio** —disponible, prestado, vencido, dado de baja y sin existencias—, con nombre propio aunque hoy compartan valor con su equivalente de feedback. El azul de «sin existencias» es el único color frío del sistema, y lo es a propósito. Y **seis colores de categoría**, que son los únicos que elige el usuario, dentro de un juego cerrado y medido (ADR-015). | [`foundations/color.md`](../design-system/foundations/color.md); auditoría de 48 pares en [`accessibility/`](../accessibility/README.md), con 4,70:1 como peor caso de texto y 3,49:1 como peor caso no textual |
 | **Tipografía** | Dos familias con reparto explícito: **serif** (`Iowan Old Style` → `Palatino` → `Georgia`) para el `h1`, los titulares de sección y los estados vacíos, **nunca por debajo de 20 px ni dentro de una fila**; **sans de sistema** para todo lo demás; **monoespaciada** para número de serie, código de barras e identificadores. Escala de siete pasos nombrada por papel, dos de ellos con `clamp()`. Pilas de sistema: cero bytes descargados y ningún salto de fuente al cargar. | [`foundations/typography.md`](../design-system/foundations/typography.md) |
 | **Densidad de información** | **Dos densidades, decididas por el dispositivo de entrada y no por el gusto.** Con el dedo no cabe ser denso —44 px de objetivo mínimo—, así que en móvil el listado es de tarjetas y respira; con puntero y teclado el aire se convierte en scroll, así que desde `md` el listado es una tabla de fila compacta (36 px), cifras en `tabular-nums` y cabecera fija. No es una preferencia configurable en la Fase 1. | [`foundations/density.md`](../design-system/foundations/density.md) |
 | **Espaciado y ritmo** | Rejilla de **4 px**, con cuatro medidas con nombre —`gutter` (16 px), `gutter-lg` (24 px), `row` (12 px) y `row-compact` (6 px)— y tres anchuras de composición: `form` (544 px), `reading` (68ch) y `shell` (1536 px). El espacio vertical entre bloques crece con la pantalla; el interlineado y la longitud de línea, no. | [`foundations/space.md`](../design-system/foundations/space.md) |
@@ -249,7 +249,7 @@ Lo que la dirección visual aporta a ese compromiso, con sus números, está en
 - **El color no es nunca el único medio.** Los cinco estados del dominio llevan
   color, etiqueta e icono propios; los campos con error llevan borde, icono y
   mensaje; la fila seleccionada lleva fondo, casilla y barra de acento.
-- **Contraste comprobado, no afirmado.** Los 36 pares que el sistema usa de
+- **Contraste comprobado, no afirmado.** Los 48 pares que el sistema usa de
   verdad están medidos en los dos modos: el peor caso de texto es 4,70:1 y el
   peor caso no textual, 3,49:1. Ningún token se sale del gamut sRGB, para que el
   número medido sea el número que se ve. Lo comprueba
@@ -277,7 +277,7 @@ existen y se ejecutan en la CI:
 | Lo que pedía la ADR-006 | Dónde se comprueba |
 |---|---|
 | Recorrido vertical de punta a punta | [`vertical-journey.spec.ts`](../../../frontend/e2e/vertical-journey.spec.ts): del alta del hogar a la devolución desde el correo, en un navegador de verdad y con un contexto sin sesión para la pantalla externa |
-| Contraste | [`check-contrast.py`](../../../scripts/check-contrast.py) mide los 36 pares de tokens en los dos modos; axe los comprueba **aplicados**, también en los dos modos |
+| Contraste | [`check-contrast.py`](../../../scripts/check-contrast.py) mide los 48 pares de tokens en los dos modos; axe los comprueba **aplicados**, también en los dos modos |
 | Foco visible | El anillo se mide en **cada parada** del recorrido de tabulación, no en una muestra |
 | Teclado completo | Se llega a la acción de cada pantalla tabulando y se activa con `Enter`; en la pantalla externa eso es la única forma de cerrar el préstamo |
 | 375 px y ultrawide | Reflujo medido a 320, a 375 y a 2560 px, comprobando arriba que el contenido no se estira sin tope |

@@ -37,7 +37,7 @@ la construcción falla.
 python scripts/check-contrast.py
 ```
 
-**36 pares medidos en los dos modos**, con estos resultados:
+**48 pares medidos en los dos modos**, con estos resultados:
 
 | Medida | Valor | Mínimo exigido |
 |---|---|---|
@@ -60,7 +60,17 @@ Tres notas sobre por qué se mide así:
   simple vista.
 - **Ningún token se sale del gamut sRGB.** Importa porque un color fuera de gamut
   lo recorta el navegador, y entonces el número medido deja de ser el número que
-  se ve: la auditoría estaría midiendo un color que nadie tiene delante.
+  se ve: la auditoría estaría midiendo un color que nadie tiene delante. **Y esa
+  comprobación es la que más ha trabajado** al añadir los seis colores de
+  categoría: tres de los doce valores nuevos —el suave del índigo y los fuertes
+  del cielo y el turquesa— nacieron fuera de gamut y hubo que bajarles el croma
+  antes de que el número significara algo.
+- **Doce de los cuarenta y ocho pares los elige el usuario**, y son los seis
+  colores de categoría de la [ADR-015](../../common/architecture/decisions/ADR-015-user-chosen-category-identity.md):
+  dos por color, contra su propio fondo suave —el marcador— y contra
+  `surface-sunken` —el hueco de una foto que falta—. Es la única parte de la
+  interfaz cuyo color no lo decide el sistema, y por eso el juego es cerrado:
+  con un selector libre no habría lista que medir.
 
 Los pares con transparencia (`scrim`) no se miden: su contraste depende de lo que
 haya debajo, así que el número no significaría nada. Se compensa por otra vía —el
@@ -75,6 +85,7 @@ en la pantalla del que diseña siempre se distingue. En DRP:
 | Situación | Además del color |
 |---|---|
 | Estado del dominio (disponible, prestado, vencido, dado de baja, sin existencias) | Etiqueta de texto **e** icono propio |
+| Identidad visual de una categoría (icono y color) | **El nombre de la categoría, siempre al lado**; el icono dentro del marcador |
 | Campo con error | Borde, icono **y** mensaje bajo el campo |
 | Fila seleccionada | Fondo, casilla marcada **y** barra de acento en el borde de inicio |
 | Enlace dentro de un párrafo | Subrayado, no solo color |
@@ -133,7 +144,7 @@ mueva solo, también 2.2.2.
 No es un extra: es un ajuste de accesibilidad para quien tiene fotofobia o
 sensibilidad a la luz. Sigue al sistema por defecto y admite conmutación
 explícita con `data-theme`, que gana en las dos direcciones —para que quien tenga
-el sistema en oscuro pueda quedarse en claro—. **Los 36 pares están medidos en
+el sistema en oscuro pueda quedarse en claro—. **Los 48 pares están medidos en
 los dos modos**, no solo en el claro.
 
 ## Lo que se comprueba sobre pantallas montadas
@@ -185,5 +196,6 @@ ponía —contraste, foco visible y teclado a 375 px y en ultrawide—, y
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | La auditoría pasa de **36 pares a 48**: los doce que añaden los seis colores de categoría, que son los primeros que **elige el usuario** y no el sistema (cierre de huecos, Hito 4). Se anota que tres de los doce valores nuevos nacieron fuera del gamut sRGB y que la comprobación de gamut fue lo que lo destapó. |
 | 2026-08-11 | Se fija WCAG 2.2 AA como objetivo normativo y se documenta la auditoría de contraste de los 36 pares, con su script de comprobación en la CI. Se anota lo que queda pendiente de verificar sobre pantallas reales. |
 | 2026-08-17 | Se sustituye «lo que todavía no está comprobado» por lo que el recorrido vertical comprueba de verdad sobre pantallas montadas —axe en los dos modos, teclado con anillo de foco en cada parada, reflujo a 320, 375 y ultrawide, y anuncio único—, con lo que se cumple la condición de la ADR-006 y `look-and-feel.md` pasa a `Vigente`. Se anotan los dos falsos resultados que la propia medición produjo —auditar a mitad de la transición de tema y auditar con el `Spinner` puesto— y lo que sigue sin comprobarse: un lector de pantalla real, las diecisiete rutas que el recorrido no atraviesa y el conmutador de tema, que no existe. |

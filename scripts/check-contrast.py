@@ -70,6 +70,25 @@ PAIRS: list[tuple[str, str, float, str]] = [
     ("color-state-overdue", "color-surface", TEXT_MINIMUM, "estado VENCIDO sobre el papel"),
     ("color-state-decommissioned", "color-surface", TEXT_MINIMUM, "estado DADO DE BAJA sobre el papel"),
     ("color-state-out-of-stock", "color-surface", TEXT_MINIMUM, "estado SIN EXISTENCIAS sobre el papel"),
+    # Los seis colores entre los que un hogar elige la identidad de una categoria
+    # (ADR-015). Entran aqui porque son la primera parte de la interfaz que
+    # ELIGE EL USUARIO: sin estas doce filas serian lo unico cuyo contraste se
+    # afirma en vez de comprobarse, que es exactamente lo que el juego cerrado
+    # viene a impedir. Dos pares por color, que son las dos superficies sobre las
+    # que se pinta: su propio fondo suave --el marcador-- y `surface-sunken`, que
+    # es el hueco de una foto que falta.
+    ("color-category-rose", "color-category-rose-soft", TEXT_MINIMUM, "marcador de categoria rosa"),
+    ("color-category-rose", "color-surface-sunken", TEXT_MINIMUM, "categoria rosa sin foto"),
+    ("color-category-plum", "color-category-plum-soft", TEXT_MINIMUM, "marcador de categoria ciruela"),
+    ("color-category-plum", "color-surface-sunken", TEXT_MINIMUM, "categoria ciruela sin foto"),
+    ("color-category-indigo", "color-category-indigo-soft", TEXT_MINIMUM, "marcador de categoria indigo"),
+    ("color-category-indigo", "color-surface-sunken", TEXT_MINIMUM, "categoria indigo sin foto"),
+    ("color-category-sky", "color-category-sky-soft", TEXT_MINIMUM, "marcador de categoria cielo"),
+    ("color-category-sky", "color-surface-sunken", TEXT_MINIMUM, "categoria cielo sin foto"),
+    ("color-category-teal", "color-category-teal-soft", TEXT_MINIMUM, "marcador de categoria turquesa"),
+    ("color-category-teal", "color-surface-sunken", TEXT_MINIMUM, "categoria turquesa sin foto"),
+    ("color-category-moss", "color-category-moss-soft", TEXT_MINIMUM, "marcador de categoria musgo"),
+    ("color-category-moss", "color-surface-sunken", TEXT_MINIMUM, "categoria musgo sin foto"),
 ]
 
 LIGHT_DARK = re.compile(r"--([a-z0-9-]+):\s*light-dark\(\s*(oklch\([^)]*\))\s*,\s*(oklch\([^)]*\))\s*\)")

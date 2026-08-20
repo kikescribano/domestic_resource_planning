@@ -127,6 +127,34 @@ el rojo de error cambie.
 Un estado se pinta **siempre** con las tres piezas: color, icono y etiqueta. El
 mapa de iconos está en [`iconography.md`](../foundations/iconography.md).
 
+### Colores de categoría
+
+Los seis entre los que un hogar elige la identidad visual de cada categoría
+([ADR-015](../../../common/architecture/decisions/ADR-015-user-chosen-category-identity.md)).
+**Son la excepción a la regla de nombres de arriba, y la única**: el significado
+lo pone la persona que clasifica, no el sistema, así que un nombre semántico no
+existe —`--color-category-3` sería ilegible en la migración, en el contrato y
+aquí—. Ninguno cae encima de los cinco tonos del dominio ni del acento.
+
+| Token | Tono | Claro | Oscuro |
+|---|---|---|---|
+| `--color-category-rose` / `-soft` | 350 | `oklch(47% 0.14 350)` · `#913266` / `#fbe6ef` | `oklch(78% 0.12 350)` · `#f197c2` / `#391f2c` |
+| `--color-category-plum` / `-soft` | 310 | `oklch(46% 0.14 310)` · `#703c91` / `#f2e9fa` | `oklch(78% 0.11 310)` · `#cda4ec` / `#302239` |
+| `--color-category-indigo` / `-soft` | 275 | `oklch(46% 0.14 275)` · `#444da4` / `#e8ecfc` | `oklch(78% 0.11 275)` · `#a3b2fe` / `#22273f` |
+| `--color-category-sky` / `-soft` | 230 | `oklch(46% 0.09 230)` · `#056180` / `#dcf1fb` | `oklch(78% 0.1 230)` · `#6ec3eb` / `#112c39` |
+| `--color-category-teal` / `-soft` | 195 | `oklch(45% 0.07 195)` · `#156161` / `#daf3f2` | `oklch(78% 0.1 195)` · `#5ecbcb` / `#0b2f2f` |
+| `--color-category-moss` / `-soft` | 130 | `oklch(45% 0.1 130)` · `#42601d` / `#e6f1dc` | `oklch(78% 0.11 130)` · `#a0c679` / `#222d17` |
+
+**El croma no es uniforme a propósito**: `sky` y `teal` bajan a 0,09 y 0,07 en
+modo claro porque con más se salen del gamut sRGB a esa claridad, y un color
+recortado por el navegador deja de ser el color medido. Lo destapó la propia
+comprobación de gamut de `check-contrast.py`.
+
+Los doce pares que producen —cada color contra su `-soft` y contra
+`surface-sunken`, que es el marcador de una foto que falta— están en la lista del
+script, que es lo que impide que un color elegido por el usuario sea lo único de
+la interfaz sin medir.
+
 ## Tipografía
 
 | Token | Valor |
@@ -262,5 +290,6 @@ está usando tokens, ya funciona en los dos modos.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | Entran los **doce tokens de color de categoría** (cierre de huecos, Hito 4): seis colores con su variante suave, la primera familia que elige el usuario y la única con nombre descriptivo, con su excepción a la regla de nombres razonada. | Equipo DRP |
 | 2026-08-10 | Creación del catálogo con los tokens del Hito 1 y el contrato de modo oscuro. | Equipo DRP |
 | 2026-08-17 | La prueba determinista de los dos modos con `data-theme` ya existe, así que deja de anunciarse en futuro. Se anota lo que costó descubrirla: cambiar el atributo abre 140 ms de transición en los que cada color es una mezcla de los dos modos, y medir ahí da un contraste que no corresponde a ningún color del sistema. | Equipo DRP |
