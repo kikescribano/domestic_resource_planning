@@ -7,9 +7,12 @@ import {
   humanMessage,
   type Article,
   type Category,
+  type CategoryColor,
+  type CategoryIcon,
   type MeasurementUnit,
 } from '../api/client'
 import { useAuthenticatedSession } from '../auth/SessionProvider'
+import { CategoryMarker, IconColorPicker } from '../ui/catalog'
 import {
   Button,
   EmptyState,
@@ -88,10 +91,17 @@ function CatalogTab({
 // Categorías
 // ---------------------------------------------------------------------------
 
+type CategoryIdentity = { icon: CategoryIcon | null; color: CategoryColor | null }
+
 function CategoriesPanel() {
   const { accessToken } = useAuthenticatedSession()
   const queryClient = useQueryClient()
-  const [name, setName] = useState('')
+  const [draft, setDraft] = useState<CategoryIdentity & { name: string }>({
+    name: '',
+    icon: null,
+    color: null,
+  })
+  const [editing, setEditing] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
 
   const categories = useQuery({
@@ -100,11 +110,35 @@ function CategoriesPanel() {
   })
 
   const create = useMutation({
-    mutationFn: () => api.createCategory({ name }, accessToken),
+    mutationFn: () =>
+      api.createCategory({ name: draft.name, icon: draft.icon, color: draft.color }, accessToken),
     onSuccess: () => {
-      setName('')
+      setDraft({ name: '', icon: null, color: null })
       setFailure(null)
       void queryClient.invalidateQueries({ queryKey: ['categories'] })
+    },
+    onError: (error) => setFailure(humanMessage(error)),
+  })
+
+  const update = useMutation({
+    mutationFn: (edited: Category) =>
+      api.updateCategory(
+        edited.id,
+        {
+          name: edited.name,
+          notes: edited.notes ?? undefined,
+          icon: edited.icon,
+          color: edited.color,
+        },
+        accessToken,
+      ),
+    onSuccess: () => {
+      setEditing(null)
+      setFailure(null)
+      void queryClient.invalidateQueries({ queryKey: ['categories'] })
+      // Los assets pintan la cara de su categoría, así que un cambio aquí los
+      // deja mintiendo hasta que alguien recargue.
+      void queryClient.invalidateQueries({ queryKey: ['assets'] })
     },
     onError: (error) => setFailure(humanMessage(error)),
   })
@@ -128,11 +162,22 @@ function CategoriesPanel() {
       <form onSubmit={submit} className="flex max-w-form flex-col gap-3">
         <Field
           label="Nueva categoría"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
+          value={draft.name}
+          onChange={(event) => setDraft({ ...draft, name: event.target.value })}
           required
           hint="Se muestra tal cual, así que va en tu idioma."
         />
+
+        {/* Opcionales los dos, y sin nada preseleccionado: una categoría sin
+            cara es el caso normal de un hogar que acaba de empezar, y elegir por
+            él convertiría en dato lo que nadie llegó a mirar. */}
+        <IconColorPicker
+          icon={draft.icon}
+          color={draft.color}
+          context="categoría nueva"
+          onChange={(identity) => setDraft({ ...draft, ...identity })}
+        />
+
         <Button type="submit" variant="primary" busy={create.isPending} busyLabel="Creando…">
           Crear categoría
         </Button>
@@ -145,8 +190,12 @@ function CategoriesPanel() {
           <CategoryRow
             key={category.id}
             category={category}
+            editing={editing === category.id}
+            onEdit={() => setEditing(category.id)}
+            onCancel={() => setEditing(null)}
+            onSave={update.mutate}
             onRetire={() => retire.mutate(category.id)}
-            busy={retire.isPending}
+            busy={retire.isPending || update.isPending}
           />
         ))}
       </ul>
@@ -154,21 +203,87 @@ function CategoriesPanel() {
   )
 }
 
+/**
+ * Una fila del catálogo, que se convierte en su propio formulario al editarla.
+ *
+ * En la misma fila y no en otra pantalla: lo que se cambia aquí es sobre todo la
+ * cara, y elegirla sin el resto de categorías delante es elegir a ciegas — con
+ * doce a la vista se ve enseguida si el verde ya lo gasta otra.
+ *
+ * Y de paso deja de haber una operación del contrato sin sitio en la interfaz:
+ * `updateCategory` existía desde el Hito 2 y no había forma de llamarla.
+ */
 function CategoryRow({
   category,
+  editing,
+  onEdit,
+  onCancel,
+  onSave,
   onRetire,
   busy,
 }: {
   category: Category
+  editing: boolean
+  onEdit: () => void
+  onCancel: () => void
+  onSave: (edited: Category) => void
   onRetire: () => void
   busy: boolean
 }) {
+  const [edited, setEdited] = useState(category)
+
+  if (editing) {
+    return (
+      <li className="flex flex-col gap-3 rounded-md border border-border bg-surface-raised px-3 py-3">
+        <Field
+          label={`Nombre de ${category.name}`}
+          value={edited.name}
+          onChange={(event) => setEdited({ ...edited, name: event.target.value })}
+        />
+        <IconColorPicker
+          icon={edited.icon}
+          color={edited.color}
+          context={category.name}
+          onChange={(identity) => setEdited({ ...edited, ...identity })}
+        />
+        <div className="flex flex-wrap gap-2">
+          <Button variant="primary" busy={busy} busyLabel="Guardando…" onClick={() => onSave(edited)}>
+            Guardar
+          </Button>
+          <Button variant="ghost" onClick={onCancel}>
+            Cancelar
+          </Button>
+        </div>
+      </li>
+    )
+  }
+
   return (
     <li className="flex min-h-touch flex-wrap items-center justify-between gap-2 rounded-md border border-border-subtle bg-surface-raised px-3 py-2">
-      <span className="text-body text-ink">{category.name}</span>
-      <Button variant="ghost" onClick={onRetire} disabled={busy}>
-        Retirar
-      </Button>
+      <span className="flex items-center gap-2">
+        <CategoryMarker icon={category.icon} color={category.color} />
+        <span className="text-body text-ink">{category.name}</span>
+      </span>
+      <span className="flex flex-wrap gap-1">
+        {/* El nombre de la categoría dentro del nombre accesible: doce botones
+            «Editar» en columna son doce controles indistinguibles para quien no
+            ve la fila. Con `aria-label` y no con un `<span class="sr-only">`
+            detrás del texto, que es lo primero que se intentó: **JSX se come el
+            espacio inicial de la línea** y el lector de pantalla acababa
+            diciendo «EditarAlimentación». Y el rótulo visible sigue estando
+            dentro del nombre, que es lo que 2.5.3 exige. */}
+        <Button variant="ghost" onClick={onEdit} aria-label={`Editar ${category.name}`}>
+          Editar
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={onRetire}
+          disabled={busy}
+          aria-label={`Retirar ${category.name}`}
+        >
+          Retirar
+        </Button>
+      </span>
     </li>
   )
 }
