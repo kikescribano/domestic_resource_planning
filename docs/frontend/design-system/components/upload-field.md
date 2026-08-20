@@ -93,16 +93,16 @@ ocho; saltarse uno es lo que produce el campo que parece colgado. Ninguno se dic
 | **Reposo** | Disparador y pista | Elegir un fichero |
 | **Seleccionado** | Nombre y tamaño, sin barra | Nada: dura lo que tarda la comprobación local en pasar y el `XMLHttpRequest` en arrancar |
 | **Convirtiendo** | Barra indeterminada, «Convirtiendo la foto…» | Nada. Solo aparece con un HEIC, y ocurre **en esta máquina**: ver más abajo |
-| **Subiendo** | Barra al *n* %, porcentaje en texto y **Cancelar** | Cancelar, que aborta la petición |
+| **Subiendo** | Barra al *n* %, porcentaje en texto y **Cancelar** | Cancelar, que aborta la petición y **devuelve el foco al disparador** |
 | **Procesando** | Barra completa e indeterminada, «Procesando…» | Nada. Ver más abajo: no es lo mismo que terminado |
 | **Terminado** | Miniatura o icono, nombre, tamaño y **Quitar** | Quitar, que devuelve a reposo |
 | **Error** | El fichero elegido, el mensaje y qué hacer | Reintentar, elegir otro, o —si es la cuota— liberar espacio |
 | **Cancelado** | Vuelta a reposo, con una línea que dice que se canceló | Elegir otro fichero |
 
-> **Dos filas de esta tabla son especificación y no descripción**, y conviene
-> saberlo antes de fiarse: **Cancelar** no existe en el componente, y por tanto
-> **Cancelado** no se alcanza. Está en [Lo que falta](#lo-que-falta) con lo que
-> hay que escribir para que sea cierto.
+> **Y las ocho filas describen ahora lo que el componente hace**, que hasta el
+> 2026-08-20 no era cierto: **Cancelar** no existía y **Cancelado** no se
+> alcanzaba. La única espera que sigue sin poder cortarse es **Convirtiendo**, y
+> no por falta de botón — ver más abajo.
 
 **El 100 % no es el final, y confundirlos es el fallo clásico de esta pieza.**
 `upload.onprogress` mide **bytes enviados**; cuando llega a `total`, al servidor
@@ -122,8 +122,13 @@ sitio, y quien mira una barra quieta merece saber cuál de las dos esperas es.
 
 La barra va **indeterminada**, como en Procesando y por el mismo motivo elevado a
 regla: el decodificador no ofrece porcentaje —devuelve la imagen o no la
-devuelve—, así que dar uno sería inventarlo. **Y no se puede cancelar**, que es la
-limitación conocida de este estado: la conversión no admite aborto.
+devuelve—, así que dar uno sería inventarlo.
+
+**Y es el único de los ocho estados sin salida**, que es la asimetría que hay que
+tener presente: subiendo se cancela y convirtiendo no, porque el decodificador no
+ofrece por dónde abortar. Por eso el botón **no aparece** aquí en lugar de
+aparecer y no hacer nada, que es la otra forma de resolverlo y la que convierte
+una limitación en una mentira.
 
 **Un fichero subido y no adjuntado no es basura que haya que recoger.** Ocupa
 cuota desde que se reserva y no se puede adjuntar mientras `uploadedAt` siga a
@@ -380,9 +385,10 @@ Evidencias de prueba, en [`files.test.tsx`](../../../../frontend/src/routes/file
 y [`heic.test.ts`](../../../../frontend/src/api/heic.test.ts): que la subida va
 por `XMLHttpRequest` y no por `fetch` —con el progreso llegando—, que el `409` de
 cuota se traduce a algo que se puede hacer, que el selector ofrece HEIC sin que la
-lista blanca del servidor haya crecido, y que la conversión detecta por bytes,
-renombra a `.jpg` y no sube el original cuando falla. Lo que se dijo al escribir
-esta ficha, antes de que existieran:
+lista blanca del servidor haya crecido, que la conversión detecta por bytes,
+renombra a `.jpg` y no sube el original cuando falla, y que **cancelar aborta la
+petición, devuelve el campo a reposo y deja el foco en el disparador**. Lo que se
+dijo al escribir esta ficha, antes de que existieran:
 
 - `userEvent.upload` sobre el `<input>` localizado por `getByLabelText`, que de
   paso verifica que la atadura etiqueta–campo sobrevive a ocultarlo.
@@ -421,22 +427,16 @@ el campo dejaría la segunda sin ella.
 
 ### Lo que falta
 
-**La lista se había quedado atrás tres veces**, y se pone al día en vez de
+**La lista se había quedado atrás cuatro veces**, y se pone al día en vez de
 arrastrar lo que ya está hecho: la función de subida de `client.ts`, los cuatro
-códigos de error sin tipar y la conversión de HEIC estaban aquí y hoy existen las
-tres. Lo que queda:
+códigos de error sin tipar, la conversión de HEIC y **cancelar una subida**
+estaban aquí y hoy existen las cuatro. Lo que queda:
 
-- **Cancelar una subida en curso.** Es lo único que esta ficha describe y el
-  componente no tiene: la fila del fichero enseña **Quitar** cuando ha terminado
-  y no ofrece **Cancelar** mientras sube, así que el estado **Cancelado** tampoco
-  se alcanza. Está escrito arriba en presente porque es la especificación de la
-  pieza, y aquí en su sitio porque no es cierto todavía. Lo que falta es el
-  `AbortController` que el componente ya declara y no llega a usar; el `onabort`
-  del cliente sí está.
-- **Cancelar la conversión de HEIC no se puede, y no es lo mismo.** El
-  decodificador no ofrece por dónde abortar, así que esa espera se aguanta entera
-  aunque llegue el botón de arriba. Queda dicho para que no se cuente como parte
-  del mismo arreglo.
+- **Cancelar la conversión de HEIC sigue sin poder hacerse**, y no es lo mismo
+  que lo anterior: el decodificador no expone ningún punto de aborto, así que esa
+  espera se aguanta entera. No es una tarea pendiente sino una propiedad de la
+  librería, y cambiarla exige cambiar de librería o partir la decodificación en
+  trozos que se puedan abandonar.
 - **La reducción de tamaño en el cliente.** Una foto de móvil ronda los 3-8 MB y
   el tope son 25, así que no falla casi nunca; pero recomprimirla a 2000 px antes
   de subir ahorra cuota, ancho de banda y tiempo de espera, y el hogar solo tiene
@@ -472,5 +472,6 @@ tres. Lo que queda:
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **Cancelar una subida deja de ser especificación.** La ficha lo describía desde su primer día —el botón en la fila del fichero, el estado **Cancelado** y el foco de vuelta al disparador— y el componente no lo tenía: el `AbortController` estaba declarado y nunca se le asignaba nada, así que `cancelled` era inalcanzable. La señal viaja ahora desde `uploadFile` hasta el `XMLHttpRequest`, cuyo gancho `onabort` llevaba puesto desde el Hito 3 de la Fase 1 esperando a que alguien lo llamara. **El botón no aparece en Convirtiendo**, y eso no es un olvido: el decodificador de HEIC no ofrece por dónde abortar, así que enseñarlo ahí convertiría una limitación en una mentira. Se retira el aviso de que dos filas de la tabla eran especificación, y «Lo que falta» pierde su cuarta entrada ya hecha. | Equipo DRP |
 | 2026-08-20 | **La conversión de HEIC deja de faltar** (Hito 2 del cierre de huecos, [ADR-014](../../../common/architecture/decisions/ADR-014-heic-conversion.md)). Los estados pasan de siete a **ocho**: el nuevo, **Convirtiendo**, es el hueco simétrico del de Procesando —uno va antes del primer byte y ocurre en el dispositivo de quien sube; el otro, después del último y en el servidor—. El `accept` gana HEIC **sin que la lista blanca crezca**, que es la distinción que su apartado explica. Se pone al día el estado de la ficha, que seguía diciendo «previsto» con el componente construido, y **la lista de «Lo que falta» pierde tres entradas ya hechas** y gana la que faltaba de verdad: **cancelar una subida no está implementado**, aunque esta ficha lo describa desde el primer día. | Equipo DRP |
 | 2026-08-13 | Creación de la ficha al arrancar el Hito 3. El componente está **previsto**: no existe nada de esto en el frontend. | Equipo DRP |

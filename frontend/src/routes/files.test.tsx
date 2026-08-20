@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -217,6 +217,49 @@ describe('la subida de un fichero', () => {
     expect(request.headers).toEqual({ Authorization: 'Bearer token' })
   })
 
+  /**
+   * La ficha de `upload-field` describía **Cancelar** desde el Hito 3 de la Fase
+   * 1 y el componente no lo tenía: el `AbortController` estaba declarado y nunca
+   * se le asignaba nada, así que el estado `cancelled` era inalcanzable.
+   *
+   * Se prueba entero y no a trozos —el botón, el abort que llega al
+   * `XMLHttpRequest`, la vuelta a reposo y el foco— porque las cuatro cosas
+   * juntas son lo que la ficha exige, y las tres primeras sin la cuarta dejan a
+   * quien navega con teclado en el principio de la página.
+   */
+  it('cancelar aborta la petición, vuelve a reposo y devuelve el foco al disparador', async () => {
+    const request = fakeXhr({ status: 201, body: { id: 'file-9' } })
+
+    await signInAndVisit('Archivo', {
+      '/api/v1/storage': USAGE,
+      '/api/v1/files?size=200': FILES,
+    })
+
+    const chooser = await screen.findByLabelText('Subir un fichero')
+    await userEvent.upload(chooser, new File(['x'], 'foto.jpg', { type: 'image/jpeg' }))
+
+    // Hasta que no hay bytes en vuelo no hay nada que cancelar: el botón
+    // aparece con el primer `onprogress`, que es lo que lleva al estado
+    // `uploading`.
+    await untilOpened(request)
+    // Dentro de `act` porque esto sí actualiza el estado de un componente
+    // montado, a diferencia de las dos pruebas de abajo, que llaman a
+    // `uploadFile` sin pantalla delante.
+    await act(async () => {
+      request.upload.onprogress?.({ lengthComputable: true, loaded: 5, total: 10 } as ProgressEvent)
+    })
+
+    const cancel = await screen.findByRole('button', { name: 'Cancelar' })
+    await userEvent.click(cancel)
+
+    expect(request.aborted).toBe(true)
+    expect(await screen.findByText('Subida cancelada.')).toBeInTheDocument()
+    // Y el disparador recupera el foco. Es el `<input>` y no el `<label>`: el
+    // anillo lo pinta la etiqueta con `focus-within`, pero lo focusable es el
+    // campo que lleva dentro.
+    expect(chooser).toHaveFocus()
+  })
+
   it('traduce el 409 de cuota agotada a algo que se puede hacer', async () => {
     const request = fakeXhr({
       status: 409,
@@ -263,6 +306,14 @@ function fakeXhr(response: { status: number; body: unknown }) {
       this.headers[name] = value
     },
     send() {},
+    // El doble tiene que abortar de verdad y no solo apuntarlo: lo que la prueba
+    // mide es que la señal llega hasta aquí, y con un `abort()` vacío pasaría
+    // igual el día que dejara de llegar.
+    aborted: false,
+    abort() {
+      this.aborted = true
+      this.onabort?.()
+    },
   }
 
   vi.stubGlobal(

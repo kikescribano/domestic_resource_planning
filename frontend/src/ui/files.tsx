@@ -5,6 +5,7 @@ import {
   ALLOWED_FILE_TYPES,
   ApiError,
   CONVERTIBLE_FILE_TYPES,
+  UPLOAD_CANCELLED,
   formatBytes,
   humanMessage,
   uploadFile,
@@ -111,6 +112,15 @@ export function UploadField({
   const [progress, setProgress] = useState(0)
   const [failure, setFailure] = useState<string | null>(null)
   const inFlight = useRef<AbortController | null>(null)
+  /**
+   * El foco vuelve **al `<input>`**, no al `<label>`.
+   *
+   * Parece al revés porque lo que se ve es la etiqueta, y es justo por eso: el
+   * `<input>` está oculto a la vista pero no al foco, y el anillo lo pinta la
+   * etiqueta con `focus-within`. Enfocar el `<label>` no haría nada —no es
+   * focusable— y dejaría el foco en el `<body>`, que es como perderlo.
+   */
+  const trigger = useRef<HTMLInputElement | null>(null)
 
   function reset(next: UploadState) {
     setState(next)
@@ -128,6 +138,9 @@ export function UploadField({
     setProgress(0)
     setState('selected')
 
+    const controller = new AbortController()
+    inFlight.current = controller
+
     try {
       const stored = await uploadFile(
         file,
@@ -136,15 +149,19 @@ export function UploadField({
           setProgress(fraction)
           setState(fraction >= 1 ? 'processing' : 'uploading')
         },
-        { onConverting: () => setState('converting') },
+        { onConverting: () => setState('converting'), signal: controller.signal },
       )
       setUploaded(stored)
       setState('done')
       onUploaded(stored)
     } catch (problem) {
       // La cancelación no es un error que haya que explicar: se pidió.
-      if (problem instanceof Error && problem.message === 'Subida cancelada') {
+      if (problem instanceof Error && problem.message === UPLOAD_CANCELLED) {
         reset('cancelled')
+        // Y el foco vuelve a donde estaba antes de pulsar. Sin esto se queda en
+        // un botón que acaba de desaparecer del DOM, y quien navega con teclado
+        // se encuentra de vuelta al principio de la página.
+        trigger.current?.focus()
         return
       }
       setFailure(humanMessage(problem))
@@ -177,6 +194,7 @@ export function UploadField({
             `display:none` lo sacaría de los dos. */}
         <input
           id={inputId}
+          ref={trigger}
           type="file"
           accept={ACCEPT_ATTRIBUTE[accept]}
           disabled={disabled}
@@ -211,6 +229,17 @@ export function UploadField({
               {state === 'done' && ' · Subido'}
             </p>
           </div>
+
+          {/* La misma posición para las dos acciones, que es lo que la ficha
+              pide: **Cancelar** mientras sube y **Quitar** cuando ha terminado.
+              `converting` se queda fuera a propósito y no por olvido — el
+              decodificador de HEIC no ofrece por dónde abortar (ADR-014), así
+              que un botón ahí mentiría. */}
+          {state === 'uploading' && (
+            <Button type="button" variant="ghost" onClick={() => inFlight.current?.abort()}>
+              Cancelar
+            </Button>
+          )}
 
           {state === 'done' && (
             <Button type="button" variant="ghost" onClick={() => reset('idle')}>
