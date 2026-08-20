@@ -71,8 +71,11 @@ La condición que **sí** hay que tomarse en serio antes de exponerlo es doble:
    documentación hacen y que quedaron a medio cumplir*: el rate limit «cuando
    llegue nginx», la validación de secretos aplicada a un secreto sí y a otro
    no, y el reparto imagen/documento de la ADR-005. **Tres de los cinco ya están
-   corregidos** (los dos fail-open de secretos y el rate limit tras el proxy);
-   quedan los dos de dependencias, que son subidas de versión con riesgo propio.
+   corregidos** (los dos fail-open de secretos y el rate limit tras el proxy), y
+   del cuarto —las dependencias de Spring— está cerrada la parte que importaba
+   hoy: **todas las CVE concretas**, más la vigilancia continua que evita repetir
+   esta auditoría a mano. Queda el salto a la línea 4.x de Spring Boot, que es un
+   bloque propio, y la sustitución de `webp-imageio`.
 2. **El despliegue todavía no existe**, y sin TLS, firewall, secretos
    inyectados, backups automatizados y un compose de producción endurecido, la
    solidez del código no basta. Eso es un bloque de trabajo propio (§ Requisitos
@@ -90,7 +93,7 @@ cerró**; un guion en la segunda significa que sigue abierto.
 | 2 | ALTA | Fail-open del secreto JWT: sin perfil activo, producción arranca con la clave de ejemplo del repositorio | Infra | 2026-08-20 | 2026-08-20 |
 | 3 | ALTA | `DRP_FILES_LINK_SECRET` no se valida al arrancar: puede quedar el secreto de firma de desarrollo en producción | Ficheros | 2026-08-20 | 2026-08-20 |
 | 4 | ALTA | `webp-imageio 0.1.6` embebe libwebp anterior al fix de CVE-2023-4863 y decodifica WebP subido por usuarios | Deps | 2026-08-20 | — |
-| 5 | ALTA | Spring Boot 3.4.x fuera de soporte OSS y sin detección continua de dependencias | Deps | 2026-08-20 | — |
+| 5 | ALTA | Spring Boot 3.4.x fuera de soporte OSS y sin detección continua de dependencias | Deps | 2026-08-20 | parcial 2026-08-20 |
 | 6 | MEDIA | `CloseAccount` (`DELETE /users/me`) no re-autentica: un access token robado expulsa a la víctima de forma permanente | AuthZ | 2026-08-20 | — |
 | 7 | MEDIA | Rotación de refresh sin detección de reutilización (robo indetectable) | Auth | 2026-08-20 | — |
 | 8 | MEDIA | Sesión deslizante sin tope absoluto: renovada una vez al mes, vive para siempre | Auth | 2026-08-20 | — |
@@ -257,12 +260,50 @@ punto accionable no depende de ninguna en particular:
   antes conviene comprobar al montar el escáner.
 
 - **OWASP:** Vulnerable Dependency Management; CI/CD Security.
-- **Acción:** (a) migrar a la línea de Spring Boot con soporte vigente —es un
-  salto menor y merece ser su propio bloque de trabajo—; (b) añadir
+- **Acción:** (a) migrar a la línea de Spring Boot con soporte vigente; (b) añadir
   `dependabot.yml` con los tres ecosistemas (`gradle`, `npm`, `github-actions`),
   un job de escaneo (Trivy / OWASP Dependency-Check / `gradle dependencyUpdates`)
   y activar secret scanning + push protection. Esto último es lo que evita
   repetir esta auditoría a mano.
+
+> **Corrección: la primera versión de este hallazgo decía «migrar a Spring Boot
+> 3.5.x, es un salto menor», y eso era falso.** Al ir a ejecutarlo se comprobó
+> contra el repositorio de artefactos que **la 3.5 también está fuera de soporte
+> OSS** —terminó el 2026-06-30, con la 3.5.16 como último parche— y que la línea
+> con soporte es la **4.x**, hoy en 4.1.1. El destino no es un salto menor sino
+> uno mayor, que arrastra **Jackson 3 con cambio de `groupId`**
+> (`com.fasterxml.jackson` → `tools.jackson`), Kotlin 2.2+, Spring Security 7,
+> Hibernate 7 y la línea 3.x de springdoc.
+>
+> Merece la pena decir **cómo** se detectó, porque es un modo de fallo que se
+> repetirá: las páginas que agregan fechas de fin de vida daban versiones que no
+> existen, y el índice de búsqueda de Maven Central respondía que la última
+> versión era la 3.5.3. Lo que zanjó la cuestión fue el `maven-metadata.xml` del
+> propio repositorio, que es el único sitio donde la respuesta no es una opinión.
+
+### 5.b Peldaño intermedio: 3.5.16
+
+- **Corregido en parte.** El salto a la 4.1 no se hace de una vez: la propia guía
+  de migración de Spring exige pasar antes por la última 3.5.x, y ese peldaño
+  **ya cierra por sí solo todas las CVE concretas** que este hallazgo listaba.
+  Versiones que resuelve el BOM tras el salto, comprobadas con
+  `gradle dependencies`: Spring Security **6.5.11** (hacía falta ≥ 6.5.9 para
+  CVE-2026-22732), Spring Framework **6.2.19**, Tomcat embebido **10.1.55**
+  (CVE-2025-48988) y `nimbus-jose-jwt` **9.37.4** (CVE-2025-53864) — la que más
+  importaba, porque se parsea un JWT en peticiones sin autenticar. Con ellas
+  entran también springdoc **2.9.0**, que acompaña a Boot y no se elige aparte, y
+  BouncyCastle **1.85.2**, que salda el hallazgo BAJA de las CVE de ASN.1.
+- **Lo que queda abierto** es el salto a la línea 4.x, que es un bloque propio por
+  lo que arrastra. Mientras no se dé, el proyecto sigue en una rama sin parches
+  nuevos: lo cerrado son las CVE de hoy, no la capacidad de recibir las de mañana.
+- **Corregido también:** la detección continua, que era la otra mitad del
+  hallazgo. Entra `.github/dependabot.yml` con los tres ecosistemas y las
+  actualizaciones agrupadas —el BOM de Spring mueve decenas de artefactos, y un
+  pull request por cada uno convierte la vigilancia en ruido que se acaba
+  ignorando—, y la CI declara `permissions: contents: read`. **Sigue pendiente y
+  no se puede hacer desde el repositorio:** activar Dependabot alerts, las
+  actualizaciones de seguridad y el escaneo de secretos con protección de push,
+  que son ajustes de la configuración del repositorio en GitHub.
 
 ---
 
@@ -470,7 +511,8 @@ Endurecimiento recomendado; ninguno bloquea el despliegue por sí solo.
 - **[BAJA] BouncyCastle `bcprov-jdk18on:1.80`** en rango de CVE-2025-8885/8916
   (DoS parseando ASN.1), pero el vector no está expuesto: BC solo respalda Argon2
   y el código no parsea ASN.1 de entrada no fiable. **Acción:** subir a 1.80.2+
-  en la misma pasada de dependencias.
+  en la misma pasada de dependencias. **Corregido** (1.85.2) junto al peldaño de
+  Spring Boot.
 - **[BAJA] Cambio de rol o expulsión con hasta 15 min de retardo.** El rol viaja
   en el JWT y el filtro no consulta la BD; `ChangeUserRole` no revoca y
   `DeactivateUser` solo revoca refresh. Compromiso consciente y documentado,
@@ -625,3 +667,4 @@ Lo que la auditoría comprobó como correcto, para que no se toque sin querer:
 |---|---|---|
 | 2026-08-20 | Creación: auditoría OWASP previa al despliegue en VPS, sobre las 106 operaciones y 31 tablas del cierre de huecos. Cinco superficies auditadas; sin vulnerabilidades críticas; cinco ALTA y catorce MEDIA en el código actual, más los requisitos del despliegue. | kikescribano |
 | 2026-08-20 | **Corregidos los tres ALTA acotados**, que eran los tres «a medio cumplir»: el rate limit recupera la IP del cliente tras un proxy declarado de confianza (`drp.rate-limit.trusted-proxies`, leyendo la **última** entrada de `X-Forwarded-For`), la ausencia de perfil pasa a contar como producción —con `bootRun` declarando `dev` y la tarea de pruebas `test`— y el secreto de firma de ficheros se valida al arrancar igual que el del JWT. La tabla del resumen gana **fecha de detección y de corrección** por hallazgo, para que se pueda decir cuánto tiempo estuvo vivo cada uno y no solo si está cerrado. Quedan abiertos los dos ALTA de dependencias, que van en su propio bloque. | kikescribano |
+| 2026-08-20 | **Hallazgo 5, cerrado en parte, y con una corrección del propio informe delante**: la recomendación original —«migrar a Spring Boot 3.5.x, es un salto menor»— **era falsa**, y se descubrió al ir a ejecutarla. La 3.5 también está fuera de soporte OSS desde el 2026-06-30 y la línea con soporte es la 4.x; el destino es un salto **mayor** que arrastra Jackson 3 con cambio de `groupId`, Kotlin 2.2+, Spring Security 7 y Hibernate 7. Se deja escrito cómo se detectó, porque el modo de fallo se repetirá: las páginas de fechas de fin de vida daban versiones inexistentes y el índice de búsqueda de Maven Central respondía con una versión atrasada; lo zanjó el `maven-metadata.xml` del repositorio. Entra el **peldaño 3.5.16** que la guía de Spring exige antes del salto y que **ya cierra todas las CVE concretas** del hallazgo —Spring Security 6.5.11, Framework 6.2.19, Tomcat 10.1.55 y nimbus-jose-jwt 9.37.4—, con springdoc 2.9.0 y BouncyCastle 1.85.2 detrás. Y entra la **vigilancia continua**, que era la otra mitad: `dependabot.yml` con los tres ecosistemas y actualizaciones agrupadas, más `permissions: contents: read` en la CI. | kikescribano |
