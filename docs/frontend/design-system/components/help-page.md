@@ -66,9 +66,11 @@ lista vacía sin explicación sería indistinguible de una rota.
 Mientras hay búsqueda activa, **las coincidencias se resaltan** dentro de las
 tarjetas con `<mark>`: la comparación normalizada encuentra y el recorte sale
 del texto original —«prestamo» resalta «préstamo», tilde incluida—. El color
-del resalte es la pareja que la capa base ya usa para el `::selection`
-—`accent-soft` con la tinta normal—, así que no estrena combinación de
-contraste.
+del resalte es la pareja ámbar `warning-soft` + `warning` —la del distintivo
+de «Prestado», medida en `check-contrast.py`—, con `font-medium` para que el
+color no sea el único portador. La primera versión usó la pareja del
+`::selection` y no sobrevivió a mirarla: sobre una tarjeta en modo oscuro
+apenas se distinguía.
 
 Sin variantes y sin estados remotos: el único estado es el texto del buscador.
 
@@ -143,6 +145,7 @@ que nació, que es como se hereda la auditoría.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **El resalte cambia a la pareja ámbar** `warning-soft` + `warning` con `font-medium`: la pareja del `::selection` sobre una tarjeta en modo oscuro apenas se veía, que es lo contrario de resaltar. | Equipo DRP |
 | 2026-08-20 | **Las coincidencias de la búsqueda se resaltan** dentro de las tarjetas con `<mark>`, recortando del texto original lo que encontró la comparación normalizada, y con la pareja de color del `::selection` de la capa base. | Equipo DRP |
 | 2026-08-20 | **El bloque único se parte en tarjetas**: cada pantalla pasa a ser una sección —cabecera con su enlace— y debajo una tarjeta por la explicación general y una por caso de uso, en rejilla de dos columnas desde `md`. El motivo es el buscador, que ahora filtra **tarjeta a tarjeta** en lugar de bloques enteros: una palabra que solo vive en un ejemplo deja esa tarjeta sola bajo su cabecera. | Equipo DRP |
 | 2026-08-20 | **Cada bloque se reparte en dos partes bajo subtítulo** —«Explicación general» y «Casos de uso»— y los casos pasan de uno a uno por funcionalidad, cada uno con su ejemplo práctico. La revisión que lo trajo corrigió además dos afirmaciones que la pantalla real desmintió: el papel se elige **al invitar** —no hay cambio de rol en Personas— y el avatar se pone en **Cuenta**. | Equipo DRP |

@@ -573,8 +573,13 @@ function cardsOf(topic: HelpTopic, needle: string): HelpCardData[] {
  * hace falta el mapa de índices: normalizar puede comerse caracteres (los
  * diacríticos descompuestos), y sin mapa el recorte bailaría.
  *
- * El color es el que el sistema ya usa para texto resaltado: la pareja del
- * `::selection` de la capa base, `accent-soft` con la tinta normal.
+ * El color fue primero la pareja del `::selection` —`accent-soft` con la
+ * tinta normal— y no sobrevivió a mirarlo: sobre una tarjeta en modo oscuro
+ * apenas se distinguía. El resalte usa la pareja ámbar `warning-soft` +
+ * `warning` —la del distintivo de «Prestado», medida en check-contrast.py—,
+ * que en los dos modos hace lo que un resalte tiene que hacer: verse antes de
+ * leerse. El `font-medium` acompaña para que el color no sea el único
+ * portador.
  */
 function highlightMatches(text: string, needle: string): ReactNode {
   if (!needle) return text
@@ -600,7 +605,7 @@ function highlightMatches(text: string, needle: string): ReactNode {
     const end = last + 1
     if (start > cursor) parts.push(text.slice(cursor, start))
     parts.push(
-      <mark key={`${start}-${end}`} className="rounded-sm bg-accent-soft text-ink">
+      <mark key={`${start}-${end}`} className="rounded-sm bg-warning-soft font-medium text-warning">
         {text.slice(start, end)}
       </mark>,
     )
