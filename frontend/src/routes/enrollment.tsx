@@ -46,6 +46,8 @@ function messageFor(error: unknown): string {
       return 'Esta invitación ya no vale: puede haber caducado, haberse usado o haberse retirado.'
     case 'IDENTITY_ALREADY_MEMBER':
       return 'Esa cuenta ya pertenece a otro hogar.'
+    case 'HOUSEHOLD_LIMIT_REACHED':
+      return 'Esta instalación no admite más hogares. Habla con quien la administra.'
     case 'UNAUTHORIZED':
       return 'El correo o la contraseña no son correctos.'
     default:

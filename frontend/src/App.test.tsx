@@ -147,6 +147,29 @@ describe('alta de un hogar', () => {
     expect(field).toHaveAttribute('aria-invalid', 'true')
     expect(field).toHaveAccessibleDescription(/demasiado común/)
   })
+
+  it('cuando la instalación está llena lo dice, sin culpar a los datos', async () => {
+    goTo('/crear-hogar')
+    stubFetch({
+      'POST /api/v1/households': {
+        status: 409,
+        body: { code: 'HOUSEHOLD_LIMIT_REACHED', message: 'La instalación no admite más hogares' },
+      },
+    })
+
+    render(<App />)
+    await userEvent.type(screen.getByLabelText('Nombre del hogar'), 'Casa')
+    await userEvent.type(screen.getByLabelText('Tu nombre'), 'Kike')
+    await userEvent.type(screen.getByLabelText('Tu correo'), 'kike@example.test')
+    await userEvent.type(screen.getByLabelText('Contraseña'), 'el gato duerme en el sofa')
+    await userEvent.click(screen.getByRole('button', { name: 'Crear el hogar' }))
+
+    // El 409 de la instalación llena es idéntico para todo el mundo, así que el
+    // mensaje habla de la instalación y no de nada que el usuario escribiera: ni
+    // el formulario está mal ni el correo delata nada.
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Esta instalación no admite más hogares. Habla con quien la administra.')
+  })
 })
 
 describe('recuperar la contraseña', () => {

@@ -150,6 +150,11 @@ paths:
         utilizable hasta verificar. Responde siempre 202, exista o no ya ese
         correo: contestar otra cosa permitiria averiguar quien esta
         registrado.
+
+
+        La unica excepcion es la instalacion llena: si tiene tope de hogares
+        y esta alcanzado, responde 409 HOUSEHOLD_LIMIT_REACHED -- identico
+        para todo el mundo, asi que tampoco delata quien esta registrado.
       security: []
       requestBody:
         required: true
@@ -160,6 +165,14 @@ paths:
         "202":
           description: Solicitud aceptada. Sin cuerpo, y siempre la misma respuesta.
         "400": { $ref: "#/components/responses/BadRequest" }
+        "409":
+          description: >
+            La instalacion ha alcanzado su tope de hogares
+            (HOUSEHOLD_LIMIT_REACHED). La misma respuesta exista o no el
+            correo.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
         default: { $ref: "#/components/responses/ServerError" }
 
@@ -3814,6 +3827,7 @@ components:
             - FILE_TYPE_NOT_ALLOWED
             - HOUSEHOLD_CLOSURE_ALREADY_REQUESTED
             - HOUSEHOLD_CLOSURE_NOT_REQUESTED
+            - HOUSEHOLD_LIMIT_REACHED
             - IDENTITY_ALREADY_MEMBER
             - IDENTITY_CLOSED
             - INTAKE_QUANTITY_NOT_POSITIVE

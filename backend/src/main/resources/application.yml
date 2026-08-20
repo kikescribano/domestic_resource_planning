@@ -75,6 +75,16 @@ server:
     context-path: /
 
 drp:
+  enrollment:
+    # Cuantos hogares admite la instalacion; el alta de mas responde 409
+    # HOUSEHOLD_LIMIT_REACHED. **Cero es sin tope**, que es lo que quiere el
+    # desarrollo; el valor real es una decision de despliegue (ADR-016) y vive
+    # en el .env del servidor, nunca aqui. Cuentan todos los hogares que
+    # existen, incluidos los pendientes de verificar y los que cursan su baja:
+    # mientras la fila este, el hueco esta ocupado, y las dos purgas lo
+    # devuelven solas.
+    max-households: ${DRP_MAX_HOUSEHOLDS:0}
+
   schedule:
     # El programador de la pasada diaria (ADR-011). Encendido por omision, que
     # es lo que quiere un despliegue; las pruebas lo apagan, porque una pasada

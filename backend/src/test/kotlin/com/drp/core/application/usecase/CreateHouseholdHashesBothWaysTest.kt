@@ -154,6 +154,10 @@ class CreateHouseholdHashesBothWaysTest {
         tenantContext = PassThroughTenantContext,
         transactions = TransactionTemplate(NoOpTransactionManager),
         clock = Clock.fixed(Instant.parse("2026-08-19T10:00:00Z"), ZoneOffset.UTC),
+        // Sin tope: lo que el tope hace tiene su propia prueba, en
+        // CreateHouseholdLimitTest, y aqui solo estorbaria.
+        policy = EnrollmentPolicy(maxHouseholds = 0),
+        directory = EmptyDirectory,
     )
 
     private fun command(email: String) = CreateHouseholdCommand(
@@ -286,6 +290,10 @@ class CreateHouseholdHashesBothWaysTest {
     private object PassThroughTenantContext : TenantContext {
         override fun currentHousehold(): UUID? = null
         override fun <T> runAs(householdId: UUID?, block: () -> T): T = block()
+    }
+
+    private object EmptyDirectory : com.drp.platform.tenant.HouseholdDirectory {
+        override fun allHouseholdIds(): List<UUID> = emptyList()
     }
 
     /** Lo justo para que `TransactionTemplate` ejecute el bloque y no haga nada más. */

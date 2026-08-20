@@ -123,7 +123,7 @@ El contrato completo, con todos los recursos, parámetros y esquemas de error, s
   }
 }
 ```
-> Sin autenticar. Responde `202 Accepted` **sin cuerpo y siempre igual**, exista o no ya ese correo: contestar otra cosa permitiría averiguar quién está registrado. Lo que ocurra de verdad se explica en el correo que llega. No devuelve sesión — el hogar no es utilizable hasta verificar.
+> Sin autenticar. Responde `202 Accepted` **sin cuerpo y siempre igual**, exista o no ya ese correo: contestar otra cosa permitiría averiguar quién está registrado. Lo que ocurra de verdad se explica en el correo que llega. No devuelve sesión — el hogar no es utilizable hasta verificar. La única excepción es una instalación con tope de hogares ya alcanzado, que responde `409` y `HOUSEHOLD_LIMIT_REACHED` — idéntico para todo el mundo, así que tampoco delata nada.
 
 **`POST /api/v1/auth/verify-email`** — request y respuesta
 ```json
