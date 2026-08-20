@@ -8,11 +8,15 @@ import { SESSION_CLAIMS, fakeTokenPair, stubFetch, type StubbedRoute } from '../
 /**
  * La baja del hogar y el cierre de cuenta, en la pantalla (ADR-012).
  *
+ * La zona de peligro vive en «General» (`/configuracion`), la pantalla de
+ * configuración que solo ve quien administra; cerró la pantalla de «Hogar»
+ * hasta que la navegación ganó el grupo «Configuración».
+ *
  * Lo que se comprueba aquí es lo que **solo se ve aquí**: que la confirmación
  * escrita mantiene el botón deshabilitado hasta que lo tecleado coincide exacto,
  * que el aviso de la baja sale con su fecha **en cualquier pantalla** y no solo
- * en la del hogar, y que quien no administra ve el aviso pero no la zona de
- * peligro.
+ * en la de configuración, y que a quien no administra la ruta lo devuelve al
+ * inicio en lugar de enseñarle la zona de peligro.
  *
  * Lo que no se comprueba aquí es la purga, que no tiene pantalla y vive en la
  * batería del backend, donde se puede mover el reloj.
@@ -74,7 +78,7 @@ afterEach(() => {
 
 describe('la zona de peligro de la baja del hogar', () => {
   it('el botón está deshabilitado hasta que lo escrito coincide exacto', async () => {
-    await resumeAt('/', { 'GET /api/v1/households/current': household(null) })
+    await resumeAt('/configuracion', { 'GET /api/v1/households/current': household(null) })
 
     const zone = await screen.findByRole('heading', { name: 'Dar de baja el hogar' })
     expect(zone).toBeInTheDocument()
@@ -100,7 +104,7 @@ describe('la zona de peligro de la baja del hogar', () => {
   })
 
   it('confirmar pide la baja al servidor', async () => {
-    const stub = await resumeAt('/', {
+    const stub = await resumeAt('/configuracion', {
       'GET /api/v1/households/current': household(null),
       'POST /api/v1/households/current/closure': household(REQUESTED),
     })
@@ -116,11 +120,15 @@ describe('la zona de peligro de la baja del hogar', () => {
     ).toBe(true)
   })
 
-  it('quien no administra no ve la zona de peligro del hogar', async () => {
-    await resumeAt('/', { 'GET /api/v1/households/current': household(null) }, 'HOUSEHOLD_MEMBER')
+  it('a quien no administra la ruta lo devuelve al inicio, sin zona de peligro', async () => {
+    await resumeAt('/configuracion', { 'GET /api/v1/households/current': household(null) }, 'HOUSEHOLD_MEMBER')
 
+    // El guardián de la pantalla redirige, así que lo que se monta es «Hogar».
     await screen.findByRole('heading', { level: 1, name: 'Hogar' })
     expect(screen.queryByRole('heading', { name: 'Dar de baja el hogar' })).not.toBeInTheDocument()
+    // Y el grupo «Configuración» tampoco está en su navegación.
+    expect(screen.queryByRole('link', { name: 'General' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Módulos del hogar' })).not.toBeInTheDocument()
   })
 })
 
@@ -151,7 +159,7 @@ describe('el aviso mientras dura la gracia', () => {
   })
 
   it('con la baja pedida, la pantalla ofrece cancelarla sin ninguna fricción', async () => {
-    const stub = await resumeAt('/', {
+    const stub = await resumeAt('/configuracion', {
       'GET /api/v1/households/current': household(REQUESTED),
       'DELETE /api/v1/households/current/closure': household(null),
     })

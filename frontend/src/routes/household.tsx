@@ -11,6 +11,7 @@ import {
   House,
   LogOut,
   MapPin,
+  Settings,
   Users,
 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
@@ -40,38 +41,91 @@ import { BrandMark, Button, DangerZone, Field, Notice, PageHeading, Spinner, Sta
  */
 
 /**
- * Las cuatro paradas de todos los días, que son las que caben en el pulgar.
+ * Las cuatro paradas que caben en el pulgar: **las cuatro primeras de «Tu
+ * hogar», en su mismo orden**. Desde el reagrupado del 2026-08-20 el orden de
+ * la navegación es uno solo para las dos plataformas, así que la barra
+ * inferior es un recorte de la columna y no otra lista: «Avisos» entró en el
+ * pulgar y «Ubicaciones» salió hacia «Datos maestros».
  *
- * El corte entre estas y las de abajo no es de importancia sino de **frecuencia**:
- * lo de arriba se usa a diario y lo de abajo se toca al montar el hogar o cuando
- * hay algo que arreglar.
+ * El tope sigue siendo aritmética: cinco paradas a 320 px —estas cuatro y
+ * «Más»— y una sexta las deja por debajo de los 44 px que exige la dirección
+ * visual. Lo que gana una pantalla nueva es sitio en la columna y en «Más»,
+ * no un hueco en el pulgar.
  */
-const PRIMARY_NAVIGATION = [
-  { to: '/', label: 'Hogar', end: true, icon: House },
-  { to: '/inventario', label: 'Inventario', end: false, icon: Boxes },
-  { to: '/ubicaciones', label: 'Ubicaciones', end: false, icon: MapPin },
-  { to: '/prestamos', label: 'Préstamos', end: false, icon: Handshake },
-]
+const THUMB_STOPS = new Set(['/', '/avisos', '/inventario', '/prestamos'])
 
 /**
- * El resto del core. En escritorio va en la barra lateral; en móvil, en «Más».
+ * Los tres grupos de la navegación, en el orden en que se enseñan. **El orden
+ * de los grupos y el de sus paradas es una decisión de producto, no una
+ * casualidad del código**: lo de todos los días arriba, lo que estructura el
+ * hogar en medio y lo que lo configura al final.
  *
- * **La bandeja de avisos entra aquí y no en la barra inferior**, y no es una
- * apreciación: el tope medido son cinco paradas a 320 px —cuatro y «Más»— y una
- * sexta las deja por debajo de los 44 px que exige la dirección visual. Así que
- * lo que gana una pantalla nueva es sitio en la columna del escritorio y en
- * «Más», no un hueco en el pulgar.
+ * - **Tu hogar** es la actividad: lo que pasa y lo que hay que atender.
+ * - **Datos maestros** es lo que las demás pantallas consultan: quién, qué y
+ *   dónde. El nombre es el término de un ERP a conciencia — este es doméstico,
+ *   pero es un ERP.
+ * - **Configuración** solo existe para quien administra: un miembro no puede
+ *   tocar nada de lo que hay dentro, y un grupo entero de puertas cerradas es
+ *   peor que ningún grupo.
  *
- * «Cuenta» no está en la lista: es de la persona y no del hogar, así que
- * acompaña a la marca —bajo el sello en escritorio, cerrando «Más» en móvil—
- * junto a la salida directa. Ver [AccountControls].
+ * Las paradas de módulo son huecos con posición fija: si el módulo está activo
+ * la parada aparece ahí, y si no, no está — la tercera capa del gate de la
+ * ADR-010. Ya no hay un grupo «Módulos»: cada módulo vive donde su contenido
+ * pertenece, y la puerta para encenderlos es «Módulos del hogar», dentro de
+ * Configuración.
+ *
+ * «Cuenta» sigue sin ser una parada: es de la persona y no del hogar, y
+ * acompaña a la marca junto a la salida directa. Ver [AccountControls].
  */
-const SECONDARY_NAVIGATION = [
-  { to: '/avisos', label: 'Avisos', end: false, icon: Bell },
-  { to: '/catalogo', label: 'Catálogo', end: false, icon: BookOpen },
-  { to: '/usuarios', label: 'Personas', end: false, icon: Users },
-  { to: '/almacenamiento', label: 'Archivo', end: false, icon: HardDrive },
-]
+function useNavigationGroups() {
+  const modules = useActiveModuleScreens()
+  const { isAdmin } = useSession()
+
+  const moduleStop = (key: string) =>
+    modules
+      .filter((screen) => screen.key === key)
+      .map((screen) => ({ to: screen.path, label: screen.label, end: false, icon: screen.icon }))
+
+  const groups = [
+    {
+      id: 'nav-home',
+      label: 'Tu hogar',
+      items: [
+        { to: '/', label: 'Hogar', end: true, icon: House },
+        { to: '/avisos', label: 'Avisos', end: false, icon: Bell },
+        { to: '/inventario', label: 'Inventario', end: false, icon: Boxes },
+        { to: '/prestamos', label: 'Préstamos', end: false, icon: Handshake },
+        ...moduleStop('MAINTENANCE'),
+        ...moduleStop('PURCHASING'),
+        ...moduleStop('WAREHOUSE'),
+      ],
+    },
+    {
+      id: 'nav-master',
+      label: 'Datos maestros',
+      items: [
+        { to: '/usuarios', label: 'Personas', end: false, icon: Users },
+        { to: '/catalogo', label: 'Catálogo', end: false, icon: BookOpen },
+        { to: '/ubicaciones', label: 'Ubicaciones', end: false, icon: MapPin },
+        ...moduleStop('SUPPLIERS'),
+        { to: '/almacenamiento', label: 'Archivo', end: false, icon: HardDrive },
+      ],
+    },
+  ]
+
+  if (isAdmin) {
+    groups.push({
+      id: 'nav-config',
+      label: 'Configuración',
+      items: [
+        { to: '/configuracion', label: 'General', end: false, icon: Settings },
+        { to: '/modulos', label: 'Módulos del hogar', end: false, icon: Blocks },
+      ],
+    })
+  }
+
+  return groups
+}
 
 /**
  * El icono de una parada de la navegación. Mismo juego (Lucide), mismo trazo
@@ -194,8 +248,8 @@ function ClosureBanner({ household }: { household: Household }) {
     <div className="mb-6">
       <Notice tone="warning" title={`Este hogar se borrará el ${formatDate(household.closure.effectiveAt)}`}>
         Se pidió darlo de baja. Hasta esa fecha todo sigue funcionando igual, y quien administre el
-        hogar puede cancelarlo desde <Link to="/" className="underline">Hogar</Link>. Después no se
-        podrá recuperar nada.
+        hogar puede cancelarlo desde <Link to="/configuracion" className="underline">General</Link>.
+        Después no se podrá recuperar nada.
       </Notice>
     </div>
   )
@@ -234,22 +288,23 @@ export function RequireSession() {
  * y columna lateral desde `md`, donde ese aire empieza a costar más de lo que
  * aporta.
  *
- * **Y desde la Fase 2, dos grupos y no una lista.** Cuatro módulos llevaban la
- * navegación de ocho entradas a doce, y doce no caben en una barra inferior: a
- * 320 px, las ocho de antes ya daban 40 px de ancho por parada, por debajo de los
- * 44 px que la dirección visual exige de todo objetivo táctil. Así que el móvil
- * lleva **cuatro paradas y «Más»**, que es una pantalla con el resto; y el
- * escritorio, donde la columna no se queda corta, las enseña todas repartidas en
- * **el hogar** y **los módulos**. Un hogar sin módulos activos ve sus ocho
- * enlaces del core intactos y una novena entrada, que es la puerta para encender
- * alguno.
+ * **Tres grupos y no una lista**: [useNavigationGroups] los define —actividad,
+ * datos maestros y, solo para quien administra, configuración— y esta es la
+ * pieza que los presenta sin renunciar al `<nav>` único. El orden es el mismo
+ * en las dos plataformas: en móvil los grupos se disuelven
+ * (`display: contents`) y quedan las cuatro primeras paradas de «Tu hogar»
+ * ([THUMB_STOPS]) y «Más» — la barra es un recorte de la columna, no otra
+ * lista—; desde `md` cada grupo es su lista rotulada. Cada enlace existe
+ * **una sola vez** en el DOM, que es lo que el patrón defiende desde el Hito 0
+ * de la Fase 2: dos copias son dos recorridos para quien navega con lector de
+ * pantalla.
  *
  * **«Cuenta» no es una parada**: acompaña a la marca con la salida directa al
  * lado —en escritorio bajo el sello, dentro del banner y fuera del landmark de
  * navegación; en móvil, en el apartado que cierra «Más»—.
  */
 function HouseholdShell() {
-  const modules = useActiveModuleScreens()
+  const groups = useNavigationGroups()
   const household = useHousehold()
 
   return (
@@ -281,32 +336,40 @@ function HouseholdShell() {
         <nav aria-label="Principal" className="flex md:flex-col md:gap-6">
           {/* Los rótulos de grupo se leen siempre aunque solo se vean desde
               `md`: `aria-labelledby` toma el texto de un elemento oculto igual
-              que de uno visible, así que en móvil las dos listas siguen estando
+              que de uno visible, así que en móvil las listas siguen estando
               nombradas para quien navega sin verlas. Son párrafos y no
               encabezados a propósito: un `h2` aquí saldría antes que el `h1` del
-              contenido y dejaría el documento con los niveles al revés. */}
-          <p id="nav-core" className="hidden text-caption text-ink-subtle md:block">
-            Tu hogar
-          </p>
-          <ul className="flex flex-1 md:flex-col md:gap-1" aria-labelledby="nav-core">
-            {PRIMARY_NAVIGATION.map((item) => (
-              <li key={item.to} className="flex flex-1 md:flex-none">
-                <NavLink to={item.to} end={item.end} className={navLinkClass}>
-                  <item.icon {...NAV_ICON} />
-                  <span>{item.label}</span>
-                </NavLink>
-              </li>
-            ))}
-            {SECONDARY_NAVIGATION.map((item) => (
-              <li key={item.to} className="hidden md:flex">
-                <NavLink to={item.to} end={item.end} className={navLinkClass}>
-                  <item.icon {...NAV_ICON} />
-                  <span>{item.label}</span>
-                </NavLink>
-              </li>
-            ))}
-            {/* La quinta parada del móvil, y solo del móvil: en escritorio no
-                hay nada detrás de ella que no esté ya en la columna. */}
+              contenido y dejaría el documento con los niveles al revés.
+
+              El `contents` de cada envoltorio y cada lista es lo que deja que
+              a lo ancho del pulgar las paradas y el «Más», que viven en listas
+              distintas, convivan en la misma fila; el DOM conserva la
+              jerarquía entera —div, ul, li—, así que las listas siguen siendo
+              listas para el lector de pantalla. */}
+          {groups.map((group) => (
+            <div key={group.id} className="contents md:block">
+              <p id={group.id} className="hidden text-caption text-ink-subtle md:block">
+                {group.label}
+              </p>
+              <ul className="contents md:mt-1 md:flex md:flex-col md:gap-1" aria-labelledby={group.id}>
+                {group.items.map((item) => (
+                  <li
+                    key={item.to}
+                    className={THUMB_STOPS.has(item.to) ? 'flex flex-1 md:flex-none' : 'hidden md:flex'}
+                  >
+                    <NavLink to={item.to} end={item.end} className={navLinkClass}>
+                      <item.icon {...NAV_ICON} />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          {/* La quinta parada del móvil, y solo del móvil: en escritorio no
+              hay nada detrás de ella que no esté ya en la columna. */}
+          <ul className="contents">
             <li className="flex flex-1 md:hidden">
               <NavLink to="/mas" className={navLinkClass}>
                 <Ellipsis {...NAV_ICON} />
@@ -314,28 +377,6 @@ function HouseholdShell() {
               </NavLink>
             </li>
           </ul>
-
-          <div className="hidden md:block">
-            <p id="nav-modules" className="text-caption text-ink-subtle">
-              Módulos
-            </p>
-            <ul className="mt-1 flex flex-col gap-1" aria-labelledby="nav-modules">
-              {modules.map((module) => (
-                <li key={module.key} className="flex">
-                  <NavLink to={module.path} className={navLinkClass}>
-                    <module.icon {...NAV_ICON} />
-                    <span>{module.label}</span>
-                  </NavLink>
-                </li>
-              ))}
-              <li className="flex">
-                <NavLink to="/modulos" className={navLinkClass}>
-                  <Blocks {...NAV_ICON} />
-                  <span>Módulos del hogar</span>
-                </NavLink>
-              </li>
-            </ul>
-          </div>
         </nav>
       </header>
 
@@ -396,7 +437,7 @@ const MORE_ROW =
   'flex min-h-touch items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 text-body text-ink'
 
 export function MorePage() {
-  const modules = useActiveModuleScreens()
+  const groups = useNavigationGroups()
   const exit = useSignOut()
 
   return (
@@ -408,35 +449,29 @@ export function MorePage() {
 
       <PageHeading title="Más" icon={Ellipsis} />
 
+      {/* Los mismos grupos de la columna, menos lo que ya está en el pulgar.
+          Un grupo que se queda sin paradas no pinta ni el rótulo. */}
       <nav aria-label="Resto del hogar">
-        <ul className="flex flex-col gap-2">
-          {SECONDARY_NAVIGATION.map((item) => (
-            <li key={item.to}>
-              <Link to={item.to} className={MORE_ROW}>
-                <item.icon {...NAV_ICON} />
-                {item.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        {groups.map((group) => {
+          const items = group.items.filter((item) => !THUMB_STOPS.has(item.to))
+          if (items.length === 0) return null
 
-        <h2 className="mt-8 font-display text-title-sm text-ink">Módulos</h2>
-        <ul className="mt-3 flex flex-col gap-2">
-          {modules.map((module) => (
-            <li key={module.key}>
-              <Link to={module.path} className={MORE_ROW}>
-                <module.icon {...NAV_ICON} />
-                {module.label}
-              </Link>
-            </li>
-          ))}
-          <li>
-            <Link to="/modulos" className={MORE_ROW}>
-              <Blocks {...NAV_ICON} />
-              Módulos del hogar
-            </Link>
-          </li>
-        </ul>
+          return (
+            <section key={group.id} className="mt-8 first:mt-0">
+              <h2 className="font-display text-title-sm text-ink">{group.label}</h2>
+              <ul className="mt-3 flex flex-col gap-2">
+                {items.map((item) => (
+                  <li key={item.to}>
+                    <Link to={item.to} className={MORE_ROW}>
+                      <item.icon {...NAV_ICON} />
+                      {item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )
+        })}
       </nav>
 
       {/* El apartado de la persona cierra la pantalla, fuera del landmark de
@@ -466,7 +501,6 @@ export function MorePage() {
 
 export function HomePage() {
   const session = useAuthenticatedSession()
-  const { isAdmin } = useSession()
   const household = useHousehold()
 
   return (
@@ -498,11 +532,37 @@ export function HomePage() {
           </div>
         )}
       </dl>
+    </>
+  )
+}
 
-      {/* La baja solo la ve y la toca quien administra. Un miembro se entera por
-          el aviso de arriba, que sí sale para todos: enterarse no es lo mismo
-          que poder hacerlo. */}
-      {isAdmin && household.data && <HouseholdClosureSection household={household.data} />}
+/**
+ * «General»: lo que configura el hogar entero, para quien lo administra.
+ *
+ * Nace con la baja del hogar, que hasta ahora cerraba la pantalla de «Hogar»:
+ * la configuración es del papel y no de la portada, y con el grupo
+ * «Configuración» en la navegación la zona de peligro tiene por fin una casa
+ * que un miembro ni siquiera ve. Por eso el guardián: el grupo no se pinta
+ * para un miembro, y la ruta tecleada a mano lo devuelve al inicio en lugar de
+ * enseñarle una pantalla en la que no puede tocar nada. El aviso de la baja no
+ * se pierde con el traslado — vive en el shell y lo ven todos.
+ */
+export function GeneralSettingsPage() {
+  const { isAdmin } = useSession()
+  const household = useHousehold()
+
+  if (!isAdmin) return <Navigate to="/" replace />
+
+  return (
+    <>
+      <PageHeading title="General" icon={Settings} />
+      <p className="text-body-sm text-ink-muted">
+        Lo que afecta al hogar entero. De momento, solo su baja.
+      </p>
+
+      {/* Mientras el hogar carga no se pinta nada: un hueco que aparece es
+          menos ruidoso que uno que parpadea. */}
+      {household.data && <HouseholdClosureSection household={household.data} />}
     </>
   )
 }

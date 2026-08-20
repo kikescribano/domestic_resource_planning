@@ -876,7 +876,9 @@ test.describe('recorrido vertical', () => {
     ).toBeVisible()
 
     // --- 1. La zona de peligro, que no se dispara con un clic ---------------
-    await navigateTo(page, 'Hogar', '/', true)
+    // Vive en «General», dentro del grupo «Configuración» que solo ve quien
+    // administra — y quien acaba de crear el hogar administra.
+    await navigateTo(page, 'General', '/configuracion')
     const confirm = page.getByRole('button', { name: 'Dar de baja el hogar' })
     await expect(confirm).toBeDisabled()
 
@@ -914,7 +916,7 @@ test.describe('recorrido vertical', () => {
     await checkReflow(page, 'el hogar con la baja pedida')
 
     // --- 3. Cancelarla, y comprobar que sigue todo --------------------------
-    await navigateTo(page, 'Hogar', '/', true)
+    await navigateTo(page, 'General', '/configuracion')
     await page.getByRole('button', { name: 'Cancelar la baja' }).click()
 
     await expect(page.getByText(/Este hogar se borrará el/)).toHaveCount(0)
@@ -1299,10 +1301,14 @@ const AUDITED_SCREENS = [
   { link: 'Ubicaciones', path: '/ubicaciones', heading: 'Ubicaciones' },
   { link: 'Personas', path: '/usuarios', heading: 'Personas' },
   // Las dos que la baja de hogar (ADR-012) llenó de contenido nuevo: «Hogar»
-  // estrena la zona de peligro y «Cuenta», el cierre de cuenta. No son rutas
-  // nuevas, pero lo que hay dentro sí lo es, y la auditoría se hereda por estar
-  // aquí en vez de escribirse aparte.
+  // estrenó la zona de peligro y «Cuenta», el cierre de cuenta. No eran rutas
+  // nuevas, pero lo que había dentro sí lo era, y la auditoría se hereda por
+  // estar aquí en vez de escribirse aparte. La zona de peligro se mudó después
+  // a «General», que entra abajo con el grupo «Configuración».
   { link: 'Hogar', path: '/', heading: 'Hogar', exact: true },
+  // «General» entra el 2026-08-20, al nacer con el grupo «Configuración» de la
+  // navegación: hereda aquí la zona de peligro de la baja, que era de «Hogar».
+  { link: 'General', path: '/configuracion', heading: 'General' },
   // «Cuenta» se llega por el banner: acompaña a la marca desde que dejó de ser
   // una parada de la lista, con la salida directa al lado.
   { link: 'Cuenta', path: '/cuenta', heading: 'Cuenta', landmark: 'banner' as const },
