@@ -13,6 +13,7 @@ docs/
 │   ├── architecture/         Contexto, contenedores, flujos y ADRs
 │   ├── contracts/            Contratos compartidos entre frontend y backend
 │   ├── standards/            Convenciones transversales
+│   ├── security/             Seguridad que cruza backend, frontend e infraestructura
 │   ├── skills/               Catálogo y definición de skills compartidas
 │   ├── marketing/            Presentaciones, identidad visual y mensajes
 │   └── templates/            Plantillas documentales
@@ -41,6 +42,7 @@ docs/
 |---|---|
 | Define producto, vocabulario o una decisión que afecta a toda la solución | `common/` |
 | Define un contrato observable por frontend y backend | `common/contracts/` |
+| Trata seguridad que cruza backend, frontend e infraestructura | `common/security/` |
 | Explica cómo el backend implementa una responsabilidad | `backend/` |
 | Explica experiencia, interfaz o implementación web | `frontend/` |
 | Describe una capacidad reutilizable en toda la solución | `common/skills/` |
