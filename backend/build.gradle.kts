@@ -12,7 +12,7 @@ plugins {
     // Security, Tomcat y Spring Framework. El salto a la 4.1 va aparte: arrastra
     // Jackson 3 con cambio de groupId, Kotlin 2.2+, Spring Security 7 y
     // Hibernate 7, y mezclarlo con esto haria imposible saber que rompio que.
-    id("org.springframework.boot") version "3.5.16"
+    id("org.springframework.boot") version "4.1.0"
     id("io.spring.dependency-management") version "1.1.7"
 }
 
@@ -60,7 +60,7 @@ dependencies {
     // 3.4 y el soporte de la 3.5 llega despues, asi que subir Boot sin subir esto
     // es la forma habitual de que Swagger deje de responder. La linea 3.x de
     // springdoc es la del Boot 4 y entra con el, no antes.
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.0")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
 
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
