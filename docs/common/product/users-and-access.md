@@ -26,7 +26,7 @@ El hogar es la unidad de aislamiento que agrupa a todo lo demás (ver 5.6), y ha
 |---|---|
 | Identificador (`id`) | — |
 | Nombre (`name`) | — |
-| Zona horaria (`timeZone`) | Identificador IANA, p. ej. `Europe/Madrid`. **La necesita el proceso diario de vencidos** (ver 4.1.5): «la fecha prevista ya pasó» no significa nada sin saber respecto a qué huso, y un hogar no tiene por qué estar donde esté el servidor |
+| Zona horaria (`timeZone`) | Identificador IANA, p. ej. `Europe/Madrid`. **Es el calendario del hogar**: toda regla que compare un día —que una intervención no sea del futuro, que una revisión toque hoy, que un lote haya caducado— resuelve su «hoy» con ella, porque un día de calendario no significa nada sin una zona y un hogar no tiene por qué estar donde esté el servidor. Lo que **no** la usa es el vencimiento de un préstamo (ver 4.1.5): `dueAt` es un instante y compararlo no necesita ninguna zona |
 | Fecha de alta (`createdAt`) | — |
 | Última modificación (`updatedAt`) | — |
 

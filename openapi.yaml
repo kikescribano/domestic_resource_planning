@@ -3811,7 +3811,10 @@ components:
         name: { type: string }
         timeZone:
           type: string
-          description: Identificador IANA, p. ej. Europe/Madrid
+          description: >
+            Identificador IANA. Es el calendario del hogar, y lo que el cliente
+            usa para saber que dia es hoy en el: el dia de UTC no vale, porque en
+            la franja entre las dos medianoches es otro.
           example: Europe/Madrid
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -3934,7 +3937,10 @@ components:
         timeZone:
           type: string
           example: Europe/Madrid
-          description: Identificador IANA. Lo usa el proceso diario de vencidos
+          description: >
+            Identificador IANA. Es el calendario del hogar: toda regla que compare
+            un dia --que una intervencion no sea del futuro, que una revision
+            toque hoy, que un lote haya caducado-- resuelve su "hoy" con ella
         admin:
           type: object
           required: [name, email, password]
