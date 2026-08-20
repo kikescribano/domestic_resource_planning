@@ -444,7 +444,7 @@ describe('árbol de ubicaciones', () => {
 
     const tree = await screen.findByRole('tree', { name: 'Ubicaciones del hogar' })
     const [, despensa] = within(tree).getAllByRole('treeitem')
-    await userEvent.click(within(despensa!).getByRole('button', { name: 'Borrar' }))
+    await userEvent.click(within(despensa!).getByRole('button', { name: 'Borrar Despensa' }))
 
     expect(await screen.findByText('No se puede borrar: todavía hay cosas guardadas ahí.')).toBeInTheDocument()
   })
@@ -491,7 +491,7 @@ describe('árbol de ubicaciones', () => {
 
     const tree = await screen.findByRole('tree', { name: 'Ubicaciones del hogar' })
     const [, despensa] = within(tree).getAllByRole('treeitem')
-    await userEvent.click(within(despensa!).getByRole('button', { name: 'Editar' }))
+    await userEvent.click(within(despensa!).getByRole('button', { name: 'Editar Despensa' }))
 
     const form = await screen.findByRole('heading', { name: 'Editar «Despensa»' })
     // El foco se va al formulario: quien lo abrió con el teclado estaba en un
@@ -519,10 +519,10 @@ describe('árbol de ubicaciones', () => {
 
     const tree = await screen.findByRole('tree', { name: 'Ubicaciones del hogar' })
     const [casa] = within(tree).getAllByRole('treeitem')
-    // El primero: un `treeitem` con hijas los contiene dentro, así que ahí abajo
-    // hay más botones «Editar» que no son el suyo. En orden de DOM, la fila del
-    // nodo va antes que su lista de hijas.
-    await userEvent.click(within(casa!).getAllByRole('button', { name: 'Editar' })[0]!)
+    // El nombre accesible lleva el del sitio, así que en un `treeitem` con hijas
+    // —que contiene los botones de todas ellas— el suyo se consulta sin
+    // ambigüedad.
+    await userEvent.click(within(casa!).getByRole('button', { name: 'Editar Casa del Pinar' }))
 
     // Meter la casa dentro de su propia despensa es el ciclo que el servidor
     // rechaza con LOCATION_CYCLE. Aquí ni se ofrece: la negativa del servidor es

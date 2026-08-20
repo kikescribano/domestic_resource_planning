@@ -26,7 +26,7 @@ import { useId, useState } from 'react'
  * `index.css`, para que ninguno pueda olvidarlo.
  */
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'ghost-danger'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant
@@ -39,6 +39,10 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   secondary: 'border border-border bg-surface-raised text-ink hover:bg-surface-hover',
   ghost: 'text-accent-ink hover:bg-surface-hover',
   danger: 'border border-danger text-danger hover:bg-danger-soft',
+  // El ghost de lo destructivo: mismo silencio que `ghost` pero en el rojo del
+  // esquema, para la acción de borrar que vive dentro de una fila y no puede
+  // cargar con el borde del `danger` en cada una.
+  'ghost-danger': 'text-danger hover:bg-danger-soft',
 }
 
 export function Button({
