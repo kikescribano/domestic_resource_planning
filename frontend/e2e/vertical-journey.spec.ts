@@ -65,6 +65,29 @@ const SHELL_CAP = 1536
  */
 const HEIC_FIXTURE = fileURLToPath(new URL('../src/test/fixtures/photo-with-gps.heic', import.meta.url))
 
+/**
+ * Un PDF mínimo, escrito aquí y no versionado como fichero.
+ *
+ * A diferencia del HEIC, este **sí** se puede fabricar: son cinco objetos y una
+ * cabecera, y el servidor no lo decodifica —de un `application/pdf` la firma de
+ * los primeros bytes es toda la comprobación que hay (5.8.3)—, así que meterlo en
+ * `fixtures/` sería versionar un binario que cabe en seis líneas.
+ *
+ * Su papel es dar a la rejilla **una celda sin miniatura**, que es el caso que se
+ * quedaba sin nombre accesible.
+ */
+const MINIMAL_PDF = Buffer.from(
+  [
+    '%PDF-1.4',
+    '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj',
+    '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj',
+    '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj',
+    'trailer<</Root 1 0 R>>',
+    '%%EOF',
+  ].join('\n'),
+  'latin1',
+)
+
 test.describe('recorrido vertical', () => {
   test('de dar de alta un hogar a devolver un préstamo desde el correo', async ({ page, browser }) => {
     const email = `persona-${Date.now()}@example.test`
@@ -907,7 +930,10 @@ test.describe('recorrido vertical', () => {
     // Con el nombre en `.jpg`: es lo que se ha guardado. Dejarlo en `.heic`
     // describiría unos bytes que ya no existen en ninguna parte.
     await expect(page.getByText('photo-with-gps.jpg')).toBeVisible()
-    await expect(page.getByRole('img', { name: /photo-with-gps/ })).toBeVisible()
+    // Por el botón y no por la imagen: la miniatura es decorativa —`alt=""`—
+    // desde que el nombre accesible lo lleva la celda, que es lo que la ficha de
+    // `file-gallery` pedía y lo que dejaba mudo al PDF mientras no se cumplió.
+    await expect(page.getByRole('button', { name: 'Abrir photo-with-gps.jpg' })).toBeVisible()
 
     // --- 4. Lo que se guardó, y lo que no ------------------------------------
     const token = await accessToken(request, email, password)
@@ -973,6 +999,22 @@ test.describe('recorrido vertical', () => {
     const navigation = page.getByRole('navigation', { name: 'Principal' })
     await expect(navigation.getByRole('link', { name: 'Mantenimiento' })).toBeVisible()
 
+    // **Un fichero dentro, y esto no es decoración de la prueba.** «Archivo»
+    // entra en la lista de abajo, y sin nada subido esa pantalla pinta su vacío:
+    // axe recorrería una rejilla que no existe y la auditoría diría que pasa sin
+    // haber mirado ninguna celda. Es exactamente el agujero por el que la celda
+    // de un PDF se pasó una semana sin nombre accesible.
+    //
+    // Se sube un **PDF** a propósito, que es el caso sin miniatura: el que se
+    // quedaba mudo.
+    const seeded = await request.post('/api/v1/files', {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: 'factura-caldera.pdf', mimeType: 'application/pdf', buffer: MINIMAL_PDF },
+      },
+    })
+    expect(seeded.status(), 'no se pudo sembrar el fichero de la auditoría').toBe(201)
+
     // El caso peor de la fase, medido una sola vez porque la navegación es una:
     // doce paradas a 320 px, con su suelo de 44 px y sin desbordar.
     await checkTouchTargets(page)
@@ -992,14 +1034,24 @@ test.describe('recorrido vertical', () => {
 })
 
 /**
- * Las pantallas que la Fase 2 añadió, más las dos que el cierre de huecos llenó
- * de contenido nuevo, con el nombre por el que se llega a ellas desde la
- * navegación.
+ * Las pantallas que la Fase 2 añadió, más las tres del core que se han ido
+ * metiendo aquí porque no tenían auditoría propia, con el nombre por el que se
+ * llega a ellas desde la navegación.
  *
  * Es una lista y no seis llamadas sueltas a propósito: **una pantalla nueva se
  * añade aquí y hereda la auditoría entera**, que es lo contrario de lo que pasó
  * en la Fase 1, donde el criterio de accesibilidad se dio por cubierto pantalla a
  * pantalla y una se quedó sin él.
+ *
+ * **Y el nombre ya es directamente falso**, que es lo que el Hito 6 del cierre de
+ * huecos tiene apuntado: aquí dentro hay tres pantallas del core —«Tu hogar»,
+ * «Tu cuenta» y «Archivo»— y ninguna es de la Fase 2. Se deja el renombrado a ese
+ * hito en vez de hacerlo de paso, pero conviene saber que la lista describe hoy
+ * «lo que se audita» y no «lo que trajo la Fase 2».
+ *
+ * **Lo que sigue sin auditar son cuatro pantallas del core**: Inventario, Sitios,
+ * Catálogo y Personas. Préstamos y Avisos sí tienen su llamada suelta en los
+ * recorridos de arriba.
  */
 const PHASE_TWO_SCREENS = [
   { link: 'Módulos del hogar', path: '/modulos', heading: 'Módulos' },
@@ -1009,6 +1061,10 @@ const PHASE_TWO_SCREENS = [
   // aquí en vez de escribirse aparte.
   { link: 'Hogar', path: '/', heading: 'Tu hogar', exact: true },
   { link: 'Cuenta', path: '/cuenta', heading: 'Tu cuenta' },
+  // «Archivo» entra el 2026-08-20, y con un fichero sembrado: es la pantalla de
+  // la rejilla de ficheros, y no la miraba axe ni aquí ni en ninguna llamada
+  // suelta. La celda de un PDF llevaba una semana sin nombre accesible por eso.
+  { link: 'Archivo', path: '/almacenamiento', heading: 'Almacenamiento' },
   { link: 'Avisos', path: '/avisos', heading: 'Avisos' },
   { link: 'Proveedores', path: '/proveedores', heading: 'Proveedores' },
   { link: 'Almacén', path: '/almacen', heading: 'Almacén' },

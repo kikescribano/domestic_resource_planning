@@ -126,13 +126,41 @@ describe('el almacenamiento del hogar', () => {
     expect(screen.getByText('2,3 MB')).toBeInTheDocument()
 
     // La imagen sí tiene miniatura; el PDF pinta el icono de tipo, y por eso
-    // solo hay una imagen en la rejilla.
-    const thumbnails = screen.getAllByRole('img')
+    // solo hay un `<img>` en la rejilla. Se busca por etiqueta y no por rol
+    // porque la miniatura es **decorativa** desde que el nombre lo lleva el
+    // botón: con `alt=""` sale del árbol de accesibilidad y `getAllByRole('img')`
+    // ya no la encuentra.
+    const thumbnails = document.querySelectorAll('ul[aria-label="Ficheros del hogar"] img')
     expect(thumbnails).toHaveLength(1)
-    expect(thumbnails[0]).toHaveAttribute('alt', 'estanteria.jpg')
+    expect(thumbnails[0]).toHaveAttribute('alt', '')
     // Nativa y perezosa: es lo que la URL firmada permite conservar y lo que
     // descartaba pintar desde un blob.
     expect(thumbnails[0]).toHaveAttribute('loading', 'lazy')
+  })
+
+  /**
+   * El defecto que el repaso de las fichas destapó el 2026-08-20: la celda
+   * tomaba su nombre del `alt` de la miniatura, y **un PDF no tiene miniatura**,
+   * así que su botón se quedaba mudo — «botón» y nada más, en la rejilla donde
+   * todo son facturas y manuales.
+   *
+   * Se comprueban **los dos casos**, porque el arreglo mueve el nombre de la
+   * imagen al botón y podría haber dejado la imagen anunciándolo dos veces.
+   */
+  it('cada celda se nombra por su fichero, tenga miniatura o no', async () => {
+    await signInAndVisit('Archivo', {
+      '/api/v1/storage': USAGE,
+      '/api/v1/files?size=200': FILES,
+    })
+
+    // El PDF, que es el que estaba mudo.
+    expect(await screen.findByRole('button', { name: 'Abrir manual-caldera.pdf' })).toBeInTheDocument()
+    // Y la imagen, que lo tenía por el `alt` y ahora lo tiene por el botón.
+    expect(await screen.findByRole('button', { name: 'Abrir estanteria.jpg' })).toBeInTheDocument()
+
+    // La miniatura queda decorativa: el nombre está escrito al lado y en el
+    // botón, y anunciarlo tres veces es ruido.
+    expect(screen.queryByRole('img', { name: 'estanteria.jpg' })).not.toBeInTheDocument()
   })
 
   it('borrar un fichero refresca también la cuota, porque se libera en el acto', async () => {

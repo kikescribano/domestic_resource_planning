@@ -30,7 +30,11 @@ fichas sirven de algo: la documentación del Hito 1 falló exactamente por ahí.
 > Lo que **no** se hace al repasar es lo contrario del arreglo: si una ficha
 > describe algo que el componente no tiene, se marca como pendiente y no se borra
 > la especificación. Es lo que pasó con **Cancelar** en `upload-field.md`, que
-> llevaba dos fases descrito sin existir y acabó construyéndose por estar escrito.
+> llevaba dos fases descrito sin existir y acabó construyéndose por estar escrito
+> — y con el **nombre accesible de la celda** en `file-gallery.md`, que estaba
+> especificado al detalle, incumplido en el código y sin ninguna prueba que lo
+> notara. Las dos veces, lo que hizo falta para arreglarlo fue que siguiera
+> escrito.
 
 > **Un detalle de vocabulario sin resolver.** El campo `Estado` de la cabecera es
 > el **estado documental** —`Borrador`, `En revisión`, `Vigente`, `Obsoleto`, que
@@ -217,6 +221,7 @@ porque es donde se incumplen:
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **Los dos defectos que el repaso destapó, arreglados.** La celda de la galería lleva su nombre accesible en el botón y la miniatura pasa a decorativa —tal y como `file-gallery.md` lo tenía especificado desde el primer día—, y **«Archivo» entra en la pasada sistemática de axe** con un fichero sembrado, porque auditarla vacía no habría mirado ninguna celda. Quedan **cuatro pantallas del core sin auditar**: Inventario, Sitios, Catálogo y Personas. | Equipo DRP |
 | 2026-08-20 | **Repaso de las doce fichas contra el código, una a una.** `avatar.md` y `file-gallery.md` decían «Previsto. No existe» de componentes construidos en el Hito 3 —siete días antes—, y `card.md`, `field.md` y `status-badge.md` arrastraban en «Lo que falta» cosas que la Fase 2 había resuelto: `PageHeading` salió de `household.tsx`, llegó `SelectField` y los tonos de dominio del distintivo existen. `button.md`, `notice.md` y `spinner.md` **no cambian ni una afirmación** —lo suyo era el marco, que hablaba en futuro de un hito cerrado hace dos fases—, y `danger-zone.md`, `loan-external-page.md` y `suppliers-page.md` estaban al día. Lo que **no** se hizo: borrar la especificación de lo que no existe. Donde el componente se queda corto, la entrada se queda y gana precisión — así es como `Textarea`, el campo numérico y el `<select>` sin migrar de `household.tsx` siguen escritos. El repaso destapó además dos cosas que no son de documentación y quedan anotadas en la ficha de la galería: **la celda de un PDF no tiene nombre accesible** y **la pantalla «Archivo» no entra en ninguna pasada de axe**, que es por lo que no se había visto. Se anota el desajuste del campo `Estado`, que seis fichas usan como estado documental y seis como estado de implementación, y las seis primeras pasan de `Borrador` a `Vigente`: describen componentes construidos y auditados. | Equipo DRP |
 | 2026-08-12 | Creación del directorio con las seis fichas de los componentes que existen, y el registro de los que el Hito 2 va a pedir. | Equipo DRP |
 | 2026-08-14 | Las tres anatomías del Hito 3 pasan de previstas a **implementadas**, en un fichero propio —`files.tsx`— y no en `primitives.tsx`: traen estado y una petición en curso, que es otra clase de complejidad. Se añade `QuotaMeter`, que la ficha de `UploadField` documentaba como variante y acabó siendo pieza aparte. | Equipo DRP |

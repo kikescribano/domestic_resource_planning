@@ -331,15 +331,19 @@ Antiusos:
 Evidencias de prueba, en
 [`files.test.tsx`](../../../../frontend/src/routes/files.test.tsx): que un PDF
 pinta su marcador y **no** un `<img>` con `src` vacío, que quitar un fichero
-refresca también la cuota, y que el `409` de un fichero en uso dice qué hacer.
+refresca también la cuota, que el `409` de un fichero en uso dice qué hacer, y que
+**cada celda se nombra por su fichero, tenga miniatura o no** — los dos casos, y
+que la miniatura no lo repite.
+
+Y en el recorrido vertical: **la pantalla entera pasa por axe en los dos modos**,
+con un PDF sembrado por la API para que la rejilla tenga una celda de verdad. Sin
+ese fichero la auditoría recorrería el estado vacío y diría que pasa sin haber
+mirado ninguna celda, que es exactamente como el defecto de arriba llegó a existir.
 
 Lo que se dijo al escribir la ficha y **sigue sin cubrirse**:
 
 - Que el `onError` de una imagen dispara la invalidación de la entidad y no una
   segunda petición de la misma URL. `onStale` está cableado y nada lo mide.
-- Que la celda es alcanzable y activable con teclado, y que **su nombre accesible
-  incluye el nombre del fichero** — ver «Lo que falta», porque hoy no lo incluye
-  en un caso.
 - Que la rejilla vacía pinta el vacío con su acción.
 
 Ojo con `jsdom`: no carga imágenes, así que ni `onLoad` ni `onError` se disparan
@@ -370,17 +374,6 @@ descargar un documento **está escrito**, aunque no por donde esta ficha esperab
 va por `window.open` sobre `/api/v1/files/{id}/content`, no por `client.ts`. Eso
 último deja en pie la mitad técnica del apunte, que se conserva más abajo.
 
-Y una entrada nueva, que es un defecto y no una carencia:
-
-- **La celda de un PDF no tiene nombre accesible.** El `<button>` de la celda
-  toma su nombre del `alt` de la miniatura, y un PDF no tiene miniatura: se pinta
-  un icono `aria-hidden` y el botón se queda **mudo**. Quien navega con lector de
-  pantalla oye «botón» y nada más, justo en la rejilla donde todo son facturas y
-  manuales. Se arregla con un `aria-label` en el botón, y **hace falta también la
-  prueba**, porque esto ha pasado desapercibido por una razón que conviene saber:
-  **la pantalla «Archivo» no está en la pasada sistemática de accesibilidad** —no
-  aparece en `PHASE_TWO_SCREENS` ni tiene una llamada suelta a `checkAccessibility`
-  en el recorrido vertical—, así que axe no la ha mirado nunca.
 - **No hay visor de imagen.** Abrir una foto a tamaño completo pide un `Dialog` o
   una hoja, y no hay ninguno de los dos. Mientras tanto, abrir una imagen es
   descargarla, que funciona pero no es lo que se espera de tocar una foto.
@@ -422,5 +415,6 @@ Y una entrada nueva, que es un defecto y no una carencia:
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **Arreglado el defecto que el repaso destapó, y tapado el agujero que lo escondía.** La celda lleva ahora su nombre accesible en el botón —«Abrir factura-caldera.pdf»— y la miniatura pasa a `alt=""`, que es lo que esta ficha especificaba desde el primer día y la implementación no había cumplido: el nombre salía del `alt`, y un PDF no tiene miniatura de la que sacarlo. Y **«Archivo» entra en la pasada sistemática de axe** con un PDF sembrado por la API, porque auditar esa pantalla vacía habría vuelto a no mirar ninguna celda. Comprobado quitando el arreglo: la auditoría falla con `button-name`. | Equipo DRP |
 | 2026-08-20 | **La ficha se pone al día con el código.** Decía «Previsto. No existe» de un componente construido en el Hito 3, y su «Lo que falta» arrastraba dos entradas resueltas: la celda compartida —que acabó siendo el componente entero, así que `FileTile` no hizo falta— y la descarga de un documento, que está escrita aunque no por donde esta ficha esperaba. Las evidencias de prueba pasan de «ninguna» a tres, con las tres que siguen faltando nombradas. **Y aparece un defecto que el repaso destapó**: la celda de un PDF **no tiene nombre accesible** —el `<button>` lo toma del `alt` de la miniatura y un PDF no tiene—, que ha pasado desapercibido porque **la pantalla «Archivo» no entra en la pasada sistemática de axe**. Se anota aquí y no se arregla: es código y prueba, no documentación. | Equipo DRP |
 | 2026-08-13 | Creación de la ficha al arrancar el Hito 3. El componente está **previsto**. Se documenta por qué la galería es componente y no patrón, y dónde queda su frontera con el listado. | Equipo DRP |

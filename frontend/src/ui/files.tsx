@@ -371,12 +371,19 @@ export function FileGallery({ label, items, onOpen, onRemove, onStale, empty }: 
           <button
             type="button"
             onClick={() => onOpen(item)}
+            // El nombre accesible lo lleva **el botón**, no la imagen, y así lo
+            // pedía la ficha desde el primer día. Tomarlo del `alt` de la
+            // miniatura funcionaba solo con miniatura: un PDF no la tiene, se
+            // pinta un icono `aria-hidden` y el botón se quedaba **mudo** — en
+            // la rejilla donde todo son facturas y manuales, que es donde peor
+            // cae. Con el `alt` vacío el nombre se anuncia una sola vez.
+            aria-label={`Abrir ${item.name}`}
             className="aspect-square overflow-hidden rounded-md bg-surface-sunken"
           >
             {item.thumbnailUrl ? (
               <img
                 src={item.thumbnailUrl}
-                alt={item.name}
+                alt=""
                 loading="lazy"
                 onError={onStale}
                 className="size-full object-cover"
