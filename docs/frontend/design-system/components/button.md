@@ -123,7 +123,7 @@ y no están dentro de un `<form>`, que es como se resuelve hoy en
 - Es un `<button>` nativo: entra en el orden de tabulación, responde a `Enter` y
   a `Espacio`, y anuncia su papel sin ayuda.
 - **El foco no lo dibuja el componente.** Lo pone `:focus-visible` en la capa
-  base con `--color-focus`, medido a 9,69:1 en claro y 11,68:1 en oscuro sobre el
+  base con `--color-focus`, medido a 9,35:1 en claro y 11,87:1 en oscuro sobre el
   fondo (ver [`accessibility/`](../../accessibility/README.md)). Los 2 px de
   separación existen para el caso difícil, que es justamente este: sobre un
   `primary` de relleno sólido, un anillo pegado se confundiría con el relleno.

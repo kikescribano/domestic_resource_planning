@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Interfaz web responsive |
-| Última revisión | 2026-08-18 |
+| Última revisión | 2026-08-20 |
 
 ## Propósito
 
@@ -23,7 +23,7 @@ no aparezca el problema.
 
 | Atributo | Se manifiesta en | Evitar |
 |---|---|---|
-| **Doméstica** | Base de papel cálido y tinta parda, sin un solo gris azulado; acento de terracota; serif en el `h1` y en los estados vacíos; ilustración de línea donde no hay datos todavía; vocabulario de casa —«Prestado a», «Se acabó», «¿Dónde está?»— en lugar de vocabulario de ERP. | La estética de panel de control: fondo gris azulado, rejilla de tarjetas de métricas, gráficas que nadie ha pedido y un logotipo arriba a la izquierda como toda identidad. |
+| **Doméstica** | Base de papel de verde empolvado y tinta de pino, la misma familia que la identidad comercial de DRP; acento teal; serif en el `h1` y en los estados vacíos; ilustración de línea donde no hay datos todavía; vocabulario de casa —«Prestado a», «Se acabó», «¿Dónde está?»— en lugar de vocabulario de ERP. | La estética de panel de control: fondo gris azulado, rejilla de tarjetas de métricas, gráficas que nadie ha pedido y un logotipo arriba a la izquierda como toda identidad. |
 | **Serena bajo volumen** | Una lista de 300 filas usa una familia, un tamaño y un peso; el color aparece solo en el estado; no hay sombra ni tarjeta por fila; el acento sólido sale una vez por pantalla. | Acumular señales sobre la misma fila —cebra, borde, sombra, fondo de color y negrita a la vez— y llamar a eso jerarquía. |
 | **Directa** | Cada vacío nombra la siguiente acción y la ofrece; cada error dice qué ha fallado y qué se puede hacer; cada confirmación destructiva nombra el objeto y la consecuencia: «Dar de baja *Taladro Bosch*. Seguirá en el historial y dejará de poder prestarse». | «Ha ocurrido un error», «¿Estás seguro?», y el aviso de éxito que se va antes de haberse leído. |
 | **Táctil y de una mano** | 44 px de objetivo mínimo; acción principal al alcance del pulgar en móvil; campos de 16 px para que iOS no haga zoom al enfocar; formulario de una columna hasta 640 px; toda la fila es pulsable, no solo su icono. | Esconder una acción frecuente detrás de un menú de tres puntos, o dejar como única zona pulsable un icono de 24 px en el extremo de la fila. |
@@ -77,11 +77,11 @@ en [`frontend/src/index.css`](../../../frontend/src/index.css).
 
 | Dimensión | Decisión vigente | Evidencia o referencia |
 |---|---|---|
-| **Color** | Base de papel cálido (`oklch(98.4% 0.006 85)`) sobre tinta parda; **un único acento**, terracota, para la acción principal y los enlaces; cuatro colores de feedback del sistema y **cinco de estado del dominio** —disponible, prestado, vencido, dado de baja y sin existencias—, con nombre propio aunque hoy compartan valor con su equivalente de feedback. El azul de «sin existencias» es el único color frío del sistema, y lo es a propósito. Y **seis colores de categoría**, que son los únicos que elige el usuario, dentro de un juego cerrado y medido (ADR-015). | [`foundations/color.md`](../design-system/foundations/color.md); auditoría de 48 pares en [`accessibility/`](../accessibility/README.md), con 4,70:1 como peor caso de texto y 3,49:1 como peor caso no textual |
+| **Color** | Base de papel de verde empolvado (`oklch(98.4% 0.006 180)`) sobre tinta de pino, tomada del esquema de la identidad comercial de DRP; **un único acento**, el teal de esa identidad, para la acción principal y los enlaces; cuatro colores de feedback del sistema y **cinco de estado del dominio** —disponible, prestado, vencido, dado de baja y sin existencias—, con nombre propio aunque hoy compartan valor con su equivalente de feedback. El azul de «sin existencias» es el único frío de los cinco estados, y lo es a propósito. Y **seis colores de categoría**, que son los únicos que elige el usuario, dentro de un juego cerrado y medido (ADR-015). | [`foundations/color.md`](../design-system/foundations/color.md); auditoría de 48 pares en [`accessibility/`](../accessibility/README.md), con 4,70:1 como peor caso de texto y 3,46:1 como peor caso no textual |
 | **Tipografía** | Dos familias con reparto explícito: **serif** (`Iowan Old Style` → `Palatino` → `Georgia`) para el `h1`, los titulares de sección y los estados vacíos, **nunca por debajo de 20 px ni dentro de una fila**; **sans de sistema** para todo lo demás; **monoespaciada** para número de serie, código de barras e identificadores. Escala de siete pasos nombrada por papel, dos de ellos con `clamp()`. Pilas de sistema: cero bytes descargados y ningún salto de fuente al cargar. | [`foundations/typography.md`](../design-system/foundations/typography.md) |
 | **Densidad de información** | **Dos densidades, decididas por el dispositivo de entrada y no por el gusto.** Con el dedo no cabe ser denso —44 px de objetivo mínimo—, así que en móvil el listado es de tarjetas y respira; con puntero y teclado el aire se convierte en scroll, así que desde `md` el listado es una tabla de fila compacta (36 px), cifras en `tabular-nums` y cabecera fija. No es una preferencia configurable en la Fase 1. | [`foundations/density.md`](../design-system/foundations/density.md) |
 | **Espaciado y ritmo** | Rejilla de **4 px**, con cuatro medidas con nombre —`gutter` (16 px), `gutter-lg` (24 px), `row` (12 px) y `row-compact` (6 px)— y tres anchuras de composición: `form` (544 px), `reading` (68ch) y `shell` (1536 px). El espacio vertical entre bloques crece con la pantalla; el interlineado y la longitud de línea, no. | [`foundations/space.md`](../design-system/foundations/space.md) |
-| **Formas, bordes y elevación** | Radios de 4 a 24 px: **8 px en controles, 12 px en tarjetas, 16 px en diálogos**, redondeo completo solo en avatares y distintivos de estado. Cuatro niveles de elevación, con sombra **de tono cálido y nunca negra**; en modo oscuro la sombra apenas se ve, así que allí quien separa planos es el escalón de claridad de la superficie más el borde. **En un listado denso no hay sombra por fila**: separan las líneas de `border-subtle`. | [`foundations/shape-and-elevation.md`](../design-system/foundations/shape-and-elevation.md) |
+| **Formas, bordes y elevación** | Radios de 4 a 24 px: **8 px en controles, 12 px en tarjetas, 16 px en diálogos**, redondeo completo solo en avatares y distintivos de estado. Cuatro niveles de elevación, con sombra **del tono de pino de la paleta y nunca negra**; en modo oscuro la sombra apenas se ve, así que allí quien separa planos es el escalón de claridad de la superficie más el borde. **En un listado denso no hay sombra por fila**: separan las líneas de `border-subtle`. | [`foundations/shape-and-elevation.md`](../design-system/foundations/shape-and-elevation.md) |
 | **Iconografía e ilustración** | Un solo juego de iconos, **[Lucide](https://lucide.dev)** (ISC), de trazo, cuadrícula de 24, grosor 1,75, en dos tamaños (20 px en línea de texto, 24 px en acción). Un icono fijo por estado del dominio, que es la mitad de la regla «nada se dice solo con color». **Ilustración solo en tres sitios** —onboarding, vacío y error bloqueante—, como máximo una por pantalla, dibujada con los propios tokens (línea de `border-strong` sobre relleno de `accent-soft`), sin degradados ni sombras, y **nunca dentro de una vista con filas**. | [`foundations/iconography.md`](../design-system/foundations/iconography.md) |
 | **Fotografía y recursos** | **La única fotografía del producto es la del usuario**: foto de asset, de artículo y avatar. No hay banco de imágenes ni fotografía decorativa —una casa ajena no ilustra la tuya—. Encuadre 1:1 con recorte centrado, esquinas de 8 px; el marcador de posición es el **icono de la categoría** sobre `surface-sunken`, nunca un rectángulo gris. Se sirven desde el dominio de ficheros que fija la [ADR-005](../../common/architecture/decisions/ADR-005-local-file-storage.md), con `loading="lazy"` fuera del primer pliegue. | [`ADR-005`](../../common/architecture/decisions/ADR-005-local-file-storage.md); [`file-storage.md`](../../backend/architecture/file-storage.md) |
 | **Movimiento y transiciones** | Cuatro duraciones —80 ms para la respuesta al toque, 140 ms para un cambio de estado, 220 ms para desplegar, 320 ms para abrir un diálogo u hoja— y tres curvas. Se anima opacidad y transformación, nunca la geometría del layout. **Nada se mueve en bucle salvo el indicador de carga.** `prefers-reduced-motion: reduce` deja todo en 1 ms, y por el principio 5 eso no pierde información. | [`foundations/motion.md`](../design-system/foundations/motion.md) |
@@ -97,10 +97,10 @@ ruido.
 La regla es **el presupuesto de calidez**: en una vista de listado, la
 personalidad se gasta en tres sitios y en ninguno más.
 
-1. **El papel de fondo.** El listado se dibuja sobre la misma base cálida que el
-   resto de la aplicación; ese tono es lo que impide que la tabla parezca una
-   hoja de cálculo, y no cuesta ni un píxel.
-2. **La acción principal.** El único relleno de terracota de la pantalla.
+1. **El papel de fondo.** El listado se dibuja sobre la misma base teñida de
+   verde que el resto de la aplicación; ese tono es lo que impide que la tabla
+   parezca una hoja de cálculo, y no cuesta ni un píxel.
+2. **La acción principal.** El único relleno de teal de la pantalla.
 3. **El estado.** El único color dentro de la fila, y con su etiqueta y su icono
    al lado.
 
@@ -251,14 +251,14 @@ Lo que la dirección visual aporta a ese compromiso, con sus números, está en
   mensaje; la fila seleccionada lleva fondo, casilla y barra de acento.
 - **Contraste comprobado, no afirmado.** Los 48 pares que el sistema usa de
   verdad están medidos en los dos modos: el peor caso de texto es 4,70:1 y el
-  peor caso no textual, 3,49:1. Ningún token se sale del gamut sRGB, para que el
+  peor caso no textual, 3,46:1. Ningún token se sale del gamut sRGB, para que el
   número medido sea el número que se ve. Lo comprueba
   [`scripts/check-contrast.py`](../../../scripts/check-contrast.py) en cada
   ejecución de la CI, sobre los valores reales de `index.css`: la tabla no puede
   quedarse desfasada sin que la construcción falle.
 - **Foco visible siempre**, con un solo anillo de 2 px y 2 px de separación,
-  declarado en la capa base para que ningún componente pueda olvidarlo: 9,69:1
-  sobre el fondo en claro y 11,68:1 en oscuro.
+  declarado en la capa base para que ningún componente pueda olvidarlo: 9,35:1
+  sobre el fondo en claro y 11,87:1 en oscuro.
 - **Objetivo táctil de 44 px**, por encima de los 24 px que exige el criterio
   2.5.8, porque esto se usa de pie y con una mano.
 - **Movimiento reducible a cero** sin pérdida de información, por el principio 5.
@@ -298,6 +298,7 @@ todavía no existe.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | **La paleta de marca gira al esquema de la identidad comercial de DRP**: papel y tinta pasan del pardo cálido al pino frío y el acento deja la terracota por el teal de las presentaciones del proyecto. Cambia solo la dimensión de color —feedback, estados y categorías se quedan—; los 48 pares se remiden y siguen en AA (peor texto 4,70:1, peor no textual 3,46:1, foco 9,35:1 y 11,87:1). |
 | 2026-08-06 | Se crea la plantilla inicial; no hay dirección visual aprobada. |
 | 2026-08-10 | Se cierra la dirección visual del Hito 1: personalidad «cálida y doméstica» concretada en cuatro atributos, cinco principios visuales, las **ocho dimensiones resueltas** sin ningún `Por decidir`, la regla del presupuesto de calidez para contener la densidad en los listados largos, los siete estados de experiencia —incluido el rechazo explícito del modo sin conexión— y la tabla responsive completa. Se fija responsable y se mantiene el estado en `Borrador` hasta la validación con Playwright del Hito 4. |
 | 2026-08-17 | **Pasa a `Vigente`.** La condición de la ADR-006 está cumplida y se ejecuta en la CI: recorrido vertical en navegador real, contraste medido en tokens y comprobado aplicado en los dos modos, anillo de foco en cada parada del recorrido de tabulación, la acción de cada pantalla alcanzada con el teclado y reflujo a 320, 375 y 2560 px. Se dice además que este documento no va a tener maquetas ni prototipos, y por qué: la dirección se expresa en tokens que se miden. Lo que falta se traslada a `accessibility/`. |

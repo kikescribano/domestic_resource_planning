@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-17 |
+| Última revisión | 2026-08-20 |
 
 ## Propósito
 
@@ -57,29 +57,29 @@ dentro del gamut sRGB, para que el ratio medido sea el ratio que se ve.
 
 | Token | Qué es | Claro | Oscuro |
 |---|---|---|---|
-| `--color-surface` | El papel de la página | `oklch(98.4% 0.006 85)` · `#fcf9f5` | `oklch(19% 0.012 70)` · `#17130e` |
-| `--color-surface-raised` | Tarjeta, diálogo, menú: lo que está por encima | `oklch(99.6% 0.003 85)` · `#fffefb` | `oklch(23% 0.014 70)` · `#211c16` |
-| `--color-surface-sunken` | Hueco: cabecera de tabla, campo de búsqueda, marcador de foto | `oklch(96% 0.009 82)` · `#f5f1eb` | `oklch(15.5% 0.01 70)` · `#0f0c08` |
-| `--color-surface-hover` | La fila bajo el puntero | `oklch(96% 0.014 70)` · `#f8f0e8` | `oklch(27% 0.016 70)` · `#2c251e` |
-| `--color-scrim` | La capa que atenúa el fondo de un diálogo | `oklch(26% 0.02 60 / 0.5)` | `oklch(10% 0.01 60 / 0.65)` |
+| `--color-surface` | El papel de la página | `oklch(98.4% 0.006 180)` · `#f6fbfa` | `oklch(19% 0.018 190)` · `#0a1616` |
+| `--color-surface-raised` | Tarjeta, diálogo, menú: lo que está por encima | `oklch(99.6% 0.003 180)` · `#fcfefe` | `oklch(23% 0.02 190)` · `#12201f` |
+| `--color-surface-sunken` | Hueco: cabecera de tabla, campo de búsqueda, marcador de foto | `oklch(96% 0.009 177)` · `#ecf4f2` | `oklch(15.5% 0.014 190)` · `#060e0d` |
+| `--color-surface-hover` | La fila bajo el puntero | `oklch(96% 0.014 183)` · `#e8f5f3` | `oklch(27% 0.022 190)` · `#1a2a29` |
+| `--color-scrim` | La capa que atenúa el fondo de un diálogo | `oklch(26% 0.02 190 / 0.5)` | `oklch(10% 0.01 190 / 0.65)` |
 
 ### Tinta
 
 | Token | Cuándo se usa | Claro | Oscuro |
 |---|---|---|---|
-| `--color-ink` | Contenido, títulos, valores | `oklch(26% 0.02 60)` · `#2b221a` | `oklch(95% 0.008 85)` · `#f1eee9` |
-| `--color-ink-muted` | Secundario: etiquetas, descripciones, ayuda | `oklch(47% 0.02 60)` · `#645850` | `oklch(76% 0.012 80)` · `#b5b0a9` |
-| `--color-ink-subtle` | Metadatos, marcas de tiempo y **placeholder** | `oklch(52% 0.018 60)` · `#71675f` | `oklch(68% 0.012 80)` · `#9c9890` |
-| `--color-ink-disabled` | Control desactivado. Único exento de 4,5:1 | `oklch(65% 0.012 60)` · `#958e88` | `oklch(50% 0.01 70)` · `#67625d` |
-| `--color-ink-inverse` | Texto sobre un relleno sólido de acento o de peligro | `oklch(99% 0.004 85)` · `#fdfcf9` | `oklch(18% 0.02 60)` · `#180f09` |
+| `--color-ink` | Contenido, títulos, valores | `oklch(26% 0.02 190)` · `#192726` | `oklch(95% 0.008 180)` · `#e9f0ef` |
+| `--color-ink-muted` | Secundario: etiquetas, descripciones, ayuda | `oklch(47% 0.02 190)` · `#4e5f5d` | `oklch(76% 0.012 185)` · `#a9b4b2` |
+| `--color-ink-subtle` | Metadatos, marcas de tiempo y **placeholder** | `oklch(52% 0.018 190)` · `#5e6c6b` | `oklch(68% 0.012 185)` · `#919b99` |
+| `--color-ink-disabled` | Control desactivado. Único exento de 4,5:1 | `oklch(65% 0.012 190)` · `#879291` | `oklch(50% 0.01 190)` · `#5d6564` |
+| `--color-ink-inverse` | Texto sobre un relleno sólido de acento o de peligro | `oklch(99% 0.004 180)` · `#f9fdfc` | `oklch(18% 0.025 190)` · `#041514` |
 
 ### Bordes
 
 | Token | Cuándo se usa | Claro | Oscuro |
 |---|---|---|---|
-| `--color-border-subtle` | Separar filas, delimitar tarjetas. **Decorativo** | `oklch(92% 0.008 80)` · `#e7e4df` | `oklch(30% 0.012 70)` · `#322d27` |
-| `--color-border` | Delimitar un **control**. Obligado a 3:1 | `oklch(62% 0.015 70)` · `#8c857d` | `oklch(58% 0.018 70)` · `#81796f` |
-| `--color-border-strong` | Control activo, seleccionado o con énfasis | `oklch(45% 0.02 70)` · `#5d5449` | `oklch(72% 0.02 70)` · `#ada397` |
+| `--color-border-subtle` | Separar filas, delimitar tarjetas. **Decorativo** | `oklch(92% 0.008 184)` · `#dfe6e5` | `oklch(30% 0.012 190)` · `#27302f` |
+| `--color-border` | Delimitar un **control**. Obligado a 3:1 | `oklch(62% 0.015 186)` · `#7d8987` | `oklch(58% 0.018 190)` · `#6f7e7d` |
+| `--color-border-strong` | Control activo, seleccionado o con énfasis | `oklch(45% 0.02 186)` · `#495957` | `oklch(72% 0.02 190)` · `#97a9a7` |
 
 > Poner `border-subtle` en un `input` incumple WCAG 1.4.11. No son
 > intercambiables.
@@ -88,11 +88,11 @@ dentro del gamut sRGB, para que el ratio medido sea el ratio que se ve.
 
 | Token | Cuándo se usa | Claro | Oscuro |
 |---|---|---|---|
-| `--color-accent` | Relleno de la acción principal. **Una vez por pantalla** | `oklch(52% 0.13 42)` · `#a54a24` | `oklch(70% 0.12 45)` · `#dc855d` |
-| `--color-accent-hover` | Ese mismo relleno bajo el puntero | `oklch(46% 0.13 42)` · `#91380e` | `oklch(76% 0.12 45)` · `#f0986f` |
-| `--color-accent-ink` | El acento **como texto**: enlaces y botones terciarios | `oklch(47% 0.12 42)` · `#903f1c` | `oklch(78% 0.1 50)` · `#eca57d` |
-| `--color-accent-soft` | Fondo tenue: fila seleccionada, distintivo, selección de texto | `oklch(94% 0.03 55)` · `#fce6d9` | `oklch(30% 0.04 45)` · `#3f271d` |
-| `--color-focus` | El anillo de foco, el mismo en todo el sistema | `oklch(38% 0.05 60)` · `#563c26` | `oklch(85% 0.05 85)` · `#ddcca9` |
+| `--color-accent` | Relleno de la acción principal. **Una vez por pantalla** | `oklch(53% 0.076 185)` · `#2d7a71` | `oklch(78% 0.075 185)` · `#7ec7be` |
+| `--color-accent-hover` | Ese mismo relleno bajo el puntero | `oklch(47% 0.078 185)` · `#116960` | `oklch(84% 0.07 185)` · `#96dad0` |
+| `--color-accent-ink` | El acento **como texto**: enlaces y botones terciarios | `oklch(47% 0.075 187)` · `#176862` | `oklch(80% 0.08 185)` · `#7fcfc4` |
+| `--color-accent-soft` | Fondo tenue: fila seleccionada, distintivo, selección de texto | `oklch(94% 0.03 180)` · `#d7f2ec` | `oklch(30% 0.045 188)` · `#0c3532` |
+| `--color-focus` | El anillo de foco, el mismo en todo el sistema | `oklch(38% 0.05 190)` · `#1d4b48` | `oklch(85% 0.05 185)` · `#aad9d2` |
 
 > `accent` y `accent-ink` no son el mismo color a propósito: un relleno solo
 > necesita 3:1 contra el papel, y un texto necesita 4,5:1.
@@ -134,7 +134,10 @@ Los seis entre los que un hogar elige la identidad visual de cada categoría
 **Son la excepción a la regla de nombres de arriba, y la única**: el significado
 lo pone la persona que clasifica, no el sistema, así que un nombre semántico no
 existe —`--color-category-3` sería ilegible en la migración, en el contrato y
-aquí—. Ninguno cae encima de los cinco tonos del dominio ni del acento.
+aquí—. Ninguno cae encima de los cinco tonos del dominio; el que más se acerca
+al acento es `teal`, a 10° del teal de marca, y se admite porque el color de una
+categoría nunca va solo ni comparte forma con un botón (ver
+[`color.md`](../foundations/color.md)).
 
 | Token | Tono | Claro | Oscuro |
 |---|---|---|---|
@@ -194,7 +197,7 @@ con la clase `font-display`, y **nunca dentro de una fila de listado**.
 | Token | Valor | Para qué |
 |---|---|---|
 | `--radius-xs` … `--radius-2xl` | 4, 6, 8, 12, 16, 24 px | Casilla · fila · control · tarjeta · diálogo · ilustración |
-| `--shadow-xs` … `--shadow-lg` | Dos capas, tono pardo translúcido | Control · tarjeta · menú · diálogo |
+| `--shadow-xs` … `--shadow-lg` | Dos capas, tono de pino translúcido | Control · tarjeta · menú · diálogo |
 | `--duration-instant` | 80 ms | Respuesta al puntero |
 | `--duration-fast` | 140 ms | Cambio de estado; también el `transition` por defecto |
 | `--duration-base` | 220 ms | Desplegar y plegar |
@@ -222,7 +225,7 @@ con la clase `font-display`, y **nunca dentro de una fila de listado**.
 > `transition-colors`, así que hay **140 ms en los que cada color es una mezcla de
 > los dos modos** —y esa mezcla no la mide ningún script ni sale de ninguna
 > decisión—. Al cerrar la Fase 1 eso acusó al botón principal de dar 3,55:1 en
-> oscuro cuando sus tokens dan 6,77:1. Quien mida colores aplicados tiene que
+> oscuro cuando sus tokens daban entonces 6,77:1. Quien mida colores aplicados tiene que
 > esperar a que no quede ninguna transición viva; quien construya el conmutador de
 > tema tiene aquí la razón por la que el cambio se ve y no se nota.
 
@@ -290,6 +293,7 @@ está usando tokens, ya funciona en los dos modos.
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-20 | **La paleta de marca gira al esquema de la identidad comercial**: los neutros pasan del pardo cálido (tonos 60–85) al pino frío (tonos 177–190) y el acento deja la terracota por el teal `#2d7a71` / `#7ec7be`, los mismos que usan las presentaciones de DRP. Feedback, estados del dominio y colores de categoría no cambian. Los 48 pares siguen medidos y dentro de AA. | Equipo DRP |
 | 2026-08-20 | Entran los **doce tokens de color de categoría** (cierre de huecos, Hito 4): seis colores con su variante suave, la primera familia que elige el usuario y la única con nombre descriptivo, con su excepción a la regla de nombres razonada. | Equipo DRP |
 | 2026-08-10 | Creación del catálogo con los tokens del Hito 1 y el contrato de modo oscuro. | Equipo DRP |
 | 2026-08-17 | La prueba determinista de los dos modos con `data-theme` ya existe, así que deja de anunciarse en futuro. Se anota lo que costó descubrirla: cambiar el atributo abre 140 ms de transición en los que cada color es una mezcla de los dos modos, y medir ahí da un contraste que no corresponde a ningún color del sistema. | Equipo DRP |

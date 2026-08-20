@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | Interfaz web responsive |
-| Última revisión | 2026-08-17 |
+| Última revisión | 2026-08-20 |
 
 ## Objetivo normativo
 
@@ -42,9 +42,9 @@ python scripts/check-contrast.py
 | Medida | Valor | Mínimo exigido |
 |---|---|---|
 | Peor caso de **texto** | **4,70:1** | 4,5:1 (1.4.3) |
-| Peor caso **no textual** | **3,49:1** | 3:1 (1.4.11) |
-| Anillo de foco sobre el fondo, modo claro | 9,69:1 | 3:1 (1.4.11) |
-| Anillo de foco sobre el fondo, modo oscuro | 11,68:1 | 3:1 (1.4.11) |
+| Peor caso **no textual** | **3,46:1** | 3:1 (1.4.11) |
+| Anillo de foco sobre el fondo, modo claro | 9,35:1 | 3:1 (1.4.11) |
+| Anillo de foco sobre el fondo, modo oscuro | 11,87:1 | 3:1 (1.4.11) |
 | Tokens fuera del gamut sRGB | ninguno | — |
 
 Tres notas sobre por qué se mide así:
@@ -53,7 +53,7 @@ Tres notas sobre por qué se mide así:
   el único gris del sistema y por tanto el que menos margen tiene. Está por
   encima del mínimo, pero es el par que hay que volver a medir antes que ningún
   otro si se toca la paleta.
-- **El peor caso no textual es el borde de control** (3,49:1) sobre el papel.
+- **El peor caso no textual es el borde de control** (3,46:1) sobre el papel.
   `border-subtle` y `border` no son intercambiables por esto: el primero es
   decorativo —separa filas— y el segundo delimita un control, así que está
   obligado a 3:1. Usar el sutil en un `input` incumple 1.4.11 sin que se note a
@@ -90,7 +90,7 @@ en la pantalla del que diseña siempre se distingue. En DRP:
 | Fila seleccionada | Fondo, casilla marcada **y** barra de acento en el borde de inicio |
 | Enlace dentro de un párrafo | Subrayado, no solo color |
 
-El azul de «sin existencias» es el único color frío del sistema, y lo es a
+El azul de «sin existencias» es el único frío de los cinco estados, y lo es a
 propósito: sobrevive a una deuteranopia que sí confunde verde, ámbar y rojo entre
 sí.
 
@@ -173,7 +173,7 @@ ponía —contraste, foco visible y teclado a 375 px y en ultrawide—, y
 - **Auditar durante el cambio de tema mide un color que no existe.** Al poner
   `data-theme` hay 140 ms de `transition-colors` en los que cada color es una
   mezcla de los dos modos. Auditando ahí, axe acusó al botón principal de dar
-  3,55:1 en oscuro cuando sus tokens dan 6,77:1. La auditoría espera ahora a que
+  3,55:1 en oscuro cuando sus tokens daban entonces 6,77:1. La auditoría espera ahora a que
   no quede ninguna transición viva, y no a un plazo fijo.
 - **Auditar una pantalla que aún carga no dice nada de la pantalla.** Con el
   `Spinner` puesto, axe recorre cuatro elementos y pasa. La primera versión de la
@@ -196,6 +196,7 @@ ponía —contraste, foco visible y teclado a 375 px y en ultrawide—, y
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | **Se remiden los 48 pares tras el giro de la paleta de marca al esquema de la identidad comercial** (neutros de pino y acento teal): todo sigue dentro de AA. El peor caso de texto no se mueve —el distintivo de «dado de baja», 4,70:1—; el peor no textual pasa de 3,49:1 a 3,46:1 (el mismo borde de control) y el anillo de foco queda en 9,35:1 en claro y 11,87:1 en oscuro. |
 | 2026-08-20 | La auditoría pasa de **36 pares a 48**: los doce que añaden los seis colores de categoría, que son los primeros que **elige el usuario** y no el sistema (cierre de huecos, Hito 4). Se anota que tres de los doce valores nuevos nacieron fuera del gamut sRGB y que la comprobación de gamut fue lo que lo destapó. |
 | 2026-08-11 | Se fija WCAG 2.2 AA como objetivo normativo y se documenta la auditoría de contraste de los 36 pares, con su script de comprobación en la CI. Se anota lo que queda pendiente de verificar sobre pantallas reales. |
 | 2026-08-17 | Se sustituye «lo que todavía no está comprobado» por lo que el recorrido vertical comprueba de verdad sobre pantallas montadas —axe en los dos modos, teclado con anillo de foco en cada parada, reflujo a 320, 375 y ultrawide, y anuncio único—, con lo que se cumple la condición de la ADR-006 y `look-and-feel.md` pasa a `Vigente`. Se anotan los dos falsos resultados que la propia medición produjo —auditar a mitad de la transición de tema y auditar con el `Spinner` puesto— y lo que sigue sin comprobarse: un lector de pantalla real, las diecisiete rutas que el recorrido no atraviesa y el conmutador de tema, que no existe. |

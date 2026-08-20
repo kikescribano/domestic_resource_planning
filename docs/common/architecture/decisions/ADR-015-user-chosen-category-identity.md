@@ -242,6 +242,20 @@ un punto intermedio que sí sería admisible y que nadie ha pedido todavía: **m
 colores cerrados**, con sus pares en la lista, que cuesta una migración y una
 tarde de medir.
 
+## Posterior a esta decisión
+
+El cuerpo de esta ADR se conserva tal y como se aceptó. El 2026-08-20 la paleta
+de marca giró al esquema de la identidad comercial de DRP —neutros de pino y
+acento teal— y eso movió una premisa de la sección 3: el acento ya no ocupa el
+tono 42 sino el **185**, así que el hueco que los seis colores se repartían
+cambia de forma. La categoría `teal` (195) pasa a ser la más cercana a un tono
+tomado —a 10° del acento— y se admite por la misma razón de forma que ya
+amparaba a `moss` y `sky`: el color de una categoría nunca va solo, y su
+recipiente es un cuadradito con icono y nombre, no la pastilla de un estado ni
+el relleno de un botón. Los seis colores de categoría, sus valores y sus doce
+pares medidos **no cambian**; el razonamiento actualizado está en
+[`foundations/color.md`](../../../frontend/design-system/foundations/color.md).
+
 ## Referencias
 
 - [ADR-006](ADR-006-frontend-stack-and-design-system.md): el sistema de diseño que

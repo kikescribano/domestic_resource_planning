@@ -51,8 +51,8 @@ Dos piezas en línea, con 8 px entre ellas (`gap-2`):
 
 El anillo usa `border` y no `border-subtle`, así que el disco entero se queda por
 encima de los 3:1 que pide el criterio 1.4.11 para un elemento no textual:
-**3,49:1 en claro y 4,30:1 en oscuro**, medidos. El segmento de acento va a
-5,56:1 y 6,64:1 sobre el papel. Los tres números salen de
+**3,46:1 en claro y 4,33:1 en oscuro**, medidos. El segmento de acento va a
+4,86:1 y 9,49:1 sobre el papel. Los tres números salen de
 [`check-contrast.py`](../../../../scripts/check-contrast.py).
 
 No hay variantes, no hay tamaños y no hay estados. El componente está montado o
