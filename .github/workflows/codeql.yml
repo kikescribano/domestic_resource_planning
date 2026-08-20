@@ -1,28 +1,34 @@
 # Analisis de codigo con CodeQL.
 #
-# **Sustituye a la configuracion por defecto**, y el motivo es uno concreto: la
-# por defecto analiza `java-kotlin` con `build-mode: autobuild`, es decir,
-# **construyendo el backend otra vez** por su cuenta y con su instrumentacion
-# encima. Eso se rompio en cuanto el proyecto subio a Kotlin 2.4, que compila a
-# traves de la Build Tools API: el demonio de Kotlin se quedaba sin memoria y el
-# analisis fallaba **incluso en pull requests que no tocaban el backend**,
-# mientras el trabajo `Backend` de la integracion pasaba sin quejarse.
+# **Sustituye a la configuracion por defecto**, y el motivo es concreto: aquella
+# analiza `java-kotlin` con `build-mode: autobuild` --construye el backend por su
+# cuenta, con su instrumentacion encima-- y eso se rompio en cuanto el proyecto
+# subio a Kotlin 2.4, que compila a traves de la Build Tools API y levanta su
+# propio demonio. El analisis fallaba por falta de memoria **incluso en pull
+# requests que no tocaban el backend**, uno de solo frontend y otro de solo
+# markdown, mientras el trabajo `Backend` de la integracion pasaba sin quejarse.
 #
 # El modo de construccion no se puede elegir desde la configuracion por defecto
-# --su API solo expone lenguajes, suite y planificacion--, y de ahi que esto sea
-# un workflow propio.
+# --su API solo expone lenguajes, suite y planificacion--, y de ahi este fichero.
 #
-# **`build-mode: none` para todo.** CodeQL extrae el codigo sin construirlo, que
-# es lo razonable aqui por dos motivos: la construccion de verdad ya la hace
-# `ci.yml` --con sus pruebas, que es donde un fallo significa algo-- y repetirla
-# solo para extraer no aporta cobertura, solo una segunda forma de fallar. Para
-# Kotlin la extraccion sin construccion es ademas la modalidad que GitHub
-# recomienda desde que existe.
+# ## Por que `manual` en Kotlin y `none` en el resto
 #
-# El precio esta anotado para que nadie lo descubra por sorpresa: sin construir,
-# CodeQL no resuelve dependencias externas, asi que pierde de vista los flujos
-# que atraviesan una biblioteca de terceros. Los que empiezan y acaban en codigo
-# del repositorio --que son los que este analisis busca-- se siguen viendo.
+# **`none` no vale para Kotlin, y conviene saberlo antes de intentarlo.** La
+# extraccion sin construir esta soportada en Java, no en Kotlin: la
+# documentacion de GitHub dice que si `build-mode` es `none` y hay codigo Kotlin,
+# **ese codigo no se analiza**. Aqui el backend es Kotlin entero, asi que el
+# resultado no es un analisis mas pobre sino ninguno --el extractor termina con
+# «CodeQL could not process any code written in Java/Kotlin»--. Se probo, y eso
+# es exactamente lo que paso.
+#
+# Asi que Kotlin se construye, pero **con nuestros pasos y no con los suyos**:
+# el mismo JDK y el mismo Gradle que usa `ci.yml`, y con el
+# `backend/gradle.properties` de este repositorio, que fija el heap del demonio
+# de Kotlin. Autobuild adivinaba; esto no adivina.
+#
+# Los otros tres lenguajes no se construyen --no hay nada que construir en
+# `actions`, y el frontend se extrae igual sin compilar-- asi que van con `none`,
+# que ademas es mucho mas rapido.
 
 name: CodeQL
 
@@ -32,8 +38,8 @@ on:
   pull_request:
   schedule:
     # Semanal, como lo tenia la configuracion por defecto. Los lunes temprano:
-    # una vulnerabilidad nueva en una consulta de CodeQL aparece sin que nadie
-    # haya tocado el codigo, y conviene verla al empezar la semana.
+    # una consulta nueva de CodeQL puede encontrar algo sin que nadie haya
+    # tocado el codigo, y conviene verlo al empezar la semana.
     - cron: '17 6 * * 1'
 
 # Minimo privilegio, igual que en `ci.yml`. `security-events: write` es lo unico
@@ -56,11 +62,15 @@ jobs:
       # Que un lenguaje falle no debe ocultar el resultado de los otros tres.
       fail-fast: false
       matrix:
-        language:
-          - actions
-          - java-kotlin
-          - javascript-typescript
-          - python
+        include:
+          - language: actions
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+          - language: python
+            build-mode: none
+          - language: java-kotlin
+            build-mode: manual
 
     steps:
       - uses: actions/checkout@v7
@@ -69,7 +79,28 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-          build-mode: none
+          build-mode: ${{ matrix.build-mode }}
+
+      # Los tres pasos siguientes son solo de Kotlin, que es el unico lenguaje
+      # que hay que construir para que el extractor vea algo.
+      - name: Preparar Java
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Preparar Gradle
+        if: matrix.language == 'java-kotlin'
+        uses: gradle/actions/setup-gradle@v5
+
+      # `assemble` y no `build`: aqui solo hace falta que el codigo **compile**
+      # para poder extraerlo. Las pruebas son de `ci.yml`, tardan diez minutos y
+      # necesitan Docker; repetirlas aqui no anadiria un solo hallazgo.
+      - name: Compilar el backend para el extractor
+        if: matrix.language == 'java-kotlin'
+        run: ./gradlew assemble --no-daemon
+        working-directory: backend
 
       - name: Analizar
         uses: github/codeql-action/analyze@v3
