@@ -28,7 +28,7 @@ import {
 import { useAuthenticatedSession, useSession } from '../auth/SessionProvider'
 import { useActiveModuleScreens } from './modules'
 import { Avatar } from '../ui/files'
-import { Button, DangerZone, Field, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primitives'
+import { BrandMark, Button, DangerZone, Field, Notice, PageHeading, Spinner, StatusBadge } from '../ui/primitives'
 
 /**
  * Lo que vive detrás del login.
@@ -68,32 +68,6 @@ const SECONDARY_NAVIGATION = [
   { to: '/almacenamiento', label: 'Archivo', end: false, icon: HardDrive },
   { to: '/cuenta', label: 'Cuenta', end: false, icon: CircleUserRound },
 ]
-
-/**
- * La marca de DRP: el sello redondo en el teal del acento con la casa dentro,
- * el nombre en la redonda de la marca y el lema debajo. Es el eco del logotipo
- * circular de la identidad comercial, con los pares ya medidos del sistema
- * —`ink-inverse` sobre `accent`—. Vive en dos sitios y por eso es una pieza:
- * la barra lateral desde `md` y la cabecera de «Hogar» en móvil, que sin esto
- * no veía la marca nunca. Es sello, no la acción principal de la pantalla:
- * el relleno de acento sigue apareciendo una sola vez como *acción*.
- */
-function BrandMark({ className = '' }: { className?: string }) {
-  return (
-    // En móvil la marca preside la pantalla de «Hogar» y va un tercio más
-    // grande; en la barra lateral vuelve a su tamaño de trabajo. El tamaño del
-    // icono va por clase y no por la prop `size`, que no sabe de breakpoints.
-    <p className={['items-center gap-3', className].join(' ')}>
-      <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-accent text-ink-inverse md:size-11">
-        <House strokeWidth={1.75} aria-hidden="true" className="size-7 md:size-5.5" />
-      </span>
-      <span className="flex flex-col">
-        <span className="font-display text-display font-extrabold leading-tight text-ink md:text-title">DRP</span>
-        <span className="text-body-sm text-ink-muted md:text-caption">El ERP doméstico</span>
-      </span>
-    </p>
-  )
-}
 
 /**
  * El icono de una parada de la navegación. Mismo juego (Lucide), mismo trazo
