@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ShoppingCart } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import {
@@ -48,7 +49,7 @@ export function PurchasingPage() {
 
   return (
     <>
-      <PageHeading title="Compras" />
+      <PageHeading title="Compras" icon={ShoppingCart} />
 
       <p className="max-w-prose text-body text-ink-muted">
         Lo que hace falta en casa. Si tienes el almacén encendido, lo que se acaba

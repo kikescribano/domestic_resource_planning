@@ -104,7 +104,7 @@ test.describe('recorrido vertical', () => {
 
     const verification = await linkFromEmail(email)
     await page.goto(verification)
-    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Hogar' })).toBeVisible()
 
     // --- 2. Una cosa que prestar --------------------------------------------
     // Por el `<nav>` y no por el texto suelto: «Inventario» aparece también en
@@ -271,7 +271,7 @@ test.describe('recorrido vertical', () => {
     await page.getByLabel('Contraseña', { exact: true }).fill(password)
     await page.getByRole('button', { name: /crear/i }).click()
     await page.goto(await linkFromEmail(email))
-    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Hogar' })).toBeVisible()
 
     const navigation = page.getByRole('navigation', { name: 'Principal' })
 
@@ -349,10 +349,10 @@ test.describe('recorrido vertical', () => {
     await page.getByLabel('Contraseña', { exact: true }).fill(password)
     await page.getByRole('button', { name: /crear/i }).click()
     await page.goto(await linkFromEmail(email))
-    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Hogar' })).toBeVisible()
 
     // --- 1. Un sitio de la casa, que es con lo que se va a enlazar ----------
-    await navigateTo(page, 'Sitios', '/ubicaciones')
+    await navigateTo(page, 'Ubicaciones', '/ubicaciones')
     await page.getByLabel('Nombre').fill('Sala de calderas')
     await page.getByLabel('Tipo').selectOption({ label: 'Habitación' })
     await page.getByRole('button', { name: 'Crear ubicación' }).click()
@@ -452,10 +452,10 @@ test.describe('recorrido vertical', () => {
     await page.getByLabel('Contraseña', { exact: true }).fill(password)
     await page.getByRole('button', { name: /crear/i }).click()
     await page.goto(await linkFromEmail(email))
-    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Hogar' })).toBeVisible()
 
     // --- 1. Una despensa con algo dentro, ANTES de encender el módulo -------
-    await navigateTo(page, 'Sitios', '/ubicaciones')
+    await navigateTo(page, 'Ubicaciones', '/ubicaciones')
     await page.getByLabel('Nombre').fill('Despensa')
     await page.getByLabel('Tipo').selectOption({ label: 'Habitación' })
     await page.getByRole('button', { name: 'Crear ubicación' }).click()
@@ -587,10 +587,10 @@ test.describe('recorrido vertical', () => {
     await page.getByLabel('Contraseña', { exact: true }).fill(password)
     await page.getByRole('button', { name: /crear/i }).click()
     await page.goto(await linkFromEmail(email))
-    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Hogar' })).toBeVisible()
 
     // --- 1. Una despensa con algo agotado, ANTES de encender el módulo ------
-    await navigateTo(page, 'Sitios', '/ubicaciones')
+    await navigateTo(page, 'Ubicaciones', '/ubicaciones')
     await page.getByLabel('Nombre').fill('Despensa')
     await page.getByLabel('Tipo').selectOption({ label: 'Habitación' })
     await page.getByRole('button', { name: 'Crear ubicación' }).click()
@@ -698,7 +698,7 @@ test.describe('recorrido vertical', () => {
     await page.getByLabel('Contraseña', { exact: true }).fill(password)
     await page.getByRole('button', { name: /crear/i }).click()
     await page.goto(await linkFromEmail(email))
-    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Hogar' })).toBeVisible()
 
     // --- 1. Una caldera, ANTES de encender el módulo -----------------------
     // Es lo que hace que la siembra tenga algo que leer: un módulo activado hoy
@@ -819,7 +819,7 @@ test.describe('recorrido vertical', () => {
     await lejos.getByLabel('Correo').fill(email)
     await lejos.getByLabel('Contraseña', { exact: true }).fill(password)
     await lejos.getByRole('button', { name: 'Entrar' }).click()
-    await expect(lejos.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+    await expect(lejos.getByRole('heading', { level: 1, name: 'Hogar' })).toBeVisible()
 
     await navigateTo(lejos, 'Mantenimiento', '/mantenimiento')
     await lejos.getByRole('button', { name: 'Ya está hecho' }).click()
@@ -861,10 +861,10 @@ test.describe('recorrido vertical', () => {
     await page.getByLabel('Contraseña', { exact: true }).fill(password)
     await page.getByRole('button', { name: /crear/i }).click()
     await page.goto(await linkFromEmail(email))
-    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Hogar' })).toBeVisible()
 
     // Algo dentro, para poder afirmar después que cancelar no se llevó nada.
-    await navigateTo(page, 'Sitios', '/ubicaciones')
+    await navigateTo(page, 'Ubicaciones', '/ubicaciones')
     await page.getByLabel('Nombre').fill('Trastero')
     await page.getByLabel('Tipo').selectOption({ label: 'Habitación' })
     await page.getByRole('button', { name: 'Crear ubicación' }).click()
@@ -893,13 +893,13 @@ test.describe('recorrido vertical', () => {
 
     // Y fuera de la pantalla del hogar, que es lo que de verdad se comprueba
     // aquí: durante la gracia todo sigue igual, así que alguien puede pasarse
-    // treinta días en el inventario sin volver a «Tu hogar».
+    // treinta días en el inventario sin volver a «Hogar».
     await navigateTo(page, 'Inventario', '/inventario')
     await expect(page.getByText(/Este hogar se borrará el/)).toBeVisible()
 
     // El hogar funciona **exactamente igual**: nada de solo lectura, que
     // castigaría justo a quien todavía puede arrepentirse.
-    await navigateTo(page, 'Sitios', '/ubicaciones')
+    await navigateTo(page, 'Ubicaciones', '/ubicaciones')
     await page.getByLabel('Nombre').fill('Buhardilla')
     await page.getByLabel('Tipo').selectOption({ label: 'Habitación' })
     await page.getByRole('button', { name: 'Crear ubicación' }).click()
@@ -919,7 +919,7 @@ test.describe('recorrido vertical', () => {
     // baja se retiró de verdad y no solo el cartel.
     await expect(page.getByRole('button', { name: 'Dar de baja el hogar' })).toBeVisible()
 
-    await navigateTo(page, 'Sitios', '/ubicaciones')
+    await navigateTo(page, 'Ubicaciones', '/ubicaciones')
     const tree = page.getByRole('tree', { name: 'Ubicaciones del hogar' })
     await expect(tree.getByText('Trastero')).toBeVisible()
     await expect(tree.getByText('Buhardilla')).toBeVisible()
@@ -955,7 +955,7 @@ test.describe('recorrido vertical', () => {
     await page.getByLabel('Contraseña', { exact: true }).fill(password)
     await page.getByRole('button', { name: /crear/i }).click()
     await page.goto(await linkFromEmail(email))
-    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Hogar' })).toBeVisible()
 
     // --- 1. Una cosa a la que ponerle la foto -------------------------------
     await navigateTo(page, 'Inventario', '/inventario')
@@ -1039,7 +1039,7 @@ test.describe('recorrido vertical', () => {
     await page.getByLabel('Contraseña', { exact: true }).fill(password)
     await page.getByRole('button', { name: /crear/i }).click()
     await page.goto(await linkFromEmail(email))
-    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Hogar' })).toBeVisible()
 
     // --- 1. La cara de una categoría, elegida a mano ------------------------
     await navigateTo(page, 'Catálogo', '/catalogo')
@@ -1159,7 +1159,7 @@ test.describe('recorrido vertical', () => {
     await page.getByLabel('Contraseña', { exact: true }).fill(password)
     await page.getByRole('button', { name: /crear/i }).click()
     await page.goto(await linkFromEmail(email))
-    await expect(page.getByRole('heading', { level: 1, name: 'Tu hogar' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Hogar' })).toBeVisible()
 
     // Los cuatro encendidos de una vez, y por la API. Encenderlos a mano desde la
     // pantalla ya lo hace el recorrido de cada módulo; lo que hace falta aquí es
@@ -1283,7 +1283,7 @@ test.describe('recorrido vertical', () => {
  * recorridos de arriba.
  */
 const AUDITED_SCREENS = [
-  { link: 'Módulos del hogar', path: '/modulos', heading: 'Módulos' },
+  { link: 'Módulos del hogar', path: '/modulos', heading: 'Módulos del hogar' },
   // «Inventario» entra el 2026-08-20, con el estado de conservación: es una de
   // las cuatro pantallas del core que seguían sin auditar, y el hito la toca en
   // sus tres sitios --el filtro del listado, la ficha y el alta--. Se siembra un
@@ -1293,18 +1293,18 @@ const AUDITED_SCREENS = [
   // dos últimas pantallas del core sin auditar, y un hito que consolida no deja
   // una deuda contada en un comentario. Sitios con una ubicación sembrada
   // --una pantalla vacía se audita sola--; en Personas ya está quien la mira.
-  { link: 'Sitios', path: '/ubicaciones', heading: 'Ubicaciones' },
+  { link: 'Ubicaciones', path: '/ubicaciones', heading: 'Ubicaciones' },
   { link: 'Personas', path: '/usuarios', heading: 'Personas' },
-  // Las dos que la baja de hogar (ADR-012) llenó de contenido nuevo: «Tu hogar»
-  // estrena la zona de peligro y «Tu cuenta», el cierre de cuenta. No son rutas
+  // Las dos que la baja de hogar (ADR-012) llenó de contenido nuevo: «Hogar»
+  // estrena la zona de peligro y «Cuenta», el cierre de cuenta. No son rutas
   // nuevas, pero lo que hay dentro sí lo es, y la auditoría se hereda por estar
   // aquí en vez de escribirse aparte.
-  { link: 'Hogar', path: '/', heading: 'Tu hogar', exact: true },
-  { link: 'Cuenta', path: '/cuenta', heading: 'Tu cuenta' },
+  { link: 'Hogar', path: '/', heading: 'Hogar', exact: true },
+  { link: 'Cuenta', path: '/cuenta', heading: 'Cuenta' },
   // «Archivo» entra el 2026-08-20, y con un fichero sembrado: es la pantalla de
   // la rejilla de ficheros, y no la miraba axe ni aquí ni en ninguna llamada
   // suelta. La celda de un PDF llevaba una semana sin nombre accesible por eso.
-  { link: 'Archivo', path: '/almacenamiento', heading: 'Almacenamiento' },
+  { link: 'Archivo', path: '/almacenamiento', heading: 'Archivo' },
   // «Catálogo» entra el 2026-08-20, con la identidad visual de las categorías:
   // es donde vive el selector de icono y color, o sea las veintidós parejas de
   // botones que este hito añade y **el único sitio del producto donde un color

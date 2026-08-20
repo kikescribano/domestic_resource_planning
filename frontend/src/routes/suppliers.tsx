@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Store } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import {
@@ -64,6 +65,7 @@ export function SuppliersPage() {
     <>
       <PageHeading
         title="Proveedores"
+        icon={Store}
         action={
           <Button variant="primary" onClick={() => setAdding((open) => !open)} aria-expanded={adding}>
             Añadir contacto

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { BookOpen } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import {
@@ -41,7 +42,7 @@ export function CatalogPage() {
 
   return (
     <>
-      <PageHeading title="Catálogo" />
+      <PageHeading title="Catálogo" icon={BookOpen} />
 
       {/* Dos listas en una pantalla y no dos rutas: se editan a la vez --se crea
           una categoría para poder clasificar el artículo que se está creando--

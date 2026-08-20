@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { MapPin } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 
 import {
@@ -181,7 +182,7 @@ export function LocationsPage() {
 
   return (
     <>
-      <PageHeading title="Ubicaciones" />
+      <PageHeading title="Ubicaciones" icon={MapPin} />
 
       <div className="flex flex-col gap-6">
         <form onSubmit={submit} className="flex max-w-form flex-col gap-3">

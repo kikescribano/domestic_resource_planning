@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Warehouse } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import {
@@ -61,7 +62,7 @@ export function WarehousePage() {
 
   return (
     <>
-      <PageHeading title="Almacén" />
+      <PageHeading title="Almacén" icon={Warehouse} />
 
       <p className="max-w-prose text-body text-ink-muted">
         Lo que hay en la despensa, el garaje y el trastero. Apunta lo que gastas,

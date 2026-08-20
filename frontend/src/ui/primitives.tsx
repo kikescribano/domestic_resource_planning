@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, Info, TriangleAlert } from 'lucide-react'
+import { CircleAlert, CircleCheck, Info, TriangleAlert, type LucideIcon } from 'lucide-react'
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -300,14 +300,19 @@ export function StatusBadge({ tone, children }: { tone: StatusTone; children: Re
  * Vive aquí y no en una ruta concreta porque el Hito 2 trae cuatro pantallas más
  * que la necesitan, y tres copias del mismo `header` es como se acaba con tres
  * tamaños de título distintos.
+ *
+ * El `icon` es el mismo que la sección lleva en la navegación —la cabecera
+ * repite el nombre y el icono del menú, no estrena otros— y va delante del
+ * texto, como en la barra lateral. `aria-hidden`, porque el nombre accesible de
+ * la pantalla es el título.
  */
-export function PageHeading({ title, action }: { title: string; action?: ReactNode }) {
+export function PageHeading({ title, action, icon: Icon }: { title: string; action?: ReactNode; icon?: LucideIcon }) {
   return (
-    // Sin la serif a propósito: esa entra solo en `AuthCard`, que es la pantalla
-    // de una sola columna. Aquí el `h1` compite con filas de listado y la serif
-    // a ese tamaño empieza a pesar.
     <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-title text-ink">{title}</h1>
+      <div className="flex items-center gap-2.5">
+        {Icon && <Icon size={24} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-accent-ink" />}
+        <h1 className="text-title text-ink">{title}</h1>
+      </div>
       {action}
     </header>
   )

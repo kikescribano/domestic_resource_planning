@@ -162,7 +162,7 @@ async function signInAndVisit(link: string, responses: Record<string, StubbedRes
   await userEvent.type(screen.getByLabelText('Correo'), 'kike@example.test')
   await userEvent.type(screen.getByLabelText('Contraseña'), 'el gato duerme en el sofa')
   await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
-  await screen.findByRole('heading', { level: 1, name: 'Tu hogar' })
+  await screen.findByRole('heading', { level: 1, name: 'Hogar' })
 
   await userEvent.click(screen.getByRole('link', { name: link }))
   return stub
@@ -420,7 +420,7 @@ describe('etiquetas e identidad visual', () => {
 
 describe('árbol de ubicaciones', () => {
   it('anida las ubicaciones y anuncia el nivel a un lector de pantalla', async () => {
-    await signInAndVisit('Sitios', {
+    await signInAndVisit('Ubicaciones', {
       'GET /api/v1/locations?size=200': LOCATIONS,
     })
 
@@ -434,7 +434,7 @@ describe('árbol de ubicaciones', () => {
   })
 
   it('borrar una ubicación que tiene cosas dentro se explica sin jerga', async () => {
-    await signInAndVisit('Sitios', {
+    await signInAndVisit('Ubicaciones', {
       'GET /api/v1/locations?size=200': LOCATIONS,
       'DELETE /api/v1/locations/loc-2': {
         status: 409,
@@ -450,7 +450,7 @@ describe('árbol de ubicaciones', () => {
   })
 
   it('la capacidad se declara al crear, con su medida', async () => {
-    const { calls } = await signInAndVisit('Sitios', {
+    const { calls } = await signInAndVisit('Ubicaciones', {
       'GET /api/v1/locations?size=200': LOCATIONS,
       'POST /api/v1/locations': {
         status: 201,
@@ -481,7 +481,7 @@ describe('árbol de ubicaciones', () => {
   })
 
   it('editar manda los cuatro campos, porque en un PATCH ausente conserva y nulo borra', async () => {
-    const { calls } = await signInAndVisit('Sitios', {
+    const { calls } = await signInAndVisit('Ubicaciones', {
       'GET /api/v1/locations?size=200': LOCATIONS,
       'PATCH /api/v1/locations/loc-2': {
         status: 200,
@@ -513,7 +513,7 @@ describe('árbol de ubicaciones', () => {
   })
 
   it('no se ofrece como destino ni ella misma ni lo que cuelga de ella', async () => {
-    await signInAndVisit('Sitios', {
+    await signInAndVisit('Ubicaciones', {
       'GET /api/v1/locations?size=200': LOCATIONS,
     })
 

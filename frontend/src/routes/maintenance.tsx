@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Wrench } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import {
@@ -53,7 +54,7 @@ export function MaintenancePage() {
 
   return (
     <>
-      <PageHeading title="Mantenimiento" />
+      <PageHeading title="Mantenimiento" icon={Wrench} />
 
       <p className="max-w-prose text-body text-ink-muted">
         Lo que hay que revisar de las cosas de casa: la caldera cada año, el filtro

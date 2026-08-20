@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Bell } from 'lucide-react'
 import { useState } from 'react'
 
 import { api, formatDate, humanMessage, type Notice } from '../api/client'
@@ -48,6 +49,7 @@ export function NoticesPage() {
     <>
       <PageHeading
         title="Avisos"
+        icon={Bell}
         action={
           unread > 0 ? (
             <Button variant="secondary" onClick={() => markAll.mutate()} busy={markAll.isPending} busyLabel="Marcando…">

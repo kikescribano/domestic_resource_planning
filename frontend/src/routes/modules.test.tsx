@@ -93,7 +93,7 @@ describe('navegación con módulos', () => {
     await resumeAt('/', { 'GET /api/v1/modules': catalogue() })
 
     const nav = mainNavigation()
-    for (const label of ['Hogar', 'Inventario', 'Sitios', 'Catálogo', 'Préstamos', 'Personas', 'Archivo', 'Cuenta']) {
+    for (const label of ['Hogar', 'Inventario', 'Ubicaciones', 'Catálogo', 'Préstamos', 'Personas', 'Archivo', 'Cuenta']) {
       expect(nav.getByRole('link', { name: label })).toBeInTheDocument()
     }
     expect(await nav.findByRole('link', { name: 'Módulos del hogar' })).toBeInTheDocument()

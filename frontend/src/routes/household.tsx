@@ -48,7 +48,7 @@ import { Button, DangerZone, Field, Notice, PageHeading, Spinner, StatusBadge } 
 const PRIMARY_NAVIGATION = [
   { to: '/', label: 'Hogar', end: true, icon: House },
   { to: '/inventario', label: 'Inventario', end: false, icon: Boxes },
-  { to: '/ubicaciones', label: 'Sitios', end: false, icon: MapPin },
+  { to: '/ubicaciones', label: 'Ubicaciones', end: false, icon: MapPin },
   { to: '/prestamos', label: 'Préstamos', end: false, icon: Handshake },
 ]
 
@@ -121,7 +121,7 @@ export function useHouseholdToday(): string | null {
 /**
  * El aviso de que el hogar va a desaparecer, **en todas las pantallas**.
  *
- * Vive en el shell y no en «Tu hogar» porque durante la gracia todo sigue
+ * Vive en el shell y no en «Hogar» porque durante la gracia todo sigue
  * funcionando igual: alguien puede pasarse treinta días dando de alta cosas en
  * el inventario sin volver a la pantalla del hogar y sin enterarse de nada. Ese
  * es exactamente el caso que la gracia existe para atrapar.
@@ -136,7 +136,7 @@ function ClosureBanner({ household }: { household: Household }) {
     <div className="mb-6">
       <Notice tone="warning" title={`Este hogar se borrará el ${formatDate(household.closure.effectiveAt)}`}>
         Se pidió darlo de baja. Hasta esa fecha todo sigue funcionando igual, y quien administre el
-        hogar puede cancelarlo desde <Link to="/" className="underline">Tu hogar</Link>. Después no se
+        hogar puede cancelarlo desde <Link to="/" className="underline">Hogar</Link>. Después no se
         podrá recuperar nada.
       </Notice>
     </div>
@@ -208,7 +208,10 @@ function HouseholdShell() {
           'md:static md:flex md:w-64 md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-t-0 md:p-gutter-lg',
         ].join(' ')}
       >
-        <p className="hidden font-display text-title font-extrabold text-ink md:block">DRP</p>
+        <p className="hidden font-display text-title font-extrabold text-ink md:flex md:items-center md:gap-2">
+          <House size={24} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
+          DRP
+        </p>
 
         <nav aria-label="Principal" className="flex md:flex-col md:gap-6">
           {/* Los rótulos de grupo se leen siempre aunque solo se vean desde
@@ -328,7 +331,7 @@ export function MorePage() {
 
   return (
     <>
-      <PageHeading title="Más" />
+      <PageHeading title="Más" icon={Ellipsis} />
 
       <nav aria-label="Resto del hogar">
         <ul className="flex flex-col gap-2">
@@ -380,7 +383,7 @@ export function HomePage() {
 
   return (
     <>
-      <PageHeading title="Tu hogar" />
+      <PageHeading title="Hogar" icon={House} />
       <Notice tone="info" title="Por dónde empezar">
         Crea primero las <Link to="/ubicaciones" className="underline">ubicaciones</Link> —la vivienda y
         lo que hay dentro— y el <Link to="/catalogo" className="underline">catálogo</Link> de lo que
@@ -526,7 +529,7 @@ export function UsersPage() {
 
   return (
     <>
-      <PageHeading title="Personas" />
+      <PageHeading title="Personas" icon={Users} />
 
       {users.isPending && <Spinner label="Cargando las personas del hogar…" />}
       {users.isError && <Notice tone="danger">No se ha podido cargar la lista.</Notice>}
@@ -655,7 +658,7 @@ export function AccountPage() {
 
   return (
     <>
-      <PageHeading title="Tu cuenta" />
+      <PageHeading title="Cuenta" icon={CircleUserRound} />
 
       <OwnAvatar accessToken={session.accessToken} />
 

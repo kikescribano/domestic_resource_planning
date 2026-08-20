@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Handshake } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router'
 
@@ -77,6 +78,7 @@ export function LoansPage() {
     <section className="space-y-6">
       <PageHeading
         title="Préstamos"
+        icon={Handshake}
         action={
           <Button onClick={() => setIsStarting((open) => !open)}>
             {isStarting ? 'Cancelar' : 'Prestar algo'}

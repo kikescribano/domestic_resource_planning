@@ -45,7 +45,7 @@ async function signInAndVisit(link: string, responses: Record<string, StubbedRou
   await userEvent.type(screen.getByLabelText('Correo'), 'kike@example.test')
   await userEvent.type(screen.getByLabelText('Contraseña'), 'el gato duerme en el sofa')
   await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
-  await screen.findByRole('heading', { level: 1, name: 'Tu hogar' })
+  await screen.findByRole('heading', { level: 1, name: 'Hogar' })
 
   await userEvent.click(screen.getByRole('link', { name: link }))
   return stub

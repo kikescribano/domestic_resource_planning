@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ShoppingCart, Store, Warehouse, Wrench, type LucideIcon } from 'lucide-react'
+import { Blocks, ShoppingCart, Store, Warehouse, Wrench, type LucideIcon } from 'lucide-react'
 import { type ReactNode } from 'react'
 import { Link } from 'react-router'
 
@@ -84,7 +84,7 @@ export function ModulesPage() {
 
   return (
     <>
-      <PageHeading title="Módulos" />
+      <PageHeading title="Módulos del hogar" icon={Blocks} />
 
       <p className="max-w-prose text-body text-ink-muted">
         DRP viene con lo básico de casa: las cosas, dónde están y a quién se las
