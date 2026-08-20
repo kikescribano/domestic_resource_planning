@@ -5,12 +5,16 @@ import com.drp.platform.event.IdempotentEventHandler
 import com.drp.platform.event.EventBus
 import com.drp.platform.tenant.TenantContext
 import com.drp.platform.event.DomainEvent
+import com.drp.test.DrpPostgres
 import com.drp.test.SpringIntegrationTest
+import com.drp.test.seedHousehold
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
@@ -34,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * un comentario. Aqui se ejecuta.
  */
 @SpringBootTest
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class EventBusIntegrationTest : SpringIntegrationTest() {
 
     @Autowired private lateinit var events: CoreEvents
@@ -50,7 +55,21 @@ class EventBusIntegrationTest : SpringIntegrationTest() {
 
     @Autowired private lateinit var carelessModule: CarelessListener
 
-    private val household = UUID.randomUUID()
+    /**
+     * Un hogar **de verdad**, y desde el Hito 1 del cierre de huecos tiene que
+     * serlo: hasta el outbox esto era un `UUID` inventado, porque publicar no
+     * escribia nada en ninguna parte. Ahora publicar deja una fila en
+     * `event_outbox` con su clave ajena contra `households`, asi que **publicar
+     * un evento de un hogar que no existe deja de ser posible** --que es lo
+     * correcto, y de paso lo unico que hace que estas pruebas hablen del mismo
+     * mundo que la aplicacion.
+     */
+    private lateinit var household: UUID
+
+    @BeforeAll
+    fun seed() {
+        DrpPostgres.instance.ownerConnection().use { household = it.seedHousehold("Hogar del bus").householdId }
+    }
 
     @BeforeEach
     fun resetHandlers() {

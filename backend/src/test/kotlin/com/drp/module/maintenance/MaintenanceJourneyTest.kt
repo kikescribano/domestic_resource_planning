@@ -11,6 +11,7 @@ import com.drp.test.patchJson
 import com.drp.test.postJson
 import com.drp.test.registerHousehold
 import com.drp.test.seededCategory
+import com.drp.test.today
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -272,7 +273,7 @@ class MaintenanceJourneyTest : SpringIntegrationTest() {
         home.activate()
         val car = home.durable("Coche")
         val planId = home.plan(car, "ITV", intervalMonths = 24)
-        home.intervene(car, planId, LocalDate.now().minusDays(1), "Pasada sin incidencias")
+        home.intervene(car, planId, today().minusDays(1), "Pasada sin incidencias")
 
         http.deleteJson("/api/v1/assets/$car", home.accessToken).statusCode.shouldBe(HttpStatus.NO_CONTENT)
 
@@ -469,7 +470,7 @@ class MaintenanceJourneyTest : SpringIntegrationTest() {
         val boiler = home.durable("Caldera")
         val planId = home.plan(boiler, "Revisión anual", intervalMonths = 12, nextDueOn = inDays(-40))
 
-        val done = LocalDate.now().minusDays(2)
+        val done = today().minusDays(2)
         home.intervene(boiler, planId, done, "Revisada y limpiada")
 
         val plan = http.getJson("$CMMS/plans/$planId", home.accessToken).body!!
@@ -487,7 +488,7 @@ class MaintenanceJourneyTest : SpringIntegrationTest() {
 
         http.postJson(
             "$CMMS/interventions",
-            """{"assetId":"$boiler","kind":"CORRECTIVE","performedOn":"${LocalDate.now()}",
+            """{"assetId":"$boiler","kind":"CORRECTIVE","performedOn":"${today()}",
                 "summary":"Se cambió la válvula"}""",
             home.accessToken,
         ).statusCode.shouldBe(HttpStatus.CREATED)
@@ -524,7 +525,7 @@ class MaintenanceJourneyTest : SpringIntegrationTest() {
         val rejected = http.postJson(
             "$CMMS/interventions",
             """{"assetId":"$boiler","planId":"$planId","kind":"PREVENTIVE",
-                "performedOn":"${LocalDate.now()}","summary":"Tarde"}""",
+                "performedOn":"${today()}","summary":"Tarde"}""",
             home.accessToken,
         )
         rejected.statusCode.shouldBe(HttpStatus.CONFLICT)
@@ -546,7 +547,7 @@ class MaintenanceJourneyTest : SpringIntegrationTest() {
 
         http.postJson(
             "$CMMS/interventions",
-            """{"assetId":"$boiler","kind":"CORRECTIVE","performedOn":"${LocalDate.now()}",
+            """{"assetId":"$boiler","kind":"CORRECTIVE","performedOn":"${today()}",
                 "summary":"Cambio de bomba","supplierId":"$supplierId"}""",
             home.accessToken,
         ).statusCode.shouldBe(HttpStatus.CREATED)
@@ -679,7 +680,7 @@ class MaintenanceJourneyTest : SpringIntegrationTest() {
 
         // Se hace. La proxima pasa a ser dentro de un mes, y el aviso se rearma
         // **sin que nadie limpie ninguna marca**: `notifiedFor` deja de coincidir.
-        home.intervene(boiler, planId, LocalDate.now(), "Purgada")
+        home.intervene(boiler, planId, today(), "Purgada")
 
         // Todavia fuera de la ventana --queda un mes--, asi que no dice nada.
         sweep.run()
@@ -812,7 +813,7 @@ class MaintenanceJourneyTest : SpringIntegrationTest() {
      * --literalmente-- y convierte la prueba en una que empieza a fallar sola un
      * dia cualquiera.
      */
-    private fun inDays(days: Long): String = LocalDate.now().plusDays(days).toString()
+    private fun inDays(days: Long): String = today().plusDays(days).toString()
 
     private companion object {
         const val CMMS = "/api/v1/maintenance"

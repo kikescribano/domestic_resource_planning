@@ -70,6 +70,15 @@ abstract class SpringIntegrationTest {
             // mismo metodo que invoca el `@Scheduled`.
             registry.add("drp.schedule.enabled") { false }
 
+            // **Y el relay del outbox, aparte.** No basta con el interruptor de
+            // arriba: `SchedulingEnabledTest` enciende el programador a proposito
+            // para medir que la pasada diaria queda registrada, y con el relay
+            // colgando de aquella propiedad empezaria a repartir eventos **cada
+            // cinco segundos** dentro de ese contexto, a mitad de otra prueba.
+            // Lo que el relay hace se comprueba invocandolo a mano, que ademas es
+            // el mismo metodo que invoca el programador.
+            registry.add("drp.outbox.enabled") { false }
+
             // El volumen de ficheros, en un directorio efimero. Se comparte entre
             // clases igual que el contenedor de PostgreSQL: crear uno por clase
             // multiplicaria los arranques sin comprobar nada mas.

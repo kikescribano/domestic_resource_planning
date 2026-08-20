@@ -415,3 +415,38 @@ alcanzado.
   plantas o préstamos avanzados son los candidatos—, la duplicación pasa de dos a
   tres y deja de poder llamarse coincidencia. Con dos, cambiar un número en el
   código sigue costando menos que una tabla que nadie ha pedido.
+
+- **El relay del outbox reutiliza la forma de este recorrido, pero no su
+  vehículo.** El Hito 1 del cierre de huecos construye el Transactional Outbox
+  ([ADR-013](ADR-013-transactional-outbox.md)) y su relay tenía que recorrer
+  hogares sin token del que sacar el hogar, que es exactamente el problema que
+  esta ADR resolvió. **La forma se copia entera**: hogar a hogar, fijando
+  `app.household_id` en cada transacción, nunca con `BYPASSRLS`, y con su `catch`
+  por hogar para que uno que falle no corte la pasada.
+
+  **El vehículo no: no es una `ScheduledCheck`.** Un evento que tardase un día en
+  llegar a Warehouse no sería una entrega diferida sino una rota, así que el relay
+  tiene periodo propio —cinco segundos— y su propio interruptor. Se descartó
+  meterlo en `DailySweep`, que habría ahorrado una clase a cambio de convertir una
+  entrega perdida en una entrega de mañana.
+
+  Y hereda una decisión de esta ADR sin cambiarle una coma: **repartir primero y
+  confirmar después**, que es el mismo «marcar los avisos como entregados
+  **después** de enviar» de la sección 6 y con el mismo motivo. Las dos opciones
+  son at-least-once imperfectas y hay que elegir cuál falla mejor: confirmar antes
+  y caerse pierde el evento para siempre; repartir y caerse antes de confirmar lo
+  repite. Repetir se nota y se aguanta; perder, ni se nota.
+
+- **La premisa de la instancia única gana un sujeto más.** La sección 7 la dejó
+  escrita como premisa y no como propiedad, con su condición de revisión: con dos
+  instancias, los procesos se ejecutan dos veces y ninguno avisa. Desde el outbox
+  hay **dos programadores y no uno**, con dos interruptores independientes
+  —`drp.schedule.enabled` y `drp.outbox.enabled`—, y con dos instancias también
+  hay dos relays repartiendo los mismos eventos. Es lo que menos duele de la lista,
+  porque la entrega es at-least-once por contrato y los handlers son idempotentes,
+  pero la condición de revisión de esta ADR ahora cubre las dos cosas.
+
+  El segundo interruptor no es celo: `SchedulingEnabledTest` enciende el
+  programador **a propósito** para medir que la pasada diaria queda registrada, y
+  con el relay colgando de aquella propiedad empezaría a repartir eventos cada
+  cinco segundos dentro de ese contexto y sobre la base que toda la suite comparte.

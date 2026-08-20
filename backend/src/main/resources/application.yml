@@ -91,6 +91,30 @@ drp:
     # conviene pasar la escoba.
     zone: ${DRP_SCHEDULE_ZONE:Europe/Madrid}
 
+  outbox:
+    # El relay del Transactional Outbox (ADR-013), que reparte lo que nadie
+    # confirmo. **Interruptor propio y no el de la pasada diaria**: hay pruebas
+    # que encienden aquel a proposito, y con este colgando de el una pasada
+    # correria cada pocos segundos dentro de su contexto. Encendido por omision,
+    # que es lo que quiere un despliegue.
+    enabled: ${DRP_OUTBOX_ENABLED:true}
+    # **Segundos, no un horario.** Un evento que tardase un dia en llegar a
+    # Warehouse no seria una entrega diferida sino una rota. Cinco segundos hacen
+    # que una caida se note como un retraso y no como un dato que falta.
+    period: ${DRP_OUTBOX_PERIOD:5s}
+    # El periodo de gracia: el relay solo mira filas mas viejas que esto.
+    #
+    # Sin el, cogeria por sistema filas que el reparto en el acto esta a punto de
+    # confirmar y repartiria dos veces **en el caso normal**. Treinta segundos son
+    # dos ordenes de magnitud mas de lo que tarda una peticion en repartir y
+    # confirmar, asi que lo que sobrevive a la ventana es lo que de verdad no
+    # llego a repartirse.
+    grace: ${DRP_OUTBOX_GRACE:30s}
+    # Cuantos eventos se reparten por hogar y pasada. Acota lo que una pasada
+    # puede tardar tras un reinicio con mucho atrasado; lo que no entre sale en
+    # la siguiente, cinco segundos despues.
+    batch-size: ${DRP_OUTBOX_BATCH_SIZE:100}
+
   security:
     jwt:
       # Clave de firma HS256. Es un SECRETO DE DESPLIEGUE y no vive en el

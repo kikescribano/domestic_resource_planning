@@ -408,3 +408,35 @@ alcanzado.
   sin haber tenido que ampliarla, con cuatro módulos, dos capacidades mudadas a
   plataforma (`com.drp.platform.mail` y `HouseholdDirectory`) y un puerto de dato
   maestro construido en medio.
+
+- **Llega el Transactional Outbox y la siembra desde estado no cambia.** La
+  sección 6 de esta ADR manda sembrar un módulo **desde el estado actual del
+  core** y no reproduciendo eventos, y su premisa era que «la entrega del bus es
+  at-least-once y **en memoria**: un módulo activado hoy no vio el `AssetCreated`
+  de hace un mes y no hay dónde ir a buscarlo». Con la
+  [ADR-013](ADR-013-transactional-outbox.md) hay por fin una tabla de eventos, y
+  **sigue sin haber dónde ir a buscarlo**: `event_outbox` es una cola y no un
+  archivo, así que la fila se borra al repartirse. Son dos problemas que se
+  parecen y no son el mismo — el outbox resuelve que un evento **publicado**
+  llegue; la siembra, que un módulo **encendido hoy** conozca lo de antes de
+  existir. Reproducir un año de eventos para sembrar seguiría siendo peor que
+  leer el estado, y ahora además sería imposible.
+
+- **El outbox es de plataforma y no nombra a ningún módulo**, que es lo que esta
+  ADR exige de todo mecanismo compartido. `EventOutbox`, su adaptador y
+  `OutboxRelay` viven en `com.drp.platform.event`, y el relay resuelve por su
+  cuenta qué hogares tienen algo pendiente —con una función acotada de
+  `drp_resolver`— en lugar de pedírselo al core: no hace falta ni un puerto nuevo.
+  **La lista de excepciones de la tercera regla sigue teniendo un solo nombre**,
+  `SessionClaims`, que es la condición de revisión que esta ADR fija.
+
+- **Y `ModuleEventHandler` conserva sus dos decisiones, revisadas con el relay
+  delante.** El outbox obligaba a volver a mirarlas, porque con un relay que
+  reparte **fuera** de la transacción del core sus dos razones —un handler unido
+  ve cero filas, y si falla se lleva por delante el alta que originó el evento—
+  dejan de tener el mismo sujeto. La respuesta, medida y no razonada: `REQUIRES_NEW`
+  se queda —sigue siendo lo que abre la transacción donde el módulo escribe, sin
+  la cual el handler correría sin `app.household_id`— y `AFTER_COMMIT` también,
+  porque el camino en el acto no ha cambiado. Lo que cambia de categoría es el
+  `fallbackExecution` de la clase base, que pasa de conveniencia a
+  imprescindible: sin él, el camino de recuperación entero no entregaría nada.

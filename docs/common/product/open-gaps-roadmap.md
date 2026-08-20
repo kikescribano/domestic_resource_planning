@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | En curso — Hito 0 cerrado |
+| Estado | En curso — Hitos 0 y 1 cerrados |
 | Responsable | Equipo DRP |
 | Ámbito | Los cuatro huecos que las Fases 1 y 2 dejaron abiertos a propósito |
 | Última revisión | 2026-08-20 |
@@ -401,34 +401,42 @@ crecen sin techo se resuelve, según
 > trabajo: la respuesta a qué se hace con una identidad huérfana la da la baja de
 > hogar, y el cierre de cuenta la aplica.
 
-### Hito 1 — Transactional Outbox · **Pendiente**
+### Hito 1 — Transactional Outbox · **Hecho** (2026-08-20)
 
-- [ ] **ADR-013 — Transactional Outbox**: qué garantía cambia —**ninguna**, sigue
+- [x] **ADR-013 — Transactional Outbox**: qué garantía cambia —**ninguna**, sigue
       siendo at-least-once—, el recorrido del relay sin `BYPASSRLS`, qué pasa con
       `AFTER_COMMIT` y `REQUIRES_NEW`, y por qué la siembra desde estado no cambia.
-- [ ] **Migración `V15`**: `event_outbox` con `household_id`, RLS y `FORCE` como
-      cualquier tabla del modelo, más la **cuarta función `SECURITY DEFINER`** en
-      el rol `drp_resolver`, que devuelve **solo identificadores** de los hogares
-      con entregas pendientes.
-- [ ] **La publicación escribe la fila dentro de la transacción del core.** Es lo
+      Con lo que le ocurre a lo pendiente cuando el hogar se purga, que la ADR-012
+      hizo posible y nadie había escrito.
+- [x] **Migración `V15`**: `event_outbox` con `household_id`, RLS y `FORCE` como
+      cualquier tabla del modelo, más la **sexta función `SECURITY DEFINER`** en
+      el rol `drp_resolver` —el plan la llamaba «la cuarta» y contando la de
+      préstamos de la V6 y la que añadió el Hito 0 eran ya cinco—, que devuelve
+      **solo identificadores** de los hogares con entregas pendientes. El modelo
+      pasa de 28 a **29 tablas**.
+- [x] **La publicación escribe la fila dentro de la transacción del core.** Es lo
       único que hace que el evento no se pierda, y es todo lo que el core nota: la
       firma de `EventBus` no cambia.
-- [ ] **El relay**, con periodo propio medido en segundos y la forma de
+- [x] **El relay**, con periodo propio medido en segundos y la forma de
       `DailySweep`: hogar a hogar, `app.household_id` en cada transacción, nunca
-      `BYPASSRLS`.
-- [ ] **La decisión sobre `ModuleEventHandler`, medida y no razonada.** Si
-      `AFTER_COMMIT` deja de significar algo, se retira con una prueba delante; si
-      se queda, se queda con la prueba que dice por qué.
-- [ ] **La guarda de idempotencia se muda**, que es lo que su propio comentario
-      dice que pasa «el día que haya outbox».
-- [ ] **La prueba que hoy no se puede escribir**: publicar, cortar el proceso antes
+      `BYPASSRLS`. Con **su propio interruptor**, medido en los dos sentidos como
+      el del programador y por el mismo motivo elevado a segundos.
+- [x] **La decisión sobre `ModuleEventHandler`, medida y no razonada.** Se quedan
+      las dos, con la prueba que dice por qué: dos testigos que se diferencian en
+      una línea, y solo el que declara `fallbackExecution` recibe por el camino del
+      relay.
+- [x] **La guarda de idempotencia se muda**, que es lo que su propio comentario
+      dice que pasa «el día que haya outbox»: su mitad duradera es la fila del
+      outbox, y en memoria queda lo que solo tiene sentido dentro de un proceso.
+- [x] **La prueba que hoy no se puede escribir**: publicar, cortar el proceso antes
       de entregar, arrancar y comprobar que el handler recibe. El testigo es el
       **módulo de prueba** del Hito 0 de la Fase 2, que vive en el árbol de pruebas
       y existe exactamente para esto.
-- [ ] **Medida de capacidad**: si la fila entregada se conserva, `event_outbox` es
-      una **sexta** tabla que crece con lo que el hogar hace, y entra en la lista de
-      la purga con su criterio de retención.
-- [ ] **Este hito no tiene frontend, y no se le inventa uno.** Nada de lo que hace
+- [x] **Medida de capacidad**: la fila entregada **se borra**, así que no hay sexta
+      tabla. Queda anotado en
+      [`capacity-measurements.md`](../../backend/operations/capacity-measurements.md)
+      para que nadie tenga que volver a derivarlo.
+- [x] **Este hito no tiene frontend, y no se le inventa uno.** Nada de lo que hace
       es visible en una pantalla, y añadir una para cumplir la forma sería añadir
       código que no defiende nada. Su recorrido vertical es dominio → aplicación →
       adaptador → PostgreSQL, y la batería E2E no se toca.
@@ -552,8 +560,8 @@ no aquí.
 | Pregunta | Hito | Por qué vence ahí |
 |---|---|---|
 | ~~**La identidad que se queda sin ninguna pertenencia: ¿baja lógica o borrado real?**~~ **Resuelta (2026-08-20): borrado real**, en la [ADR-012](../architecture/decisions/ADR-012-data-erasure-household-closure-and-account-closure.md) y en [`decisions.md`](decisions.md). Conservarla retiene datos personales de alguien que ya no puede entrar y **no libera su correo** —el índice único dejó de ser parcial por baja—, así que esa persona no puede volver nunca. Borrarla es lo que `PurgeUnverifiedHouseholds` ya hace, pero allí no había nada que conservar | 0 | Es lo que la baja de hogar produce, y sin respuesta no se puede escribir su purga |
-| **¿El outbox es el único camino de entrega, o convive con la entrega in-process?** Un solo camino deja una sola semántica que razonar y añade la latencia del relay; convivir entrega al instante y obliga a decidir qué significa una fila que el otro camino ya entregó | 1 | De ello depende si `AFTER_COMMIT` sigue significando algo en `ModuleEventHandler` |
-| **¿La fila entregada se borra o se conserva?** Borrarla deja el outbox sin crecimiento; conservarla da un registro de lo publicado y convierte `event_outbox` en la **sexta** tabla sin techo, con su criterio de retención | 1 | La medición de capacidad distingue lo que crece con lo que el hogar tiene de lo que crece con lo que hace, y esto es lo segundo |
+| ~~**¿El outbox es el único camino de entrega, o convive con la entrega in-process?**~~ **Resuelta (2026-08-20): convive**, en la [ADR-013](../architecture/decisions/ADR-013-transactional-outbox.md) y en [`decisions.md`](decisions.md). Un solo camino volvería **asíncrona respecto a la petición** una entrega que hoy no lo es, en los cuatro módulos a la vez y sin ninguna pantalla que lo pida; el relay queda como camino de recuperación, con un periodo de gracia para no pisar al reparto en el acto | 1 | De ello depende si `AFTER_COMMIT` sigue significando algo en `ModuleEventHandler` |
+| ~~**¿La fila entregada se borra o se conserva?**~~ **Resuelta (2026-08-20): se borra.** El outbox es una cola y no un archivo, así que **no hay sexta tabla**: su estado normal es vacía y su tamaño es el indicador. Conservarla habría dado un registro de lo publicado a cambio de una segunda copia de cada `payload` y de una retención inventada para una necesidad que nadie ha expresado | 1 | La medición de capacidad distingue lo que crece con lo que el hogar tiene de lo que crece con lo que hace, y esto es lo segundo |
 | **HEIC: ¿cliente o servidor?** Con las dos medidas delante, y no antes | 2 | Es la decisión del hito, y su ADR no se puede escribir sin ella |
 | **La etiqueta: ¿catálogo por hogar o columna de texto?** El catálogo cuesta una tabla y una relación; el texto no se puede renombrar, ni deduplicar sin distinguir mayúsculas, ni autocompletar sin recorrer todos los assets | 4 | Es lo que decide la migración, y con datos dentro cambiarla cuesta otra |
 
@@ -582,5 +590,6 @@ no aquí.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-08-20 | **Hito 1 cerrado**: el **Transactional Outbox**, con la **ADR-013**, la migración `V15` —`event_outbox` y la sexta función acotada— y el relay con su periodo en segundos y su propio interruptor. Se resuelven las dos preguntas que el plan le había asignado —**convive** con la entrega en el acto, y **la fila entregada se borra**— y se deciden otras seis por el camino. La trampa que el plan anunciaba estaba donde decía y era de una línea: el `try/catch` de `publish` habría pasado de proteger al core a **tragarse el fallo de escribir la fila**, perdiendo el evento en el silencio exacto que el outbox viene a impedir. Sacarla del `try` —y no confirmar cuando el reparto lanza— cierra de paso **la peor limitación conocida del bus**, medida desde la Fase 1 y hasta hoy sin respuesta: un `@EventListener` a pelo que revienta dejaba sin evento a los handlers que iban detrás. Lo que la implementación destapó y el plan no preveía: **el `@Order` de la clase base no puede ser `@Order(0)`** —adelantaría a los handlers respecto a listeners con orden declarado, y una prueba de la Fase 1 lo midió— así que va un escalón por delante de la confirmación y no a la cabeza; **publicar un evento de un hogar que no existe deja de ser posible**, por la clave ajena, lo que obligó a sembrar un hogar de verdad en una prueba del bus que llevaba desde la Fase 1 usando un `UUID` inventado; y **`event_outbox` es la primera tabla del modelo que no puede estar llena**, así que la prueba de la cascada del Hito 0 —que exige que cada tabla con `household_id` tenga algo dentro antes de purgar— la llena **a mano** con una entrega que nadie va a confirmar, y de paso comprueba que lo pendiente de un hogar purgado se va con él. La decisión sobre `ModuleEventHandler` se cierra **con las dos mitades medidas** y ninguna se retira; la guarda de idempotencia se muda a la fila del outbox y **no a una tabla de `(handler, eventId)`**, porque no cerraría la ventana y ningún handler desplegado la necesita — los tres ya son idempotentes por construcción en sus propias tablas, y hay una prueba que lo mide entregando el mismo `eventId` a dos instancias del handler. **Sin frontend y sin tocar la batería E2E**, que es la excepción declarada del plan |
 | 2026-08-20 | **Hito 0 cerrado**: la baja de hogar con treinta días de gracia, el cierre de cuenta con su avatar y `PurgeClosedHouseholds` dentro del recorrido que ya existía. Con ellos, la **ADR-012**, la migración `V14` —tres columnas y una función acotada más—, cuatro operaciones en el contrato y la zona de peligro con confirmación escrita. Se resuelve la pregunta que el plan le había asignado —la identidad huérfana **se borra de verdad**— y se deciden otras cinco por el camino, entre ellas la del último administrador. Se cierran de paso dos promesas ajenas: la de `PurgeUnverifiedHouseholds` sobre el directorio del hogar y el criterio de retención de cuatro de las cinco tablas sin techo. La auditoría sistemática destapó además que **el limitador de frecuencia no daba para dos pantallas más**, con un síntoma que no se parecía a la causa |
 | 2026-08-19 | Se crea al planificar el cierre de los cuatro huecos que las Fases 1 y 2 dejaron abiertos a propósito: seis hitos, cuatro ADR nuevas, cinco preguntas con su hito asignado y las cuatro decisiones de arranque tomadas antes de empezar. Se decide **dónde encaja**: un bloque entre fases, ni un hito 0 de la Fase 3 ni una fase numerada |

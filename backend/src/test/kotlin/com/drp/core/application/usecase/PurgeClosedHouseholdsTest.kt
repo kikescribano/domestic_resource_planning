@@ -1,5 +1,7 @@
 package com.drp.core.application.usecase
 
+import com.drp.platform.event.DomainEvent
+import com.drp.platform.event.EventOutbox
 import com.drp.platform.schedule.DailySweep
 import com.drp.test.DrpPostgres
 import com.drp.test.SpringIntegrationTest
@@ -14,6 +16,7 @@ import com.drp.test.postJson
 import com.drp.test.queryAll
 import com.drp.test.registerHousehold
 import com.drp.test.seededCategory
+import com.drp.test.today
 import com.drp.test.uploadFile
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
@@ -29,6 +32,7 @@ import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 
@@ -58,6 +62,7 @@ class PurgeClosedHouseholdsTest : SpringIntegrationTest() {
 
     @Autowired private lateinit var sweep: DailySweep
     @Autowired private lateinit var http: TestRestTemplate
+    @Autowired private lateinit var outbox: EventOutbox
 
     private val postgres = DrpPostgres.instance
 
@@ -415,10 +420,37 @@ class PurgeClosedHouseholdsTest : SpringIntegrationTest() {
         ).statusCode.shouldBe(HttpStatus.CREATED)
         http.postJson(
             "$CMMS/interventions",
-            """{"assetId":"$drill","kind":"CORRECTIVE","performedOn":"${LocalDate.now()}",
+            """{"assetId":"$drill","kind":"CORRECTIVE","performedOn":"${today()}",
                 "summary":"Se cambió la escobilla"}""",
             token,
         ).statusCode.shouldBe(HttpStatus.CREATED)
+
+        // Y una entrega pendiente en la cola del outbox, que es **la unica tabla
+        // del modelo que hay que llenar a mano**.
+        //
+        // Todo lo de arriba ha publicado eventos de sobra, y ninguno deja rastro
+        // aqui: la fila se borra al repartirse (ADR-013), asi que el estado
+        // normal de `event_outbox` es vacia. Con la comprobacion de «cada tabla
+        // con algo dentro» eso la dejaria fuera del retrato, y una tabla que la
+        // siembra no llega a tocar **pasaria por purgada** sin que nadie la
+        // hubiera purgado.
+        //
+        // Se deja una fila que nadie va a confirmar --el relay esta apagado en la
+        // suite-- y con ella se comprueba de paso lo que la ADR-013 promete: **lo
+        // pendiente de un hogar purgado se va con el hogar**. Es lo correcto, no
+        // hay a quien entregarselo, y conservarlo dejaria el `payload` de un
+        // hogar que pidio marcharse.
+        outbox.record(
+            DomainEvent(
+                eventId = UUID.randomUUID(),
+                type = "AssetDeactivated",
+                occurredAt = Instant.now(),
+                householdId = UUID.fromString(household.householdId),
+                aggregateId = drill,
+                version = DomainEvent.INITIAL_VERSION,
+                payload = mapOf("mergedIntoAssetId" to null),
+            ),
+        )
     }
 
     private fun requestClosure(household: TestHousehold) {
@@ -493,7 +525,7 @@ class PurgeClosedHouseholdsTest : SpringIntegrationTest() {
     private fun avatarPathOf(identityId: UUID): Path =
         storageRoot.resolve("avatar/${identityId.toString().take(2)}/$identityId")
 
-    private fun inDays(days: Long): String = LocalDate.now().plusDays(days).toString()
+    private fun inDays(days: Long): String = today().plusDays(days).toString()
 
     private companion object {
         const val WAREHOUSE = "/api/v1/warehouse"
