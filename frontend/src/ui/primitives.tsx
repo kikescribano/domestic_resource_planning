@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, House, Info, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { CircleAlert, CircleCheck, House, Info, TriangleAlert, X, type LucideIcon } from 'lucide-react'
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -283,14 +283,21 @@ const NOTICE_TONES: Record<NoticeTone, { box: string; icon: ReactNode }> = {
  * `role="alert"` solo en los de error: un `alert` interrumpe al lector de
  * pantalla, y hacerlo para confirmar un éxito es exactamente el ruido que la
  * dirección visual llama «feedback intrusivo».
+ *
+ * `onDismiss` pinta la equis y nada más: recordar la decisión es de quien
+ * monta el aviso, porque solo él sabe si «leído» dura una sesión o para
+ * siempre. Un aviso que refleja un estado vivo —el formulario falló— no la
+ * lleva: se va cuando la situación cambia, no cuando estorba.
  */
 export function Notice({
   tone = 'info',
   title,
+  onDismiss,
   children,
 }: {
   tone?: NoticeTone
   title?: string
+  onDismiss?: () => void
   children: ReactNode
 }) {
   const { box, icon } = NOTICE_TONES[tone]
@@ -307,6 +314,18 @@ export function Notice({
         {title && <p className="font-medium">{title}</p>}
         <div className="text-ink-muted">{children}</div>
       </div>
+      {onDismiss && (
+        // `size-11` son los 44 px del objetivo táctil; los márgenes negativos
+        // devuelven el aire sobrante para que la equis no engorde el aviso.
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Descartar el aviso"
+          className="-my-1.5 -mr-1.5 ml-auto flex size-11 shrink-0 items-center justify-center self-start rounded-md text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
+        >
+          <X size={16} aria-hidden="true" />
+        </button>
+      )}
     </div>
   )
 }

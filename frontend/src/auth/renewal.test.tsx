@@ -59,7 +59,7 @@ async function signIn(responses: Record<string, StubbedRoute>) {
   await userEvent.type(screen.getByLabelText('Correo'), 'kike@example.test')
   await userEvent.type(screen.getByLabelText('Contraseña'), 'el gato duerme en el sofa')
   await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
-  await screen.findByRole('heading', { level: 1, name: 'Hogar' })
+  await screen.findByRole('heading', { level: 1, name: /^Hogar/ })
 
   return stub
 }
@@ -211,7 +211,7 @@ describe('reanudar al cargar la página', () => {
 
     render(<App />)
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Hogar' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: /^Hogar/ })).toBeInTheDocument()
   })
 
   it('mientras reanuda espera, en vez de redirigir a la pantalla de entrar', async () => {
@@ -251,7 +251,7 @@ describe('reanudar al cargar la página', () => {
 
     completeRefresh?.()
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Hogar' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: /^Hogar/ })).toBeInTheDocument()
   })
 
   it('con un token guardado que ya no vale, lleva a entrar y en silencio', async () => {

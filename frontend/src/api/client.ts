@@ -308,15 +308,45 @@ export const CONDITION_LABELS: Record<AssetCondition, string> = {
 /** El orden de la escala, para pintar los desplegables sin repetirlo en cada pantalla. */
 export const CONDITIONS: AssetCondition[] = ['NEW', 'GOOD', 'WORN', 'DAMAGED', 'UNUSABLE']
 
-/** Cómo se escribe cada unidad al mostrarla. Son datos, así que van en castellano. */
+/**
+ * Cómo se escribe cada unidad, en singular y en plural. Son datos que lee una
+ * persona, así que van en castellano y **con su concordancia**: «1 kilogramo»,
+ * «2 kilogramos». Antes convivían tres formas —abreviaturas, un plural fijo y
+ * pantallas que enseñaban el enumerado crudo en minúsculas («2 kilogram»)— y
+ * ninguna era español.
+ *
+ * El singular es además cómo se **nombra** la unidad cuando no hay número
+ * delante: el desplegable del catálogo y la ficha de un artículo. Junto a un
+ * campo de cantidad va el plural, y junto a un número decide [formatQuantity].
+ */
 export const UNIT_LABELS: Record<MeasurementUnit, string> = {
+  UNIT: 'unidad',
+  GRAM: 'gramo',
+  KILOGRAM: 'kilogramo',
+  MILLILITER: 'mililitro',
+  LITER: 'litro',
+  METER: 'metro',
+  PACK: 'paquete',
+}
+
+export const UNIT_LABELS_PLURAL: Record<MeasurementUnit, string> = {
   UNIT: 'unidades',
-  GRAM: 'g',
-  KILOGRAM: 'kg',
-  MILLILITER: 'ml',
-  LITER: 'l',
-  METER: 'm',
+  GRAM: 'gramos',
+  KILOGRAM: 'kilogramos',
+  MILLILITER: 'mililitros',
+  LITER: 'litros',
+  METER: 'metros',
   PACK: 'paquetes',
+}
+
+/**
+ * Una cantidad con su unidad concordada: «1 litro», «2 litros», «0,5 litros»
+ * —solo el uno exacto va en singular—. Sin unidad, el número a secas: es el
+ * caso del consumible sin artículo y de la lista de la compra apuntada a mano.
+ */
+export function formatQuantity(quantity: number, unit?: MeasurementUnit | null): string {
+  if (!unit) return String(quantity)
+  return `${quantity} ${quantity === 1 ? UNIT_LABELS[unit] : UNIT_LABELS_PLURAL[unit]}`
 }
 
 export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
@@ -1991,4 +2021,58 @@ export const api = {
       renewable: false,
       ...(conditionOnReturn ? { body: { conditionOnReturn } } : {}),
     }),
+
+  // --- Los contadores del panel de «Hogar» ----------------------------------
+  // El contrato no tiene un endpoint de resumen, y no le hace falta: toda
+  // colección pagina con un `total` calculado **después** del filtro, así que
+  // cada indicador es la página mínima (`size=1`) de un listado que ya existe,
+  // quedándose con ese número. Son las operaciones de siempre con otro tamaño,
+  // no operaciones nuevas — si algún día el panel pesa, el sitio de la
+  // optimización es un endpoint de resumen en el contrato, no este cliente.
+  //
+  // Los cuatro últimos son de módulo y responden 403 MODULE_INACTIVE apagados:
+  // quien los llame comprueba antes el catálogo, igual que el guardián de ruta.
+
+  countUnreadNotices: (accessToken: string) =>
+    countFrom(`/notices${queryString({ unreadOnly: true, size: 1 })}`, accessToken),
+
+  countAssets: (accessToken: string) =>
+    countFrom(`/assets${queryString({ size: 1 })}`, accessToken),
+
+  countOpenLoans: (accessToken: string) =>
+    countFrom(`/loans${queryString({ open: true, size: 1 })}`, accessToken),
+
+  countOverdueLoans: (accessToken: string) =>
+    countFrom(`/loans${queryString({ status: 'OVERDUE', size: 1 })}`, accessToken),
+
+  countUsers: (accessToken: string) =>
+    countFrom(`/users${queryString({ size: 1 })}`, accessToken),
+
+  countArticles: (accessToken: string) =>
+    countFrom(`/articles${queryString({ size: 1 })}`, accessToken),
+
+  countLocations: (accessToken: string) =>
+    countFrom(`/locations${queryString({ size: 1 })}`, accessToken),
+
+  countSuppliers: (accessToken: string) =>
+    countFrom(`/suppliers${queryString({ size: 1 })}`, accessToken),
+
+  countStockExpiring: (accessToken: string, withinDays: number) =>
+    countFrom(`/warehouse/stock${queryString({ expiringWithinDays: withinDays, size: 1 })}`, accessToken),
+
+  countStockBelowMinimum: (accessToken: string) =>
+    countFrom(`/warehouse/stock${queryString({ belowMinimum: true, size: 1 })}`, accessToken),
+
+  /** Sin `status`: el servidor entiende «lo pendiente», NEEDED e IN_PURCHASE. */
+  countShoppingPending: (accessToken: string) =>
+    countFrom(`/purchasing/list${queryString({ size: 1 })}`, accessToken),
+
+  /** Sin suelo, como el filtro que lo sirve: lo ya pasado sigue contando. */
+  countMaintenanceDue: (accessToken: string, withinDays: number) =>
+    countFrom(`/maintenance/plans${queryString({ dueWithinDays: withinDays, size: 1 })}`, accessToken),
+}
+
+/** El `total` de una colección, sin cargar con sus filas. */
+function countFrom(path: string, accessToken: string): Promise<number> {
+  return request<Page<unknown>>(path, { accessToken }).then((page) => page.total)
 }

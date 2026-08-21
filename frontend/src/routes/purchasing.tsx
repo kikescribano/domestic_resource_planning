@@ -6,6 +6,7 @@ import {
   ITEM_ORIGIN_LABELS,
   SERVICE_CATEGORY_LABELS,
   api,
+  formatQuantity,
   humanMessage,
   type ServiceCategory,
   type ShoppingItem,
@@ -334,7 +335,7 @@ function ShoppingItemRow({
           </span>
           {item.quantity !== null && (
             <span className="text-body-sm text-ink-muted">
-              {item.quantity} {item.unit ? item.unit.toLowerCase() : ''}
+              {formatQuantity(item.quantity, item.unit)}
             </span>
           )}
           {item.packLabel && <span className="text-caption text-ink-subtle">envase de {item.packLabel}</span>}

@@ -4,8 +4,11 @@ import { useState, type FormEvent } from 'react'
 
 import {
   MOVEMENT_KIND_LABELS,
+  UNIT_LABELS_PLURAL,
   api,
+  formatQuantity,
   humanMessage,
+  type MeasurementUnit,
   type StockItem,
   type StockLot,
 } from '../api/client'
@@ -193,9 +196,7 @@ function StockRow({ item, onChanged }: { item: StockItem; onChanged: () => void 
           {item.nearestExpiry && <StatusBadge tone="neutral">Caduca {item.nearestExpiry}</StatusBadge>}
         </span>
         <span className="flex flex-wrap items-center gap-3 text-body-sm text-ink-muted">
-          <span>
-            {item.quantity} {item.unit.toLowerCase()}
-          </span>
+          <span>{formatQuantity(item.quantity, item.unit)}</span>
           {item.location && <span>{item.location}</span>}
         </span>
       </button>
@@ -309,7 +310,7 @@ function ConsumptionForm({
   return (
     <form onSubmit={submit} className="flex max-w-form flex-wrap items-start gap-2">
       <Field
-        label={`Gastado de ${item.article} (${item.unit.toLowerCase()})`}
+        label={`Gastado de ${item.article} (${UNIT_LABELS_PLURAL[item.unit]})`}
         type="number"
         inputMode="decimal"
         min="0"
@@ -360,7 +361,7 @@ function MinimumForm({
   return (
     <form onSubmit={submit} className="mt-3 flex max-w-form flex-wrap items-start gap-2">
       <Field
-        label={`Avisarme cuando quede menos de (${item.unit.toLowerCase()})`}
+        label={`Avisarme cuando quede menos de (${UNIT_LABELS_PLURAL[item.unit]})`}
         type="number"
         inputMode="decimal"
         min="0"
@@ -384,7 +385,7 @@ function LotRow({
   onFailure,
 }: {
   lot: StockLot
-  unit: string
+  unit: MeasurementUnit
   onDone: () => void
   onFailure: (message: string) => void
 }) {
@@ -399,7 +400,7 @@ function LotRow({
   return (
     <li className="flex flex-wrap items-center gap-2 text-body-sm text-ink">
       <span>
-        {lot.quantity} {unit.toLowerCase()} · caduca el {lot.expiresOn}
+        {formatQuantity(lot.quantity, unit)} · caduca el {lot.expiresOn}
         {lot.lotCode && <span className="text-ink-muted"> · lote {lot.lotCode}</span>}
       </span>
       {/* El nombre accesible lleva la fecha: con tres lotes, tres botones que
@@ -473,7 +474,7 @@ function LotForm({
             required
           />
           <Field
-            label={`Cuánto caduca (${item.unit.toLowerCase()})`}
+            label={`Cuánto caduca (${UNIT_LABELS_PLURAL[item.unit]})`}
             type="number"
             inputMode="decimal"
             min="0"

@@ -162,7 +162,7 @@ async function signInAndVisit(link: string, responses: Record<string, StubbedRes
   await userEvent.type(screen.getByLabelText('Correo'), 'kike@example.test')
   await userEvent.type(screen.getByLabelText('Contraseña'), 'el gato duerme en el sofa')
   await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
-  await screen.findByRole('heading', { level: 1, name: 'Hogar' })
+  await screen.findByRole('heading', { level: 1, name: /^Hogar/ })
 
   await userEvent.click(screen.getByRole('link', { name: link }))
   return stub
@@ -550,7 +550,7 @@ describe('existencias', () => {
     await userEvent.click(screen.getByRole('link', { name: 'Dar entrada' }))
     await userEvent.selectOptions(await screen.findByLabelText('Artículo'), 'art-1')
     await userEvent.selectOptions(screen.getByLabelText('Dónde se guarda'), 'loc-2')
-    await userEvent.type(screen.getByLabelText('Cantidad que entra (g)'), '1000')
+    await userEvent.type(screen.getByLabelText('Cantidad que entra (gramos)'), '1000')
     await userEvent.click(screen.getByRole('button', { name: 'Dar entrada' }))
 
     const intake = calls.find((call) => call.url.endsWith('/assets/intake'))

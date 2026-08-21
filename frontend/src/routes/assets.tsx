@@ -7,9 +7,10 @@ import {
   CONDITIONS,
   CONDITION_LABELS,
   DOCUMENT_TYPE_LABELS,
-  UNIT_LABELS,
+  UNIT_LABELS_PLURAL,
   api,
   formatDay,
+  formatQuantity,
   humanMessage,
   type ApiWarning,
   type Asset,
@@ -64,7 +65,7 @@ function statusOf(asset: Asset): { label: string; tone: 'available' | 'lent' | '
 
 function quantityOf(asset: Asset): string | null {
   if (asset.type !== 'CONSUMABLE' || asset.quantity === null) return null
-  return `${asset.quantity} ${asset.unit ? UNIT_LABELS[asset.unit] : ''}`.trim()
+  return formatQuantity(asset.quantity, asset.unit)
 }
 
 // ---------------------------------------------------------------------------
@@ -508,7 +509,7 @@ export function IntakePage() {
         </SelectField>
 
         <Field
-          label={`Cantidad que entra${chosen ? ` (${UNIT_LABELS[chosen.unit]})` : ''}`}
+          label={`Cantidad que entra${chosen ? ` (${UNIT_LABELS_PLURAL[chosen.unit]})` : ''}`}
           type="number"
           min="0"
           step="any"

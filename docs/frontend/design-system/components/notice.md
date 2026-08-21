@@ -5,7 +5,7 @@
 | Estado | Vigente |
 | Responsable | Equipo DRP |
 | Ámbito | frontend |
-| Última revisión | 2026-08-20 |
+| Última revisión | 2026-08-21 |
 
 ## Propósito y situaciones de uso
 
@@ -40,6 +40,10 @@ Una caja horizontal con dos columnas y 12 px entre ellas (`gap-3`):
    sobrescribe.
 2. **El cuerpo**: un `<p>` opcional con el título en `font-medium`, y el
    contenido en `text-ink-muted`.
+3. **La equis de descarte**, solo si el montador pasa `onDismiss`: un botón de
+   `size-11` —los 44 px del objetivo táctil— empujado a la derecha con
+   `ml-auto` y con márgenes negativos para no engordar el aviso. El icono `X`
+   va `aria-hidden`; el nombre lo pone `aria-label="Descartar el aviso"`.
 
 | Rasgo | Valor | Token |
 |---|---|---|
@@ -65,7 +69,10 @@ icono— y el texto va siempre en tinta. No es un descuido: es lo que mantiene e
 contraste del texto en el par medido y hace que el aviso se entienda en blanco y
 negro.
 
-No hay estados: un `Notice` está o no está.
+No hay estados: un `Notice` está o no está. Descartarlo no es un estado suyo
+sino de quien lo monta: la equis solo llama a `onDismiss`, y **recordar la
+decisión es del montador**, porque solo él sabe si «leído» dura una sesión o
+para siempre — la portada, por ejemplo, lo apunta en `localStorage`.
 
 ## API pública
 
@@ -75,6 +82,7 @@ type NoticeTone = 'info' | 'success' | 'warning' | 'danger'
 function Notice(props: {
   tone?: NoticeTone   // por defecto 'info'
   title?: string
+  onDismiss?: () => void
   children: ReactNode
 }): JSX.Element
 ```
@@ -83,6 +91,7 @@ function Notice(props: {
 |---|---|
 | `tone` | Elige colores, icono y **el papel ARIA**. Por defecto `'info'` |
 | `title` | Primera línea en `font-medium`. Opcional: la mitad de los usos no lo lleva |
+| `onDismiss` | Pinta la equis de descarte y la conecta. Sin ella no hay botón: un aviso que refleja un estado vivo —el formulario falló— no debe poder descartarse |
 | `children` | El cuerpo. Admite marcado, y se usa para meter un enlace dentro del aviso |
 
 No acepta `className`, ni `id`, ni el resto de atributos de un `<div>`. La API es
@@ -117,9 +126,10 @@ Esta es la parte que decide la calidad del componente:
   no mueva el foco es la razón por la que se puede usar en mitad de un
   formulario.
 - **No es enfocable ni recibe tabulación.** Si el aviso lleva un enlace dentro,
-  el enlace sí, y ese es hoy el único camino de teclado hacia una acción dentro
-  de un aviso.
-- **El icono va `aria-hidden`**: el texto ya dice lo que pasa.
+  el enlace sí; y si lleva `onDismiss`, la equis es un botón con su parada de
+  tabulador **después** de los enlaces del cuerpo, porque va al final del DOM.
+- **El icono va `aria-hidden`**: el texto ya dice lo que pasa. El de la equis
+  también, y su nombre accesible lo pone el `aria-label` del botón.
 
 ## Ejemplos correctos, antiusos y evidencias de prueba
 
@@ -180,9 +190,10 @@ alta y en `HomePage`, `warning` en el login cuando el correo no está verificado
 
 ### Lo que falta
 
-- **No se puede cerrar.** No hay botón de cierre ni `onDismiss`. Para un aviso
-  que refleja un estado —el formulario falló— es correcto; para uno informativo
-  que el usuario ya ha leído, no.
+- ~~**No se puede cerrar.**~~ **Resuelto el 2026-08-21, con el panel de
+  «Hogar»**: `onDismiss` pinta la equis y el montador decide qué recordar y
+  dónde. Sigue siendo correcto que un aviso de estado vivo no la lleve — por
+  eso es opcional y ningún otro uso la ha ganado.
 - **No tiene ranura de acción.** Hoy la acción se cuela como un `<Link>` dentro
   de `children`, que funciona para un enlace y no para un botón de «Reintentar».
   El fallo de carga de un listado lo va a pedir en el Hito 2.
@@ -210,5 +221,6 @@ alta y en `HomePage`, `warning` en el login cuando el correo no está verificado
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-08-21 | **Gana `onDismiss`**, con el panel de «Hogar»: la equis de descarte —44 px, `aria-label`, empujada con `ml-auto`— aparece solo si el montador la pide, y recordar la decisión queda del lado del montador a propósito. Se cierra la primera entrada de «Lo que falta», que llevaba dos revisiones diciendo exactamente esto. | Equipo DRP |
 | 2026-08-20 | **Repasada entera contra el código y no cambia ni una afirmación**: sigue sin poder cerrarse, sin ranura de acción, sin enseñar el código del contrato, y siguen sin existir `Toast` y el error bloqueante a pantalla completa. Lo único que se corrige es el marco temporal de la lista, que hablaba en futuro de un hito ya cerrado. | Equipo DRP |
 | 2026-08-12 | Creación de la ficha sobre la implementación del Hito 1. | Equipo DRP |
