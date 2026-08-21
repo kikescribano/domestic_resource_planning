@@ -93,8 +93,9 @@ Tres detalles que se pierden al leer las clases por encima:
   la pulse con el pulgar por error. Desde el 2026-08-20 la salida rápida
   acompaña a la marca —«Cuenta» y «Salir» bajo el sello en escritorio, en el
   banner y fuera del landmark de navegación; en móvil, en el apartado que
-  cierra «Más»— y `AccountPage` conserva la sección que explica qué pasa al
-  salir. Lo que sigue sin existir es un «Salir» dentro de la lista.
+  cierra «Más»—, y desde el 2026-08-21 es la única salida: la sección que
+  `AccountPage` conservaba se retiró por redundante. Lo que sigue sin existir
+  es un «Salir» dentro de la lista.
 
 ### Tres grupos, y el tope de cinco paradas
 
