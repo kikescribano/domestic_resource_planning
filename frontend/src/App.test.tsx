@@ -52,7 +52,7 @@ describe('acceso', () => {
     await userEvent.type(screen.getByLabelText('Contraseña'), 'el gato duerme en el sofa')
     await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Hogar' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: /^Hogar/ })).toBeInTheDocument()
   })
 
   it('cuando el correo no está verificado lo dice y ofrece reenviar el enlace', async () => {
@@ -200,7 +200,7 @@ describe('verificación del correo', () => {
 
     render(<App />)
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Hogar' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: /^Hogar/ })).toBeInTheDocument()
     expect(calls[0]?.body).toEqual({ token: 'un-token-de-prueba' })
   })
 
@@ -215,7 +215,7 @@ describe('verificación del correo', () => {
     })
 
     render(<App />)
-    await screen.findByRole('heading', { level: 1, name: 'Hogar' })
+    await screen.findByRole('heading', { level: 1, name: /^Hogar/ })
 
     // El token es de un solo uso: una segunda llamada lo invalidaría y la
     // pantalla acabaría diciendo que el enlace no vale justo después de haber
@@ -464,7 +464,7 @@ describe('reanudar la sesión al recargar', () => {
 
     // Se entra, que es lo que fallaba: con dos renovaciones, la segunda tumbaba
     // la sesión que la primera acababa de establecer.
-    expect(await screen.findByRole('heading', { level: 1, name: 'Hogar' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: /^Hogar/ })).toBeInTheDocument()
     expect(localStorage.getItem('drp.refreshToken')).not.toBeNull()
 
     // Y la causa, medida y no supuesta: **una sola llamada**. Sin esto, la prueba

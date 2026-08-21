@@ -69,8 +69,39 @@ const HOUSEHOLD_WITHOUT_CLOSURE: Record<string, StubbedRoute> = {
   },
 }
 
+/**
+ * Y el panel de «Hogar», a cero, por el mismo motivo que los dos de arriba:
+ * la portada pide sus contadores en cuanto se monta, y toda prueba que aterrice
+ * en ella tras un login o una reanudación los dispararía contra rutas sin
+ * preparar. Van de base con `total: 0` —el hogar recién creado— y cualquier
+ * prueba del panel los sustituye con la misma clave.
+ *
+ * Los contadores de módulo no están: con el catálogo de base vacío, el panel
+ * no llega a pedirlos. La prueba que active un módulo pone también los suyos.
+ */
+const EMPTY_COUNT = { status: 200, body: { items: [], page: 0, size: 1, total: 0 } }
+
+const HOME_PANEL_AT_ZERO: Record<string, StubbedRoute> = {
+  'GET /api/v1/notices?unreadOnly=true&size=1': EMPTY_COUNT,
+  'GET /api/v1/assets?size=1': EMPTY_COUNT,
+  'GET /api/v1/loans?open=true&size=1': EMPTY_COUNT,
+  'GET /api/v1/loans?status=OVERDUE&size=1': EMPTY_COUNT,
+  'GET /api/v1/users?size=1': EMPTY_COUNT,
+  'GET /api/v1/articles?size=1': EMPTY_COUNT,
+  'GET /api/v1/locations?size=1': EMPTY_COUNT,
+  'GET /api/v1/storage': {
+    status: 200,
+    body: { usedBytes: 0, quotaBytes: 1073741824, maxFileBytes: 10485760 },
+  },
+}
+
 export function stubFetch(routes: Record<string, StubbedRoute>) {
-  const responses = { ...CATALOGUE_WITHOUT_MODULES, ...HOUSEHOLD_WITHOUT_CLOSURE, ...routes }
+  const responses = {
+    ...CATALOGUE_WITHOUT_MODULES,
+    ...HOUSEHOLD_WITHOUT_CLOSURE,
+    ...HOME_PANEL_AT_ZERO,
+    ...routes,
+  }
   const calls: RecordedCall[] = []
 
   const implementation = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

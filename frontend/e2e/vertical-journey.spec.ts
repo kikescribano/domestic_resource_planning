@@ -106,6 +106,21 @@ test.describe('recorrido vertical', () => {
     await page.goto(verification)
     await expect(page.getByRole('heading', { level: 1, name: 'Hogar' })).toBeVisible()
 
+    // La única cabecera dinámica del producto: el título de la portada lleva el
+    // nombre del hogar en cuanto llega, no un rótulo genérico.
+    await expect(page.getByRole('heading', { level: 1, name: 'Hogar Casa del Pinar' })).toBeVisible()
+
+    // Y el aviso de arranque se descarta con su equis y **la decisión sobrevive
+    // a una recarga**: es `localStorage` del navegador, así que solo se puede
+    // afirmar aquí. La pasada sistemática no lo descarta, para que axe audite
+    // el aviso con su botón.
+    await expect(page.getByText('Por dónde empezar')).toBeVisible()
+    await page.getByRole('button', { name: 'Descartar el aviso' }).click()
+    await expect(page.getByText('Por dónde empezar')).toBeHidden()
+    await page.reload()
+    await expect(page.getByRole('heading', { level: 1, name: 'Hogar Casa del Pinar' })).toBeVisible()
+    await expect(page.getByText('Por dónde empezar')).toBeHidden()
+
     // --- 2. Una cosa que prestar --------------------------------------------
     // Por el `<nav>` y no por el texto suelto: «Inventario» aparece también en
     // enlaces dentro del contenido, y una coincidencia ambigua es un fallo que
@@ -1408,6 +1423,10 @@ const AUDITED_SCREENS = [
   // nuevas, pero lo que había dentro sí lo era, y la auditoría se hereda por
   // estar aquí en vez de escribirse aparte. La zona de peligro se mudó después
   // a «General», que entra abajo con el grupo «Configuración».
+  // «Hogar» es desde el 2026-08-21 el panel de indicadores. Se audita con la
+  // siembra de arriba ya hecha —asset, ubicación y fichero— para que las
+  // tarjetas lleven números de verdad, y con el aviso de arranque sin
+  // descartar, para que axe mire también su equis.
   { link: 'Hogar', path: '/', heading: 'Hogar', exact: true },
   // «General» entra el 2026-08-20, al nacer con el grupo «Configuración» de la
   // navegación: hereda aquí la zona de peligro de la baja, que era de «Hogar».

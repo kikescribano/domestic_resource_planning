@@ -593,43 +593,6 @@ export function MorePage() {
   )
 }
 
-export function HomePage() {
-  const session = useAuthenticatedSession()
-  const household = useHousehold()
-
-  return (
-    <>
-      {/* La marca solo en móvil: en escritorio ya la enseña la barra lateral.
-          La ven «Hogar» y «Más», las dos puertas de la barra inferior.
-          Centrada: presentada a la izquierda parecía un desajuste del título
-          de la pantalla. */}
-      <BrandMark className="mb-6 flex justify-center md:hidden" />
-
-      <PageHeading title="Hogar" icon={House} />
-      <Notice tone="info" title="Por dónde empezar">
-        Crea primero las <Link to="/ubicaciones" className="underline">ubicaciones</Link> —la vivienda y
-        lo que hay dentro— y el <Link to="/catalogo" className="underline">catálogo</Link> de lo que
-        sueles tener en casa. Con eso, dar de alta algo en el{' '}
-        <Link to="/inventario" className="underline">inventario</Link> es elegir de una lista.
-      </Notice>
-      <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border border-border-subtle bg-surface-raised p-4">
-          <dt className="text-caption text-ink-muted">Tu papel aquí</dt>
-          <dd className="mt-1 text-body text-ink">
-            {session.claims.role === 'HOUSEHOLD_ADMIN' ? 'Administras el hogar' : 'Eres miembro del hogar'}
-          </dd>
-        </div>
-        {household.data && (
-          <div className="rounded-lg border border-border-subtle bg-surface-raised p-4">
-            <dt className="text-caption text-ink-muted">Cómo se llama</dt>
-            <dd className="mt-1 text-body text-ink">{household.data.name}</dd>
-          </div>
-        )}
-      </dl>
-    </>
-  )
-}
-
 /**
  * «General»: lo que configura el hogar entero, para quien lo administra.
  *

@@ -82,21 +82,21 @@ const HELP_TOPICS: HelpTopic[] = [
     path: '/',
     icon: House,
     overview:
-      'La portada tras entrar. Recuerda por dónde empezar, enseña tu papel en el hogar y cómo se llama, y mientras dure una baja en gracia, el aviso con su fecha se ve aquí y en todas las demás pantallas.',
+      'La portada tras entrar, con el nombre del hogar en su título: un panel con una tarjeta por pantalla y el número que esa pantalla vigila. Mientras dure una baja en gracia, el aviso con su fecha se ve aquí y en todas las demás pantallas.',
     useCases: [
+      {
+        title: 'Ver el estado del hogar de un vistazo',
+        description:
+          'Cada tarjeta es una pantalla y su indicador: avisos sin leer, préstamos fuera de casa —con los vencidos marcados—, lo que caduca o queda bajo mínimo en el almacén, las revisiones que tocan, lo que hay por comprar y el espacio ocupado del archivo. Pulsar una tarjeta lleva a su pantalla.',
+        example:
+          'Entras por la mañana y ves «Avisos 2» y un préstamo vencido: ya sabes a qué dos sitios ir sin recorrer el menú.',
+      },
       {
         title: 'Arrancar con buen pie',
         description:
-          'La portada encadena los tres primeros pasos en su orden: primero Ubicaciones —la vivienda y lo que hay dentro—, luego el Catálogo de lo que sueles tener, y con eso dar de alta en el Inventario es elegir de una lista.',
+          'El aviso de arranque encadena los tres primeros pasos en su orden: primero Ubicaciones —la vivienda y lo que hay dentro—, luego el Catálogo de lo que sueles tener, y con eso dar de alta en el Inventario es elegir de una lista. Cuando ya no haga falta, se descarta con su equis y no vuelve en ese navegador.',
         example:
           'Acabas de crear el hogar y no sabes por dónde empezar: sigues los tres enlaces en orden y el inventario nace ya ordenado.',
-      },
-      {
-        title: 'Saber cuál es tu papel',
-        description:
-          'Dice si administras el hogar o eres miembro, que es lo que decide qué puedes tocar: encender módulos, invitar o la baja del hogar son de administración.',
-        example:
-          'No encuentras «General» en el menú: aquí ves que eres miembro, y ya sabes que eso es de quien administra.',
       },
     ],
   },

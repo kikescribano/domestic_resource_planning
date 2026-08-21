@@ -45,7 +45,7 @@ async function signInAndVisit(link: string, responses: Record<string, StubbedRou
   await userEvent.type(screen.getByLabelText('Correo'), 'kike@example.test')
   await userEvent.type(screen.getByLabelText('Contraseña'), 'el gato duerme en el sofa')
   await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
-  await screen.findByRole('heading', { level: 1, name: 'Hogar' })
+  await screen.findByRole('heading', { level: 1, name: /^Hogar/ })
 
   await userEvent.click(screen.getByRole('link', { name: link }))
   return stub
@@ -103,7 +103,7 @@ describe('el almacenamiento del hogar', () => {
 
   it('pinta cuánto ocupa el hogar y avisa cuando queda poco', async () => {
     await signInAndVisit('Archivo', {
-      '/api/v1/storage': USAGE,
+      'GET /api/v1/storage': USAGE,
       '/api/v1/files?size=200': FILES,
     })
 
@@ -118,7 +118,7 @@ describe('el almacenamiento del hogar', () => {
 
   it('lista los ficheros con su tamaño, y el PDF sin miniatura', async () => {
     await signInAndVisit('Archivo', {
-      '/api/v1/storage': USAGE,
+      'GET /api/v1/storage': USAGE,
       '/api/v1/files?size=200': FILES,
     })
 
@@ -149,7 +149,7 @@ describe('el almacenamiento del hogar', () => {
    */
   it('cada celda se nombra por su fichero, tenga miniatura o no', async () => {
     await signInAndVisit('Archivo', {
-      '/api/v1/storage': USAGE,
+      'GET /api/v1/storage': USAGE,
       '/api/v1/files?size=200': FILES,
     })
 
@@ -165,7 +165,7 @@ describe('el almacenamiento del hogar', () => {
 
   it('borrar un fichero refresca también la cuota, porque se libera en el acto', async () => {
     const { calls } = await signInAndVisit('Archivo', {
-      '/api/v1/storage': USAGE,
+      'GET /api/v1/storage': USAGE,
       '/api/v1/files?size=200': FILES,
       'DELETE /api/v1/files/file-1': { status: 204 },
     })
@@ -182,7 +182,7 @@ describe('el almacenamiento del hogar', () => {
 
   it('ofrece HEIC en el selector, aunque la lista blanca del servidor siga teniendo cuatro tipos', async () => {
     await signInAndVisit('Archivo', {
-      '/api/v1/storage': USAGE,
+      'GET /api/v1/storage': USAGE,
       '/api/v1/files?size=200': FILES,
     })
 
@@ -200,7 +200,7 @@ describe('el almacenamiento del hogar', () => {
 
   it('un fichero en uso no se borra, y lo dice con lo que hay que hacer', async () => {
     await signInAndVisit('Archivo', {
-      '/api/v1/storage': USAGE,
+      'GET /api/v1/storage': USAGE,
       '/api/v1/files?size=200': FILES,
       'DELETE /api/v1/files/file-1': {
         status: 409,
@@ -259,7 +259,7 @@ describe('la subida de un fichero', () => {
     const request = fakeXhr({ status: 201, body: { id: 'file-9' } })
 
     await signInAndVisit('Archivo', {
-      '/api/v1/storage': USAGE,
+      'GET /api/v1/storage': USAGE,
       '/api/v1/files?size=200': FILES,
     })
 

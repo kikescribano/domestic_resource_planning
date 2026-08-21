@@ -124,7 +124,7 @@ describe('la zona de peligro de la baja del hogar', () => {
     await resumeAt('/configuracion', { 'GET /api/v1/households/current': household(null) }, 'HOUSEHOLD_MEMBER')
 
     // El guardián de la pantalla redirige, así que lo que se monta es «Hogar».
-    await screen.findByRole('heading', { level: 1, name: 'Hogar' })
+    await screen.findByRole('heading', { level: 1, name: /^Hogar/ })
     expect(screen.queryByRole('heading', { name: 'Dar de baja el hogar' })).not.toBeInTheDocument()
     // Y el grupo «Configuración» tampoco está en su navegación.
     expect(screen.queryByRole('link', { name: 'General' })).not.toBeInTheDocument()

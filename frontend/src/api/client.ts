@@ -1991,4 +1991,58 @@ export const api = {
       renewable: false,
       ...(conditionOnReturn ? { body: { conditionOnReturn } } : {}),
     }),
+
+  // --- Los contadores del panel de «Hogar» ----------------------------------
+  // El contrato no tiene un endpoint de resumen, y no le hace falta: toda
+  // colección pagina con un `total` calculado **después** del filtro, así que
+  // cada indicador es la página mínima (`size=1`) de un listado que ya existe,
+  // quedándose con ese número. Son las operaciones de siempre con otro tamaño,
+  // no operaciones nuevas — si algún día el panel pesa, el sitio de la
+  // optimización es un endpoint de resumen en el contrato, no este cliente.
+  //
+  // Los cuatro últimos son de módulo y responden 403 MODULE_INACTIVE apagados:
+  // quien los llame comprueba antes el catálogo, igual que el guardián de ruta.
+
+  countUnreadNotices: (accessToken: string) =>
+    countFrom(`/notices${queryString({ unreadOnly: true, size: 1 })}`, accessToken),
+
+  countAssets: (accessToken: string) =>
+    countFrom(`/assets${queryString({ size: 1 })}`, accessToken),
+
+  countOpenLoans: (accessToken: string) =>
+    countFrom(`/loans${queryString({ open: true, size: 1 })}`, accessToken),
+
+  countOverdueLoans: (accessToken: string) =>
+    countFrom(`/loans${queryString({ status: 'OVERDUE', size: 1 })}`, accessToken),
+
+  countUsers: (accessToken: string) =>
+    countFrom(`/users${queryString({ size: 1 })}`, accessToken),
+
+  countArticles: (accessToken: string) =>
+    countFrom(`/articles${queryString({ size: 1 })}`, accessToken),
+
+  countLocations: (accessToken: string) =>
+    countFrom(`/locations${queryString({ size: 1 })}`, accessToken),
+
+  countSuppliers: (accessToken: string) =>
+    countFrom(`/suppliers${queryString({ size: 1 })}`, accessToken),
+
+  countStockExpiring: (accessToken: string, withinDays: number) =>
+    countFrom(`/warehouse/stock${queryString({ expiringWithinDays: withinDays, size: 1 })}`, accessToken),
+
+  countStockBelowMinimum: (accessToken: string) =>
+    countFrom(`/warehouse/stock${queryString({ belowMinimum: true, size: 1 })}`, accessToken),
+
+  /** Sin `status`: el servidor entiende «lo pendiente», NEEDED e IN_PURCHASE. */
+  countShoppingPending: (accessToken: string) =>
+    countFrom(`/purchasing/list${queryString({ size: 1 })}`, accessToken),
+
+  /** Sin suelo, como el filtro que lo sirve: lo ya pasado sigue contando. */
+  countMaintenanceDue: (accessToken: string, withinDays: number) =>
+    countFrom(`/maintenance/plans${queryString({ dueWithinDays: withinDays, size: 1 })}`, accessToken),
+}
+
+/** El `total` de una colección, sin cargar con sus filas. */
+function countFrom(path: string, accessToken: string): Promise<number> {
+  return request<Page<unknown>>(path, { accessToken }).then((page) => page.total)
 }
