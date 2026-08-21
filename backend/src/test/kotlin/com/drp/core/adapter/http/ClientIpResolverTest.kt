@@ -1,8 +1,13 @@
 package com.drp.core.adapter.http
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.mock.web.MockHttpServletRequest
 
 /**
@@ -115,6 +120,62 @@ class ClientIpResolverTest {
         val request = MockHttpServletRequest().apply { remoteAddr = proxy }
 
         resolver.resolve(request).shouldBe(proxy)
+    }
+
+    @Test
+    @DisplayName("una cabecera de proxy sin ningun proxy declarado avisa en el log, y una sola vez")
+    fun `el proxy sin declarar deja su firma en el log`() {
+        // Es la mitad en caliente del aviso de arranque de
+        // TrustedProxiesStartupNotice: si llega la cabecera que pone un proxy y
+        // aqui no hay ninguno declarado, o hay un proxy que nadie declaro --y el
+        // cubo por IP es uno para todos sus clientes-- o alguien la falsifica.
+        // Las dos merecen una linea; ninguna merece mil.
+        val resolver = ClientIpResolver(emptyList())
+
+        val warnings = capturingWarnings {
+            repeat(3) {
+                resolver.resolve(
+                    MockHttpServletRequest().apply {
+                        remoteAddr = proxy
+                        addHeader("X-Forwarded-For", client)
+                    },
+                )
+            }
+        }
+
+        warnings.size shouldBe 1
+        warnings.single().formattedMessage shouldContain "DRP_TRUSTED_PROXIES"
+    }
+
+    @Test
+    @DisplayName("con proxies declarados, una cabecera de un desconocido no escribe en el log")
+    fun `con proxy declarado no se avisa`() {
+        // El operador ya hizo su parte. Avisar de cada peticion con la cabecera
+        // inventada seria dejar que quien llama escriba en el log de otro.
+        val resolver = ClientIpResolver(listOf(proxy))
+
+        val warnings = capturingWarnings {
+            resolver.resolve(
+                MockHttpServletRequest().apply {
+                    remoteAddr = "198.51.100.4"
+                    addHeader("X-Forwarded-For", "1.2.3.4")
+                },
+            )
+        }
+
+        warnings.size shouldBe 0
+    }
+
+    private fun capturingWarnings(block: () -> Unit): List<ILoggingEvent> {
+        val log = LoggerFactory.getLogger(ClientIpResolver::class.java) as ch.qos.logback.classic.Logger
+        val appender = ListAppender<ILoggingEvent>().also { it.start() }
+        log.addAppender(appender)
+        try {
+            block()
+        } finally {
+            log.detachAppender(appender)
+        }
+        return appender.list.filter { it.level == Level.WARN }
     }
 
     @Test

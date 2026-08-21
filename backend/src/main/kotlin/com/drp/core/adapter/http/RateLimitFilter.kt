@@ -7,6 +7,7 @@ import jakarta.servlet.ServletInputStream
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletRequestWrapper
 import jakarta.servlet.http.HttpServletResponse
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpHeaders
@@ -19,6 +20,7 @@ import java.io.ByteArrayInputStream
 import java.time.Clock
 import java.time.Duration
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Limite de frecuencia sobre los endpoints sin autenticar (`429 RATE_LIMITED`).
@@ -228,11 +230,48 @@ class ClientIpResolver(trustedProxies: List<String>) {
         .filter { it.isNotEmpty() }
         .map { IpAddressMatcher(it) }
 
+    /**
+     * Una vez por proceso basta: el sintoma se repite en cada peticion y un log
+     * que grita lo mismo mil veces se deja de leer.
+     */
+    private val warnedUndeclaredProxy = AtomicBoolean(false)
+
     fun resolve(request: HttpServletRequest): String {
         val peer = request.remoteAddr?.takeIf { it.isNotBlank() } ?: return UNKNOWN
-        if (trusted.none { it.matches(peer) }) return peer
+        if (trusted.none { it.matches(peer) }) {
+            warnIfLooksLikeUndeclaredProxy(request, peer)
+            return peer
+        }
 
         return request.forwardedFor() ?: request.realIp() ?: peer
+    }
+
+    /**
+     * La otra mitad del aviso de arranque de `TrustedProxiesStartupNotice`: la
+     * firma en caliente del proxy sin declarar.
+     *
+     * Si no hay **ningun** proxy declarado y aun asi llegan las cabeceras que un
+     * proxy pone, una de dos: o delante hay un proxy que nadie declaro --y
+     * entonces el limite por IP esta contando a todos sus clientes en el mismo
+     * cubo-- o quien llama manda la cabecera por su cuenta, que se ignora y ya
+     * esta. El log no puede distinguirlas, y el mensaje dice las dos.
+     *
+     * Solo con la lista vacia, a proposito: con proxies declarados el operador
+     * ya hizo su parte, y avisar de cada cliente que invente una cabecera seria
+     * dejar que quien llama escriba en el log.
+     */
+    private fun warnIfLooksLikeUndeclaredProxy(request: HttpServletRequest, peer: String) {
+        if (trusted.isNotEmpty()) return
+        if (request.getHeader(FORWARDED_FOR) == null && request.getHeader(REAL_IP) == null) return
+        if (!warnedUndeclaredProxy.compareAndSet(false, true)) return
+        log.warn(
+            "Llega X-Forwarded-For o X-Real-IP desde {} sin ningun proxy declarado en " +
+                "drp.rate-limit.trusted-proxies. Si eso es un proxy, el limite por IP esta contando " +
+                "a todos sus clientes en el mismo cubo: declara DRP_TRUSTED_PROXIES. Si no lo es, " +
+                "alguien envia la cabecera por su cuenta y se ignora, que es lo correcto. " +
+                "Solo se avisa una vez.",
+            peer,
+        )
     }
 
     /** La ultima entrada: la que puso el proxy de confianza y no quien llamo. */
@@ -251,6 +290,8 @@ class ClientIpResolver(trustedProxies: List<String>) {
         getHeader(REAL_IP)?.trim()?.takeIf { it.isNotEmpty() }
 
     private companion object {
+        val log = LoggerFactory.getLogger(ClientIpResolver::class.java)
+
         const val FORWARDED_FOR = "X-Forwarded-For"
         const val REAL_IP = "X-Real-IP"
 
