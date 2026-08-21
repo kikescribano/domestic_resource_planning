@@ -11,7 +11,9 @@ La decisión —por qué un VPS con compose, por qué GHCR, por qué Gmail, por 
 el 8081— está en la
 [ADR-016](../../common/architecture/decisions/ADR-016-production-deployment.md).
 Este documento es el manual de operación: los comandos, en el orden en que se
-ejecutan.
+ejecutan. Para operar desde una sesión de agente existe además la skill
+[`deploy-vps`](../../../.claude/skills/deploy-vps/SKILL.md), que condensa este
+manual con los escollos ya pagados; si discrepan, gana este documento.
 
 DRP está en `http://vps-7f6cfe1b.vps.ovh.net/` — **HTTP plano, sin dominio ni
 TLS todavía**; el porqué y el hasta cuándo, al final.
