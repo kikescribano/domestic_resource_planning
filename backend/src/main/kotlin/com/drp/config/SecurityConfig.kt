@@ -128,8 +128,20 @@ class SecurityConfig {
             // ajeno pueda hacer enviar al navegador por su cuenta: el token va en
             // una cabecera que solo pone el propio cliente.
             .csrf { it.disable() }
-            // CORS habilitado en CorsConfig
-            .cors { }
+            // Sin CORS, y es decision y no olvido (hallazgo 11 de la auditoria
+            // OWASP): no existe ninguna peticion cross-origin en ninguna
+            // topologia del proyecto. El frontend llama a /api en relativo
+            // siempre; en desarrollo el servidor de Vite hace de proxy y en
+            // produccion nginx sirve la SPA y /api desde el mismo origen
+            // (ADR-016). Las imagenes firmadas del otro origen viajan por
+            // <img>, que no participa en CORS. Sin configuracion se falla
+            // cerrado: un origen ajeno no recibe cabeceras Access-Control-* y
+            // el navegador bloquea. La configuracion de desarrollo que hubo
+            // aqui --localhost cableado, allowedHeaders("*") y credenciales--
+            // solo anadia superficie, y el dia que un origen remoto exista de
+            // verdad esto vuelve como propiedad de despliegue, no como una
+            // lista escrita en el codigo.
+            .cors { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests { requests ->
                 requests

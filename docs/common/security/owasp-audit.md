@@ -99,8 +99,8 @@ cerró**; un guion en la segunda significa que sigue abierto.
 | 7 | MEDIA | Rotación de refresh sin detección de reutilización (robo indetectable) | Auth | 2026-08-20 | — |
 | 8 | MEDIA | Sesión deslizante sin tope absoluto: renovada una vez al mes, vive para siempre | Auth | 2026-08-20 | — |
 | 9 | MEDIA | Refresh token de 30 días en `localStorage` (decisión aplazada no revisada) | Auth | 2026-08-20 | — |
-| 10 | MEDIA | Sin CSP ni cabeceras de seguridad para la SPA; HSTS no se emitirá sin `forward-headers-strategy` | Cabeceras | 2026-08-20 | — |
-| 11 | MEDIA | CORS de desarrollo cableado con `allowCredentials` y `allowedHeaders("*")`, sin variante de producción | Cabeceras | 2026-08-20 | — |
+| 10 | MEDIA | Sin CSP ni cabeceras de seguridad para la SPA; HSTS no se emitirá sin `forward-headers-strategy` | Cabeceras | 2026-08-20 | 2026-08-21 |
+| 11 | MEDIA | CORS de desarrollo cableado con `allowCredentials` y `allowedHeaders("*")`, sin variante de producción | Cabeceras | 2026-08-20 | 2026-08-21 |
 | 12 | MEDIA | Los PDF se sirven con URL firmada de portador, contra el reparto imagen/documento de la ADR-005 | Ficheros | 2026-08-20 | — |
 | 13 | MEDIA | `accel-redirect` es fail-open: olvidarlo reabre la entrega de bytes en el origen de la aplicación | Ficheros | 2026-08-20 | — |
 | 14 | MEDIA | Decodificación de imágenes sin límite de concurrencia (OOM con pocos PNG de 50 Mpx) | Ficheros | 2026-08-20 | — |
@@ -108,7 +108,7 @@ cerró**; un guion en la segunda significa que sigue abierto.
 | 16 | MEDIA | `AcceptInvitation` emite sesión a una identidad dada de baja (deny-by-default roto) | AuthZ | 2026-08-20 | — |
 | 17 | MEDIA | Oráculo de tiempo en `password-reset`/`resend`: enumeración de correos por el reloj | Auth | 2026-08-20 | — |
 | 18 | MEDIA | La URL de documento externo no valida esquema y el cliente la abre con `window.open` (XSS almacenado entre miembros) | Inyección | 2026-08-20 | — |
-| 19 | MEDIA | El compose publica PostgreSQL, Mailpit y nginx en `0.0.0.0` | Infra | 2026-08-20 | — |
+| 19 | MEDIA | El compose publica PostgreSQL, Mailpit y nginx en `0.0.0.0` | Infra | 2026-08-20 | 2026-08-21 |
 | — | BAJA/INFO | Quince puntos más de endurecimiento (ver detalle) | Varias | 2026-08-20 | — |
 
 > **Las dos fechas coinciden hoy porque la auditoría y el primer cierre son del
@@ -434,6 +434,34 @@ que sirva el frontend en producción una CSP sin `unsafe-eval` (el trabajo de
 `Permissions-Policy` y HSTS; configurar `forward-headers-strategy` en el backend.
 Entra en el bloque de despliegue.
 
+**Corregido el 2026-08-21.** Las cabeceras viven donde la ADR-016 puso el
+frontend en producción: el nginx del contenedor `web`
+(`deploy/nginx/templates/default.conf.template`). Su servidor de la aplicación
+declara `X-Content-Type-Options`, `Referrer-Policy: no-referrer`,
+`Permissions-Policy` y una CSP con `frame-ancestors 'none'` y **sin
+`unsafe-eval`**, medida contra el artefacto construido y no supuesta: la
+variante csp de `heic-to` resulta ser JavaScript puro compilado con wasm2js —el
+chunk no contiene ni `eval` ni una llamada a `WebAssembly`—, su Worker nace de
+un `URL.createObjectURL` (de ahí `worker-src blob:`), React pinta atributos
+`style=` (de ahí `'unsafe-inline'` solo en estilos) y las imágenes firmadas
+entran por `img-src` con el origen de `DRP_FILES_PUBLIC_URL`, que el compose
+pasa ahora también al contenedor `web`. Las cabeceras se repiten dentro de
+`/assets/` y `/index.html` por la herencia de `add_header` que la propia
+plantilla documenta. El backend gana `server.forward-headers-strategy: native`
+—`framework` se fía de la cabecera venga de quien venga y corre antes que el
+limitador de frecuencia— con `internal-proxies` acotado a la red de compose,
+para que en desarrollo quien resuelva la IP siga siendo `ClientIpResolver` con
+su lista explícita. **HSTS queda escrito y apagado**: emitirlo sobre HTTP lo
+prohíbe la RFC 6797 (§7.2), así que el `add_header` está comentado y se
+enciende con el TLS que la ADR-016 deja pendiente — y ese día Spring lo emitirá
+también en la API, porque `request.isSecure()` ya dirá la verdad. Todo lo
+anterior lo fija `ProductionWebTemplateTest`, que levanta un nginx real con la
+plantilla del despliegue: era la única pieza sin vigilancia, porque el
+recorrido vertical corre contra Vite y no contra este nginx. La plantilla de
+desarrollo no cambia a propósito: su puerto 80 proxya la API —cuyas respuestas
+ya llevan las cabeceras de Spring Security— y la SPA de desarrollo la sirve
+Vite.
+
 **11. CORS de desarrollo cableado.** `CorsConfig.kt:20-29` — orígenes localhost en
 duro, `allowedHeaders = ["*"]` y `allowCredentials = true`, sin propiedad ni
 perfil que lo cambie al desplegar; el propio comentario admite que producción
@@ -442,6 +470,21 @@ cookies y solo amplía superficie. El riesgo práctico hoy es que quien desplieg
 «lo arregle» con un comodín. *CORS.* **Acción:** orígenes por propiedad
 (`drp.cors.allowed-origins`), lista concreta de cabeceras y `allowCredentials =
 false`.
+
+**Corregido el 2026-08-21 — y no con la acción propuesta, sino con menos:
+`CorsConfig` desaparece entero.** La acción se escribió antes de la ADR-016;
+con ella en pie, no existe ninguna petición cross-origin en ninguna topología
+del proyecto. El cliente llama a `/api` **en relativo siempre**: en producción
+nginx sirve la SPA y proxya `/api` desde el mismo origen; en desarrollo el
+proxy de Vite hace lo mismo —también para el móvil de la red local, que habla
+con Vite y no con el backend—; y las imágenes firmadas del otro origen viajan
+por `<img>`, que no participa en CORS. Una propiedad
+`drp.cors.allowed-origins` sería configuración muerta, y la configuración
+muerta es justo lo que el riesgo práctico del hallazgo describía: algo que
+quien despliega acaba rellenando con un comodín. Sin configuración se falla
+cerrado —ninguna cabecera `Access-Control-*` y el navegador bloquea—, y si
+algún día existe un origen remoto de verdad, CORS vuelve como configuración de
+despliegue y no como una lista escrita en el código.
 
 **12. Los PDF se sirven con URL firmada de portador.** `FileDtos.kt:43` emite
 `url = urls.original(...)` para **todo** `StoredFile`, PDF incluido. La
@@ -517,6 +560,13 @@ firewall del host). En una red compartida, un tercero llega al PostgreSQL con
 `drp_owner/drp_owner` —superusuario— y a un SMTP que acepta cualquier auth.
 Aunque sea el compose de desarrollo, no cuesta nada cerrarlo. *Docker Security.*
 **Acción:** prefijar loopback (`"127.0.0.1:5432:5432"`, etc.).
+
+**Corregido el 2026-08-21.** Los cinco puertos del `compose.yaml` de
+desarrollo llevan el prefijo `127.0.0.1`, con el motivo escrito en el propio
+fichero; en local no cambia nada, porque todo se usa por `localhost`. El
+compose de producción no lo necesitaba: `deploy/compose.yaml` solo publica el
+80 y el 8081 de nginx, y PostgreSQL y el backend viven en la red interna sin
+publicar puerto alguno (ADR-016).
 
 ---
 
@@ -633,20 +683,29 @@ Endurecimiento recomendado; ninguno bloquea el despliegue por sí solo.
 
 ## Requisitos del despliegue (bloque de trabajo aparte)
 
-El despliegue en la VPS **no existe todavía** y es su propio bloque. Estos son sus
-requisitos de seguridad imprescindibles, cada uno con su cheat sheet. Ninguno es
-un defecto del código: es lo que hay que construir para que la solidez del código
-llegue a producción.
+El despliegue en la VPS **no existía cuando se escribió esta lista**; la
+[ADR-016](../architecture/decisions/ADR-016-production-deployment.md) lo cerró
+después en su forma mínima —sin dominio ni TLS, a propósito—, así que la lista
+se conserva como registro de requisitos: parte quedó cumplida por aquel bloque
+y parte, empezando por el TLS y lo que cuelga de él, sigue pendiente. Ninguno
+es un defecto del código: es lo que hay que construir para que la solidez del
+código llegue a producción.
 
 1. **TLS/HTTPS** (REST Security): certbot/ACME con redirección 80→443, HSTS, y el
-   **segundo dominio de ficheros** también bajo TLS. Configurar
-   `server.forward-headers-strategy` en el backend (sin ello Spring no sabe que
-   está tras un proxy TLS y HSTS no se emite).
+   **segundo dominio de ficheros** también bajo TLS.
+   `server.forward-headers-strategy` **ya está configurado** (hallazgo 10,
+   2026-08-21) y el HSTS está escrito y comentado en la plantilla de nginx: al
+   activar TLS basta descomentarlo, y `ProductionWebTemplateTest` —que hoy fija
+   que **no** se emite, porque sobre HTTP lo prohíbe la RFC 6797— fallará
+   entonces a propósito para que se venga a fijar lo contrario.
    - **Y declarar `DRP_TRUSTED_PROXIES`** con la IP o el rango del nginx que
      tenga delante: el limitador ya sabe recuperar la IP real del cliente, pero
      por omisión no se fía de nadie, así que sin esta variable vuelve a contar a
-     todo el mundo en el mismo cubo. Es la variable que más fácil es olvidar,
-     porque nada falla al arrancar sin ella.
+     todo el mundo en el mismo cubo. `deploy/compose.yaml` la declara, y desde
+     el 2026-08-21 **el olvido ya no es silencioso**: fuera de desarrollo el
+     arranque avisa con un WARN si está vacía, y llega un segundo aviso en
+     caliente —una sola vez— cuando entra una cabecera de proxy sin ningún
+     proxy declarado.
 2. **Compose de producción endurecido** (Docker / IaC Security): red interna sin
    publicar PostgreSQL ni SMTP; solo 443 expuesto; `restart: unless-stopped`;
    contenedores `user:` no root, `read_only` + `tmpfs`, `cap_drop: [ALL]`,
@@ -748,3 +807,4 @@ Lo que la auditoría comprobó como correcto, para que no se toque sin querer:
 | 2026-08-20 | **Hallazgo 5: cerrada también la mitad que vivía en los ajustes del repositorio**, auditada contra la API de GitHub con la CLI `gh` en lugar de fiarla a la interfaz. Lo encontrado: alertas de Dependabot ya activas y grafo de dependencias funcionando, pero las security updates y todo el escaneo de secretos apagados. Se activan por API las security updates, el secret scanning y la push protection —re-verificado con las mismas consultas—, se comprueba que el token de Actions ya tenía `read` por defecto, y entra CodeQL con el *default setup*. Cero alertas de dependencias y de código a día de hoy. Los *non-provider patterns* y las *validity checks* quedan fuera a propósito: son de pago y el criterio es cuenta gratuita con repositorio público. Del hallazgo 5 solo queda abierto el salto a Spring Boot 4.x. | kikescribano |
 | 2026-08-21 | **`webp-imageio` llega a la 0.11.0 y se retira el candado que lo impedía.** El proyecto sube a **Kotlin 2.4.10**, que era la única condición que bloqueaba esa versión —está compilada con Kotlin 2.4 y el compilador anterior rechazaba su metadata—, así que se sube la dependencia y **se retira la regla de `dependabot.yml`** que fijaba la línea 0.10.x. El criterio queda escrito: una regla cuya condición se cumple y no se retira es deuda que nadie vuelve a mirar, y acaba bloqueando algo por un motivo que dejó de ser cierto; la nota se conserva en el fichero para que quien dude de si estuvo fijado encuentre la respuesta. La 0.11.0 empaqueta **libwebp 1.6.0**, verificada como en cada salto anterior. Sigue vigente el aviso de despliegue —sus binarios de Linux x86/x86_64 ya no valen para glibc antiguas, lo que importaría sobre una imagen musl— y la trampa medida de que un cambio de dependencia puede pasar en local y fallar en la CI por la compilación incremental de Kotlin. | kikescribano |
 | 2026-08-21 | **Primera pasada completa de CodeQL, revisada y a cero.** El análisis de Kotlin tardó 1 h 42 min y subió cinco alertas de severidad alta; se revisaron las cinco contra el código y ninguna era real: tres `java/sql-injection` en la persistencia de Warehouse, Purchasing y Maintenance (plantillas constantes con los valores por parámetros `?`; `placeholders()` genera marcadores, no valores) y un `java/path-injection` en `FilesystemFileStorage` (la doble valla de `resolve()`) se descartan como *false positive*, y el CSRF deshabilitado —decisión documentada en «Cumple»— como *won't fix*, cada una con su motivo escrito en la propia alerta. Con ello la pestaña Security queda entera a cero —dependencias, código y secretos— con los cuatro mecanismos encendidos: lo que aparezca ahí a partir de ahora es nuevo de verdad. | kikescribano |
+| 2026-08-21 | **Corregidos los hallazgos 10, 11 y 19 —los tres MEDIA que el despliegue convierte en fallos del día del arranque— y el arreglo del hallazgo 1 gana el aviso que le faltaba.** Las cabeceras de la SPA viven donde la ADR-016 puso el frontend: el nginx de `deploy/`, con una CSP **sin `unsafe-eval` medida contra el artefacto construido** —la variante csp de `heic-to` resulta ser wasm2js puro, sin `eval` ni `WebAssembly` en el chunk; su Worker sí exige `worker-src blob:`—, `frame-ancestors 'none'`, `Referrer-Policy`, `Permissions-Policy`, la repetición en `/assets/` y `/index.html` que la herencia de `add_header` exige, y **HSTS escrito y apagado** porque la RFC 6797 prohíbe emitirlo sobre HTTP: se enciende con el TLS pendiente, y la prueba nueva fallará entonces a propósito. El backend gana `server.forward-headers-strategy: native` con `internal-proxies` acotado a la red de compose —`framework` se fía de cualquiera y corre antes que el limitador—. Todo lo fija `ProductionWebTemplateTest` sobre un nginx real con la plantilla del despliegue, que era lo único sin vigilancia: el recorrido vertical corre contra Vite. El CORS **no se parametriza: se elimina**, porque tras la ADR-016 no existe ninguna petición cross-origin en ninguna topología —Vite hace proxy en desarrollo, nginx comparte origen en producción, las imágenes van por `<img>`— y una lista de orígenes sería configuración muerta que alguien rellenaría con un comodín. Los cinco puertos del compose de desarrollo pasan a loopback. Y el olvido de `DRP_TRUSTED_PROXIES` deja de ser silencioso: WARN al arrancar fuera de desarrollo, aviso en caliente —una sola vez— cuando llega una cabecera de proxy sin ningún proxy declarado y, como red de refuerzo que la suite no mide, el RemoteIpValve de `native` resuelve por su cuenta la IP real cuando el salto viene de la red de compose. | kikescribano |

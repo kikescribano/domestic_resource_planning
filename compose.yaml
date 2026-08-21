@@ -6,6 +6,14 @@
 #
 # Es para **ejecutar la aplicacion**, no para las pruebas: las de integracion usan
 # Testcontainers, que arranca lo suyo y lo destruye al terminar.
+#
+# Todos los puertos van con el prefijo 127.0.0.1 a proposito (hallazgo 19 de la
+# auditoria OWASP): publicados sin IP, Docker los expone en todas las interfaces
+# y sus reglas de iptables se ponen por delante del cortafuegos del anfitrion.
+# En una red compartida eso es el PostgreSQL de desarrollo --drp_owner/drp_owner,
+# superusuario-- y un SMTP que acepta cualquier cosa, al alcance de cualquiera; y
+# copiado a un servidor, lo mismo pero en internet. En local no cambia nada:
+# localhost sigue llegando a todo.
 
 services:
   postgres:
@@ -17,7 +25,7 @@ services:
       POSTGRES_USER: drp_owner
       POSTGRES_PASSWORD: drp_owner
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - ./.data/postgres:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
@@ -34,8 +42,8 @@ services:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
     ports:
-      - "1025:1025"  # SMTP, al que apunta el adaptador de EmailSender
-      - "8025:8025"  # interfaz web y API, de donde el recorrido vertical lee el correo
+      - "127.0.0.1:1025:1025"  # SMTP, al que apunta el adaptador de EmailSender
+      - "127.0.0.1:8025:8025"  # interfaz web y API, de donde el recorrido vertical lee el correo
 
   # La entrega de ficheros, tal y como se despliega (ADR-005).
   #
@@ -56,8 +64,8 @@ services:
   nginx:
     image: nginx:1.27-alpine
     ports:
-      - "8090:80"  # la aplicacion, por delante del proxy
-      - "8091:81"  # los ficheros: otro origen, y en produccion otro dominio
+      - "127.0.0.1:8090:80"  # la aplicacion, por delante del proxy
+      - "127.0.0.1:8091:81"  # los ficheros: otro origen, y en produccion otro dominio
     environment:
       # El mismo secreto que firma la aplicacion. Si no coinciden, **todas** las
       # imagenes dan 403 y ninguna otra cosa falla, que es un sintoma facil de

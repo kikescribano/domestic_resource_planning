@@ -17,11 +17,14 @@ export default defineConfig({
   server: {
     port: 5173,
     // Escucha también en la red local para poder probar desde otro
-    // dispositivo (un móvil contra la IP del equipo). El backend admite esos
-    // orígenes en desarrollo: ver CorsConfig en el backend.
+    // dispositivo (un móvil contra la IP del equipo). Le basta el proxy de
+    // abajo: el móvil habla con Vite y Vite con el backend.
     host: true,
     // En desarrollo la API se alcanza por el mismo origen, para que el
-    // frontend no tenga que saber nada de CORS ni de dominios.
+    // frontend no tenga que saber nada de CORS ni de dominios. No es solo
+    // comodidad: el backend no tiene CORS —no hay ninguna petición
+    // cross-origin en ninguna topología del proyecto (ver SecurityConfig)—
+    // así que sin este proxy las llamadas a la API no funcionarían.
     proxy: {
       '/api': { target: 'http://localhost:8080', changeOrigin: true },
     },

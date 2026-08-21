@@ -26,6 +26,44 @@ server {
 
     root /srv/drp/web;
 
+    # Las cabeceras de seguridad de la SPA (hallazgo 10 de la auditoria OWASP).
+    # Aqui y no en el backend, porque quien sirve el frontend en produccion es
+    # este nginx (ADR-016): el estatico no pasa por Spring y sus cabeceras solo
+    # pueden nacer aqui. `always` para que salgan tambien en los errores. A las
+    # respuestas proxyadas de /api les caen encima ademas de las que Spring
+    # Security ya pone, y repetir `nosniff` es inocuo.
+    #
+    # **Se repiten dentro de /assets/ y de /index.html, y no es descuido**:
+    # nginx hereda las `add_header` de arriba solo si el `location` no declara
+    # ninguna, y esos dos declaran su Cache-Control. Es la misma trampa que el
+    # servidor de ficheros documenta mas abajo.
+    #
+    # La CSP esta medida contra el artefacto construido, no supuesta:
+    # - `script-src 'self'` sin `unsafe-eval` ni `wasm-unsafe-eval`: la
+    #   conversion HEIC usa la variante csp de heic-to (ADR-014), que es
+    #   JavaScript puro compilado con wasm2js -- el chunk construido no contiene
+    #   ni una llamada a eval ni a WebAssembly.
+    # - `worker-src blob:`: ese mismo chunk monta su Worker con
+    #   URL.createObjectURL.
+    # - `style-src 'unsafe-inline'`: React pinta atributos style= (los colores
+    #   de categoria de la ADR-015, entre otros) y para la CSP el atributo es
+    #   estilo en linea.
+    # - `img-src` incluye el otro origen: las imagenes firmadas viven en
+    #   ${DRP_FILES_PUBLIC_URL} (ADR-005) y se pintan con <img>.
+    # - Todo lo demas es de origen propio: la SPA se sirve sus propias fuentes
+    #   woff2 y no llama a ningun tercero.
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' ${DRP_FILES_PUBLIC_URL}; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+    # HSTS queda escrito y APAGADO a proposito, no olvidado: la RFC 6797 (7.2)
+    # prohibe emitirlo sobre HTTP y el navegador lo ignoraria igual. El dia que
+    # llegue el TLS que la ADR-016 deja pendiente, se descomenta --tambien en
+    # /assets/, /index.html y el servidor de ficheros-- y el backend ya sabra
+    # decir request.isSecure() gracias a server.forward-headers-strategy.
+    # add_header Strict-Transport-Security "max-age=31536000" always;
+
     # 25 MB por fichero mas la envoltura del multipart, como el tope de Spring:
     # sin esto nginx cortaria la subida con un 413 propio, fuera del contrato.
     client_max_body_size 26m;
@@ -61,6 +99,14 @@ server {
     # asi que se pueden cachear sin fecha de caducidad practica.
     location /assets/ {
         add_header Cache-Control "public, max-age=31536000, immutable" always;
+
+        # Las de seguridad, repetidas porque este location declara la suya y
+        # con ello pierde todas las del servidor. Ver la nota de arriba.
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' ${DRP_FILES_PUBLIC_URL}; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
         try_files $uri =404;
     }
 
@@ -68,6 +114,12 @@ server {
     # bundles y quedarse uno viejo es quedarse la aplicacion vieja.
     location = /index.html {
         add_header Cache-Control "no-cache" always;
+
+        # Repetidas por lo mismo que en /assets/.
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' ${DRP_FILES_PUBLIC_URL}; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
     }
 
     # El resto es la SPA: toda ruta que no sea un fichero real --/entrar,
