@@ -976,7 +976,7 @@ export function AccountPage() {
     <>
       <PageHeading title="Cuenta" icon={CircleUserRound} />
 
-      <OwnAvatar accessToken={session.accessToken} />
+      <OwnAvatar accessToken={session.accessToken} identityId={session.claims.identityId} />
 
       <form onSubmit={submit} className="flex max-w-form flex-col gap-4" noValidate>
         <h2 className="font-display text-title-sm text-ink">Cambiar la contraseña</h2>
@@ -1096,11 +1096,15 @@ const AVATAR_ACCEPT = ['image/jpeg', 'image/png', 'image/webp', ...CONVERTIBLE_F
  * de adjuntar. Y responde `204` sin cuerpo, así que lo que hay que hacer después
  * es volver a leer a la persona: el `avatarUrl` no llega en la respuesta.
  *
+ * Releer a la persona es buscarse en `GET /users` **por el `identityId` del
+ * token**: no hay `GET /users/me`, y la lista llega sin orden garantizado, así
+ * que la posición no dice quién es quién.
+ *
  * No consume la cuota de ningún hogar —una identidad no pertenece a uno— y por
  * eso su tope es otro: 1 MB, y solo imagen.
  */
 
-function OwnAvatar({ accessToken }: { accessToken: string }) {
+function OwnAvatar({ accessToken, identityId }: { accessToken: string; identityId: string }) {
   const queryClient = useQueryClient()
   const [problem, setProblem] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -1112,7 +1116,7 @@ function OwnAvatar({ accessToken }: { accessToken: string }) {
     queryFn: () => api.listUsers(accessToken),
   })
 
-  const mine = me.data?.items[0] ?? null
+  const mine = me.data?.items.find((user) => user.identityId === identityId) ?? null
 
   function refresh() {
     setProblem(null)
