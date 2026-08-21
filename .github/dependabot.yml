@@ -133,6 +133,29 @@ updates:
       # Agrupar lo rutinario es el objetivo; agrupar lo que hay que decidir es lo
       # contrario. Los mayores pasan a llegar **de uno en uno**, con su propia
       # integración y su propia decisión.
+      # **Vite y Vitest suben juntos, mayores incluidos, y es la excepción a la
+      # regla de arriba.** Va delante del grupo `tooling` a propósito: la primera
+      # coincidencia manda, así que estas tres tienen que decidirse aquí.
+      #
+      # No es una preferencia: **por separado ninguna de las dos puede pasar**, y
+      # se comprobó ejecutándolas. Vitest declara la configuración que vive
+      # dentro de `vite.config.ts` --el bloque `test`, que llega por el
+      # `/// <reference types="vitest/config" />`--, de modo que Vite 8 con
+      # Vitest 3 no compila: la ampliación de tipos ya no describe esa versión y
+      # TypeScript rechaza el objeto entero con un `TS2769`. Y Vitest 4 sin Vite
+      # 8 tampoco es el problema contrario, pero el orden natural es que viajen
+      # a la vez, porque son dos piezas de la misma herramienta.
+      #
+      # `@vitejs/*` entra en el mismo grupo por lo mismo: un plugin de Vite está
+      # atado a la versión mayor de Vite.
+      #
+      # La regla general --cada mayor llega solo-- sigue siendo la buena; esto es
+      # la excepción medida, no una grieta.
+      vite:
+        patterns:
+          - vite
+          - vitest
+          - "@vitejs/*"
       tooling:
         dependency-type: development
         update-types:
