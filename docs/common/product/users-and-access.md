@@ -88,6 +88,8 @@ Crear un hogar es lo que da existencia a un inquilino, así que es **la única e
 
 Iniciar sesión con el correo sin verificar se rechaza; `ResendVerification` reenvía el enlace si caducó o se perdió.
 
+La instalación puede además llevar un **tope de hogares** (`maxHouseholds`, configuración de despliegue; cero es sin tope, que es el valor por defecto). Con el tope alcanzado, `CreateHousehold` responde `409` `HOUSEHOLD_LIMIT_REACHED` **antes de tocar nada y de forma idéntica exista o no el correo**, así que la instalación llena no se convierte en un comprobador de direcciones. Cuentan todos los hogares que existen — también los pendientes de verificar y los que cursan su baja —, y las dos purgas liberan el hueco solas. Es una cota de dimensionado, no un invariante del modelo: dos altas cruzadas en el último hueco pueden colarse las dos, y el exceso lo reabsorbe la purga de no verificados.
+
 > **La infraestructura de correo deja de ser aplazable.** La decisión de 4.1.7 dejaba la invitación por email para más adelante porque no había con qué enviar correos. Exigir verificación en el alta cambia esa premisa: si hay correo el primer día, lo que sostenía el aplazamiento desaparece (ver 4.1.7).
 
 Dos cosas que se derivan de que el endpoint sea anónimo:

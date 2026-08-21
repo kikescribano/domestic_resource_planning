@@ -1,6 +1,7 @@
 package com.drp.config
 
 import com.drp.core.application.SessionPolicy
+import com.drp.core.application.usecase.EnrollmentPolicy
 import com.drp.core.application.usecase.StoragePolicy
 import com.drp.core.domain.identity.PasswordPolicy
 import org.springframework.beans.factory.annotation.Value
@@ -47,6 +48,11 @@ class ApplicationConfig {
     fun sessionPolicy(
         @Value("\${drp.security.jwt.refresh-token-ttl}") refreshTokenTtl: Duration,
     ): SessionPolicy = SessionPolicy(refreshTokenTtl)
+
+    @Bean
+    fun enrollmentPolicy(
+        @Value("\${drp.enrollment.max-households}") maxHouseholds: Int,
+    ): EnrollmentPolicy = EnrollmentPolicy(maxHouseholds)
 
     /**
      * Para los casos de uso que tienen que fijar el contexto de inquilino

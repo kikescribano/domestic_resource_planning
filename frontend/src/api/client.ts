@@ -35,6 +35,7 @@ export type ApiErrorCode =
   | 'FILE_TYPE_NOT_ALLOWED'
   | 'HOUSEHOLD_CLOSURE_ALREADY_REQUESTED'
   | 'HOUSEHOLD_CLOSURE_NOT_REQUESTED'
+  | 'HOUSEHOLD_LIMIT_REACHED'
   | 'IDENTITY_ALREADY_MEMBER'
   | 'IDENTITY_CLOSED'
   | 'INTAKE_QUANTITY_NOT_POSITIVE'
@@ -106,6 +107,7 @@ const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   // otro dispositivo, que en un hogar compartido no es raro.
   HOUSEHOLD_CLOSURE_ALREADY_REQUESTED: 'El hogar ya tiene una baja pedida. Recarga para ver la fecha.',
   HOUSEHOLD_CLOSURE_NOT_REQUESTED: 'El hogar no tiene ninguna baja pedida. Puede que alguien ya la cancelara.',
+  HOUSEHOLD_LIMIT_REACHED: 'Esta instalación no admite más hogares. Habla con quien la administra.',
   EXISTENCE_ALREADY_IN_LOCATION: 'Ahí ya hay una existencia de este artículo. Únelas en lugar de moverla.',
   INTAKE_QUANTITY_NOT_POSITIVE: 'La cantidad que entra tiene que ser mayor que cero.',
   LOAN_ALREADY_RETURNED: 'Este préstamo ya estaba devuelto.',

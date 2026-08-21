@@ -1,0 +1,141 @@
+# nginx de produccion (ADR-016): la SPA, el proxy de /api y la entrega de
+# ficheros de la ADR-005, en un solo proceso.
+#
+# Es la plantilla de docker/nginx/templates/default.conf.template con una
+# diferencia: el `location /` del servidor de la aplicacion ya no proxya todo
+# al backend sino que sirve el estatico del frontend, y el proxy queda acotado
+# a /api/. El servidor de ficheros del puerto 81 es identico al de desarrollo;
+# si se toca alli, se toca aqui.
+#
+# Dos servidores porque son dos origenes: sin dominio, la separacion que la
+# ADR-005 exige se hace por puerto --el 80 para la aplicacion y el 8081
+# publicado hacia el 81 para los ficheros--. Un puerto distinto ES otro origen
+# para el navegador, que es lo que importa.
+
+# El formato de log de los ficheros: registra $uri y **no $request**, que
+# incluiria la firma completa de una URL todavia valida (condicion de la
+# ADR-005).
+log_format drp_files '$remote_addr [$time_local] "$request_method $uri" $status $body_bytes_sent';
+
+# ---------------------------------------------------------------------------
+# La aplicacion: el estatico de la SPA y el proxy de /api
+# ---------------------------------------------------------------------------
+server {
+    listen 80 default_server;
+    server_name _;
+
+    root /srv/drp/web;
+
+    # 25 MB por fichero mas la envoltura del multipart, como el tope de Spring:
+    # sin esto nginx cortaria la subida con un 413 propio, fuera del contrato.
+    client_max_body_size 26m;
+
+    # Comprimir el texto abarata la SPA entera; las imagenes ya vienen
+    # comprimidas y no se tocan.
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+
+    # La ruta interna a la que apunta X-Accel-Redirect. `internal` significa
+    # que solo se alcanza desde una redireccion interna: pedirla desde fuera da
+    # 404. La aplicacion autoriza **en cada peticion** y nginx entrega los
+    # bytes.
+    location /internal/ {
+        internal;
+        alias /srv/drp/files/;
+    }
+
+    location /api/ {
+        proxy_pass http://${DRP_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Una subida de 25 MB por una conexion mala tarda; los 60 s de serie la
+        # cortarian a mitad.
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_request_buffering off;
+    }
+
+    # Los bundles llevan hash en el nombre: cambiar el contenido cambia la URL,
+    # asi que se pueden cachear sin fecha de caducidad practica.
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+    }
+
+    # El index nunca se cachea sin revalidar: es lo unico que apunta a los
+    # bundles y quedarse uno viejo es quedarse la aplicacion vieja.
+    location = /index.html {
+        add_header Cache-Control "no-cache" always;
+    }
+
+    # El resto es la SPA: toda ruta que no sea un fichero real --/entrar,
+    # /crear-hogar, /verificar-correo...-- devuelve el index y el router de
+    # React resuelve. Sin esto, el enlace de un correo de verificacion daria
+    # 404.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Los ficheros: identico al de desarrollo (ver la cabecera)
+# ---------------------------------------------------------------------------
+server {
+    listen 81;
+    server_name _;
+
+    access_log /var/log/nginx/files.log drp_files;
+
+    # Las tres que no son opcionales, mas la de Referer para que la firma no
+    # viaje en la cabecera de ninguna navegacion posterior. `always` para que
+    # tambien salgan en las respuestas de error.
+    #
+    # **Se repiten dentro de cada `location`, y no es descuido.** nginx hereda
+    # las `add_header` del nivel de arriba **solo si el nivel de abajo no
+    # declara ninguna**: en cuanto un `location` anade una cabecera propia,
+    # pierde todas las heredadas.
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Content-Security-Policy "default-src 'none'; sandbox" always;
+    add_header Referrer-Policy "no-referrer" always;
+
+    location /f/ {
+        # La firma va en `s` y la caducidad en `e`. `secure_link` deja en
+        # $secure_link: "" si la firma no cuadra, "0" si ha caducado, "1" si
+        # vale.
+        secure_link $arg_s,$arg_e;
+
+        # El mensaje que se firma, **exactamente el mismo que arma la
+        # aplicacion** en SignedFileUrls: caducidad, ruta, un espacio y el
+        # secreto. El secreto va AL FINAL: md5(mensaje+secreto) no admite
+        # extension de longitud y md5(secreto+mensaje) si.
+        secure_link_md5 "$secure_link_expires$uri ${DRP_FILES_LINK_SECRET}";
+
+        if ($secure_link = "") { return 403; }
+        if ($secure_link = "0") { return 410; }
+
+        alias /srv/drp/files/;
+
+        # Las tres heredadas, repetidas porque este `location` declara las
+        # suyas y con ello pierde las del servidor. Ver la nota de mas arriba.
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Content-Security-Policy "default-src 'none'; sandbox" always;
+        add_header Referrer-Policy "no-referrer" always;
+
+        # Siempre adjunto. NO impide que un <img> pinte la imagen: el navegador
+        # solo honra Content-Disposition en navegaciones y descargas, no en
+        # subrecursos.
+        add_header Content-Disposition "attachment" always;
+
+        # Los ficheros son inmutables --cambiar una foto es subir otra-- y la
+        # URL caduca sola. `private` porque son de un hogar, no de la red.
+        add_header Cache-Control "private, max-age=900" always;
+    }
+
+    # Nada mas se sirve desde este origen. Que no haya raiz ni listado es parte
+    # del aislamiento: aqui no vive la aplicacion.
+    location / {
+        return 404;
+    }
+}

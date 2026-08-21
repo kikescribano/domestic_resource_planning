@@ -13,6 +13,7 @@ import com.drp.core.application.port.IdentityRepository
 import com.drp.core.application.port.PasswordHasher
 import com.drp.core.application.port.SecretGenerator
 import com.drp.core.application.port.TenantResolver
+import com.drp.platform.tenant.HouseholdDirectory
 import com.drp.platform.tenant.TenantContext
 import com.drp.platform.error.BusinessRuleViolation
 import com.drp.platform.error.ErrorCode
@@ -66,6 +67,23 @@ data class CreateHouseholdCommand(
 )
 
 /**
+ * Cuantos hogares admite la instalacion. Cero es sin tope, que es el valor de
+ * desarrollo; el valor real lo fija cada despliegue en su configuracion
+ * (ADR-016), no el codigo.
+ *
+ * Cuentan **todos los hogares que existen**, incluidos los que estan sin
+ * verificar y los que cursan su baja con gracia: mientras la fila exista, el
+ * hogar ocupa su sitio. Los dos estados se liberan solos --la purga de no
+ * verificados a los siete dias, la de bajas al vencer la gracia-- asi que un
+ * hueco bloqueado por uno de ellos es un hueco que vuelve.
+ */
+data class EnrollmentPolicy(val maxHouseholds: Int) {
+    init {
+        require(maxHouseholds >= 0) { "El tope de hogares no puede ser negativo" }
+    }
+}
+
+/**
  * El alta de un hogar: la unica escritura sin credencial alguna de la API.
  *
  * Dos cosas se derivan de que el endpoint sea anonimo, y las dos estan
@@ -92,9 +110,20 @@ class CreateHousehold(
     private val tenantContext: TenantContext,
     private val transactions: TransactionTemplate,
     private val clock: Clock,
+    private val policy: EnrollmentPolicy,
+    private val directory: HouseholdDirectory,
 ) {
 
     fun handle(command: CreateHouseholdCommand) {
+        // Lo primero, porque es un hecho de la instalacion y no de la peticion:
+        // con el tope alcanzado la respuesta es este 409 para **todo el mundo**,
+        // exista o no el correo, asi que no delata nada --y no hay motivo para
+        // pagar un Argon2id que no puede llevar a ninguna parte--. Dos altas
+        // cruzadas en el ultimo hueco pueden colarse las dos: es una cota de
+        // dimensionado, no un invariante del modelo, y la purga de no
+        // verificados reabsorbe el exceso sola.
+        enforceCapacity()
+
         val email = EmailAddress.of(command.adminEmail)
         val timeZone = command.timeZone.toZoneId()
         passwordPolicy.require(command.adminPassword)
@@ -116,6 +145,21 @@ class CreateHousehold(
         // deshacer un alta que ya esta persistida y cuyo token sigue siendo
         // valido.
         emailSender.send(message)
+    }
+
+    /**
+     * El tope de la instalacion, contra el mismo `list_household_ids()` acotado
+     * que usa la pasada diaria: solo identificadores y sin `BYPASSRLS`, que es
+     * la unica forma admitida de mirar fuera del hogar actual (ADR-003).
+     */
+    private fun enforceCapacity() {
+        if (policy.maxHouseholds == 0) return
+        if (directory.allHouseholdIds().size >= policy.maxHouseholds) {
+            throw BusinessRuleViolation(
+                ErrorCode.HOUSEHOLD_LIMIT_REACHED,
+                "La instalación no admite más hogares",
+            )
+        }
     }
 
     private fun create(

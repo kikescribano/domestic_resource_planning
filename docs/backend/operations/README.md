@@ -29,15 +29,21 @@ Este directorio documentará cómo ejecutar y mantener el backend en cada entorn
   decisiones del script. Sirve para ver la aplicación entera sin teclear nada en
   cada arranque local.
 
+- [`deployment.md`](deployment.md): **el manual del VPS de producción** — qué
+  hay en la máquina, cómo se despliega una versión nueva desde GHCR, cómo se
+  fija o revierte una versión y cómo se restaura la copia diaria. La decisión
+  que lo sostiene es la
+  [ADR-016](../../common/architecture/decisions/ADR-016-production-deployment.md);
+  llega con el bloque de despliegue del 2026-08-21.
+
 ## Contenido previsto
 
+Lo que la lista original prometía sobre despliegue, secretos, migraciones,
+backup y fallos conocidos vive ya en [`deployment.md`](deployment.md). Queda:
+
 - Requisitos y arranque local reproducible.
-- Configuración por entorno y gestión de secretos.
-- Build, empaquetado, despliegue y rollback.
 - Health checks, logs estructurados, métricas y trazas.
-- Migraciones durante despliegues.
 - Objetivos de servicio y alertas.
-- Runbooks para fallos conocidos, backup y restauración.
 
 Los comandos deben ser ejecutables, indicar precondiciones y evitar valores
 sensibles en ejemplos o salidas.
