@@ -7,12 +7,12 @@ skill [`marketing-deck`](../../../../.claude/skills/marketing-deck/SKILL.md).
 
     python docs/common/marketing/assets/build-drp-tecnico-minitheme.py
 
-**Refleja el estado del repositorio a 2026-08-20**: 106 operaciones en el
-contrato, 31 tablas, quince ADR, Fases 1 y 2 cerradas más el cierre de huecos, y
-cuatro módulos construidos. Los cinco datos que caducan antes, y que hay que
-repasar siempre antes de regenerar, son **la fase en curso, el número de
-operaciones del contrato, el de tablas, el de ADR y cuántos módulos hay
-construidos**.
+**Refleja el estado del repositorio a 2026-08-21**: 107 operaciones en el
+contrato, 31 tablas, dieciséis ADR, Fases 1 y 2 cerradas más el cierre de
+huecos, cuatro módulos construidos y **DRP desplegado en producción** (ADR-016).
+Los cinco datos que caducan antes, y que hay que repasar siempre antes de
+regenerar, son **la fase en curso, el número de operaciones del contrato, el de
+tablas, el de ADR y cuántos módulos hay construidos**.
 """
 
 from __future__ import annotations
@@ -55,22 +55,24 @@ def build() -> Path:
     alcance.text(
         172,
         "Cómo está construido DRP: arquitectura, datos, contrato y "
-        "verificación. Refleja el repositorio a 20 de agosto de 2026.",
+        "verificación. Refleja el repositorio a 21 de agosto de 2026.",
         "Backend en Kotlin sobre Spring Boot: monolito modular con Clean "
         "Architecture y un event bus in-process.",
         "PostgreSQL 16 o superior, con Row-Level Security y migraciones en SQL "
         "plano versionadas con Flyway.",
         "Frontend en TypeScript y React sobre Vite, mobile-first desde 375 px "
         "y accesible según WCAG 2.2 nivel AA.",
-        "Contrato OpenAPI 3.0 en la raíz del repositorio, con 106 operaciones "
+        "Contrato OpenAPI 3.0 en la raíz del repositorio, con 107 operaciones "
         "y cliente de TypeScript generado.",
         "Monorepo con backend, frontend y documentación, construido en GitHub "
         "Actions con cinco trabajos.",
-        "Quince ADR recogen las decisiones estructurales, sus alternativas "
+        "Dieciséis ADR recogen las decisiones estructurales, sus alternativas "
         "descartadas y el motivo de cada una.",
         "Ficheros en el disco del servidor tras un puerto propio, servidos por "
-        "nginx con una cuota de 1 GB por hogar.")
-    alcance.notes("README, secciones 5, 6, 7 y 9.")
+        "nginx con una cuota de 1 GB por hogar.",
+        "En producción en un VPS: compose propio, imágenes de la CI vía GHCR "
+        "y secretos generados solo en el servidor.")
+    alcance.notes("README, secciones 5, 6, 7, 8.5 y 9; ADR-016.")
 
     # 3 · Índice --------------------------------------------------------------
     indice = deck.use(3)
@@ -182,13 +184,13 @@ def build() -> Path:
     # 14 · Cifras -------------------------------------------------------------
     cifras = deck.use(10)
     cifras.drop(415)  # duplicado que la plantilla dejó debajo del 419
-    cifras.text(425, "106")
+    cifras.text(425, "107")
     cifras.text(426, "operaciones en el contrato OpenAPI")
     cifras.text(420, "31")
     cifras.text(419, "tablas, con RLS y FORCE las del core")
-    cifras.text(421, "15")
+    cifras.text(421, "16")
     cifras.text(424, "ADR, cada una con su porqué")
-    cifras.text(423, "10")
+    cifras.text(423, "11")
     cifras.text(422, "recorridos en navegador real")
     cifras.notes("README, cabecera y sección 8.")
 

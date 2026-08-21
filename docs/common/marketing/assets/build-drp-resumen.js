@@ -8,9 +8,15 @@
  *   npm install pptxgenjs
  *   node build-drp-resumen.js ../presentations/DRP-resumen.pptx
  *
- * Refleja el estado del README a 2026-08-20: **Fase 1 (core), Fase 2 (módulos
- * activables) y el cierre de huecos cerrados**. Al cambiar el README de forma
- * sustantiva, actualiza el contenido de aquí y vuelve a ejecutarlo.
+ * Refleja el estado del README a 2026-08-21: **Fase 1 (core), Fase 2 (módulos
+ * activables), el cierre de huecos y el despliegue cerrados** — DRP corre en
+ * producción en un VPS (ADR-016), con el hogar de demostración dentro y ningún
+ * hogar real todavía. Al cambiar el README de forma sustantiva, actualiza el
+ * contenido de aquí y vuelve a ejecutarlo.
+ *
+ * La diapositiva de capturas enseña **capturas reales** de la aplicación
+ * (2026-08-21, hogar de demostración), desde `../screenshots/`: se ejecuta
+ * desde `assets/`, o las rutas relativas no resuelven.
  *
  * Ojo con una trampa de este fichero: no falla ni avisa cuando se queda atrás,
  * simplemente sigue generando un deck que ya no es cierto. Pasó: al cerrar la
@@ -118,9 +124,9 @@ function lines(items, o = {}) {
   });
 
   const chips = [
-    ["Fases 1 y 2 + cierre de huecos", TEAL],
+    ["En producción", TEAL],
     ["Core + 4 módulos", "24534F"],
-    ["2026-08-20", "24534F"],
+    ["2026-08-21", "24534F"],
   ];
   let cx = 0.95;
   chips.forEach(([t, c]) => {
@@ -156,7 +162,7 @@ function lines(items, o = {}) {
     x: 7.75, y: 6.25, w: 4.95, h: 0.72, margin: 0, valign: "top", fontFace: SANS, fontSize: 10.5, italic: true, color: "7E9895", lineSpacing: 15,
   });
 
-  s.addNotes("Portada. Resumen del README.md de DRP (estado 2026-08-20): Fases 0, 1 y 2 y el cierre de huecos cerrados. El core completo y los cuatro módulos de prioridad alta, activables hogar por hogar.");
+  s.addNotes("Portada. Resumen del README.md de DRP (estado 2026-08-21): Fases 0, 1 y 2, el cierre de huecos y el despliegue cerrados (ADR-016). El core completo y los cuatro módulos de prioridad alta, activables hogar por hogar, en producción en un VPS.");
 }
 
 // ═══ 2 · Problema y visión ════════════════════════════════════════════════════
@@ -602,11 +608,11 @@ function lines(items, o = {}) {
     });
   });
 
-  s.addText("Los cuatro de prioridad alta son el alcance entero de la Fase 2 y siguen en desarrollo: el código está, el despliegue todavía no. La lista no está cerrada, pero no hay cajón de sastre.", {
+  s.addText("Los cuatro de prioridad alta son el alcance entero de la Fase 2 y siguen en desarrollo: desplegados desde el 2026-08-21, lo que les falta es un hogar real dentro. La lista no está cerrada, pero no hay cajón de sastre.", {
     x: M, y: 6.05, w: CW, h: 0.5, margin: 0, valign: "top", fontFace: SANS, fontSize: 13, italic: true, color: TEAL, lineSpacing: 19,
   });
   foot(s);
-  s.addNotes("README §4.2: módulos activables, cada uno con estado y prioridad. Trece filas, sin fila de backlog. Los cuatro de prioridad alta se construyeron en la Fase 2 y están en desarrollo; los nueve restantes siguen por diseñar.");
+  s.addNotes("README §4.2: módulos activables, cada uno con estado y prioridad. Trece filas, sin fila de backlog. Los cuatro de prioridad alta se construyeron en la Fase 2 y siguen en «En desarrollo» — desde el despliegue (ADR-016) el motivo se muda: ya no es «no hay despliegue» sino «no hay ningún hogar real dentro»—; los nueve restantes siguen por diseñar.");
 }
 
 // ═══ 12 · Arquitectura ════════════════════════════════════════════════════════
@@ -768,16 +774,16 @@ function lines(items, o = {}) {
   head(s, "CAPA DE APLICACIÓN", "Los casos de uso del core");
 
   card(s, { x: M, y: 1.62, w: 7.6, h: 4.75, fill: TINT });
-  s.addText("Comandos · 30", { x: M + 0.38, y: 1.84, w: 7.0, h: 0.38, margin: 0, valign: "middle", fontFace: SERIF, fontSize: 18, bold: true, color: INK });
+  s.addText("Comandos · 43", { x: M + 0.38, y: 1.84, w: 7.0, h: 0.38, margin: 0, valign: "middle", fontFace: SERIF, fontSize: 18, bold: true, color: INK });
   s.addText("Cada uno valida sus reglas y, cuando corresponde, publica su evento en el bus", {
     x: M + 0.38, y: 2.2, w: 7.0, h: 0.28, margin: 0, valign: "middle", fontFace: SANS, fontSize: 11.5, color: MUTED,
   });
 
-  // Treinta nombres no caben legibles: van por área, con el recuento completo y
-  // tres ejemplos de cada una. El catálogo entero está en el README §5.7.
+  // Cuarenta y tres nombres no caben legibles: van por área, con el recuento
+  // completo y tres ejemplos de cada una. El catálogo entero está en el §5.7.
   const areas = [
-    ["Catálogo y assets", 11, ["CreateArticle", "RegisterConsumableIntake", "MergeStockItems"]],
-    ["Hogar, identidad y acceso", 11, ["CreateHousehold", "VerifyEmail", "InviteUser"]],
+    ["Catálogo, assets y ubicaciones", 19, ["CreateAsset", "RegisterConsumableIntake", "MergeStockItems"]],
+    ["Hogar, identidad y acceso", 16, ["CreateHousehold", "InviteUser", "ReactivateUser"]],
     ["Documentos y ficheros", 5, ["AttachDocument", "UploadFile", "SetIdentityAvatar"]],
     ["Préstamos", 3, ["StartLoan", "ConfirmReturn", "GenerateExternalAccessToken"]],
   ];
@@ -792,28 +798,35 @@ function lines(items, o = {}) {
   });
 
   card(s, { x: M + 0.38, y: 5.78, w: 7.0 - 0.16, h: 0.5, fill: INK2, shadow: false });
-  s.addText("Comandos de sistema · 3 — PurgeUnverifiedHouseholds · PurgeUnusedFiles · MarkOverdueLoans", {
-    x: M + 0.38, y: 5.78, w: 7.0 - 0.16, h: 0.5, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 10, bold: true, color: "CFE1DE",
+  s.addText("Comandos de sistema · 4 — PurgeUnverifiedHouseholds · PurgeClosedHouseholds · PurgeUnusedFiles · MarkOverdueLoans", {
+    x: M + 0.38, y: 5.78, w: 7.0 - 0.16, h: 0.5, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 9, bold: true, color: "CFE1DE",
   });
 
   const rx = 8.5, rw = W - M - rx;
   card(s, { x: rx, y: 1.62, w: rw, h: 4.75, fill: TINT2 });
-  s.addText("Consultas · 12", { x: rx + 0.38, y: 1.84, w: rw - 0.76, h: 0.38, margin: 0, valign: "middle", fontFace: SERIF, fontSize: 18, bold: true, color: INK });
+  s.addText("Consultas · 17", { x: rx + 0.38, y: 1.84, w: rw - 0.76, h: 0.38, margin: 0, valign: "middle", fontFace: SERIF, fontSize: 18, bold: true, color: INK });
   s.addText("Lectura del catálogo, los assets y el hogar", {
     x: rx + 0.38, y: 2.2, w: rw - 0.76, h: 0.28, margin: 0, valign: "middle", fontFace: SANS, fontSize: 11.5, color: MUTED,
   });
+  // Diecisiete nombres piden dos columnas: una sola lista no cabe legible.
   s.addText(lines([
-    "ListArticles", "ListAssets", "GetAsset", "ListCategories",
-    "ListLocations", "ListUsers", "ListInvitations", "GetLoan",
-    "ListDocuments", "ListFiles", "DownloadFile", "GetStorageUsage",
-  ], { bullet: true, opts: { fontFace: MONO } }), {
-    x: rx + 0.42, y: 2.6, w: rw - 0.84, h: 2.6, margin: 0, valign: "top", fontFace: MONO, fontSize: 11, bold: true, color: INK, lineSpacing: 15,
+    "ListArticles", "ListAssets", "GetAsset", "ListAssetChildren",
+    "ListCategories", "ListTags", "ListLocations", "GetLocation",
+    "ListDocuments",
+  ], { opts: { fontFace: MONO } }), {
+    x: rx + 0.42, y: 2.6, w: (rw - 0.84) / 2, h: 2.6, margin: 0, valign: "top", fontFace: MONO, fontSize: 10, bold: true, color: INK, lineSpacing: 15,
+  });
+  s.addText(lines([
+    "ListFiles", "DownloadFile", "GetStorageUsage", "GetCurrentHousehold",
+    "ListUsers", "ListInvitations", "GetLoan", "ListLoans",
+  ], { opts: { fontFace: MONO } }), {
+    x: rx + 0.42 + (rw - 0.84) / 2, y: 2.6, w: (rw - 0.84) / 2, h: 2.6, margin: 0, valign: "top", fontFace: MONO, fontSize: 10, bold: true, color: INK, lineSpacing: 15,
   });
   s.addText("Toda consulta queda acotada al householdId del token. Los listados excluyen por defecto los assets dados de baja y los artículos retirados.", {
     x: rx + 0.42, y: 5.25, w: rw - 0.84, h: 1.0, margin: 0, valign: "top", fontFace: SANS, fontSize: 11.5, italic: true, color: MUTED, lineSpacing: 17,
   });
   foot(s);
-  s.addNotes("README §5.7: catálogo de comandos y queries de la capa de aplicación.");
+  s.addNotes("README §5.7: catálogo de comandos y queries de la capa de aplicación, a 2026-08-21 — 43 comandos, 4 de sistema y 17 queries. ReactivateUser es la incorporación más reciente (2026-08-20).");
 }
 
 // ═══ 16 · Stack ═══════════════════════════════════════════════════════════════
@@ -827,7 +840,7 @@ function lines(items, o = {}) {
     ["Migraciones", "Flyway", "SQL plano versionado, esquema y políticas juntos"],
     ["Comunicación BE", "Event bus in-process", "Puerto propio sobre Spring, sin dependencia añadida"],
     ["Comunicación FE ↔ BE", "API REST + JWT", "Spring Security; tokens acotados de préstamo"],
-    ["Contratos", "OpenAPI 3.0", "openapi.yaml, 106 operaciones, fuente de verdad"],
+    ["Contratos", "OpenAPI 3.0", "openapi.yaml, 107 operaciones, fuente de verdad"],
     ["Frontend", "React sobre Vite", "Mobile-first, de 375 px a ultrawide; WCAG 2.2 AA"],
     ["Testing", "JUnit 5 + Testcontainers", "Vitest y Playwright en el frontend"],
   ];
@@ -842,11 +855,11 @@ function lines(items, o = {}) {
   });
 
   card(s, { x: M, y: 6.05, w: CW, h: 0.62, fill: INK, shadow: false });
-  s.addText("Once ADR recogen el porqué y lo descartado: monolito modular · Spring Boot · Row-Level Security · Flyway · ficheros en disco · React + Vite · contrato como fuente de verdad · monorepo · correo saliente · fronteras de módulo · comprobaciones periódicas y avisos", {
-    x: M, y: 6.05, w: CW, h: 0.62, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 11, color: "CFE1DE",
+  s.addText("Dieciséis ADR recogen el porqué y lo descartado: monolito modular · Spring Boot · Row-Level Security · Flyway · ficheros en disco · React + Vite · contrato como fuente de verdad · monorepo · correo saliente · fronteras de módulo · comprobaciones y avisos · supresión de datos · Transactional Outbox · conversión de HEIC · identidad de categoría · despliegue en producción", {
+    x: M, y: 6.05, w: CW, h: 0.62, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 10, color: "CFE1DE",
   });
   foot(s);
-  s.addNotes("README §6 y ADR-001 a ADR-011. Las dos últimas llegaron con la Fase 2: fronteras de módulo y activación por hogar, y programación de comprobaciones y entrega de avisos.");
+  s.addNotes("README §6 y ADR-001 a ADR-016. Las cuatro del cierre de huecos llegaron el 2026-08-20 y la ADR-016 —despliegue de producción— el 2026-08-21.");
 }
 
 // ═══ 17 · Testing ═════════════════════════════════════════════════════════════
@@ -885,7 +898,38 @@ function lines(items, o = {}) {
   s.addNotes("README §7: distribución 60/25/15 y ejemplos por nivel.");
 }
 
-// ═══ 18 · Roadmap ═════════════════════════════════════════════════════════════
+// ═══ 18 · El cliente, en pantalla ═════════════════════════════════════════════
+{
+  const s = newSlide();
+  head(s, "EL CLIENTE WEB", "Así se ve, en los dos modos");
+
+  // Capturas reales de la aplicación (2026-08-21, hogar de demostración), no
+  // maquetas: el panel «Hogar» en claro, «Inventario» en oscuro y la entrada
+  // en un ancho de móvil. El marco oscuro solo encuadra.
+  // Las medidas de cada imagen van explícitas, calculadas con la proporción
+  // del PNG: el `sizing` de pptxgenjs no lee el tamaño intrínseco del fichero
+  // y deforma la captura.
+  const shots = [
+    { x: M, w: 5.0, iw: 4.75, ih: 3.34, img: "home-dashboard-desktop-light.png", cap: "«Hogar», el panel de indicadores (modo claro)" },
+    { x: 5.8, w: 5.0, iw: 4.75, ih: 3.34, img: "inventory-desktop-dark.png", cap: "«Inventario», en modo oscuro" },
+    { x: 11.0, w: 1.73, iw: 1.49, ih: 3.23, img: "login-mobile-dark.png", cap: "La entrada, en el móvil" },
+  ];
+  shots.forEach((sh) => {
+    card(s, { x: sh.x, y: 1.8, w: sh.w, h: 3.62, fill: INK, r: 0.08 });
+    s.addImage({ path: "../screenshots/" + sh.img,
+      x: sh.x + (sh.w - sh.iw) / 2, y: 1.8 + (3.62 - sh.ih) / 2, w: sh.iw, h: sh.ih });
+    s.addText(sh.cap, { x: sh.x, y: 5.5, w: sh.w, h: 0.6, margin: 0, align: "center", valign: "top", fontFace: SANS, fontSize: 10.5, color: MUTED, lineSpacing: 14 });
+  });
+
+  card(s, { x: M, y: 6.2, w: CW, h: 0.55, fill: TINT, shadow: false });
+  s.addText("Capturas de la instancia en producción, del 21 de agosto de 2026, con el hogar de demostración dentro. El contraste de los dos modos se comprueba en la CI y la auditoría de accesibilidad recorre ambos.", {
+    x: M + 0.3, y: 6.2, w: CW - 0.6, h: 0.55, margin: 0, valign: "middle", fontFace: SANS, fontSize: 11.5, color: INK2, lineSpacing: 16,
+  });
+  foot(s);
+  s.addNotes("Capturas reales de la aplicación a 2026-08-21, con el hogar de demostración de scripts/seed-demo-data.sql: «Hogar» en escritorio claro, «Inventario» en escritorio oscuro y el login en ancho de móvil. README §5.5 (responsive), ADR-006 (sistema de diseño y los dos modos) y la comprobación de contraste de la CI.");
+}
+
+// ═══ 19 · Roadmap ═════════════════════════════════════════════════════════════
 {
   const s = newSlide();
   head(s, "ESTADO ACTUAL", "Roadmap por fases");
@@ -911,20 +955,20 @@ function lines(items, o = {}) {
     s.addText(f[3], { x: x + 0.28, y: cy + 2.95, w: 1.55, h: 0.36, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 10.5, bold: true, color: done ? WHITE : MUTED });
   });
 
-  s.addText("Entre la Fase 2 y la 3, un bloque sin número completado el 2026-08-20 — el cierre de huecos: baja de hogar y de cuenta, Transactional Outbox, conversión de HEIC, los cuatro atributos propuestos y el «hoy» del hogar.", {
+  s.addText("Entre la Fase 2 y la 3, dos bloques sin número: el cierre de huecos (2026-08-20) — baja de hogar y de cuenta, Transactional Outbox, HEIC, los cuatro atributos y el «hoy» del hogar — y el despliegue (2026-08-21, ADR-016): DRP en producción en un VPS, sin dominio ni TLS a propósito.", {
     x: M, y: 5.52, w: CW, h: 0.5, margin: 0, valign: "top", fontFace: SANS, fontSize: 12, color: MUTED, lineSpacing: 17,
   });
-  s.addText("Criterio de validación (ADR-001), cumplido en todo lo entregado: un recorrido vertical que atraviesa frontend, API autenticada, aplicación, dominio y PostgreSQL. Hoy son diez, en un navegador de verdad.", {
+  s.addText("Criterio de validación (ADR-001), cumplido en todo lo entregado: un recorrido vertical que atraviesa frontend, API autenticada, aplicación, dominio y PostgreSQL. Hoy son once, en un navegador de verdad.", {
     x: M, y: 6.1, w: CW, h: 0.5, margin: 0, valign: "top", fontFace: SANS, fontSize: 12, italic: true, color: TEAL, lineSpacing: 17,
   });
   foot(s);
-  s.addNotes("README §8: roadmap y estado. Fase 0 cerrada el 2026-08-07, Fase 1 el 2026-08-17, Fase 2 el 2026-08-19 y el cierre de huecos —que no es una fase y por eso no lleva tarjeta numerada— el 2026-08-20. El detalle de cada bloque vive en su propio roadmap, en docs/common/product/.");
+  s.addNotes("README §8: roadmap y estado. Fase 0 cerrada el 2026-08-07, Fase 1 el 2026-08-17, Fase 2 el 2026-08-19, el cierre de huecos —que no es una fase y por eso no lleva tarjeta numerada— el 2026-08-20, y el despliegue —tampoco lo es— el 2026-08-21 (§8.5 y ADR-016). El detalle de cada bloque vive en su propio roadmap, en docs/common/product/.");
 }
 
-// ═══ 19 · Cierre ══════════════════════════════════════════════════════════════
+// ═══ 20 · Cierre ══════════════════════════════════════════════════════════════
 {
   const s = newSlide(true);
-  head(s, "SIGUIENTE PASO", "El core, cuatro módulos y el cierre de huecos, entregados", true);
+  head(s, "SIGUIENTE PASO", "Entregado, desplegado — y a la espera de la Fase 3", true);
   s.addText("Lo que queda es la Fase 3: los nueve módulos restantes de la sección 4.2, sobre un mecanismo de activación que ya existe y una plataforma de avisos que ya entrega.", {
     x: M, y: 1.45, w: 9.5, h: 0.62, margin: 0, valign: "top", fontFace: SANS, fontSize: 15, color: "C4D4D1", lineSpacing: 21,
   });
@@ -944,7 +988,7 @@ function lines(items, o = {}) {
   });
 
   const closing = [
-    ["Lo entregado", "El core completo, cuatro módulos y el cierre de huecos, sobre activación por hogar y avisos programados. 106 operaciones en el contrato, 31 tablas con Row-Level Security y diez recorridos verticales."],
+    ["Lo entregado", "El core completo, cuatro módulos, el cierre de huecos y el despliegue: DRP corre en producción desde el 2026-08-21. 107 operaciones en el contrato, 31 tablas con Row-Level Security y once recorridos verticales."],
     ["Lo que queda", "Los nueve módulos restantes, por orden de prioridad. Ninguno pide arquitectura nueva: el camino de un módulo está recorrido cuatro veces."],
   ];
   closing.forEach((c, i) => {
@@ -954,11 +998,11 @@ function lines(items, o = {}) {
     s.addText(c[1], { x: x + 0.38, y: 5.0, w: 5.1, h: 0.9, margin: 0, valign: "top", fontFace: SANS, fontSize: 12.5, color: "BFD3D0", lineSpacing: 18 });
   });
 
-  s.addText("Fuente: README.md · documento vivo, última actualización 2026-08-20", {
+  s.addText("Fuente: README.md · documento vivo, última actualización 2026-08-21", {
     x: M, y: 6.35, w: CW, h: 0.35, margin: 0, valign: "middle", fontFace: SANS, fontSize: 11, color: "7E9895",
   });
   foot(s, true);
-  s.addNotes("README §8, §9 y §11: cierre de la Fase 2 y del cierre de huecos, y lo que queda para la Fase 3, que todavía no está planificada.");
+  s.addNotes("README §8, §8.5, §9 y §11: cierre de la Fase 2, del cierre de huecos y del despliegue (ADR-016), y lo que queda para la Fase 3, que todavía no está planificada.");
 }
 
 const out = process.argv[2] || "DRP-resumen.pptx";

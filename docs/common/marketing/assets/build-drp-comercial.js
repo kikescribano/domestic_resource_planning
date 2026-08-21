@@ -16,16 +16,19 @@
  * proyecto, no lee el repositorio y no quiere tecnicismos: inversión,
  * colaboradores y primeros hogares piloto.
  *
- * PROCEDENCIA: refleja el estado del README a **2026-08-20**, verificado contra
+ * PROCEDENCIA: refleja el estado del README a **2026-08-21**, verificado contra
  * el repositorio ese mismo día:
  *
- *   - Fase: **Fases 1 y 2 completadas** (2026-08-17 y 2026-08-19) y el **cierre
- *     de huecos completado** (2026-08-20); la Fase 3 está pendiente y **sin
- *     planificar**.
- *   - ADR: **quince** (ADR-001 a ADR-015).
- *   - Operaciones del contrato: **106** (`grep -c operationId: openapi.yaml`).
+ *   - Fase: **Fases 1 y 2 completadas** (2026-08-17 y 2026-08-19), el **cierre
+ *     de huecos completado** (2026-08-20) y el **despliegue completado**
+ *     (2026-08-21, ADR-016: un VPS real, sin dominio ni TLS a propósito); la
+ *     Fase 3 está pendiente y **sin planificar**.
+ *   - ADR: **dieciséis** (ADR-001 a ADR-016).
+ *   - Operaciones del contrato: **107** (`grep -c operationId: openapi.yaml`).
  *   - Módulos construidos: **cuatro de trece** (proveedores, warehouse, compras
- *     y mantenimiento), todos en estado «En desarrollo» porque no hay despliegue.
+ *     y mantenimiento), todos en estado «En desarrollo»: desde que el despliegue
+ *     existe, lo que separa ese estado de «En producción» ya no es «no hay
+ *     despliegue» sino que **no hay ningún hogar real dentro** (README §4.2).
  *
  * El cierre de huecos **no entra en el deck**, y la decisión se tomó cuando esa
  * fila apareció en la sección 8 y se mantiene ahora que está completada: no es
@@ -33,18 +36,26 @@
  * fases siguen siendo cuatro con tres cerradas y las diapositivas de estado
  * siguen siendo ciertas tal cual. Es saldo de deuda interna, no avance de
  * producto, y queda por debajo de la altura a la que habla esta presentación.
+ * **El despliegue sí entra**, y no como fila de roadmap sino como estado —«en
+ * producción»—, porque es exactamente lo que el destinatario pregunta.
  *
  * Esos cuatro son los datos que más rápido caducan y **hay que repasarlos cada
  * vez**: este fichero no falla ni avisa cuando se queda atrás, simplemente sigue
  * generando un deck impecable que ya no es cierto. Le pasó a su hermano durante
  * nueve días.
  *
- * RESTRICCIÓN DE HONESTIDAD, que aquí no es un matiz de estilo: **no hay ningún
- * despliegue, ni hogares reales, ni nadie usando esto**. La presentación no
- * puede decir que está en producción, ni inventar clientes, precios, cuota de
+ * RESTRICCIÓN DE HONESTIDAD, que aquí no es un matiz de estilo: DRP corre en
+ * producción desde el 2026-08-21, pero **no hay hogares reales ni nadie usando
+ * esto** — dentro vive el hogar de demostración. La presentación puede decir
+ * «desplegado y en marcha»; no puede inventar clientes, precios, cuota de
  * mercado, testimonios ni métricas de negocio. Si una cifra no está en el
  * repositorio, no aparece. La escena de la diapositiva «Un día con DRP» va
  * marcada como ilustrativa por ese motivo.
+ *
+ * CAPTURAS: las imágenes de pantalla son **capturas reales** de la aplicación
+ * (2026-08-21, hogar de demostración de `scripts/seed-demo-data.sql`), desde
+ * `../screenshots/` y en modo claro, que es el del lienzo de este deck. Se
+ * ejecuta desde `assets/`, o las rutas relativas no resuelven.
  *
  * LICENCIA DE LA DIRECCIÓN VISUAL: la retícula, la jerarquía tipográfica, el
  * ritmo de portada y cierre, la declaración grande y la línea de tiempo están
@@ -52,7 +63,7 @@
  * (references/pitch-deck-minitheme-slidesgo.pptx), no copiadas: su lienzo es de
  * 10 × 5,62" contra los 13,3" de este, así que lo que se pegara tal cual se
  * escribiría fuera de pantalla. Se descargó con cuenta gratuita, y esa licencia
- * **exige conservar la diapositiva de agradecimiento**: es la número 16 y **no
+ * **exige conservar la diapositiva de agradecimiento**: es la número 17 y **no
  * se retira** mientras la presentación salga fuera.
  *
  * CONTACTO: la última diapositiva deja el bloque de contacto sin rellenar a
@@ -193,7 +204,7 @@ function echo(slide, x, y, w, text, size, color, align) {
   });
 
   const chips = [
-    ["Fases 1 y 2 cerradas", TEAL],
+    ["En producción", TEAL],
     ["4 de 13 módulos construidos", "24534F"],
     ["Agosto de 2026", "24534F"],
   ];
@@ -235,7 +246,7 @@ function echo(slide, x, y, w, text, size, color, align) {
     x: 7.72, y: 6.2, w: 5.0, h: 0.4, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 12, italic: true, color: TEALLT,
   });
 
-  s.addNotes("Portada. Presentación comercial de DRP, dirigida a quien no conoce el proyecto: inversión, colaboradores y primeros hogares piloto. Procede del README §1 y refleja su estado a 2026-08-20: Fases 1 y 2 y el cierre de huecos cerrados, cuatro de trece módulos construidos y ningún despliegue todavía.");
+  s.addNotes("Portada. Presentación comercial de DRP, dirigida a quien no conoce el proyecto: inversión, colaboradores y primeros hogares piloto. Procede del README §1 y refleja su estado a 2026-08-21: Fases 1 y 2, cierre de huecos y despliegue cerrados (ADR-016), cuatro de trece módulos construidos y ningún hogar real dentro todavía.");
 }
 
 // ═══ 2 · El problema ══════════════════════════════════════════════════════════
@@ -449,7 +460,7 @@ function echo(slide, x, y, w, text, size, color, align) {
   });
 
   card(s, { x: M, y: 6.08, w: CW, h: 0.62, fill: SAND, shadow: false });
-  s.addText("Escena ilustrativa: ningún hogar real usa todavía DRP. Todo lo que ocurre en ella está construido, pero aún no desplegado.", {
+  s.addText("Escena ilustrativa: ningún hogar real usa todavía DRP. Todo lo que ocurre en ella está construido y en producción; la familia es inventada.", {
     x: M, y: 6.08, w: CW, h: 0.62, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 12, bold: true, color: TERRA,
   });
 
@@ -626,28 +637,21 @@ function echo(slide, x, y, w, text, size, color, align) {
   });
 
   // Dos dispositivos con el mismo contenido recolocado: el móvil en una columna
-  // y la pantalla ancha en dos. Es la idea de «primero el móvil», dibujada.
+  // y la pantalla ancha en su panel. Desde el despliegue son capturas reales
+  // —la pantalla «Hogar», con el hogar de demostración dentro—, no maquetas.
+  // Las medidas de cada imagen van explícitas, calculadas con la proporción
+  // del PNG (389x843 y 1342x942): el `sizing` de pptxgenjs no lee el tamaño
+  // intrínseco del fichero y deforma la captura.
   const phone = { x: 6.6, y: 1.62, w: 2.05, h: 4.3 };
   card(s, { x: phone.x, y: phone.y, w: phone.w, h: phone.h, fill: INK, r: 0.2 });
-  card(s, { x: phone.x + 0.13, y: phone.y + 0.28, w: phone.w - 0.26, h: phone.h - 0.56, fill: WHITE, line: "D3DFDC", r: 0.05, shadow: false });
-  s.addText("Trastero", { x: phone.x + 0.28, y: phone.y + 0.42, w: phone.w - 0.56, h: 0.3, margin: 0, valign: "middle", fontFace: SANS, fontSize: 11, bold: true, color: INK });
-  ["Taladro", "Escalera", "Caja de tornillos", "Bicicleta", "Sombrilla"].forEach((t, i) => {
-    const y = phone.y + 0.82 + i * 0.55;
-    card(s, { x: phone.x + 0.26, y, w: phone.w - 0.52, h: 0.44, fill: TINT2, r: 0.06, shadow: false });
-    s.addText(t, { x: phone.x + 0.38, y, w: phone.w - 0.76, h: 0.44, margin: 0, valign: "middle", fontFace: SANS, fontSize: 9.5, color: INK2 });
-  });
+  s.addImage({ path: "../screenshots/home-dashboard-mobile-light.png",
+    x: phone.x + 0.11, y: phone.y + 0.17, w: 1.83, h: 3.96 });
   s.addText("375 px", { x: phone.x, y: phone.y + phone.h + 0.12, w: phone.w, h: 0.3, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 11, bold: true, color: MUTED });
 
   const desk = { x: 9.05, y: 1.62, w: 3.68, h: 2.9 };
   card(s, { x: desk.x, y: desk.y, w: desk.w, h: desk.h, fill: INK, r: 0.1 });
-  card(s, { x: desk.x + 0.14, y: desk.y + 0.14, w: desk.w - 0.28, h: desk.h - 0.5, fill: WHITE, line: "D3DFDC", r: 0.04, shadow: false });
-  s.addText("Trastero", { x: desk.x + 0.32, y: desk.y + 0.28, w: 1.6, h: 0.28, margin: 0, valign: "middle", fontFace: SANS, fontSize: 10.5, bold: true, color: INK });
-  ["Taladro", "Escalera", "Caja de tornillos", "Bicicleta", "Sombrilla", "Manguera"].forEach((t, i) => {
-    const col = i % 2, row = Math.floor(i / 2);
-    const x = desk.x + 0.32 + col * 1.56, y = desk.y + 0.68 + row * 0.55;
-    card(s, { x, y, w: 1.44, h: 0.44, fill: TINT2, r: 0.06, shadow: false });
-    s.addText(t, { x: x + 0.12, y, w: 1.2, h: 0.44, margin: 0, valign: "middle", fontFace: SANS, fontSize: 9, color: INK2 });
-  });
+  s.addImage({ path: "../screenshots/home-dashboard-desktop-light.png",
+    x: desk.x + 0.14, y: desk.y + 0.14, w: 3.4, h: 2.39 });
   s.addShape(pres.ShapeType.rect, { x: desk.x + desk.w / 2 - 0.45, y: desk.y + desk.h, w: 0.9, h: 0.16, fill: { color: INK2 }, line: { color: INK2, width: 0.5 } });
   s.addText("hasta ultrapanorámico", { x: desk.x, y: desk.y + desk.h + 0.28, w: desk.w, h: 0.3, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 11, bold: true, color: MUTED });
 
@@ -657,10 +661,51 @@ function echo(slide, x, y, w, text, size, color, align) {
   });
 
   foot(s);
-  s.addNotes("README §5.5 (Frontend responsive): enfoque mobile-first, de 375 px a ultrawide. Y §6, fila de accesibilidad: WCAG 2.2 nivel AA como objetivo normativo verificable, comprobado en navegador real dentro del recorrido vertical.");
+  s.addNotes("README §5.5 (Frontend responsive): enfoque mobile-first, de 375 px a ultrawide. Y §6, fila de accesibilidad: WCAG 2.2 nivel AA como objetivo normativo verificable, comprobado en navegador real dentro del recorrido vertical. Los dos dispositivos enseñan capturas reales de la pantalla «Hogar» (2026-08-21, hogar de demostración), no maquetas dibujadas.");
 }
 
-// ═══ 12 · Dónde está el proyecto ══════════════════════════════════════════════
+// ═══ 12 · Así se ve ═══════════════════════════════════════════════════════════
+{
+  const s = newSlide();
+  head(s, "ASÍ SE VE", "Capturas reales, no maquetas");
+
+  // «Compras» en escritorio y el menú «Más» en el móvil: la aplicación en
+  // producción, con el hogar de demostración dentro. El resto de la diapositiva
+  // solo las encuadra; aquí no se dibuja ningún contenido inventado.
+  // Medidas explícitas por la proporción real del PNG (ver diapositiva 11).
+  const shot = { x: M, y: 1.75, w: 6.5, h: 4.55 };
+  card(s, { x: shot.x, y: shot.y, w: shot.w, h: shot.h, fill: INK, r: 0.1 });
+  s.addImage({ path: "../screenshots/shopping-list-desktop-light.png",
+    x: shot.x + 0.22, y: shot.y + 0.15, w: 6.05, h: 4.25 });
+  s.addText("«Compras»: lo que falta en casa, agrupado para ir a comprar y marcado al volver.", {
+    x: shot.x, y: shot.y + shot.h + 0.12, w: shot.w, h: 0.35, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 11, color: MUTED,
+  });
+
+  const menu = { x: 7.0, y: 1.75, w: 2.25, h: 4.55 };
+  card(s, { x: menu.x, y: menu.y, w: menu.w, h: menu.h, fill: INK, r: 0.2 });
+  s.addImage({ path: "../screenshots/more-menu-mobile-light.png",
+    x: menu.x + 0.15, y: menu.y + 0.16, w: 1.96, h: 4.23 });
+  s.addText("El menú «Más» del móvil", {
+    x: menu.x, y: menu.y + menu.h + 0.12, w: menu.w, h: 0.35, margin: 0, align: "center", valign: "middle", fontFace: SANS, fontSize: 11, color: MUTED,
+  });
+
+  const rx = 9.62, rw = W - M - rx;
+  card(s, { x: rx, y: 1.75, w: rw, h: 2.15, fill: TINT, shadow: false });
+  s.addText("Lo que se ve es lo que hay", { x: rx + 0.28, y: 1.95, w: rw - 0.56, h: 0.6, margin: 0, valign: "top", fontFace: SERIF, fontSize: 16, bold: true, color: INK, lineSpacing: 21 });
+  s.addText("Capturas del 21 de agosto de 2026, de la instancia en producción. El hogar es el de demostración: catorce meses de histórico para poder enseñar.", {
+    x: rx + 0.28, y: 2.6, w: rw - 0.56, h: 1.2, margin: 0, valign: "top", fontFace: SANS, fontSize: 11.5, color: MUTED, lineSpacing: 16,
+  });
+  card(s, { x: rx, y: 4.15, w: rw, h: 2.15, fill: TINT2, shadow: false });
+  s.addText("Los dos modos, auditados", { x: rx + 0.28, y: 4.35, w: rw - 0.56, h: 0.6, margin: 0, valign: "top", fontFace: SERIF, fontSize: 16, bold: true, color: INK2, lineSpacing: 21 });
+  s.addText("Claro y oscuro, con el contraste comprobado en los dos: la construcción falla si un color baja del nivel AA, en lugar de descubrirse en una auditoría.", {
+    x: rx + 0.28, y: 5.0, w: rw - 0.56, h: 1.2, margin: 0, valign: "top", fontFace: SANS, fontSize: 11.5, color: MUTED, lineSpacing: 16,
+  });
+
+  foot(s);
+  s.addNotes("Capturas reales de la aplicación (2026-08-21): «Compras» en escritorio y el menú «Más» en ancho de móvil, modo claro, con el hogar de demostración de scripts/seed-demo-data.sql. La nota de los dos modos procede de la CI (comprobación de contraste sobre los tokens de color) y de la auditoría de accesibilidad del recorrido vertical.");
+}
+
+// ═══ 13 · Dónde está el proyecto ══════════════════════════════════════════════
 {
   const s = newSlide();
   head(s, "DÓNDE ESTÁ EL PROYECTO", "Tres fases cerradas, la cuarta sin empezar");
@@ -689,14 +734,14 @@ function echo(slide, x, y, w, text, size, color, align) {
   card(s, { x: M, y: 5.62, w: CW, h: 1.14, fill: SAND, shadow: false });
   s.addText([
     { text: "Lo que todavía no hay:  ", options: { bold: true, color: TERRA } },
-    { text: "ningún servidor contratado, ningún hogar real dentro y nadie usando esto para saber dónde está el taladro. Por eso los cuatro módulos construidos siguen diciendo «en desarrollo» y no «en producción»: el código está entero, el despliegue no ha empezado.", options: { color: BODY } },
+    { text: "ningún hogar real dentro. El código está entero y desde el 21 de agosto corre en un servidor real, con el hogar de demostración cargado; los cuatro módulos construidos siguen diciendo «en desarrollo» y no «en producción» porque nadie usa esto aún para saber dónde está el taladro.", options: { color: BODY } },
   ], { x: M + 0.4, y: 5.62, w: CW - 0.8, h: 1.14, margin: 0, valign: "middle", fontFace: SANS, fontSize: 13, lineSpacing: 19 });
 
   foot(s);
-  s.addNotes("README §8 (Roadmap y estado actual) con el detalle de 8.2 y 8.3, y la nota de §4.2 que explica por qué los cuatro módulos construidos siguen en «En desarrollo»: no hay despliegue, ni hogar real, ni nadie usando el producto.");
+  s.addNotes("README §8 (Roadmap y estado actual) con el detalle de 8.2, 8.3 y 8.5, y la nota de §4.2: el despliegue existe desde el 2026-08-21 (ADR-016) y el motivo de «En desarrollo» se muda — ya no es «no hay despliegue» sino «no hay ningún hogar real dentro».");
 }
 
-// ═══ 13 · En números, sin maquillaje ══════════════════════════════════════════
+// ═══ 14 · En números, sin maquillaje ══════════════════════════════════════════
 {
   const s = newSlide(true);
   head(s, "EN NÚMEROS", "Lo que hay, contado sin adornos", true);
@@ -718,7 +763,7 @@ function echo(slide, x, y, w, text, size, color, align) {
   const stats = [
     ["3 de 4", "FASES CERRADAS", "La cuarta ni siquiera está planificada todavía: convertirla en un plan es un trabajo en sí mismo.", TEALLT],
     ["4 de 13", "MÓDULOS CONSTRUIDOS", "Enteros, no maquetas: con sus pantallas, sus avisos y sus pruebas. Los otros nueve tienen sitio, no fecha.", TEALLT],
-    ["0", "HOGARES USÁNDOLO", "No hay despliegue ni servidor contratado. Es exactamente lo siguiente que este proyecto necesita.", TERRA],
+    ["0", "HOGARES REALES DENTRO", "Desplegado y esperándolos: el primer hogar piloto es exactamente lo siguiente que este proyecto necesita.", TERRA],
   ];
   const rx = 6.35, rw = W - M - rx, chh = 1.3;
   stats.forEach((t, i) => {
@@ -734,10 +779,10 @@ function echo(slide, x, y, w, text, size, color, align) {
   });
 
   foot(s, true);
-  s.addNotes("README §4.2 (trece módulos, cuatro construidos y en desarrollo) y §8 (cuatro fases, tres de ellas cerradas, y la Fase 3 pendiente sin planificar). El cero de hogares es literal: §4.2 declara que no hay despliegue, ni servidor contratado, ni nadie usando el producto.");
+  s.addNotes("README §4.2 (trece módulos, cuatro construidos y en desarrollo) y §8 (cuatro fases, tres de ellas cerradas, y la Fase 3 pendiente sin planificar). El cero de hogares es literal: §4.2 declara que el despliegue existe desde el 2026-08-21 y que lo que falta es un hogar real dentro.");
 }
 
-// ═══ 14 · Qué falta y qué se busca ════════════════════════════════════════════
+// ═══ 15 · Qué falta y qué se busca ════════════════════════════════════════════
 {
   const s = newSlide();
   head(s, "QUÉ FALTA Y QUÉ SE BUSCA", "Tres huecos, y las tres cosas que los llenan");
@@ -747,7 +792,7 @@ function echo(slide, x, y, w, text, size, color, align) {
   card(s, { x: M, y: cy, w: cw, h: chh, fill: TINT });
   s.addText("QUÉ FALTA", { x: M + 0.38, y: cy + 0.3, w: cw - 0.76, h: 0.3, margin: 0, valign: "middle", fontFace: SANS, fontSize: 10.5, bold: true, charSpacing: 1.5, color: MUTED });
   const gaps = [
-    ["Un servidor donde vivir", "El tamaño está medido con consumo real y la máquina está elegida. Lo que no está es contratada."],
+    ["Un dominio con su candado", "El servidor ya corre. El dominio y el cifrado esperan a propósito al primer hogar que no sea de demostración."],
     ["Los primeros hogares", "Dos decisiones del producto están esperando a que haya casas de verdad para poder contestarse."],
     ["Los nueve módulos que quedan", "Ninguno pide inventar nada nuevo: el camino de un módulo ya está recorrido cuatro veces enteras."],
   ];
@@ -763,7 +808,7 @@ function echo(slide, x, y, w, text, size, color, align) {
   card(s, { x: rx, y: cy, w: cw, h: chh, fill: TEAL });
   s.addText("QUÉ SE BUSCA", { x: rx + 0.38, y: cy + 0.3, w: cw - 0.76, h: 0.3, margin: 0, valign: "middle", fontFace: SANS, fontSize: 10.5, bold: true, charSpacing: 1.5, color: ONTEAL });
   const asks = [
-    ["Inversión", "Para el despliegue, para sostenerlo en marcha y para el tiempo que la Fase 3 necesita."],
+    ["Inversión", "Para sostener en marcha el servidor que ya corre y para el tiempo que la Fase 3 necesita."],
     ["Colaboradores", "Quien quiera construir un módulo tiene cuatro ejemplos completos delante y un camino escrito."],
     ["Hogares piloto", "La pieza que ninguna cantidad de código sustituye: casas de verdad, con sus cosas de verdad dentro."],
   ];
@@ -780,10 +825,10 @@ function echo(slide, x, y, w, text, size, color, align) {
   });
 
   foot(s);
-  s.addNotes("README §6 (fila de despliegue: VPS elegido con consumo medido, no contratado), §4.2 (las dos decisiones abiertas cuyo responsable pasó a ser «la primera revisión de operación con hogares reales dentro») y §8.3 (el camino de módulo recorrido cuatro veces).");
+  s.addNotes("README §8.5 y ADR-016 (despliegue completado; dominio y TLS deliberadamente fuera hasta el primer hogar ajeno), §4.2 (las dos decisiones abiertas cuyo responsable pasó a ser «la primera revisión de operación con hogares reales dentro») y §8.3 (el camino de módulo recorrido cuatro veces).");
 }
 
-// ═══ 15 · Cierre y llamada a la acción ════════════════════════════════════════
+// ═══ 16 · Cierre y llamada a la acción ════════════════════════════════════════
 {
   const s = newSlide(true);
   head(s, "EL SIGUIENTE PASO", "Lo construido funciona entero. Le falta una casa dentro.", true);
@@ -794,7 +839,7 @@ function echo(slide, x, y, w, text, size, color, align) {
   const ctas = [
     ["Abre tu hogar", "Sé uno de los primeros hogares piloto. Tus preguntas valen más que las respuestas que podamos inventarnos.", TEAL, WHITE],
     ["Construye un módulo", "Nueve tienen sitio reservado. Cuatro caminos completos están escritos para copiarlos.", TEALLT, INK],
-    ["Financia el despliegue", "Poner esto en marcha y sostenerlo es lo que separa un producto construido de un producto usado.", TERRA, WHITE],
+    ["Sostén lo desplegado", "El servidor ya corre. Sostenerlo en marcha y dar tiempo a la Fase 3 es lo que separa un arranque de un camino.", TERRA, WHITE],
   ];
   const cw = 3.83, cy = 2.5, chh = 2.5;
   ctas.forEach((c, i) => {
@@ -819,7 +864,7 @@ function echo(slide, x, y, w, text, size, color, align) {
   s.addNotes("README §8 y §4.2: cierre y llamada a la acción. Las tres peticiones —hogares piloto, colaboradores e inversión— se corresponden con los tres huecos declarados en la diapositiva anterior. El bloque de contacto se rellena en el generador antes de cada envío; no se inventa.");
 }
 
-// ═══ 16 · Agradecimientos y créditos ══════════════════════════════════════════
+// ═══ 17 · Agradecimientos y créditos ══════════════════════════════════════════
 {
   // Esta diapositiva NO se retira. La plantilla de Slidesgo se descargó con
   // cuenta gratuita, y esa licencia permite modificarla y usarla con fines

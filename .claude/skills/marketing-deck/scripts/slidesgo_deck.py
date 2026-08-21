@@ -24,7 +24,8 @@ Tres cosas que este módulo impone y no son negociables:
 - **El texto sustituye, no reformatea.** Se conserva el formato del párrafo y de
   su primer run, que es de donde salen tipografía, cuerpo y color heredados.
 
-Requiere `pip install python-pptx`.
+Requiere `pip install python-pptx Pillow` (Pillow, para medir la proporción de
+las imágenes que `Slide.image()` sustituye).
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ from typing import Iterable, Sequence
 
 from pptx import Presentation
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+from pptx.util import Emu, Inches
 
 # La plantilla de referencia, versionada en el área de marketing.
 TEMPLATE = (Path(__file__).resolve().parents[4]
@@ -174,6 +176,44 @@ class Slide:
                 _set_paragraph(marco.paragraphs[0], valor)
                 for sobrante in list(marco.paragraphs)[1:]:
                     sobrante._p.getparent().remove(sobrante._p)
+        return self
+
+    def image(self, shape_id: int, path: Path | str,
+              box: tuple[float, float, float, float] | None = None) -> "Slide":
+        """Sustituye la imagen de una forma PICTURE por un fichero local.
+
+        La imagen nueva se encaja por proporción, centrada, dentro de una caja
+        en pulgadas —la de la propia forma si no se pasa `box`—, y se retira el
+        recorte (`srcRect`) que la plantilla tuviera puesto: estaba calculado
+        para su relleno, no para lo que entra ahora.
+        """
+        ruta = Path(path)
+        if not ruta.exists():
+            raise DeckError(f"id={shape_id}: no encuentro la imagen {ruta}")
+        forma = self._shape(shape_id)
+        if forma.shape_type != 13:  # PICTURE
+            raise DeckError(f"id={shape_id}: la forma no es una imagen")
+
+        _, rId = self._slide.part.get_or_add_image_part(str(ruta))
+        relleno = forma._element.blipFill
+        relleno.find(f"{_A_NS}blip").set(f"{_R_NS}embed", rId)
+        recorte = relleno.find(f"{_A_NS}srcRect")
+        if recorte is not None:
+            relleno.remove(recorte)
+
+        if box is None:
+            box = (Emu(forma.left).inches, Emu(forma.top).inches,
+                   Emu(forma.width).inches, Emu(forma.height).inches)
+        caja_x, caja_y, caja_w, caja_h = box
+        from PIL import Image as PILImage
+        with PILImage.open(ruta) as imagen:
+            proporcion = imagen.width / imagen.height
+        ancho = min(caja_w, caja_h * proporcion)
+        alto = ancho / proporcion
+        forma.left = Inches(caja_x + (caja_w - ancho) / 2)
+        forma.top = Inches(caja_y + (caja_h - alto) / 2)
+        forma.width = Inches(ancho)
+        forma.height = Inches(alto)
         return self
 
     def drop(self, *shape_ids: int) -> "Slide":
