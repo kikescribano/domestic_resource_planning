@@ -48,7 +48,7 @@ Pillow`; el rasterizado además pide `pypdfium2` y LibreOffice.
 | Herramienta | Para qué |
 |---|---|
 | [`inspect-template.py`](scripts/inspect-template.py) | Qué hay en cada diapositiva de la plantilla y **con qué `id` se rellena**. Sin resumen, `python inspect-template.py 9 21` da el detalle. |
-| [`slidesgo_deck.py`](scripts/slidesgo_deck.py) | La biblioteca: `Deck.use(n)` elige una diapositiva, `.text()`, `.table()`, `.drop()` y `.notes()` la rellenan, `.save()` la escribe. |
+| [`slidesgo_deck.py`](scripts/slidesgo_deck.py) | La biblioteca: `Deck.use(n)` elige una diapositiva, `.text()`, `.table()`, `.image()`, `.drop()` y `.notes()` la rellenan, `.save()` la escribe. |
 | [`qa-deck.py`](scripts/qa-deck.py) | Verificación: atribución, relleno olvidado, presupuesto de texto y encaje. Sale con código 1 si hay algo que impide entregar. |
 | [`render-deck.py`](scripts/render-deck.py) | Un PNG por diapositiva, y hojas de contactos con `--hojas`, para **mirarlas**. |
 
@@ -76,7 +76,9 @@ instrucciones, iconos y recursos de Slidesgo**. Estas son las que se usan:
 | 10 | Cuatro cifras con pie | 425/426, 420/419, 421/424, 423/422 — y **`drop(415)`**, que es un duplicado que la plantilla dejó debajo |
 | 11 | Una cifra grande | Cifra (433) y pie (432) |
 | 12 | Una frase a pantalla completa | El mismo texto en las tres capas del rótulo (438, 439, 440) |
+| 16 | Título con una imagen apaisada: una captura de escritorio | Título (623), subtítulo (622), pie lateral (617), imagen (608 con `.image()`) — y **`drop` de todo el andamiaje de estadística que trae**: 610, 611, 615, 616 y 618–621 |
 | 17 | Tabla de 4×4 | Título (629) y tabla (630), con fila de cabecera |
+| 18 | Una captura de móvil en vertical, con texto al lado | Título (638), párrafo (637), imagen (643 con `.image()`) |
 | 19 | Cuatro llamadas alrededor de un diagrama | Título (677), subtítulo (692), textos (686–689) |
 | 20 | Línea de tiempo | Título (704), cuatro hitos (706, 707, 709, 711), final (714), tres etiquetas (703, 701, 702) y sus pies (716, 717, 718) |
 | 21 | **Agradecimiento — obligatoria** | Rótulo en tres capas (726, 727, 729), contacto (730), nota de atribución (731) |
@@ -87,10 +89,16 @@ cuatro separadores de sección con una sola composición.
 
 Las que **no** se usan, y por qué: la 13 y la 14 traen fotos corporativas de
 oficina de **3 MB cada una** —fuera de tono para un producto doméstico, y el
-peso se queda en el repositorio para siempre—; la 16 y la 18 llevan un gráfico y
-una pantalla de móvil que **son imágenes**, no datos, así que enseñarlas sería
-enseñar algo falso; la 15 es un mapamundi; y de la 22 en adelante es material de
-Slidesgo sobre la propia plantilla.
+peso se queda en el repositorio para siempre—; la 15 es un mapamundi; y de la 22
+en adelante es material de Slidesgo sobre la propia plantilla.
+
+La 16 y la 18 estuvieron en esta lista mientras enseñarlas era enseñar algo
+falso: llevan **imágenes** —un gráfico de barras y una pantalla de móvil—, no
+datos. Entraron al catálogo cuando hubo **capturas reales** del producto que
+poner en ellas, con `Slide.image()`: sustituye la imagen encajando la nueva por
+proporción y retira el recorte que la plantilla tuviera puesto. La regla de
+fondo no cambia: una imagen de relleno no se enseña nunca; una captura, solo si
+es del producto de verdad y se dice de qué versión procede.
 
 ## El procedimiento
 
@@ -124,6 +132,7 @@ Ninguna de estas da error. Todas se descubrieron mirando el render.
 | **Enlaces disfrazados** | Algunos párrafos del relleno son enlaces, y el verde, la negrita y el subrayado viven en el run. Reutilizarlo deja una línea resaltada en mitad de una lista. | Ya resuelto: `text()` limpia el formato del run cuando encuentra `hlinkClick`. |
 | **El castellano ocupa más** | La plantilla está compuesta en inglés. Una descripción de tarjeta pasa de dos líneas a tres y se sale de la tarjeta sin avisar. | `qa-deck.py` compara con el relleno original y mide el encaje. Se corrige acortando, no agrandando la caja. |
 | **Etiquetas de once caracteres** | En las tarjetas de la 9 y en la línea de tiempo de la 20 el texto se parte o se recorta a partir de nueve o diez caracteres. | Etiquetas de **nueve caracteres o menos**; lo preciso va en la descripción. |
+| **El subrayado de las etiquetas no crece** | En la línea de tiempo de la 20, cada etiqueta lleva detrás un resalte verde del ancho de su relleno original (VENUS, JUPITER, MARS). El texto que sobresale se pinta **negro sobre negro** y desaparece sin avisar: `qa-deck.py` no lo ve, porque el texto cabe en su caja. | Etiquetas como mucho del largo del relleno que sustituyen, y mirar el render. |
 | **Formas duplicadas** | La diapositiva 10 tiene dos textos superpuestos (415 y 419). Se rellena el de arriba y el de abajo se queda hablando de Venus. | `drop(415)`. Y en general, el aviso de relleno olvidado de `qa-deck.py`. |
 | **Las tipografías no se pueden medir** | Van incrustadas como **EOT comprimido con MicroType Express**: ni Pillow ni LibreOffice las abren. | `qa-deck.py` mide con una sustituta y **se calibra contra el relleno original**, medido con la misma fuente equivocada. |
 | **El render no es PowerPoint** | LibreOffice sustituye las tipografías, así que los cortes de línea no son los definitivos. | Sirve para composición, no para medir al píxel. Lo que mide es `qa-deck.py`. |

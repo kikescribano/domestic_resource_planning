@@ -12,10 +12,18 @@ skill [`marketing-deck`](../../../../.claude/skills/marketing-deck/SKILL.md).
 
     python docs/common/marketing/assets/build-drp-comercial-minitheme.py
 
-**Refleja el estado del repositorio a 2026-08-20**: Fases 1 y 2 cerradas, cuatro
-módulos construidos, cierre de huecos completado y Fase 3 sin planificar. Los cinco datos que caducan antes, y que hay que repasar siempre
-antes de regenerar, son **la fase en curso, el número de operaciones del
-contrato, el de tablas, el de ADR y cuántos módulos hay construidos**.
+**Refleja el estado del repositorio a 2026-08-21**: Fases 1 y 2 cerradas, cuatro
+módulos construidos, cierre de huecos completado, **DRP desplegado en producción**
+(ADR-016: un VPS real, sin dominio ni TLS a propósito y sin ningún hogar real
+dentro todavía) y Fase 3 sin planificar. Los cinco datos que caducan antes, y
+que hay que repasar siempre antes de regenerar, son **la fase en curso, el
+número de operaciones del contrato, el de tablas, el de ADR y cuántos módulos
+hay construidos**.
+
+Las dos diapositivas de captura enseñan **capturas reales** de la aplicación
+(2026-08-21, hogar de demostración de `scripts/seed-demo-data.sql`), desde
+[`../screenshots/`](../screenshots/): aquí no se enseña ninguna imagen de
+relleno.
 """
 
 from __future__ import annotations
@@ -29,6 +37,7 @@ sys.path.insert(0, str(RAIZ / ".claude" / "skills" / "marketing-deck" / "scripts
 from slidesgo_deck import Deck  # noqa: E402
 
 SALIDA = RAIZ / "docs" / "common" / "marketing" / "presentations" / "DRP-comercial-minitheme.pptx"
+CAPTURAS = RAIZ / "docs" / "common" / "marketing" / "screenshots"
 
 
 def seccion(deck: Deck, numero: str, titulo: str, subtitulo: str, nota: str):
@@ -85,7 +94,7 @@ def build() -> Path:
     indice.text(186, "MÓDULOS")
     indice.text(187, "Trece capacidades, cuatro ya construidas")
     indice.text(188, "ESTADO")
-    indice.text(189, "Qué hay hecho y qué viene detrás")
+    indice.text(189, "En producción, y lo que viene detrás")
     indice.notes("Recorrido de la presentación.")
 
     # 4 · Sección 1 -----------------------------------------------------------
@@ -188,15 +197,15 @@ def build() -> Path:
 
     # 14 · Sección 4 ----------------------------------------------------------
     seccion(deck, "#04", "EL ESTADO",
-            "Qué hay construido a agosto de 2026",
-            "README, sección 8.")
+            "Construido y en producción, a agosto de 2026",
+            "README, secciones 8 y 8.5; ADR-016.")
 
     # 15 · Cifras -------------------------------------------------------------
     cifras = deck.use(10)
     cifras.drop(415)  # duplicado que la plantilla dejó debajo del 419
     cifras.text(425, "13")
     cifras.text(426, "módulos previstos, cuatro construidos")
-    cifras.text(420, "106")
+    cifras.text(420, "107")
     cifras.text(419, "operaciones disponibles en la API")
     cifras.text(421, "1 GB")
     cifras.text(424, "de documentos por hogar")
@@ -210,23 +219,60 @@ def build() -> Path:
     aislamiento.text(432, "capas de aislamiento: nadie ve lo que no es suyo")
     aislamiento.notes("README, sección 5.6; ADR-003.")
 
-    # 17 · El camino ----------------------------------------------------------
+    # 17 · Así se ve ----------------------------------------------------------
+    escritorio = deck.use(16)
+    # El andamiaje de estadística de la composición es de su relleno: los años,
+    # THEM/US y sus porcentajes, y también las nueve decoraciones que los
+    # arropaban —papeles rasgados y círculos a mano alzada—, que sin sus
+    # etiquetas quedan flotando encima de la captura.
+    escritorio.drop(610, 611, 615, 616, 618, 619, 620, 621,
+                    602, 603, 604, 605, 606, 607, 612, 613, 614)
+    escritorio.text(623, "ASÍ SE VE")
+    escritorio.text(622, "El panel del hogar, en producción")
+    escritorio.text(617, "Captura real de la aplicación: el hogar de "
+                         "demostración, con sus catorce meses de histórico.")
+    escritorio.image(608, CAPTURAS / "home-dashboard-desktop-dark.png",
+                     box=(0.86, 1.7, 6.6, 3.6))
+    escritorio.notes("Captura de la aplicación a 2026-08-21: pantalla «Hogar» "
+                     "en escritorio, modo oscuro, con el hogar de demostración "
+                     "de scripts/seed-demo-data.sql.")
+
+    # 18 · En el móvil --------------------------------------------------------
+    movil = deck.use(18)
+    movil.text(638, "Y EN EL MÓVIL")
+    movil.text(
+        637,
+        "De pie en el trastero y con una mano: el cliente va del móvil de "
+        "375 px a ultrawide, accesible según WCAG 2.2 AA.")
+    # La caja baja respecto a la original para que la pestaña del marco del
+    # teléfono no tape la cabecera de la captura.
+    movil.image(643, CAPTURAS / "inventory-mobile-dark.png",
+                box=(6.4, 0.9, 2.2, 4.04))
+    movil.notes("Captura de la aplicación a 2026-08-21: «Inventario» en ancho "
+                "de móvil, modo oscuro, con el hogar de demostración. README, "
+                "sección 5.5 y ADR-006.")
+
+    # 19 · El camino ----------------------------------------------------------
     camino = deck.use(20)
     camino.text(704, "EL CAMINO")
     camino.text(706, "F0")
     camino.text(707, "F1")
     camino.text(709, "F2")
-    camino.text(711, "F3")
-    camino.text(714, "HOY")
+    camino.text(711, "HOY")
+    camino.text(714, "F3")
+    # Las etiquetas llevan detrás un subrayado verde con el ancho de su relleno
+    # original (VENUS, JUPITER, MARS): lo que sobresale se pinta negro sobre
+    # negro y desaparece. De ahí el largo de estas tres.
     camino.text(703, "CORE")
     camino.text(716, "El core completo y su cliente web")
     camino.text(701, "MÓDULO")
     camino.text(717, "Activación por hogar y cuatro módulos")
-    camino.text(702, "FUTURO")
-    camino.text(718, "Los nueve módulos que faltan")
-    camino.notes("README, sección 8: fases y estado.")
+    camino.text(702, "LISTO")
+    camino.text(718, "En producción, en un VPS real")
+    camino.notes("README, secciones 8 y 8.5: fases, bloques y estado. El punto "
+                 "final es la Fase 3, pendiente y sin planificar.")
 
-    # 18 · Gracias ------------------------------------------------------------
+    # 20 · Gracias ------------------------------------------------------------
     gracias = deck.use(21)
     for identificador in (726, 727, 729):  # las tres capas del rótulo
         gracias.text(identificador, "GRACIAS")
