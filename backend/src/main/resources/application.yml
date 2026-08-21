@@ -73,6 +73,28 @@ spring:
 server:
   servlet:
     context-path: /
+  # Detras de un proxy, las cabeceras X-Forwarded-* las procesa el RemoteIpValve
+  # de Tomcat (hallazgo 10 de la auditoria OWASP). Sin esto, request.isSecure()
+  # es falso aunque el proxy termine TLS, y Spring no emitiria HSTS ni sabria el
+  # esquema real el dia que el TLS pendiente de la ADR-016 llegue.
+  #
+  # `native` y no `framework`, y la diferencia es de seguridad: el
+  # ForwardedHeaderFilter de `framework` se fia de la cabecera venga de quien
+  # venga y corre antes que el limitador de frecuencia, asi que le entregaria a
+  # quien llama la eleccion de su propio remoteAddr. El valve de `native` solo
+  # procesa las cabeceras cuando el salto inmediato casa con internal-proxies.
+  forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      # Solo la red de contenedores cuenta como salto interno, que es donde vive
+      # el nginx de compose (el mismo rango que deploy/compose.yaml declara en
+      # DRP_TRUSTED_PROXIES). El valor por omision de Tomcat abarca todo RFC1918
+      # y loopback, y con el cualquier despliegue que exponga el backend a una
+      # red privada --el desarrollo incluido-- dejaria elegir cubo del limitador
+      # con una X-Forwarded-For inventada. Acotado asi, en desarrollo el valve
+      # no interviene y quien resuelve la IP sigue siendo ClientIpResolver con
+      # su lista explicita de confianza.
+      internal-proxies: '172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}'
 
 drp:
   enrollment:

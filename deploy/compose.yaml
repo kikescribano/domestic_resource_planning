@@ -118,6 +118,9 @@ services:
       # El mismo secreto que firma la aplicacion. Si no coinciden, **todas**
       # las imagenes dan 403 y ninguna otra cosa falla.
       DRP_FILES_LINK_SECRET: ${DRP_FILES_LINK_SECRET:?}
+      # El otro origen de los ficheros, que la Content-Security-Policy de la
+      # SPA declara en img-src: sin el, ninguna imagen firmada se pintaria.
+      DRP_FILES_PUBLIC_URL: ${DRP_FILES_PUBLIC_URL:?falta DRP_FILES_PUBLIC_URL en .env}
     ports:
       - "80:80"    # la aplicacion
       - "8081:81"  # los ficheros: el otro origen (ADR-005)
