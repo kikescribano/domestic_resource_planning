@@ -212,3 +212,33 @@ Dos mandos, según lo que haya que deshacer:
   descrita en la lista de abiertos de
   [`deployment.md`](../../../backend/operations/deployment.md), y ejecutarla
   será un bloque propio que amplíe esta ADR hacia adelante.
+
+## Hacia adelante: TLS y dominio (2026-08-21)
+
+El primer punto de la lista de arriba **se cerró el mismo día que la ADR se
+aceptó**, en su propio bloque, y antes de lo que la ADR preveía: no lo forzó
+el escáner de códigos ni un hogar ajeno, sino que el coste resultó menor de lo
+temido y se decidió no esperar.
+
+- **El dominio es `kikescribano.es`** (OVH, misma cuenta que el VPS,
+  ~6 €/año), con DRP en `drp.kikescribano.es`. El plan A —un `.ovh` de ~3 €—
+  no fue posible: OVH tiene **suspendido temporalmente el registro de `.ovh`
+  nuevos**, y `drp.es` está cogido. El certificado autofirmado se descartó por
+  lo previsto: HTTPS con aviso a toda página en cada dispositivo no es
+  producción.
+- **El certificado es de Let's Encrypt, uno con los dos nombres**
+  (`drp.…` y `files.drp.…`), emitido por certbot en el anfitrión —standalone
+  para la primera emisión, cuando el 443 aún no podía arrancar sin él— y
+  renovado **sin cortes** por webroot: el desafío se escribe en
+  `deploy/data/acme`, nginx lo sirve en el 80, y un gancho de despliegue
+  recarga nginx al renovar. La cuenta de Let's Encrypt se registró con el
+  correo del proyecto y la aceptación de su Subscriber Agreement la autorizó
+  el propietario expresamente.
+- **La separación de ficheros de la ADR-005 pasa de puerto a subdominio**,
+  que es la forma que esta ADR llamaba provisional al 8081: `files.drp.…` en
+  el 443 por SNI, y **el 8081 deja de existir**. El 80 queda solo para el
+  desafío ACME y la redirección; el HSTS que la plantilla llevaba escrito y
+  comentado se enciende; el nombre viejo del VPS redirige al dominio.
+- **Lo que esta ampliación no toca**: el análisis antivirus y el despliegue
+  continuo siguen abiertos con sus motivos, y el firewall del panel de OVH
+  sigue siendo opción y no tarea.

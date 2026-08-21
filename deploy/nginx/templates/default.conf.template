@@ -1,16 +1,22 @@
-# nginx de produccion (ADR-016): la SPA, el proxy de /api y la entrega de
-# ficheros de la ADR-005, en un solo proceso.
+# nginx de produccion (ADR-016, con el TLS de su ampliacion): la SPA, el proxy
+# de /api y la entrega de ficheros de la ADR-005, en un solo proceso y con
+# certificado de Let's Encrypt.
 #
-# Es la plantilla de docker/nginx/templates/default.conf.template con una
-# diferencia: el `location /` del servidor de la aplicacion ya no proxya todo
-# al backend sino que sirve el estatico del frontend, y el proxy queda acotado
-# a /api/. El servidor de ficheros del puerto 81 es identico al de desarrollo;
-# si se toca alli, se toca aqui.
+# Cuatro servidores porque son dos origenes y dos protocolos. Los dos del 80
+# solo hacen dos cosas: contestar el desafio ACME --emitir y renovar el
+# certificado sin cortar nada-- y mandar todo lo demas a su https. Los dos del
+# 443 se reparten por nombre (SNI): ${DRP_APP_HOST} es la aplicacion y
+# ${DRP_FILES_HOST} los ficheros firmados -- **la separacion de origen de la
+# ADR-005 es por fin por dominio**, como se escribio que seria; el puerto 8081
+# ya no existe.
 #
-# Dos servidores porque son dos origenes: sin dominio, la separacion que la
-# ADR-005 exige se hace por puerto --el 80 para la aplicacion y el 8081
-# publicado hacia el 81 para los ficheros--. Un puerto distinto ES otro origen
-# para el navegador, que es lo que importa.
+# El servidor de ficheros sigue el patron de
+# docker/nginx/templates/default.conf.template: si se toca alli, se toca aqui.
+#
+# El certificado es UNO con dos nombres (el directorio lleva el del primero,
+# ${DRP_APP_HOST}); lo emite y renueva certbot en el anfitrion contra
+# /srv/drp/acme, que aqui se sirve en /.well-known/acme-challenge/. Los
+# detalles de emision y renovacion, en deployment.md.
 
 # El formato de log de los ficheros: registra $uri y **no $request**, que
 # incluiria la firma completa de una URL todavia valida (condicion de la
@@ -18,11 +24,47 @@
 log_format drp_files '$remote_addr [$time_local] "$request_method $uri" $status $body_bytes_sent';
 
 # ---------------------------------------------------------------------------
-# La aplicacion: el estatico de la SPA y el proxy de /api
+# Puerto 80: ACME y redireccion. Nada mas se sirve en claro.
 # ---------------------------------------------------------------------------
+server {
+    listen 80;
+    server_name ${DRP_FILES_HOST};
+
+    location /.well-known/acme-challenge/ {
+        root /srv/drp/acme;
+    }
+
+    location / {
+        return 301 https://${DRP_FILES_HOST}$request_uri;
+    }
+}
+
 server {
     listen 80 default_server;
     server_name _;
+
+    location /.well-known/acme-challenge/ {
+        root /srv/drp/acme;
+    }
+
+    # Tambien lo que llegue por la IP o por el nombre viejo del VPS: la unica
+    # direccion publica de la aplicacion es la del dominio.
+    location / {
+        return 301 https://${DRP_APP_HOST}$request_uri;
+    }
+}
+
+# ---------------------------------------------------------------------------
+# La aplicacion: el estatico de la SPA y el proxy de /api, en 443
+# ---------------------------------------------------------------------------
+server {
+    listen 443 ssl default_server;
+    http2 on;
+    server_name ${DRP_APP_HOST};
+
+    ssl_certificate     /etc/letsencrypt/live/${DRP_APP_HOST}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DRP_APP_HOST}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
 
     root /srv/drp/web;
 
@@ -57,12 +99,10 @@ server {
     add_header Referrer-Policy "no-referrer" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
 
-    # HSTS queda escrito y APAGADO a proposito, no olvidado: la RFC 6797 (7.2)
-    # prohibe emitirlo sobre HTTP y el navegador lo ignoraria igual. El dia que
-    # llegue el TLS que la ADR-016 deja pendiente, se descomenta --tambien en
-    # /assets/, /index.html y el servidor de ficheros-- y el backend ya sabra
-    # decir request.isSecure() gracias a server.forward-headers-strategy.
-    # add_header Strict-Transport-Security "max-age=31536000" always;
+    # El HSTS que esperaba comentado a que hubiera TLS, encendido el dia que lo
+    # hubo. Solo sobre https, como la RFC 6797 manda; el backend sabe decir
+    # request.isSecure() gracias a server.forward-headers-strategy.
+    add_header Strict-Transport-Security "max-age=31536000" always;
 
     # 25 MB por fichero mas la envoltura del multipart, como el tope de Spring:
     # sin esto nginx cortaria la subida con un 413 propio, fuera del contrato.
@@ -106,6 +146,7 @@ server {
         add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' ${DRP_FILES_PUBLIC_URL}; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
         add_header Referrer-Policy "no-referrer" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
 
         try_files $uri =404;
     }
@@ -120,6 +161,7 @@ server {
         add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' ${DRP_FILES_PUBLIC_URL}; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
         add_header Referrer-Policy "no-referrer" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
     }
 
     # El resto es la SPA: toda ruta que no sea un fichero real --/entrar,
@@ -132,11 +174,16 @@ server {
 }
 
 # ---------------------------------------------------------------------------
-# Los ficheros: identico al de desarrollo (ver la cabecera)
+# Los ficheros: el otro origen, ahora por subdominio (ADR-005)
 # ---------------------------------------------------------------------------
 server {
-    listen 81;
-    server_name _;
+    listen 443 ssl;
+    http2 on;
+    server_name ${DRP_FILES_HOST};
+
+    ssl_certificate     /etc/letsencrypt/live/${DRP_APP_HOST}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DRP_APP_HOST}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
 
     access_log /var/log/nginx/files.log drp_files;
 
@@ -151,6 +198,7 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header Content-Security-Policy "default-src 'none'; sandbox" always;
     add_header Referrer-Policy "no-referrer" always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
 
     location /f/ {
         # La firma va en `s` y la caducidad en `e`. `secure_link` deja en
@@ -169,11 +217,12 @@ server {
 
         alias /srv/drp/files/;
 
-        # Las tres heredadas, repetidas porque este `location` declara las
-        # suyas y con ello pierde las del servidor. Ver la nota de mas arriba.
+        # Las heredadas, repetidas porque este `location` declara las suyas y
+        # con ello pierde las del servidor. Ver la nota de mas arriba.
         add_header X-Content-Type-Options "nosniff" always;
         add_header Content-Security-Policy "default-src 'none'; sandbox" always;
         add_header Referrer-Policy "no-referrer" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
 
         # Siempre adjunto. NO impide que un <img> pinte la imagen: el navegador
         # solo honra Content-Disposition en navegaciones y descargas, no en
