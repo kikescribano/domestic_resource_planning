@@ -550,7 +550,7 @@ describe('existencias', () => {
     await userEvent.click(screen.getByRole('link', { name: 'Dar entrada' }))
     await userEvent.selectOptions(await screen.findByLabelText('Artículo'), 'art-1')
     await userEvent.selectOptions(screen.getByLabelText('Dónde se guarda'), 'loc-2')
-    await userEvent.type(screen.getByLabelText('Cantidad que entra (g)'), '1000')
+    await userEvent.type(screen.getByLabelText('Cantidad que entra (gramos)'), '1000')
     await userEvent.click(screen.getByRole('button', { name: 'Dar entrada' }))
 
     const intake = calls.find((call) => call.url.endsWith('/assets/intake'))

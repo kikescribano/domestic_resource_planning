@@ -308,15 +308,45 @@ export const CONDITION_LABELS: Record<AssetCondition, string> = {
 /** El orden de la escala, para pintar los desplegables sin repetirlo en cada pantalla. */
 export const CONDITIONS: AssetCondition[] = ['NEW', 'GOOD', 'WORN', 'DAMAGED', 'UNUSABLE']
 
-/** Cómo se escribe cada unidad al mostrarla. Son datos, así que van en castellano. */
+/**
+ * Cómo se escribe cada unidad, en singular y en plural. Son datos que lee una
+ * persona, así que van en castellano y **con su concordancia**: «1 kilogramo»,
+ * «2 kilogramos». Antes convivían tres formas —abreviaturas, un plural fijo y
+ * pantallas que enseñaban el enumerado crudo en minúsculas («2 kilogram»)— y
+ * ninguna era español.
+ *
+ * El singular es además cómo se **nombra** la unidad cuando no hay número
+ * delante: el desplegable del catálogo y la ficha de un artículo. Junto a un
+ * campo de cantidad va el plural, y junto a un número decide [formatQuantity].
+ */
 export const UNIT_LABELS: Record<MeasurementUnit, string> = {
+  UNIT: 'unidad',
+  GRAM: 'gramo',
+  KILOGRAM: 'kilogramo',
+  MILLILITER: 'mililitro',
+  LITER: 'litro',
+  METER: 'metro',
+  PACK: 'paquete',
+}
+
+export const UNIT_LABELS_PLURAL: Record<MeasurementUnit, string> = {
   UNIT: 'unidades',
-  GRAM: 'g',
-  KILOGRAM: 'kg',
-  MILLILITER: 'ml',
-  LITER: 'l',
-  METER: 'm',
+  GRAM: 'gramos',
+  KILOGRAM: 'kilogramos',
+  MILLILITER: 'mililitros',
+  LITER: 'litros',
+  METER: 'metros',
   PACK: 'paquetes',
+}
+
+/**
+ * Una cantidad con su unidad concordada: «1 litro», «2 litros», «0,5 litros»
+ * —solo el uno exacto va en singular—. Sin unidad, el número a secas: es el
+ * caso del consumible sin artículo y de la lista de la compra apuntada a mano.
+ */
+export function formatQuantity(quantity: number, unit?: MeasurementUnit | null): string {
+  if (!unit) return String(quantity)
+  return `${quantity} ${quantity === 1 ? UNIT_LABELS[unit] : UNIT_LABELS_PLURAL[unit]}`
 }
 
 export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {

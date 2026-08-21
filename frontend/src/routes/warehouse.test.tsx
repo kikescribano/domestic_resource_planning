@@ -190,7 +190,7 @@ describe('apuntar un consumo', () => {
 
     // El texto es la mitad de la decisión: el `PATCH` del core es absoluto y esto
     // es un delta, así que la etiqueta tiene que decir cuál de los dos es.
-    expect(await screen.findByLabelText('Gastado de Arroz (gram)')).toBeInTheDocument()
+    expect(await screen.findByLabelText('Gastado de Arroz (gramos)')).toBeInTheDocument()
     expect(screen.getByText('Lo que has gastado, no lo que queda.')).toBeInTheDocument()
   })
 
@@ -211,7 +211,7 @@ describe('apuntar un consumo', () => {
     })
 
     await userEvent.click(await screen.findByRole('button', { name: /Arroz/ }))
-    await userEvent.type(await screen.findByLabelText('Gastado de Arroz (gram)'), '5000')
+    await userEvent.type(await screen.findByLabelText('Gastado de Arroz (gramos)'), '5000')
     await userEvent.click(screen.getByRole('button', { name: 'Apuntar consumo' }))
 
     // El texto es **el del cliente** y no el del servidor: el `message` de la API
@@ -238,7 +238,7 @@ describe('apuntar un consumo', () => {
     })
 
     await userEvent.click(await screen.findByRole('button', { name: /Arroz/ }))
-    await userEvent.clear(await screen.findByLabelText('Avisarme cuando quede menos de (gram)'))
+    await userEvent.clear(await screen.findByLabelText('Avisarme cuando quede menos de (gramos)'))
     await userEvent.click(screen.getByRole('button', { name: 'Guardar mínimo' }))
 
     // Vacío es `null` y no cero: cero significaría «avísame cuando no quede
