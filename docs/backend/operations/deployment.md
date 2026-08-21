@@ -200,3 +200,20 @@ los archiva.
   lo subió.
 - **El firewall de red de OVH** (panel), anotado como opción: duplicaría en un
   segundo sitio la lista de puertos que hoy gobierna el compose.
+- **El despliegue continuo (CD)**, anotado como deuda el 2026-08-21. Hoy
+  desplegar es deliberadamente manual (ADR-016): fusionar publica las imágenes
+  y el `pull` lo ejecuta alguien. El día que la deriva entre `main` y
+  producción pese más que ese control, **la forma ya está elegida** y es un job
+  final en el propio workflow de imágenes: entra al VPS por SSH con una clave
+  dedicada **restringida con `command=` forzado** en el `authorized_keys` —esa
+  clave solo puede ejecutar el script de despliegue, ni shell ni ninguna otra
+  cosa, que es lo que contiene un secreto de repositorio comprometido—, con
+  `concurrency` para que dos merges seguidos no se pisen, **absteniéndose
+  cuando el `.env` fije un `DRP_VERSION` distinto de `latest`** —un anclaje de
+  vuelta atrás no debe deshacerse solo— y saltando la ventana del barrido de
+  las 03:15, para no reiniciar el backend a mitad de la pasada diaria. Se
+  descartó el agente de sondeo en el VPS (watchtower o un timer): despliega
+  cuando toca el sondeo y no cuando se fusiona, y no actualiza el checkout de
+  `deploy/`, así que un cambio del compose o de la plantilla de nginx no
+  llegaría. Ejecutarlo será su propio bloque pequeño, con la sección hacia
+  adelante que la ADR-016 pide.

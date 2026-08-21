@@ -205,3 +205,10 @@ Dos mandos, según lo que haya que deshacer:
 - **El firewall de red de OVH** (el del panel, delante de la máquina), que
   duplicaría la lista de puertos en un segundo sitio: se anota como opción, no
   como tarea.
+- **El despliegue continuo** (añadido el 2026-08-21, el mismo día de aceptar
+  esta ADR). Esta decisión fija que producción cambia cuando alguien lo decide,
+  y esa frase es reversible a bajo coste: la forma preferida —un job de SSH en
+  el propio workflow, con clave de mando forzado y sus dos salvaguardas— queda
+  descrita en la lista de abiertos de
+  [`deployment.md`](../../../backend/operations/deployment.md), y ejecutarla
+  será un bloque propio que amplíe esta ADR hacia adelante.
