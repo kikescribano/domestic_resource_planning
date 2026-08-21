@@ -40,6 +40,10 @@ nadie real:
 
 Contraseña: `DemoDRP2026Local`.
 
+> **En producción esa contraseña no vale**: es pública por estar aquí, así que
+> tras cada carga se sustituye por una que solo vive en el `.env` del servidor.
+> El cómo y el porqué, en [`deployment.md`](deployment.md).
+
 Los cuatro tienen el correo verificado, así que se entra directamente por
 `/entrar` sin pasar por Mailpit.
 

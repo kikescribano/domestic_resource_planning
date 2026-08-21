@@ -159,11 +159,24 @@ cd /opt/drp && docker compose --project-directory deploy exec -T \
   postgres psql -U drp_app -d drp -v ON_ERROR_STOP=1 < scripts/seed-demo-data.sql
 ```
 
-Cuentas, contraseña y contenido, en [`demo-dataset.md`](demo-dataset.md). Sus
-dos costes en producción están asumidos por escrito en la ADR-016: la
-contraseña es pública —quien la use entra en **ese** hogar y en ningún otro— y
-sus avisos escriben a direcciones `.test`, así que el buzón de la cuenta de
-Gmail recibe sus rebotes; una regla de filtrado los archiva.
+Cuentas y contenido, en [`demo-dataset.md`](demo-dataset.md). **La contraseña
+de producción no es la del repositorio**: el seed deja la pública
+(`DemoDRP2026Local`) y por eso cada carga termina ejecutando
+
+```bash
+cd /opt/drp/deploy && ./change-demo-password.sh
+```
+
+que la cambia por la de `DRP_DEMO_PASSWORD` del `.env` —solo del servidor— a
+través de la propia aplicación (login + `ChangePassword`, con el Argon2id de
+siempre). Es idempotente, así que relanzarlo sobre una demo ya cambiada no
+toca nada. **Los dos pasos van juntos**: una carga del seed sin este script
+deja el hogar Serrano abierto a cualquiera que lea el código.
+
+El otro coste de la demo en producción sigue asumido en la ADR-016: sus avisos
+escriben a direcciones `.test`, así que el buzón de la cuenta de Gmail recibe
+sus rebotes; una regla de filtrado (`mailer-daemon` + `hogar-serrano.test`)
+los archiva.
 
 ## Qué mirar cuando algo falla
 

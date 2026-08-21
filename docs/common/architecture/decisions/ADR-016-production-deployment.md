@@ -153,12 +153,22 @@ existen, y las dos purgas liberan hueco solas.
 Decisión de producto tomada al arrancar el bloque: el hogar Serrano
 (`lucia@hogar-serrano.test` y compañía) está en la instancia real, cargado con
 el mismo `scripts/seed-demo-data.sql` idempotente que en local, para poder
-enseñar la aplicación con catorce meses de vida dentro. Sus dos costes se
-asumen por escrito: la contraseña de la demo es pública —cualquiera que
-conozca la URL puede entrar en **ese** hogar, que no toca a los demás gracias
-al aislamiento de la ADR-002/003— y sus avisos rebotan a diario contra el
-buzón remitente. El hogar de demo **cuenta** para el tope de hogares: ocupa
-disco y pasada diaria como cualquier otro.
+enseñar la aplicación con catorce meses de vida dentro.
+
+**Con la contraseña del repositorio fuera.** La que el seed escribe es pública
+—está en el código— y dejarla en producción sería una puerta abierta al hogar
+Serrano para cualquiera que lo lea, así que cada carga termina con
+`deploy/change-demo-password.sh`: cambia las cuatro cuentas a la contraseña de
+`DRP_DEMO_PASSWORD`, que vive en el `.env` del servidor como cualquier otro
+secreto, y lo hace **por la puerta de la aplicación** —login y
+`ChangePassword`— para que la hashee el mismo Argon2id que las demás. Se
+descartó editar el hash en la base o mantener un seed distinto para
+producción: las dos cosas duplican lo que la aplicación ya sabe hacer.
+
+El coste que sí se asume por escrito: sus avisos rebotan a diario contra el
+buzón remitente (direcciones `.test`), archivados por una regla de filtrado. Y
+el hogar de demo **cuenta** para el tope de hogares: ocupa disco y pasada
+diaria como cualquier otro.
 
 ## Validación
 
