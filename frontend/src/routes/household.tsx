@@ -158,8 +158,8 @@ const NAV_ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true, className: 
 /**
  * Cerrar la sesión y volver a la puerta. Compartido por los tres sitios desde
  * los que se sale: el bloque de la marca en escritorio, el apartado que cierra
- * «Más» en móvil y la sección de la pantalla de «Cuenta», que es la que
- * explica qué pasa al salir.
+ * «Más» en móvil y el desenlace del cierre de cuenta, que termina saliendo
+ * porque esa sesión ya no vale para nada.
  */
 function useSignOut() {
   const { signOut } = useSession()
