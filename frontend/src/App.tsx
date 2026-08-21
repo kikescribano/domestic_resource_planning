@@ -13,12 +13,12 @@ import {
   VerifyEmailPage,
 } from './routes/enrollment'
 import { AssetDetailPage, AssetsPage, IntakePage, NewAssetPage } from './routes/assets'
-import { CatalogPage } from './routes/catalog'
+import { CatalogPage, NewArticlePage, NewCategoryPage } from './routes/catalog'
 import { HelpPage } from './routes/help'
 import { AccountPage, GeneralSettingsPage, MorePage, RequireSession, UsersPage } from './routes/household'
 import { HomePage } from './routes/home'
 import { ExternalLoanPage, LoansPage } from './routes/loans'
-import { LocationsPage } from './routes/locations'
+import { LocationsPage, NewLocationPage } from './routes/locations'
 import { MaintenancePage } from './routes/maintenance'
 import { ModuleScreen, ModulesPage } from './routes/modules'
 import { NoticesPage } from './routes/notices'
@@ -88,7 +88,12 @@ export function App() {
             <Route element={<RequireSession />}>
               <Route path="/" element={<HomePage />} />
               <Route path="/catalogo" element={<CatalogPage />} />
+              {/* Las altas del catálogo y de ubicaciones, cada una en su
+                  página, como las del inventario. */}
+              <Route path="/catalogo/nuevo-articulo" element={<NewArticlePage />} />
+              <Route path="/catalogo/nueva-categoria" element={<NewCategoryPage />} />
               <Route path="/ubicaciones" element={<LocationsPage />} />
+              <Route path="/ubicaciones/nueva" element={<NewLocationPage />} />
               <Route path="/inventario" element={<AssetsPage />} />
               {/* Antes que `/inventario/:id`, o «nuevo» se leería como un
                   identificador y la ficha respondería 404. */}

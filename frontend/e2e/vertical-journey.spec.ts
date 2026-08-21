@@ -468,9 +468,13 @@ test.describe('recorrido vertical', () => {
 
     // --- 1. Un sitio de la casa, que es con lo que se va a enlazar ----------
     await navigateTo(page, 'Ubicaciones', '/ubicaciones')
+    // El alta vive en su propia página desde 2026-08-21: botón en la cabecera,
+    // como en el inventario, y al crear se vuelve solo al árbol.
+    await page.getByRole('link', { name: 'Nueva ubicación' }).click()
     await page.getByLabel('Nombre').fill('Sala de calderas')
     await page.getByLabel('Tipo').selectOption({ label: 'Habitación' })
     await page.getByRole('button', { name: 'Crear ubicación' }).click()
+    await page.waitForURL('**/ubicaciones')
     // Por el árbol y no por el texto suelto: el nombre aparece también dentro
     // del `<option>` de «Dentro de», que está en el DOM y no se ve.
     await expect(
@@ -571,14 +575,17 @@ test.describe('recorrido vertical', () => {
 
     // --- 1. Una despensa con algo dentro, ANTES de encender el módulo -------
     await navigateTo(page, 'Ubicaciones', '/ubicaciones')
+    await page.getByRole('link', { name: 'Nueva ubicación' }).click()
     await page.getByLabel('Nombre').fill('Despensa')
     await page.getByLabel('Tipo').selectOption({ label: 'Habitación' })
     await page.getByRole('button', { name: 'Crear ubicación' }).click()
+    await page.waitForURL('**/ubicaciones')
     await expect(
       page.getByRole('tree', { name: 'Ubicaciones del hogar' }).getByText('Despensa'),
     ).toBeVisible()
 
     await navigateTo(page, 'Catálogo', '/catalogo')
+    await page.getByRole('link', { name: 'Nuevo artículo' }).click()
     await page.getByLabel('Nombre del artículo').fill('Arroz')
     await page.getByLabel('Categoría').selectOption({ label: 'Alimentación' })
     // `exact` porque el catálogo tiene ahora dos campos cuyo nombre accesible
@@ -587,6 +594,8 @@ test.describe('recorrido vertical', () => {
     // para una búsqueda por subcadena, no.
     await page.getByLabel('Unidad', { exact: true }).selectOption('GRAM')
     await page.getByRole('button', { name: 'Crear artículo' }).click()
+    // El alta vuelve sola al catálogo, donde la fila nueva es la prueba.
+    await page.waitForURL('**/catalogo')
     await expect(page.getByText('Arroz')).toBeVisible()
 
     await page.goto('/inventario/entrada')
@@ -706,18 +715,22 @@ test.describe('recorrido vertical', () => {
 
     // --- 1. Una despensa con algo agotado, ANTES de encender el módulo ------
     await navigateTo(page, 'Ubicaciones', '/ubicaciones')
+    await page.getByRole('link', { name: 'Nueva ubicación' }).click()
     await page.getByLabel('Nombre').fill('Despensa')
     await page.getByLabel('Tipo').selectOption({ label: 'Habitación' })
     await page.getByRole('button', { name: 'Crear ubicación' }).click()
+    await page.waitForURL('**/ubicaciones')
     await expect(
       page.getByRole('tree', { name: 'Ubicaciones del hogar' }).getByText('Despensa'),
     ).toBeVisible()
 
     await navigateTo(page, 'Catálogo', '/catalogo')
+    await page.getByRole('link', { name: 'Nuevo artículo' }).click()
     await page.getByLabel('Nombre del artículo').fill('Sal')
     await page.getByLabel('Categoría').selectOption({ label: 'Alimentación' })
     await page.getByLabel('Unidad', { exact: true }).selectOption('GRAM')
     await page.getByRole('button', { name: 'Crear artículo' }).click()
+    await page.waitForURL('**/catalogo')
     // `exact` porque «Sal» es subcadena de «Saltar al contenido» y de «Salir»:
     // sin él, el modo estricto revienta con varias coincidencias — y la forma
     // antigua pasaba casando con el salto al contenido, sin esperar a la fila.
@@ -983,9 +996,11 @@ test.describe('recorrido vertical', () => {
 
     // Algo dentro, para poder afirmar después que cancelar no se llevó nada.
     await navigateTo(page, 'Ubicaciones', '/ubicaciones')
+    await page.getByRole('link', { name: 'Nueva ubicación' }).click()
     await page.getByLabel('Nombre').fill('Trastero')
     await page.getByLabel('Tipo').selectOption({ label: 'Habitación' })
     await page.getByRole('button', { name: 'Crear ubicación' }).click()
+    await page.waitForURL('**/ubicaciones')
     await expect(
       page.getByRole('tree', { name: 'Ubicaciones del hogar' }).getByText('Trastero'),
     ).toBeVisible()
@@ -1020,9 +1035,11 @@ test.describe('recorrido vertical', () => {
     // El hogar funciona **exactamente igual**: nada de solo lectura, que
     // castigaría justo a quien todavía puede arrepentirse.
     await navigateTo(page, 'Ubicaciones', '/ubicaciones')
+    await page.getByRole('link', { name: 'Nueva ubicación' }).click()
     await page.getByLabel('Nombre').fill('Buhardilla')
     await page.getByLabel('Tipo').selectOption({ label: 'Habitación' })
     await page.getByRole('button', { name: 'Crear ubicación' }).click()
+    await page.waitForURL('**/ubicaciones')
     await expect(
       page.getByRole('tree', { name: 'Ubicaciones del hogar' }).getByText('Buhardilla'),
     ).toBeVisible()
@@ -1372,6 +1389,9 @@ test.describe('recorrido vertical', () => {
     await checkTouchTargets(page)
 
     for (const screen of AUDITED_SCREENS) {
+      // Una pantalla con `from` se alcanza como la alcanza una persona: primero
+      // su página madre por la navegación, y desde allí el botón de la cabecera.
+      if (screen.from) await navigateTo(page, screen.from.link, screen.from.path)
       await navigateTo(page, screen.link, screen.path, screen.exact ?? false, screen.landmark)
       await expect(
         page.getByRole('heading', { level: 1, name: screen.heading }),
@@ -1402,7 +1422,15 @@ test.describe('recorrido vertical', () => {
  * el Hito 6. Préstamos y Avisos tienen además su llamada suelta en los
  * recorridos de arriba.
  */
-const AUDITED_SCREENS = [
+const AUDITED_SCREENS: Array<{
+  link: string
+  path: string
+  heading: string
+  exact?: boolean
+  landmark?: 'navigation' | 'banner' | 'main'
+  /** La página madre, cuando a esta se llega por un botón de su cabecera y no por la navegación. */
+  from?: { link: string; path: string }
+}> = [
   { link: 'Módulos del hogar', path: '/modulos', heading: 'Módulos del hogar' },
   // «Inventario» entra el 2026-08-20, con el estado de conservación: es una de
   // las cuatro pantallas del core que seguían sin auditar, y el hito la toca en
@@ -1417,6 +1445,17 @@ const AUDITED_SCREENS = [
   // confirmación armada-- se audita en el recorrido de miembros de arriba, que
   // es el único sitio con un segundo miembro de verdad.
   { link: 'Ubicaciones', path: '/ubicaciones', heading: 'Ubicaciones' },
+  // Las pantallas de alta que desde el 2026-08-21 viven fuera de su página
+  // madre: el botón está en la cabecera de esta, así que `from` pasa antes por
+  // ella, que es el camino que hace una persona. Sus formularios pintan
+  // siempre sus campos, así que no hay nada que sembrar.
+  {
+    from: { link: 'Ubicaciones', path: '/ubicaciones' },
+    link: 'Nueva ubicación',
+    path: '/ubicaciones/nueva',
+    heading: 'Nueva ubicación',
+    landmark: 'main',
+  },
   { link: 'Personas', path: '/usuarios', heading: 'Personas' },
   // Las dos que la baja de hogar (ADR-012) llenó de contenido nuevo: «Hogar»
   // estrenó la zona de peligro y «Cuenta», el cierre de cuenta. No eran rutas
@@ -1444,6 +1483,22 @@ const AUDITED_SCREENS = [
   // lo elige el usuario**. Se siembra una categoría con color antes, porque en
   // gris axe no habría mirado ninguno de los seis.
   { link: 'Catálogo', path: '/catalogo', heading: 'Catálogo' },
+  // Las dos altas del catálogo, por el mismo camino que la de ubicaciones. La
+  // de categoría es además el otro sitio con el selector de icono y color.
+  {
+    from: { link: 'Catálogo', path: '/catalogo' },
+    link: 'Nuevo artículo',
+    path: '/catalogo/nuevo-articulo',
+    heading: 'Nuevo artículo',
+    landmark: 'main',
+  },
+  {
+    from: { link: 'Catálogo', path: '/catalogo' },
+    link: 'Nueva categoría',
+    path: '/catalogo/nueva-categoria',
+    heading: 'Nueva categoría',
+    landmark: 'main',
+  },
   { link: 'Avisos', path: '/avisos', heading: 'Avisos' },
   { link: 'Proveedores', path: '/proveedores', heading: 'Proveedores' },
   { link: 'Almacén', path: '/almacen', heading: 'Almacén' },
@@ -1653,18 +1708,23 @@ async function checkTouchTargets(page: Page) {
  * vuelve antes de que la ruta haya cambiado y el `await` siguiente se pondría a
  * buscar en la pantalla anterior.
  *
- * El landmark es el de navegación salvo para «Cuenta», que desde que acompaña
- * a la marca vive en el banner y fuera de la lista de paradas.
+ * El landmark es el de navegación salvo para «Cuenta» —que desde que acompaña
+ * a la marca vive en el banner y fuera de la lista de paradas— y para las
+ * pantallas de alta, cuyo botón vive en el `main` de su página madre.
  */
 async function navigateTo(
   page: Page,
   label: string,
   path: string,
   exact = false,
-  landmark: 'navigation' | 'banner' = 'navigation',
+  landmark: 'navigation' | 'banner' | 'main' = 'navigation',
 ) {
   const scope =
-    landmark === 'banner' ? page.getByRole('banner') : page.getByRole('navigation', { name: 'Principal' })
+    landmark === 'banner'
+      ? page.getByRole('banner')
+      : landmark === 'main'
+        ? page.getByRole('main')
+        : page.getByRole('navigation', { name: 'Principal' })
   // `exact` hace falta desde que la lista incluye «Hogar»: por omisión Playwright
   // busca la subcadena, así que «Hogar» resuelve también a «Módulos del hogar» y
   // el localizador falla por ambigüedad en vez de por ausencia.
