@@ -977,7 +977,7 @@ export function AccountPage() {
 
       <OwnAvatar accessToken={session.accessToken} identityId={session.claims.identityId} />
 
-      <form onSubmit={submit} className="flex max-w-form flex-col gap-4" noValidate>
+      <form onSubmit={submit} className="mt-6 flex max-w-form flex-col gap-4" noValidate>
         <h2 className="font-display text-title-sm text-ink">Cambiar la contraseña</h2>
         <p className="text-body-sm text-ink-muted">
           Se cerrarán tus otras sesiones. Esta se queda abierta.
