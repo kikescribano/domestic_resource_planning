@@ -77,10 +77,18 @@ es que el cambio esté fusionado**. Después, en el VPS:
 ```bash
 ssh drp-vps
 cd /opt/drp && git pull --ff-only        # compose, plantillas y scripts al día
+git log --oneline -1                     # ¿de verdad estamos en la punta?
 cd deploy
 docker compose pull
 docker compose up -d
 ```
+
+El vistazo al `git log` no es ceremonia: un `pull` abortado que pase
+inadvertido —encadenado tras una tubería, por ejemplo, que se traga su código
+de salida— deja el `compose up` corriendo **imágenes nuevas sobre el compose y
+las plantillas viejos**, que es una combinación que nadie ha probado. Pasó el
+2026-08-21 y el síntoma fue nginx muriendo al arrancar por una variable que el
+compose antiguo no le pasaba.
 
 Flyway migra solo al arrancar el backend; no hay paso de migración aparte. Un
 despliegue corta el servicio los segundos que tarda el backend en levantar —
@@ -188,6 +196,7 @@ los archiva.
 | El backend no arranca y habla de secretos | Un secreto del `.env` vacío o igual al del repositorio | La validación de `SecurityConfig` es deliberada: poner un secreto real |
 | El alta responde 409 | El tope de hogares está alcanzado | `HOUSEHOLD_LIMIT_REACHED` es comportamiento, no error: subir `DRP_MAX_HOUSEHOLDS` o dar de baja un hogar |
 | La pasada diaria no deja rastro | El programador apagado o dos instancias | [`scheduled-jobs.md`](scheduled-jobs.md) |
+| El `git pull` aborta por cambios locales | Deriva en el checkout del VPS — pasó el 2026-08-21 con una renormalización de finales de línea | El checkout es un **espejo de `main`**, nada local en él tiene valor: `git fetch && git reset --hard origin/main`. Es seguro porque `reset --hard` solo toca ficheros **rastreados**, y el `.env` y `deploy/data/` están ignorados por git — sobreviven, comprobado ese mismo día. Después, `git log --oneline -1` antes de seguir |
 
 ## Lo que queda abierto a propósito
 
