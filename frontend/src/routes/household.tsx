@@ -953,7 +953,6 @@ function MemberRow({ user, canDecide }: { user: User; canDecide: boolean }) {
 
 export function AccountPage() {
   const session = useAuthenticatedSession()
-  const exit = useSignOut()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
 
@@ -1012,21 +1011,6 @@ export function AccountPage() {
           Cambiar la contraseña
         </Button>
       </form>
-
-      {/* La salida rápida vive con la marca —bajo el sello en escritorio,
-          cerrando «Más» en móvil—, pero esta sección se queda: es la única que
-          explica qué pasa al salir. Lo que sigue sin existir es un «Salir»
-          entre las paradas de la lista, al lado de «Personas», esperando a que
-          alguien lo pulse por error con el pulgar. */}
-      <section className="mt-10 max-w-form border-t border-border-subtle pt-6">
-        <h2 className="font-display text-title-sm text-ink">Cerrar sesión</h2>
-        <p className="mt-1 text-body-sm text-ink-muted">
-          Se cierra en este dispositivo. Las demás siguen abiertas.
-        </p>
-        <Button variant="secondary" className="mt-4" onClick={exit}>
-          Salir
-        </Button>
-      </section>
 
       <CloseAccountSection />
     </>
