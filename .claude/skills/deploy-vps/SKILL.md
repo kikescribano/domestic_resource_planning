@@ -14,9 +14,13 @@ y los escollos que ya costaron un despliegue roto.
 El mapa mínimo: `ssh drp-vps` (alias local ya configurado). El repo vive en
 `/opt/drp` sobre la rama `main`; el compose, el `.env` (600, todos los
 secretos) y `data/` en `/opt/drp/deploy`. Tres contenedores: `postgres` y
-`backend` en red interna, `web` (nginx) publicando **80** (SPA + `/api`) y
-**8081** (ficheros firmados, el otro origen de la ADR-005). Las imágenes las
-publica la CI en GHCR en cada push a `main`, con etiqueta `latest` y el SHA.
+`backend` en red interna, `web` (nginx) publicando **80** (solo ACME y
+redirección) y **443**, donde `https://drp.kikescribano.es` es la aplicación y
+`https://files.drp.kikescribano.es` los ficheros firmados (el otro origen de
+la ADR-005, por SNI). El certificado es de Let's Encrypt, uno con los dos
+nombres, renovado por el certbot del anfitrión contra `deploy/data/acme` con
+un gancho que recarga nginx. Las imágenes las publica la CI en GHCR en cada
+push a `main`, con etiqueta `latest` y el SHA.
 
 **Es producción: lo desplegado se queda corriendo.** La regla de apagar lo que
 se arranca aplica a lo local, no al VPS.
@@ -73,7 +77,7 @@ ssh drp-vps 'cd /opt/drp/deploy && docker compose logs backend --since 5m 2>&1 |
 exit.) La SPA responde con sus cabeceras:
 
 ```bash
-curl -s -D - -o /dev/null http://vps-7f6cfe1b.vps.ovh.net/ | grep -iE "^HTTP|content-security"
+curl -s -D - -o /dev/null https://drp.kikescribano.es/ | grep -iE "^HTTP|content-security|strict-transport"
 ```
 
 Y la aplicación se atraviesa: login con `lucia@hogar-serrano.test` y la
@@ -125,6 +129,7 @@ la copia diaria de OVH (procedimiento en el manual).
 Ni `BYPASSRLS`, ni una segunda instancia del backend con el programador
 encendido (ADR-011: la pasada diaria correría dos veces), ni secretos del
 `.env` por el chat o el repositorio — se generan en el servidor
-(`openssl rand`) o los coloca el usuario en persona. TLS y dominio siguen
-pendientes a propósito; hasta entonces, HTTP plano es la realidad conocida y
-auditada.
+(`openssl rand`) o los coloca el usuario en persona. Y el certificado no se
+gestiona a mano: lo renueva el timer de certbot; si el navegador avisa de
+caducidad, `sudo certbot renew --dry-run` dice el motivo y el manual trae el
+resto.

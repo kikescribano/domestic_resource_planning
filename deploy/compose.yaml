@@ -11,10 +11,12 @@
 # - **Solo `web` publica puertos.** PostgreSQL y el backend viven en la red
 #   interna de compose y no se alcanzan desde fuera de la maquina.
 # - **Los puertos publicados por Docker PUENTEAN UFW** (Docker escribe sus
-#   reglas de iptables por delante). Que aqui solo se publiquen 80 y 8081 es
+#   reglas de iptables por delante). Que aqui solo se publiquen 80 y 443 es
 #   por tanto EL cortafuegos efectivo de la aplicacion, no una comodidad.
-# - **El 8081 es deliberado**: es el otro origen desde el que se sirven los
-#   ficheros (ADR-005). Sin dominio, otro origen solo puede ser otro puerto.
+# - **Los ficheros son otro dominio, no otro puerto**: desde el TLS de la
+#   ampliacion de la ADR-016, el otro origen de la ADR-005 es
+#   files.<dominio> en el 443 y el 8081 ya no existe. El 80 solo contesta el
+#   desafio ACME y redirige.
 #
 # Y una premisa operativa (ADR-011): **una sola instancia del backend**, con el
 # programador y el relay del outbox encendidos, que es su valor por omision.
@@ -121,9 +123,21 @@ services:
       # El otro origen de los ficheros, que la Content-Security-Policy de la
       # SPA declara en img-src: sin el, ninguna imagen firmada se pintaria.
       DRP_FILES_PUBLIC_URL: ${DRP_FILES_PUBLIC_URL:?falta DRP_FILES_PUBLIC_URL en .env}
+      # Los dos nombres del certificado. El de la aplicacion es ademas el
+      # directorio de /etc/letsencrypt/live/ (el primer -d de la emision), y
+      # cada uno debe casar con su URL publica del .env.
+      DRP_APP_HOST: ${DRP_APP_HOST:?falta DRP_APP_HOST en .env}
+      DRP_FILES_HOST: ${DRP_FILES_HOST:?falta DRP_FILES_HOST en .env}
     ports:
-      - "80:80"    # la aplicacion
-      - "8081:81"  # los ficheros: el otro origen (ADR-005)
+      - "80:80"    # ACME y redireccion: en claro no se sirve nada mas
+      - "443:443"  # la aplicacion y los ficheros, repartidos por nombre (SNI)
     volumes:
       # De solo lectura: nginx entrega bytes y no escribe ninguno.
       - ./data/files:/srv/drp/files:ro
+      # El webroot del desafio ACME: certbot (en el anfitrion) escribe aqui y
+      # este nginx lo sirve en /.well-known/acme-challenge/. Es lo que permite
+      # renovar sin parar nada.
+      - ./data/acme:/srv/drp/acme:ro
+      # Los certificados del anfitrion. Se monta el arbol entero porque live/
+      # son enlaces simbolicos hacia archive/.
+      - /etc/letsencrypt:/etc/letsencrypt:ro

@@ -15,8 +15,11 @@ ejecutan. Para operar desde una sesión de agente existe además la skill
 [`deploy-vps`](../../../.claude/skills/deploy-vps/SKILL.md), que condensa este
 manual con los escollos ya pagados; si discrepan, gana este documento.
 
-DRP está en `http://vps-7f6cfe1b.vps.ovh.net/` — **HTTP plano, sin dominio ni
-TLS todavía**; el porqué y el hasta cuándo, al final.
+DRP está en **`https://drp.kikescribano.es/`**, con los ficheros firmados en
+`https://files.drp.kikescribano.es/` — TLS de Let's Encrypt desde el
+2026-08-21 (ampliación de la ADR-016). El puerto 80 solo contesta el desafío
+ACME y redirige; el 8081 ya no existe. El nombre viejo del VPS
+(`vps-7f6cfe1b.vps.ovh.net`) sigue resolviendo y redirige al dominio.
 
 ## Qué hay en el VPS
 
@@ -37,12 +40,22 @@ Los tres contenedores y sus puertos:
 |---|---|---|
 | `postgres` | `postgres:16-alpine` | ninguno (red interna) |
 | `backend` | `ghcr.io/kikescribano/drp-backend` | ninguno (red interna) |
-| `web` | `ghcr.io/kikescribano/drp-web` | **80** (aplicación) y **8081** (ficheros, ADR-005) |
+| `web` | `ghcr.io/kikescribano/drp-web` | **80** (ACME + redirección) y **443** (aplicación y ficheros, por nombre) |
 
 Dos cosas de los puertos que conviene no olvidar: **los que publica Docker
 puentean UFW** —la lista de `ports:` del compose es el cortafuegos efectivo— y
-el 8081 no es un descuido sino el **otro origen** desde el que se sirven los
-ficheros con URL firmada.
+los dos orígenes de la ADR-005 se reparten el 443 **por nombre** (SNI):
+`drp.…` es la aplicación y `files.drp.…` los ficheros con URL firmada.
+
+El dominio `kikescribano.es` está comprado en OVH (misma cuenta que el VPS) y
+su zona DNS lleva dos registros `A` —`drp` y `files.drp`— apuntando a la IP de
+la máquina. El certificado es **uno con los dos nombres**, emitido y renovado
+por **certbot en el anfitrión** (paquete de Ubuntu, con su timer de systemd):
+el desafío ACME se escribe en `deploy/data/acme` y nginx lo sirve, así que las
+renovaciones no cortan nada, y el gancho
+`/etc/letsencrypt/renewal-hooks/deploy/reload-drp-web.sh` recarga nginx al
+renovar. La cuenta de Let's Encrypt está registrada con el correo del
+proyecto.
 
 El programador de la pasada diaria y el relay del outbox van **encendidos**
 (su valor por omisión), con una sola instancia del backend: es la premisa de la
@@ -149,10 +162,29 @@ Queda escrita por si hay que repetirla sobre una máquina nueva:
 3. La primera vez, o si GHCR no está accesible: `docker compose build` (el
    compose lleva las secciones `build:` exactamente para esto). El camino
    normal es `docker compose pull`.
-4. `docker compose up -d`. El primer arranque de `postgres` ejecuta
+4. **El certificado antes que nginx**: el servidor 443 referencia
+   `/etc/letsencrypt/live/<DRP_APP_HOST>/` y sin él el contenedor `web` muere
+   al arrancar. Con el DNS ya apuntando y el puerto 80 libre, la emisión
+   inicial va en modo standalone (después, las renovaciones usan el webroot y
+   no cortan nada):
+
+   ```bash
+   sudo apt-get install -y certbot
+   sudo certbot certonly --standalone -d <DRP_APP_HOST> -d <DRP_FILES_HOST> \
+     -m drpelerpdomestico@gmail.com --agree-tos --no-eff-email
+   ```
+
+   Y el gancho de recarga, para que una renovación llegue a nginx:
+
+   ```bash
+   printf '#!/bin/sh\ndocker compose --project-directory /opt/drp/deploy exec -T web nginx -s reload\n' | \
+     sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-drp-web.sh > /dev/null && \
+     sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-drp-web.sh
+   ```
+5. `docker compose up -d`. El primer arranque de `postgres` ejecuta
    `postgres/init/01-app-role.sh` —los roles de la ADR-003, con las
    contraseñas del `.env`— y el backend migra con Flyway al levantar.
-5. **Los paquetes de GHCR nacen privados** aunque el repositorio sea público:
+6. **Los paquetes de GHCR nacen privados** aunque el repositorio sea público:
    la primera publicación exige hacerlos públicos una vez, a mano, en los
    ajustes del paquete en GitHub, o el `pull` anónimo del VPS responderá 401.
 
@@ -199,13 +231,16 @@ los archiva.
 | El alta responde 409 | El tope de hogares está alcanzado | `HOUSEHOLD_LIMIT_REACHED` es comportamiento, no error: subir `DRP_MAX_HOUSEHOLDS` o dar de baja un hogar |
 | La pasada diaria no deja rastro | El programador apagado o dos instancias | [`scheduled-jobs.md`](scheduled-jobs.md) |
 | El `git pull` aborta por cambios locales | Deriva en el checkout del VPS — pasó el 2026-08-21 con una renormalización de finales de línea | El checkout es un **espejo de `main`**, nada local en él tiene valor: `git fetch && git reset --hard origin/main`. Es seguro porque `reset --hard` solo toca ficheros **rastreados**, y el `.env` y `deploy/data/` están ignorados por git — sobreviven, comprobado ese mismo día. Después, `git log --oneline -1` antes de seguir |
+| El navegador avisa de certificado caducado | La renovación de certbot lleva >30 días fallando | `sudo certbot renew --dry-run` dice el motivo; lo habitual sería el webroot (`deploy/data/acme`) desmontado o el 80 sin servir el desafío. El estado, con `sudo certbot certificates` |
+| `web` muere al arrancar con `cannot load certificate` | Arranque en frío sin emitir el certificado, o `/etc/letsencrypt` sin montar | El paso 4 del arranque en frío va **antes** que `compose up` |
 
 ## Lo que queda abierto a propósito
 
-- **TLS, dominio y DNS.** Hoy no rompen nada —la auditoría de contexto seguro
-  del frontend salió limpia, ADR-016— y son la condición para el día del
-  escáner de códigos de barras o del primer hogar ajeno. Con ellos, los
-  ficheros pasarán del puerto 8081 a un subdominio.
+- ~~**TLS, dominio y DNS.**~~ **Cerrado el 2026-08-21**, el mismo día que el
+  resto del bloque: `kikescribano.es` comprado en OVH, certificado de Let's
+  Encrypt con los dos nombres, HSTS encendido y los ficheros mudados del
+  puerto 8081 al subdominio, que era la forma que la ADR-005 pedía. El detalle
+  operativo, más arriba; la decisión, en la ampliación de la ADR-016.
 - **El análisis antivirus de lo subido**, abierto desde la Fase 1 y con su
   motivo intacto: es la defensa de cuando un fichero pueda salir del hogar que
   lo subió.
