@@ -687,6 +687,7 @@ class AssetRepositoryAdapter(
 
     override fun list(filter: AssetFilter, pagination: Pagination): Page<Asset> {
         val found = assets.search(
+            query = filter.query,
             locationId = filter.locationId,
             parentAssetId = filter.parentAssetId,
             ownerId = filter.ownerId,

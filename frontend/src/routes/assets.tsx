@@ -74,19 +74,25 @@ function quantityOf(asset: Asset): string | null {
 
 export function AssetsPage() {
   const { accessToken } = useAuthenticatedSession()
+  const [query, setQuery] = useState('')
   const [type, setType] = useState<AssetType | ''>('')
   const [condition, setCondition] = useState<AssetCondition | ''>('')
   const [tagId, setTagId] = useState('')
 
+  // La búsqueda entra en la clave: cambiarla es otra consulta, no un filtro en
+  // memoria — la misma razón que en el catálogo, y con el mismo `q`.
   const assets = useQuery({
-    queryKey: ['assets', type, condition, tagId],
+    queryKey: ['assets', query, type, condition, tagId],
     queryFn: () =>
       api.listAssets(accessToken, {
+        ...(query ? { q: query } : {}),
         ...(type ? { type } : {}),
         ...(condition ? { condition } : {}),
         ...(tagId ? { tagId } : {}),
       }),
   })
+
+  const isFiltered = Boolean(query || type || condition || tagId)
 
   // Solo las vigentes: una etiqueta retirada sigue puesta en lo que la llevaba,
   // pero ofrecerla como filtro sería ofrecer vocabulario que el hogar ya dejó.
@@ -131,53 +137,81 @@ export function AssetsPage() {
           </FilterChip>
         </div>
 
-        {/* En desplegable y no en más pastillas: son cinco valores, y cinco
-            pastillas más al lado de las tres de arriba convierten la cabecera
-            del listado en un panel de filtros. Va con `SelectField` porque es
-            quien pone la pista en `aria-describedby` en vez de dentro del
-            nombre accesible del campo. */}
-        <SelectField
-          label="Estado de conservación"
-          hint="Lo que nadie ha anotado no aparece en ningún filtro: sin anotar no es un estado."
-          className="max-w-form"
-          value={condition}
-          onChange={(event) => setCondition(event.target.value as AssetCondition | '')}
-        >
-          <option value="">Cualquiera</option>
-          {CONDITIONS.map((value) => (
-            <option key={value} value={value}>
-              {CONDITION_LABELS[value]}
-            </option>
-          ))}
-        </SelectField>
+        {/* Los tres campos comparten fila en escritorio y se apilan en móvil,
+            con la búsqueda primero. Alineados por la cabeza (`items-start`) y
+            no por el pie, por lo mismo que los formularios en línea: las
+            pistas tienen largos distintos y alinear por abajo haría bailar
+            los campos. El tope `max-w-form` pasa del campo a su hueco, para
+            que en la fila cada uno reparta y en columna nada cambie. */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-3">
+          <div className="max-w-form md:min-w-0 md:flex-1">
+            <Field
+              label="Buscar"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              hint="Por el nombre. No distingue mayúsculas ni acentos."
+            />
+          </div>
 
-        {/* Un desplegable y no una pastilla por etiqueta: el vocabulario de un
-            hogar crece sin techo, y veinte pastillas en la cabecera dejan el
-            listado debajo del pliegue. `SelectField` porque es quien pone la
-            pista en `aria-describedby` en vez de dentro del nombre accesible. */}
-        <SelectField
-          label="Etiqueta"
-          hint="Una sola: cruzar dos son dos preguntas distintas y todavía no hay ninguna pantalla que las pida."
-          className="max-w-form"
-          value={tagId}
-          onChange={(event) => setTagId(event.target.value)}
-        >
-          <option value="">Cualquiera</option>
-          {tags.data?.items.map((tag) => (
-            <option key={tag.id} value={tag.id}>
-              {tag.name}
-            </option>
-          ))}
-        </SelectField>
+          {/* En desplegable y no en más pastillas: son cinco valores, y cinco
+              pastillas más al lado de las tres de arriba convierten la cabecera
+              del listado en un panel de filtros. Va con `SelectField` porque es
+              quien pone la pista en `aria-describedby` en vez de dentro del
+              nombre accesible del campo. */}
+          <div className="max-w-form md:min-w-0 md:flex-1">
+            <SelectField
+              label="Estado de conservación"
+              hint="Lo que nadie ha anotado no aparece en ningún filtro: sin anotar no es un estado."
+              value={condition}
+              onChange={(event) => setCondition(event.target.value as AssetCondition | '')}
+            >
+              <option value="">Cualquiera</option>
+              {CONDITIONS.map((value) => (
+                <option key={value} value={value}>
+                  {CONDITION_LABELS[value]}
+                </option>
+              ))}
+            </SelectField>
+          </div>
+
+          {/* Un desplegable y no una pastilla por etiqueta: el vocabulario de un
+              hogar crece sin techo, y veinte pastillas en la cabecera dejan el
+              listado debajo del pliegue. `SelectField` porque es quien pone la
+              pista en `aria-describedby` en vez de dentro del nombre accesible. */}
+          <div className="max-w-form md:min-w-0 md:flex-1">
+            <SelectField
+              label="Etiqueta"
+              hint="Una sola: cruzar dos son dos preguntas distintas y todavía no hay ninguna pantalla que las pida."
+              value={tagId}
+              onChange={(event) => setTagId(event.target.value)}
+            >
+              <option value="">Cualquiera</option>
+              {tags.data?.items.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
+                </option>
+              ))}
+            </SelectField>
+          </div>
+        </div>
 
         {assets.isPending ? (
           <Spinner label="Cargando inventario" />
         ) : assets.isError ? (
           <Notice tone="danger">{humanMessage(assets.error)}</Notice>
         ) : assets.data.items.length === 0 ? (
-          <EmptyState title="Aquí no hay nada todavía">
-            Da de alta un duradero, o dale entrada a un consumible del catálogo.
-          </EmptyState>
+          // Con un filtro puesto, «no hay nada todavía» mentiría: hay
+          // inventario, solo que nada de lo que hay coincide.
+          isFiltered ? (
+            <EmptyState title="Nada coincide con esos filtros">
+              Prueba a quitar alguno o a buscar otra cosa.
+            </EmptyState>
+          ) : (
+            <EmptyState title="Aquí no hay nada todavía">
+              Da de alta un duradero, o dale entrada a un consumible del catálogo.
+            </EmptyState>
+          )
         ) : (
           <ul className="flex flex-col gap-2">
             {assets.data.items.map((asset) => (

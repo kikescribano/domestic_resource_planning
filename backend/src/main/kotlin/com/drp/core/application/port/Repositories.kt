@@ -418,6 +418,13 @@ data class LocationLoad(
 )
 
 data class AssetFilter(
+    /**
+     * Busqueda por el nombre **resuelto**: cuando el asset hereda el nombre de
+     * su articulo, compara contra el del articulo, que es el que se ve en el
+     * listado. Normalizada, sin distinguir mayusculas ni acentos, como la del
+     * catalogo.
+     */
+    val query: String? = null,
     val locationId: UUID? = null,
     val parentAssetId: UUID? = null,
     val ownerId: UUID? = null,

@@ -722,6 +722,43 @@ describe('existencias', () => {
     const row = await screen.findByRole('link', { name: /Ventilador/ })
     expect(within(row).getByText('Inservible')).toBeInTheDocument()
   })
+
+  it('la búsqueda por texto va al servidor, no filtra en memoria', async () => {
+    const { calls } = await signInAndVisit('Inventario', {
+      'GET /api/v1/assets?size=200': {
+        status: 200,
+        body: { items: [durable()], page: 0, size: 200, total: 1 },
+      },
+      'GET /api/v1/assets?q=tala&size=200': {
+        status: 200,
+        body: { items: [durable()], page: 0, size: 200, total: 1 },
+      },
+    })
+
+    await userEvent.type(await screen.findByLabelText('Buscar'), 'tala')
+
+    await vi.waitFor(() => {
+      expect(calls.some((call) => call.url.includes('q=tala'))).toBe(true)
+    })
+  })
+
+  it('con un filtro puesto y sin resultados, el vacío no dice que no hay nada todavía', async () => {
+    await signInAndVisit('Inventario', {
+      'GET /api/v1/assets?size=200': {
+        status: 200,
+        body: { items: [durable()], page: 0, size: 200, total: 1 },
+      },
+      'GET /api/v1/assets?q=z&size=200': {
+        status: 200,
+        body: { items: [], page: 0, size: 200, total: 0 },
+      },
+    })
+
+    await userEvent.type(await screen.findByLabelText('Buscar'), 'z')
+
+    // Hay inventario —lo que no hay es nada que coincida—, y el vacío lo dice.
+    expect(await screen.findByText('Nada coincide con esos filtros')).toBeInTheDocument()
+  })
 })
 
 describe('identificación de un duradero', () => {
