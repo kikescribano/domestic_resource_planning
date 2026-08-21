@@ -186,7 +186,10 @@ describe('catálogo', () => {
       'POST /api/v1/articles': { status: 201, body: SUGAR },
     })
 
-    await userEvent.type(screen.getByLabelText('Nombre del artículo'), 'Lentejas')
+    // El alta vive en su propia página desde 2026-08-21: se llega por el botón
+    // de la cabecera, como en el inventario.
+    await userEvent.click(screen.getByRole('link', { name: 'Nuevo artículo' }))
+    await userEvent.type(await screen.findByLabelText('Nombre del artículo'), 'Lentejas')
     await userEvent.selectOptions(screen.getByLabelText('Categoría'), 'cat-1')
     await userEvent.selectOptions(screen.getByLabelText('Unidad'), 'GRAM')
     await userEvent.click(screen.getByRole('button', { name: 'Crear artículo' }))
@@ -205,7 +208,8 @@ describe('catálogo', () => {
       },
     })
 
-    await userEvent.type(screen.getByLabelText('Nombre del artículo'), 'Azúcar')
+    await userEvent.click(screen.getByRole('link', { name: 'Nuevo artículo' }))
+    await userEvent.type(await screen.findByLabelText('Nombre del artículo'), 'Azúcar')
     await userEvent.selectOptions(screen.getByLabelText('Categoría'), 'cat-1')
     await userEvent.click(screen.getByRole('button', { name: 'Crear artículo' }))
 
@@ -367,8 +371,10 @@ describe('etiquetas e identidad visual', () => {
       'POST /api/v1/categories': { status: 201, body: CATEGORIES.body.items[0] },
     })
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Categorías' }))
-    await userEvent.type(screen.getByLabelText('Nueva categoría'), 'Escalada')
+    // El alta vive en su propia página desde 2026-08-21, con el botón en la
+    // cabecera del catálogo.
+    await userEvent.click(screen.getByRole('link', { name: 'Nueva categoría' }))
+    await userEvent.type(await screen.findByLabelText('Nombre'), 'Escalada')
 
     // Por su nombre en castellano: es lo único que tiene quien no ve la rejilla.
     await userEvent.click(screen.getByRole('button', { name: 'Bicicleta, categoría nueva' }))
@@ -385,8 +391,8 @@ describe('etiquetas e identidad visual', () => {
       'GET /api/v1/articles?size=200': ARTICLES,
     })
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Categorías' }))
-    const bike = screen.getByRole('button', { name: 'Bicicleta, categoría nueva' })
+    await userEvent.click(screen.getByRole('link', { name: 'Nueva categoría' }))
+    const bike = await screen.findByRole('button', { name: 'Bicicleta, categoría nueva' })
     expect(bike).toHaveAttribute('aria-pressed', 'false')
 
     await userEvent.click(bike)
@@ -458,6 +464,9 @@ describe('árbol de ubicaciones', () => {
       },
     })
 
+    // El alta vive en su propia página desde 2026-08-21, con el botón en la
+    // cabecera del árbol.
+    await userEvent.click(await screen.findByRole('link', { name: 'Nueva ubicación' }))
     await userEvent.type(await screen.findByLabelText('Nombre'), 'Estantería')
     await userEvent.selectOptions(screen.getByLabelText('Tipo'), 'SHELF')
     await userEvent.selectOptions(screen.getByLabelText('Dentro de'), 'loc-2')
@@ -498,7 +507,9 @@ describe('árbol de ubicaciones', () => {
     // botón del árbol, y el formulario aparece en otro sitio de la página.
     expect(form).toHaveFocus()
 
-    const name = screen.getAllByLabelText('Nombre')[1]!
+    // Sin índice desde que el alta vive en su propia página: en esta pantalla
+    // el único «Nombre» es el del formulario de edición.
+    const name = screen.getByLabelText('Nombre')
     await userEvent.clear(name)
     await userEvent.type(name, 'Despensa grande')
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
@@ -527,7 +538,9 @@ describe('árbol de ubicaciones', () => {
     // Meter la casa dentro de su propia despensa es el ciclo que el servidor
     // rechaza con LOCATION_CYCLE. Aquí ni se ofrece: la negativa del servidor es
     // la red de seguridad, no el camino normal.
-    const parent = screen.getAllByLabelText('Dentro de')[1]!
+    // Sin índice desde que el alta vive en su propia página: el único «Dentro
+    // de» de esta pantalla es el del formulario de edición.
+    const parent = screen.getByLabelText('Dentro de')
     expect(within(parent).getByRole('option', { name: 'Nada: es una vivienda' })).toBeInTheDocument()
     expect(within(parent).queryByRole('option', { name: 'Casa del Pinar' })).not.toBeInTheDocument()
     expect(within(parent).queryByRole('option', { name: 'Despensa' })).not.toBeInTheDocument()
@@ -721,6 +734,43 @@ describe('existencias', () => {
     // las opciones del filtro.
     const row = await screen.findByRole('link', { name: /Ventilador/ })
     expect(within(row).getByText('Inservible')).toBeInTheDocument()
+  })
+
+  it('la búsqueda por texto va al servidor, no filtra en memoria', async () => {
+    const { calls } = await signInAndVisit('Inventario', {
+      'GET /api/v1/assets?size=200': {
+        status: 200,
+        body: { items: [durable()], page: 0, size: 200, total: 1 },
+      },
+      'GET /api/v1/assets?q=tala&size=200': {
+        status: 200,
+        body: { items: [durable()], page: 0, size: 200, total: 1 },
+      },
+    })
+
+    await userEvent.type(await screen.findByLabelText('Buscar'), 'tala')
+
+    await vi.waitFor(() => {
+      expect(calls.some((call) => call.url.includes('q=tala'))).toBe(true)
+    })
+  })
+
+  it('con un filtro puesto y sin resultados, el vacío no dice que no hay nada todavía', async () => {
+    await signInAndVisit('Inventario', {
+      'GET /api/v1/assets?size=200': {
+        status: 200,
+        body: { items: [durable()], page: 0, size: 200, total: 1 },
+      },
+      'GET /api/v1/assets?q=z&size=200': {
+        status: 200,
+        body: { items: [], page: 0, size: 200, total: 0 },
+      },
+    })
+
+    await userEvent.type(await screen.findByLabelText('Buscar'), 'z')
+
+    // Hay inventario —lo que no hay es nada que coincida—, y el vacío lo dice.
+    expect(await screen.findByText('Nada coincide con esos filtros')).toBeInTheDocument()
   })
 })
 

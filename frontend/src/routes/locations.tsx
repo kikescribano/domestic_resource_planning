@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router'
 
 import {
   CAPACITY_DEFAULT_UNITS,
@@ -163,7 +164,6 @@ export function LocationsPage() {
   const { accessToken } = useAuthenticatedSession()
   const queryClient = useQueryClient()
   const [failure, setFailure] = useState<string | null>(null)
-  const [draft, setDraft] = useState<LocationDraft>(emptyDraft)
   const [editingId, setEditingId] = useState<string | null>(null)
 
   const locations = useQuery({
@@ -175,27 +175,6 @@ export function LocationsPage() {
   const tree = useMemo(() => buildTree(items), [items])
   const editing = items.find((location) => location.id === editingId) ?? null
 
-  const create = useMutation({
-    mutationFn: () => {
-      const capacity = capacityOf(draft.capacity)
-      return api.createLocation(
-        {
-          name: draft.name,
-          type: draft.type,
-          ...(draft.parentLocationId ? { parentLocationId: draft.parentLocationId } : {}),
-          ...(capacity ? { capacity } : {}),
-        },
-        accessToken,
-      )
-    },
-    onSuccess: () => {
-      setDraft(emptyDraft())
-      setFailure(null)
-      void queryClient.invalidateQueries({ queryKey: ['locations'] })
-    },
-    onError: (error) => setFailure(humanMessage(error)),
-  })
-
   const remove = useMutation({
     mutationFn: (id: string) => api.deleteLocation(id, accessToken),
     onSuccess: () => {
@@ -205,60 +184,24 @@ export function LocationsPage() {
     onError: (error) => setFailure(humanMessage(error)),
   })
 
-  function submit(event: FormEvent) {
-    event.preventDefault()
-    create.mutate()
-  }
-
   return (
     <>
-      <PageHeading title="Ubicaciones" icon={MapPin} />
+      {/* El alta en su propia página, como en el inventario y el catálogo: un
+          formulario permanente encima del árbol lo empujaba bajo el pliegue. */}
+      <PageHeading
+        title="Ubicaciones"
+        icon={MapPin}
+        action={
+          <Link
+            to="/ubicaciones/nueva"
+            className="inline-flex min-h-touch items-center rounded-md bg-accent px-4 text-body font-medium text-ink-inverse"
+          >
+            Nueva ubicación
+          </Link>
+        }
+      />
 
       <div className="flex flex-col gap-6">
-        <form onSubmit={submit} className="flex max-w-form flex-col gap-3">
-          <Field
-            label="Nombre"
-            value={draft.name}
-            onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-            required
-            hint="Único entre las que cuelgan del mismo sitio, no en todo el hogar."
-          />
-
-          <SelectField
-            label="Tipo"
-            value={draft.type}
-            onChange={(event) => setDraft({ ...draft, type: event.target.value as LocationType })}
-          >
-            {LOCATION_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {LOCATION_TYPE_LABELS[type]}
-              </option>
-            ))}
-          </SelectField>
-
-          <SelectField
-            label="Dentro de"
-            value={draft.parentLocationId}
-            onChange={(event) => setDraft({ ...draft, parentLocationId: event.target.value })}
-          >
-            <option value="">Nada: es una vivienda</option>
-            {items.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.name}
-              </option>
-            ))}
-          </SelectField>
-
-          <CapacityFields
-            value={draft.capacity}
-            onChange={(capacity) => setDraft({ ...draft, capacity })}
-          />
-
-          <Button type="submit" variant="primary" busy={create.isPending} busyLabel="Creando…">
-            Crear ubicación
-          </Button>
-        </form>
-
         {editing && (
           <EditLocationForm
             key={editing.id}
@@ -282,7 +225,8 @@ export function LocationsPage() {
           <Notice tone="danger">{humanMessage(locations.error)}</Notice>
         ) : tree.length === 0 ? (
           <EmptyState title="Todavía no hay ninguna ubicación">
-            Empieza por la vivienda y ve colgando de ella plantas, habitaciones y muebles.
+            Empieza por la vivienda con «Nueva ubicación», arriba a la derecha, y ve
+            colgando de ella plantas, habitaciones y muebles.
           </EmptyState>
         ) : (
           // Un solo `ul` con `role="tree"`: la jerarquía se anuncia con
@@ -496,6 +440,95 @@ function LocationBranch({
         </ul>
       )}
     </li>
+  )
+}
+
+export function NewLocationPage() {
+  const { accessToken } = useAuthenticatedSession()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [failure, setFailure] = useState<string | null>(null)
+  const [draft, setDraft] = useState<LocationDraft>(emptyDraft)
+
+  // La lista entera para el «Dentro de»: el alta cuelga de cualquier sitio ya
+  // existente, igual que colgaba cuando el formulario vivía sobre el árbol.
+  const locations = useQuery({
+    queryKey: ['locations'],
+    queryFn: () => api.listLocations(accessToken),
+  })
+
+  const create = useMutation({
+    mutationFn: () => {
+      const capacity = capacityOf(draft.capacity)
+      return api.createLocation(
+        {
+          name: draft.name,
+          type: draft.type,
+          ...(draft.parentLocationId ? { parentLocationId: draft.parentLocationId } : {}),
+          ...(capacity ? { capacity } : {}),
+        },
+        accessToken,
+      )
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['locations'] })
+      void navigate('/ubicaciones')
+    },
+    onError: (error) => setFailure(humanMessage(error)),
+  })
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    create.mutate()
+  }
+
+  return (
+    <>
+      <PageHeading title="Nueva ubicación" />
+
+      <form onSubmit={submit} className="flex max-w-form flex-col gap-3">
+        <Field
+          label="Nombre"
+          value={draft.name}
+          onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+          required
+          hint="Único entre las que cuelgan del mismo sitio, no en todo el hogar."
+        />
+
+        <SelectField
+          label="Tipo"
+          value={draft.type}
+          onChange={(event) => setDraft({ ...draft, type: event.target.value as LocationType })}
+        >
+          {LOCATION_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {LOCATION_TYPE_LABELS[type]}
+            </option>
+          ))}
+        </SelectField>
+
+        <SelectField
+          label="Dentro de"
+          value={draft.parentLocationId}
+          onChange={(event) => setDraft({ ...draft, parentLocationId: event.target.value })}
+        >
+          <option value="">Nada: es una vivienda</option>
+          {(locations.data?.items ?? []).map((location) => (
+            <option key={location.id} value={location.id}>
+              {location.name}
+            </option>
+          ))}
+        </SelectField>
+
+        <CapacityFields value={draft.capacity} onChange={(capacity) => setDraft({ ...draft, capacity })} />
+
+        {failure && <Notice tone="danger">{failure}</Notice>}
+
+        <Button type="submit" variant="primary" busy={create.isPending} busyLabel="Creando…">
+          Crear ubicación
+        </Button>
+      </form>
+    </>
   )
 }
 

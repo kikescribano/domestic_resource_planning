@@ -853,6 +853,38 @@ class AssetJourneyTest : SpringIntegrationTest() {
     }
 
     // ----------------------------------------------------------------------
+    // Busqueda por texto
+    // ----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("la busqueda por texto compara normalizada y contra el nombre resuelto")
+    fun `la busqueda encuentra tambien por el nombre del articulo`() {
+        val home = http.registerHousehold()
+        home.createAsset(
+            """{"name":"Taladro","type":"DURABLE","categoryId":"${home.category("Herramientas")}"}""",
+        )
+
+        // Una existencia no guarda nombre propio: lo hereda de su articulo. Si
+        // la busqueda mirase solo `assets.name`, no encontraria ninguna.
+        val pantry = home.createLocation("""{"name":"Despensa","type":"ROOM"}""")
+        val sugar = home.createArticle(
+            """{"name":"Azúcar","categoryId":"${home.category("Alimentación")}","unit":"GRAM"}""",
+        )
+        home.intake(sugar, pantry, 300)
+
+        // En minusculas y sin tilde, que es como se escribe deprisa en un movil.
+        val stock = http.getJson("/api/v1/assets?q=azucar", home.accessToken)
+        stock.statusCode.shouldBe(HttpStatus.OK)
+        stock.body!!.shouldContain("Azúcar")
+        stock.body!!.shouldNotContain("Taladro")
+
+        // Y el nombre propio de un duradero se encuentra igual.
+        val tools = http.getJson("/api/v1/assets?q=TALA", home.accessToken)
+        tools.body!!.shouldContain("Taladro")
+        tools.body!!.shouldNotContain("Azúcar")
+    }
+
+    // ----------------------------------------------------------------------
     // Utilidades
     // ----------------------------------------------------------------------
 

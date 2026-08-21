@@ -812,6 +812,8 @@ export interface Asset {
 }
 
 export interface AssetFilters {
+  /** Por el nombre resuelto —el del artículo cuando lo hay—, normalizado en el servidor. */
+  q?: string
   locationId?: string
   parentAssetId?: string
   articleId?: string

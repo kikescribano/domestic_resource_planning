@@ -53,6 +53,7 @@ class AssetController(
     @GetMapping
     @Suppress("LongParameterList")
     fun list(
+        @RequestParam(required = false) q: String?,
         @RequestParam(required = false) locationId: UUID?,
         @RequestParam(required = false) parentAssetId: UUID?,
         @RequestParam(required = false) ownerId: UUID?,
@@ -67,6 +68,7 @@ class AssetController(
         @RequestParam(defaultValue = "50") size: Int,
     ): PageResponse<AssetResponse> = listAssets.handle(
         AssetFilter(
+            q,
             locationId,
             parentAssetId,
             ownerId,

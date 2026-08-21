@@ -474,13 +474,19 @@ interface AssetJpaRepository : JpaRepository<AssetEntity, UUID> {
     fun countOpenLoans(@Param("assetId") assetId: UUID): Long
 
     /**
-     * El listado con sus **diez** filtros. Excluye los `DECOMMISSIONED` **salvo
+     * El listado con sus **once** filtros. Excluye los `DECOMMISSIONED` **salvo
      * que se pida ese estado**, que es la unica forma de ver el historial.
      *
      * El de etiqueta va por `EXISTS` y no por `JOIN`: con un `JOIN` un asset con
      * dos etiquetas saldria dos veces en cuanto el filtro dejara de estar puesto
      * --y la cuenta total mentiria--, mientras que `EXISTS` responde a la
      * pregunta que se hace, que es «la lleva o no la lleva».
+     *
+     * El `q` compara contra el nombre **resuelto** --`coalesce` con el del
+     * articulo--, porque un asset con articulo no guarda nombre propio: buscar
+     * solo sobre `assets.name` no encontraria ninguna existencia. Normaliza con
+     * `immutable_unaccent`, igual que la busqueda del catalogo: buscar «azucar»
+     * tiene que encontrar «Azúcar».
      */
     @Query(
         value = """
@@ -498,6 +504,10 @@ interface AssetJpaRepository : JpaRepository<AssetEntity, UUID> {
               AND (CAST(:tagId AS uuid) IS NULL
                    OR EXISTS (SELECT 1 FROM asset_tags at
                               WHERE at.asset_id = assets.id AND at.tag_id = CAST(:tagId AS uuid)))
+              AND (CAST(:query AS text) IS NULL
+                   OR lower(immutable_unaccent(coalesce(assets.name,
+                        (SELECT a.name FROM articles a WHERE a.id = assets.article_id))))
+                      LIKE '%' || lower(immutable_unaccent(CAST(:query AS text))) || '%')
             ORDER BY created_at DESC
         """,
         countQuery = """
@@ -515,11 +525,16 @@ interface AssetJpaRepository : JpaRepository<AssetEntity, UUID> {
               AND (CAST(:tagId AS uuid) IS NULL
                    OR EXISTS (SELECT 1 FROM asset_tags at
                               WHERE at.asset_id = assets.id AND at.tag_id = CAST(:tagId AS uuid)))
+              AND (CAST(:query AS text) IS NULL
+                   OR lower(immutable_unaccent(coalesce(assets.name,
+                        (SELECT a.name FROM articles a WHERE a.id = assets.article_id))))
+                      LIKE '%' || lower(immutable_unaccent(CAST(:query AS text))) || '%')
         """,
         nativeQuery = true,
     )
     @Suppress("LongParameterList")
     fun search(
+        @Param("query") query: String?,
         @Param("locationId") locationId: UUID?,
         @Param("parentAssetId") parentAssetId: UUID?,
         @Param("ownerId") ownerId: UUID?,
